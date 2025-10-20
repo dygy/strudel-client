@@ -1,0 +1,19 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "jsxImportSource": "react",
+    "noImplicitAny": false,
+    "baseUrl": ".",
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "paths": {
+      "@components/*": ["src/components/*"],
+      "@src/*": ["src/*"],
+    }
+  },
+  "include": [
+    "src/**/*",
+    "src/types/**/*"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "vite-vanilla-repl-cm6",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.0.11"
+  },
+  "dependencies": {
+    "@strudel/codemirror": "^1.2.5",
+    "@strudel/core": "^1.2.4",
+    "@strudel/draw": "^1.2.4",
+    "@strudel/mini": "^1.2.4",
+    "@strudel/soundfonts": "^1.2.5",
+    "@strudel/tonal": "^1.2.4",
+    "@strudel/transpiler": "^1.2.4",
+    "@strudel/webaudio": "^1.2.5"
+  }
+}
