@@ -5,11 +5,6 @@
   "installCommand": "pnpm install",
   "devCommand": "cd website && npm run dev",
   "regions": ["iad1"],
-  "functions": {
-    "website/src/pages/api/**/*.ts": {
-      "runtime": "nodejs18.x"
-    }
-  },
   "headers": [
     {
       "source": "/sw.js",
