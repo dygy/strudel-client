@@ -1,3 +1,6 @@
+/* Import RTL language support */
+@import '../i18n/rtl.css';
+
 @font-face {
   font-family: 'PressStart';
   src: url('/fonts/PressStart2P/PressStart2P-Regular.ttf');
@@ -60,9 +63,6 @@
   src: url('/fonts/mode7/MODE7GX3.TTF');
   size-adjust: 82%;
 }
-
-/* Import RTL language support */
-@import '../i18n/rtl.css';
 
 .prose > h1:not(:first-child) {
   margin-top: 30px;
