@@ -56,9 +56,10 @@ function ToastItem({ toast, onRemove }: ToastProps) {
       }, toast.duration);
       return () => clearTimeout(timer);
     }
-  }, [toast.duration]);
+  }, [toast.duration, toast.id]); // Add toast.id as dependency
 
   const handleRemove = () => {
+    if (isLeaving) return; // Prevent multiple removal calls
     setIsLeaving(true);
     setTimeout(() => onRemove(toast.id), 300);
   };
@@ -102,9 +103,11 @@ export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
   if (toasts.length === 0) return null;
 
   return createPortal(
-    <div className="fixed bottom-8 left-4 z-[10001] space-y-2">
+    <div className="fixed bottom-8 right-4 z-[10001] space-y-2 pointer-events-none">
       {toasts.map((toast) => (
-        <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />
+        <div key={toast.id} className="pointer-events-auto">
+          <ToastItem toast={toast} onRemove={onRemove} />
+        </div>
       ))}
     </div>,
     document.body
@@ -118,6 +121,16 @@ export function useToast() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const addToast = (toast: Omit<Toast, 'id'>) => {
+    // Check for duplicate toasts with the same title and type
+    const isDuplicate = toasts.some(existingToast => 
+      existingToast.title === toast.title && 
+      existingToast.type === toast.type
+    );
+    
+    if (isDuplicate) {
+      return; // Don't add duplicate toast
+    }
+
     const id = `toast-${++toastId}`;
     const newToast: Toast = {
       id,
@@ -125,12 +138,20 @@ export function useToast() {
       ...toast,
     };
     
-    setToasts(prev => [...prev, newToast]);
+    setToasts(prev => {
+      // Limit to maximum 5 toasts to prevent overflow
+      const newToasts = [...prev, newToast];
+      return newToasts.slice(-5);
+    });
     return id;
   };
 
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
+
+  const clearAllToasts = () => {
+    setToasts([]);
   };
 
   const success = (title: string, message?: string, duration?: number) => 
@@ -149,6 +170,7 @@ export function useToast() {
     toasts,
     addToast,
     removeToast,
+    clearAllToasts,
     success,
     error,
     warning,

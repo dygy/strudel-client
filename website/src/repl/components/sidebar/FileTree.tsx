@@ -528,7 +528,7 @@ export function FileTree({
           </div>
           {/* Flexible empty space for context menu that fills remaining height */}
           <WorkingContextMenu items={emptySpaceContextItems}>
-            <div className="flex-1 min-h-[200px]"></div>
+            <div className="flex-1 h-full"></div>
           </WorkingContextMenu>
         </div>
       )}

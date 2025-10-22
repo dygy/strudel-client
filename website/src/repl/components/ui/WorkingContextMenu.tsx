@@ -69,7 +69,7 @@ export function WorkingContextMenu({ items, children }: WorkingContextMenuProps)
 
   return (
     <>
-      <div onContextMenu={showMenu}>
+      <div className="h-full" onContextMenu={showMenu}>
         {children}
       </div>
       
