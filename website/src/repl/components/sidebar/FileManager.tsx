@@ -550,11 +550,15 @@ export function FileManager({ context }: FileManagerProps) {
     if (renamingStep && renameValue.trim()) {
       const { trackId, stepIndex } = renamingStep;
       const track = tracks[trackId];
-      if (track && track.steps && track.steps[stepIndex]) {
-        const updatedSteps = [...track.steps];
+      const step = track?.steps?.[stepIndex];
+      const newName = renameValue.trim();
+      
+      // Only proceed if we have a valid step and the name actually changed
+      if (step && step.name !== newName) {
+        const updatedSteps = [...track.steps!];
         updatedSteps[stepIndex] = {
           ...updatedSteps[stepIndex],
-          name: renameValue.trim(),
+          name: newName,
           modified: new Date().toISOString(),
         };
         
@@ -721,6 +725,15 @@ export function FileManager({ context }: FileManagerProps) {
     setIsDragOver(false);
 
     const files = Array.from(e.dataTransfer.files);
+    
+    // Check for ZIP files first (library import)
+    const zipFiles = files.filter(file => file.name.endsWith('.zip'));
+    if (zipFiles.length > 0) {
+      zipFiles.forEach(file => processLibraryImport(file));
+      return;
+    }
+
+    // Handle regular JS/TXT files
     const jsFiles = files.filter(file => 
       file.type === 'text/javascript' || 
       file.name.endsWith('.js') || 
@@ -742,17 +755,21 @@ export function FileManager({ context }: FileManagerProps) {
 
   const finishRename = () => {
     if (renamingTrack && renameValue.trim()) {
-      const oldName = tracks[renamingTrack]?.name;
-      setTracks(prev => ({
-        ...prev,
-        [renamingTrack]: {
-          ...prev[renamingTrack],
-          name: renameValue.trim(),
-          modified: new Date().toISOString()
-        }
-      }));
+      const track = tracks[renamingTrack];
+      const oldName = track?.name;
+      const newName = renameValue.trim();
       
-      if (oldName !== renameValue.trim()) {
+      // Only proceed if we have a valid track and the name actually changed
+      if (track && oldName && oldName !== newName) {
+        setTracks(prev => ({
+          ...prev,
+          [renamingTrack]: {
+            ...prev[renamingTrack],
+            name: newName,
+            modified: new Date().toISOString()
+          }
+        }));
+        
         toast.success(t('files:trackRenamed'));
       }
     }
@@ -786,6 +803,168 @@ export function FileManager({ context }: FileManagerProps) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const exportLibraryAsZip = async () => {
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+
+      // Create library structure
+      const libraryData = {
+        tracks,
+        folders,
+        exportDate: new Date().toISOString(),
+        version: '1.0'
+      };
+
+      // Add metadata
+      zip.file('library-metadata.json', JSON.stringify(libraryData, null, 2));
+
+      // Add each track with proper folder structure
+      Object.values(tracks).forEach((track) => {
+        const folderPath = track.folder || '';
+        const trackPath = folderPath ? `${folderPath}/` : '';
+
+        if (track.isMultitrack && track.steps) {
+          // Create multitrack folder
+          const multitrackFolder = zip.folder(`${trackPath}${track.name}`);
+          
+          // Add each step
+          track.steps.forEach((step) => {
+            const fileName = `${step.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
+            multitrackFolder?.file(fileName, step.code);
+          });
+
+          // Add multitrack metadata
+          const metadata = {
+            name: track.name,
+            isMultitrack: true,
+            activeStep: track.activeStep || 0,
+            created: track.created,
+            modified: track.modified,
+            steps: track.steps.map(step => ({
+              id: step.id,
+              name: step.name,
+              created: step.created,
+              modified: step.modified
+            }))
+          };
+          multitrackFolder?.file('metadata.json', JSON.stringify(metadata, null, 2));
+        } else {
+          // Regular track
+          const fileName = `${trackPath}${track.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
+          zip.file(fileName, track.code);
+        }
+      });
+
+      // Generate and download ZIP
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `strudel-library-${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(t('files:libraryExported'));
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast.error('Export failed');
+    }
+  };
+
+  const importLibraryFromZip = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.zip')) {
+      toast.error(t('files:invalidLibraryFile'));
+      return;
+    }
+
+    processLibraryImport(file);
+    event.target.value = ''; // Reset input
+  };
+
+  const processLibraryImport = async (file: File) => {
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = await JSZip.loadAsync(file);
+
+      // Check if it's a valid library export
+      const metadataFile = zip.file('library-metadata.json');
+      if (metadataFile) {
+        // Import full library
+        const metadataContent = await metadataFile.async('text');
+        const libraryData = JSON.parse(metadataContent);
+
+        if (libraryData.tracks && libraryData.folders) {
+          // Merge with existing data (with conflict resolution)
+          const newTracks = { ...tracks };
+          const newFolders = { ...folders };
+
+          // Import folders
+          Object.values(libraryData.folders).forEach((folder: any) => {
+            if (!newFolders[folder.id]) {
+              newFolders[folder.id] = folder;
+            }
+          });
+
+          // Import tracks
+          Object.values(libraryData.tracks).forEach((track: any) => {
+            const existingTrack = newTracks[track.id];
+            if (existingTrack) {
+              // Handle conflict - rename imported track
+              const newId = `${track.id}_imported_${Date.now()}`;
+              newTracks[newId] = {
+                ...track,
+                id: newId,
+                name: `${track.name} (imported)`
+              };
+            } else {
+              newTracks[track.id] = track;
+            }
+          });
+
+          setTracks(newTracks);
+          setFolders(newFolders);
+          toast.success(t('files:libraryImported'));
+        } else {
+          toast.error(t('files:invalidLibraryFile'));
+        }
+      } else {
+        // Try to import as individual files
+        const jsFiles: File[] = [];
+        zip.forEach((relativePath, zipEntry) => {
+          if (relativePath.endsWith('.js') && !zipEntry.dir) {
+            // Convert zip entry to File-like object for processing
+            zipEntry.async('text').then(content => {
+              const fileName = relativePath.split('/').pop() || 'imported.js';
+              const trackName = fileName.replace(/\.[^/.]+$/, '');
+              
+              const trackId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+              const newTrack: Track = {
+                id: trackId,
+                name: trackName,
+                code: content,
+                created: new Date().toISOString(),
+                modified: new Date().toISOString(),
+              };
+
+              setTracks(prev => ({ ...prev, [trackId]: newTrack }));
+            });
+          }
+        });
+
+        toast.success(t('files:libraryImported'));
+      }
+    } catch (error) {
+      console.error('Import failed:', error);
+      toast.error(t('files:invalidLibraryFile'));
+    }
   };
 
 
@@ -857,6 +1036,21 @@ export function FileManager({ context }: FileManagerProps) {
       icon: <ArrowDownTrayIcon className="w-4 h-4" />,
       onClick: exportAllTracks,
     },
+    {
+      label: t('files:exportLibraryAsZip'),
+      icon: <ArrowDownTrayIcon className="w-4 h-4" />,
+      onClick: exportLibraryAsZip,
+      className: "p-3 border-b border-gray-600",
+    },
+    {
+      label: t('files:importLibraryFromZip'),
+      icon: <ArrowDownTrayIcon className="w-4 h-4 rotate-180" />,
+      onClick: () => {
+        const fileInput = document.getElementById('library-import-input') as HTMLInputElement;
+        fileInput?.click();
+      },
+      className: "p-3 border-b border-gray-600",
+    },
   ];
 
   return (
@@ -885,6 +1079,14 @@ export function FileManager({ context }: FileManagerProps) {
             type="file"
             accept=".js,.txt"
             onChange={importTrack}
+            className="hidden"
+          />
+          {/* Hidden file input for library import */}
+          <input
+            id="library-import-input"
+            type="file"
+            accept=".zip"
+            onChange={importLibraryFromZip}
             className="hidden"
           />
         </div>

@@ -415,6 +415,11 @@ export function registerSynthSounds() {
 }
 
 export function waveformN(partials, type) {
+  // Ensure minimum partials for createPeriodicWave
+  if (partials < 1) {
+    partials = 1;
+  }
+  
   const real = new Float32Array(partials + 1);
   const imag = new Float32Array(partials + 1);
   const ac = getAudioContext();
@@ -449,8 +454,8 @@ export function waveformN(partials, type) {
 export function getOscillator(s, t, value) {
   let { n: partials, duration, noise = 0 } = value;
   let o;
-  // If no partials are given, use stock waveforms
-  if (!partials || s === 'sine') {
+  // If no partials are given or partials is 0 or 1, use stock waveforms
+  if (!partials || partials < 2 || s === 'sine') {
     o = getAudioContext().createOscillator();
     o.type = s || 'triangle';
   }

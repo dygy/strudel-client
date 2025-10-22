@@ -382,10 +382,23 @@ export function FileTree({
                   value={renameValue}
                   onChange={(e) => setRenameValue(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') onRenameFinish();
-                    if (e.key === 'Escape') onRenameCancel();
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      onRenameFinish();
+                    }
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      onRenameCancel();
+                    }
                   }}
-                  onBlur={onRenameFinish}
+                  onBlur={(e) => {
+                    // Only finish rename if the input still has the same value and wasn't cancelled
+                    if (e.target.value.trim()) {
+                      onRenameFinish();
+                    } else {
+                      onRenameCancel();
+                    }
+                  }}
                   className="w-full px-1 py-0 text-sm bg-background border border-gray-600 rounded"
                   autoFocus
                   onClick={(e) => e.stopPropagation()}
@@ -434,10 +447,23 @@ export function FileTree({
                           value={renameValue}
                           onChange={(e) => setRenameValue(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') onRenameStepFinish();
-                            if (e.key === 'Escape') onRenameStepCancel();
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              onRenameStepFinish();
+                            }
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              onRenameStepCancel();
+                            }
                           }}
-                          onBlur={onRenameStepFinish}
+                          onBlur={(e) => {
+                            // Only finish rename if the input still has the same value and wasn't cancelled
+                            if (e.target.value.trim()) {
+                              onRenameStepFinish();
+                            } else {
+                              onRenameStepCancel();
+                            }
+                          }}
                           className="w-full px-1 py-0 text-xs bg-background border border-gray-600 rounded"
                           autoFocus
                           onClick={(e) => e.stopPropagation()}

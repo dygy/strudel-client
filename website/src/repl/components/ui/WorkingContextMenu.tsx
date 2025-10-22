@@ -6,6 +6,7 @@ interface MenuItem {
   icon?: React.ReactNode;
   separator?: boolean;
   disabled?: boolean;
+  className?: string;
 }
 
 interface WorkingContextMenuProps {
@@ -88,7 +89,7 @@ export function WorkingContextMenu({ items, children }: WorkingContextMenuProps)
                     item.disabled 
                       ? 'text-foreground/50 cursor-not-allowed' 
                       : 'text-foreground hover:bg-lineHighlight cursor-pointer'
-                  }`}
+                  } ${item.className || ''}`}
                   onClick={() => {
                     if (!item.disabled) {
                       item.onClick();
