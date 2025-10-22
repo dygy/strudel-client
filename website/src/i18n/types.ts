@@ -25,6 +25,7 @@ export interface FilesTranslations {
   load: string;
   delete: string;
   download: string;
+  downloadFolder: string;
   import: string;
   duplicate: string;
   rename: string;
@@ -96,6 +97,8 @@ export interface FilesTranslations {
   stepDeleted: string;
   cannotDeleteLastStep: string;
   multitrackDownloaded: string;
+  folderDownloaded: string;
+  emptyFolder: string;
   activeStep: string;
   newMultitrack: string;
   multitrackCreated: string;

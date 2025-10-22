@@ -624,6 +624,77 @@ export function FileManager({ context }: FileManagerProps) {
     toast.success(t('files:stepDeleted'));
   };
 
+  const downloadFolder = async (folderPath: string) => {
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+
+      // Get all tracks in this folder and its subfolders
+      const folderTracks = Object.values(tracks).filter(track => 
+        track.folder === folderPath || track.folder?.startsWith(`${folderPath}/`)
+      );
+
+      if (folderTracks.length === 0) {
+        toast.error(t('files:emptyFolder'));
+        return;
+      }
+
+      // Add each track to the ZIP
+      folderTracks.forEach((track) => {
+        const relativePath = track.folder ? track.folder.replace(folderPath, '').replace(/^\//, '') : '';
+        const trackPath = relativePath ? `${relativePath}/` : '';
+
+        if (track.isMultitrack && track.steps) {
+          // Create multitrack folder
+          const multitrackFolder = zip.folder(`${trackPath}${track.name}`);
+          
+          // Add each step
+          track.steps.forEach((step) => {
+            const fileName = `${step.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
+            multitrackFolder?.file(fileName, step.code);
+          });
+
+          // Add multitrack metadata
+          const metadata = {
+            name: track.name,
+            isMultitrack: true,
+            activeStep: track.activeStep || 0,
+            created: track.created,
+            modified: track.modified,
+            steps: track.steps.map(step => ({
+              id: step.id,
+              name: step.name,
+              created: step.created,
+              modified: step.modified
+            }))
+          };
+          multitrackFolder?.file('metadata.json', JSON.stringify(metadata, null, 2));
+        } else {
+          // Regular track
+          const fileName = `${trackPath}${track.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
+          zip.file(fileName, track.code);
+        }
+      });
+
+      // Generate and download ZIP
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      const folderName = folderPath.split('/').pop() || 'folder';
+      a.download = `${folderName}-${new Date().toISOString().split('T')[0]}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(t('files:folderDownloaded'));
+    } catch (error) {
+      console.error('Folder download failed:', error);
+      toast.error('Folder download failed');
+    }
+  };
+
   const downloadTrack = async (track: Track) => {
     if (track.isMultitrack && track.steps) {
       // Download as ZIP for multitrack
@@ -1206,6 +1277,8 @@ export function FileManager({ context }: FileManagerProps) {
         onTrackDelete={deleteTrack}
         onTrackDuplicate={duplicateTrack}
         onTrackInfo={handleTrackInfo}
+        onTrackDownload={downloadTrack}
+        onFolderDownload={downloadFolder}
         onTrackCreate={handleTrackCreate}
         onFolderCreate={handleFolderCreate}
         onFolderRename={handleFolderRename}

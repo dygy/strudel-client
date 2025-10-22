@@ -9,6 +9,7 @@ import {
   PencilIcon,
   TrashIcon,
   InformationCircleIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@src/i18n';
 import { WorkingContextMenu } from '../ui/WorkingContextMenu';
@@ -59,6 +60,8 @@ interface FileTreeProps {
   onTrackDelete: (trackId: string) => void;
   onTrackDuplicate: (track: Track) => void;
   onTrackInfo: (track: Track) => void;
+  onTrackDownload: (track: Track) => void;
+  onFolderDownload: (folderPath: string) => void;
   onTrackCreate: (parentPath?: string) => void;
   onFolderCreate: (parentPath?: string) => void;
   onFolderRename: (folderPath: string) => void;
@@ -254,6 +257,11 @@ export function FileTree({
     baseItems.push(
       { separator: true, label: '', onClick: () => {} },
       {
+        label: t('files:download'),
+        icon: <ArrowDownTrayIcon className="w-4 h-4" />,
+        onClick: () => onTrackDownload(track),
+      },
+      {
         label: t('files:info'),
         icon: <InformationCircleIcon className="w-4 h-4" />,
         onClick: () => onTrackInfo(track),
@@ -281,6 +289,11 @@ export function FileTree({
       onClick: () => onFolderCreate(folder.path),
     },
     { separator: true, label: '', onClick: () => {} },
+    {
+      label: t('files:downloadFolder'),
+      icon: <ArrowDownTrayIcon className="w-4 h-4" />,
+      onClick: () => onFolderDownload(folder.path),
+    },
     {
       label: t('files:rename'),
       icon: <PencilIcon className="w-4 h-4" />,
