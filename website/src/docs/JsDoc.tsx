@@ -1,4 +1,4 @@
-import jsdoc from '../../doc.json'; // doc.json is built with `npm run jsdoc-json`
+import jsdoc from '../../doc.json'; // doc.json is built with `npm run jsdoc-json` and copied to website/
 import { MiniRepl } from './MiniRepl';
 import React from 'react';
 
