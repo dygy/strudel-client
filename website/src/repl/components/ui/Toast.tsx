@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircleIcon, ExclamationCircleIcon, InformationCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
@@ -41,7 +41,15 @@ const iconStyles = {
 function ToastItem({ toast, onRemove }: ToastProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(toast.duration || 3000);
+  const [isPaused, setIsPaused] = useState(false);
   const Icon = toastIcons[toast.type];
+
+  const handleRemove = useCallback(() => {
+    if (isLeaving) return; // Prevent multiple removal calls
+    setIsLeaving(true);
+    setTimeout(() => onRemove(toast.id), 300);
+  }, [isLeaving, onRemove, toast.id]);
 
   useEffect(() => {
     // Trigger entrance animation
@@ -50,19 +58,25 @@ function ToastItem({ toast, onRemove }: ToastProps) {
   }, []);
 
   useEffect(() => {
-    if (toast.duration && toast.duration > 0) {
-      const timer = setTimeout(() => {
-        handleRemove();
-      }, toast.duration);
-      return () => clearTimeout(timer);
-    }
-  }, [toast.duration, toast.id]); // Add toast.id as dependency
+    if (toast.duration && toast.duration > 0 && !isPaused) {
+      // Update countdown every 100ms for smooth progress bar
+      const interval = setInterval(() => {
+        setTimeLeft(prev => {
+          const newTime = prev - 100;
+          if (newTime <= 0) {
+            clearInterval(interval);
+            handleRemove();
+            return 0;
+          }
+          return newTime;
+        });
+      }, 100);
 
-  const handleRemove = () => {
-    if (isLeaving) return; // Prevent multiple removal calls
-    setIsLeaving(true);
-    setTimeout(() => onRemove(toast.id), 300);
-  };
+      return () => clearInterval(interval);
+    }
+  }, [toast.duration, toast.id, handleRemove, isPaused]);
+
+  const progressPercentage = toast.duration ? (timeLeft / toast.duration) * 100 : 0;
 
   return (
     <div
@@ -70,24 +84,46 @@ function ToastItem({ toast, onRemove }: ToastProps) {
         transform transition-all duration-300 ease-in-out mb-2
         ${isVisible && !isLeaving ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}
       `}
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
     >
       <div className={`
-        max-w-sm w-full border rounded-lg shadow-lg p-4 flex items-start space-x-3
+        max-w-sm w-full border rounded-lg shadow-lg overflow-hidden relative
         ${toastStyles[toast.type]}
       `}>
-        <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${iconStyles[toast.type]}`} />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">{toast.title}</p>
-          {toast.message && (
-            <p className="text-sm opacity-90 mt-1">{toast.message}</p>
-          )}
+        {/* Progress bar */}
+        {toast.duration && toast.duration > 0 && (
+          <div className="absolute bottom-0 left-0 h-1 bg-black/20 w-full">
+            <div 
+              className="h-full bg-current transition-all duration-100 ease-linear"
+              style={{ width: `${progressPercentage}%` }}
+            />
+          </div>
+        )}
+        
+        <div className="p-4 flex items-start space-x-3">
+          <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${iconStyles[toast.type]}`} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">{toast.title}</p>
+            {toast.message && (
+              <p className="text-sm opacity-90 mt-1">{toast.message}</p>
+            )}
+          </div>
+          <div className="flex items-center space-x-2">
+            {/* Countdown display */}
+            {toast.duration && toast.duration > 0 && (
+              <span className="text-xs opacity-60 font-mono">
+                {Math.ceil(timeLeft / 1000)}s
+              </span>
+            )}
+            <button
+              onClick={handleRemove}
+              className="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+            >
+              <XCircleIcon className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-        <button
-          onClick={handleRemove}
-          className="flex-shrink-0 ml-2 opacity-60 hover:opacity-100 transition-opacity"
-        >
-          <XCircleIcon className="w-4 h-4" />
-        </button>
       </div>
     </div>
   );
