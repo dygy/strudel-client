@@ -15,14 +15,23 @@ After cloning the project, you can run the REPL locally:
 
 1. Install [Node.js](https://nodejs.org/)
 2. Install [pnpm](https://pnpm.io/installation)
-3. Install dependencies by running the following command:
+3. Setup the workspace with local packages:
    ```bash
-   pnpm i
+   npm run setup:workspace
+   ```
+   Or manually:
+   ```bash
+   pnpm install
+   pnpm run build:packages
    ```
 4. Run the development server:
    ```bash
    pnpm dev
    ```
+
+### Development with Local Packages
+
+This project uses a monorepo structure with local packages. See [WORKSPACE_DEVELOPMENT.md](./WORKSPACE_DEVELOPMENT.md) for detailed development workflow.
 
 ## Using Strudel In Your Project
 
@@ -33,6 +42,19 @@ Read more about how to use these in your own project [here](https://strudel.cc/t
 You will need to abide by the terms of the [GNU Affero Public Licence v3](LICENSE). As such, Strudel code can only be shared within free/open source projects under the same license -- see the license for details.
 
 Licensing info for the default sound banks can be found over on the [dough-samples](https://github.com/felixroos/dough-samples/blob/main/README.md) repository.
+
+## Deployment
+
+Deploy your own instance of Strudel:
+
+### Quick Deploy to Vercel
+```bash
+npm run deploy:vercel:prod
+```
+
+### Other Platforms
+- **Vercel**: See [VERCEL_SETUP.md](./VERCEL_SETUP.md) for quick setup
+- **Netlify, AWS, etc**: See [DEPLOYMENT.md](./DEPLOYMENT.md) for comprehensive guide
 
 ## Contributing
 

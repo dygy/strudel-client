@@ -67,5 +67,20 @@
   "folderMoved": "Фасцикла је успешно премештена!",
   "rootFolder": "Корен",
   "rightClickToCreate": "Десни клик за креирање фајлова и фасцикли",
-  "exportAll": "Извези Све Нумере"
+  "exportAll": "Извези Све Нумере",
+  "dropToImport": "Превуци фајлове овде за увоз",
+  "trackImported": "Нумера '{{name}}' је успешно увезена!",
+  "invalidFileType": "Молимо превуците само .js или .txt фајлове",
+  "convertToMultitrack": "Конвертуј у Мултинумеру",
+  "convertedToMultitrack": "Нумера је успешно конвертована у мултинумеру!",
+  "addStep": "Додај Корак",
+  "stepName": "Име корака",
+  "stepAdded": "Корак је успешно додат!",
+  "stepDeleted": "Корак је успешно обрисан!",
+  "cannotDeleteLastStep": "Не може се обрисати последњи корак",
+  "multitrackDownloaded": "Мултинумера је успешно преузета као ZIP!",
+  "activeStep": "Активни Корак",
+  "newMultitrack": "Нова Мултинумера",
+  "multitrackCreated": "Мултинумера је успешно креирана!",
+  "stepRenamed": "Корак је успешно преименован!"
 }

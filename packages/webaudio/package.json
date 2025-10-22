@@ -33,9 +33,10 @@
   },
   "homepage": "https://codeberg.org/uzu/strudel#readme",
   "dependencies": {
-    "@strudel/core": "^1.2.4",
-    "@strudel/draw": "^1.2.4",
-    "superdough": "^1.2.5"
+    "@strudel/core": "workspace:*",
+    "@strudel/draw": "workspace:*",
+    "superdough": "workspace:*",
+    "supradough": "workspace:*"
   },
   "devDependencies": {
     "vite": "^6.0.11"

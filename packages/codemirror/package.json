@@ -44,12 +44,12 @@
     "@replit/codemirror-emacs": "^6.1.0",
     "@replit/codemirror-vim": "^6.3.0",
     "@replit/codemirror-vscode-keymap": "^6.0.2",
-    "@strudel/core": "^1.2.4",
-    "@strudel/draw": "^1.2.4",
-    "@strudel/tonal": "^1.2.4",
-    "@strudel/transpiler": "^1.2.4",
+    "@strudel/core": "workspace:*",
+    "@strudel/draw": "workspace:*",
+    "@strudel/tonal": "workspace:*",
+    "@strudel/transpiler": "workspace:*",
     "@tonaljs/tonal": "^4.10.0",
-    "superdough": "^1.2.5",
+    "superdough": "workspace:*",
     "nanostores": "^0.11.3"
   },
   "devDependencies": {

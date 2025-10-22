@@ -19,8 +19,9 @@
   },
   "homepage": "https://codeberg.org/uzu/strudel/src/branch/main/packages/hs2js",
   "dependencies": {
-    "@strudel/core": "^1.2.4",
-    "@strudel/mini": "^1.2.4"
+    "@strudel/core": "workspace:*",
+    "@strudel/mini": "workspace:*",
+    "hs2js": "workspace:*"
   },
   "devDependencies": {
     "vite": "^6.0.11"

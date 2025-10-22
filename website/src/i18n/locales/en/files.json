@@ -67,5 +67,20 @@
   "folderMoved": "Folder moved successfully!",
   "rootFolder": "Root",
   "rightClickToCreate": "Right-click to create files and folders",
-  "exportAll": "Export All Tracks"
+  "exportAll": "Export All Tracks",
+  "dropToImport": "Drop files here to import",
+  "trackImported": "Track '{{name}}' imported successfully!",
+  "invalidFileType": "Please drop .js or .txt files only",
+  "convertToMultitrack": "Convert to Multitrack",
+  "convertedToMultitrack": "Track converted to multitrack successfully!",
+  "addStep": "Add Step",
+  "stepName": "Step name",
+  "stepAdded": "Step added successfully!",
+  "stepDeleted": "Step deleted successfully!",
+  "cannotDeleteLastStep": "Cannot delete the last step",
+  "multitrackDownloaded": "Multitrack downloaded as ZIP successfully!",
+  "activeStep": "Active Step",
+  "newMultitrack": "New Multitrack",
+  "multitrackCreated": "Multitrack created successfully!",
+  "stepRenamed": "Step renamed successfully!"
 }

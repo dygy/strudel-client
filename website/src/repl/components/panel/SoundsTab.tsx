@@ -72,7 +72,7 @@ export function SoundsTab() {
   }, [sounds, soundsFilter, search]);
 
   // holds mutable ref to current triggered sound
-  const trigRef = useRef<Promise<any> | undefined>();
+  const trigRef = useRef<Promise<any> | undefined>(undefined);
 
   // Used to cycle through sound previews on banks with multiple sounds
   let soundPreviewIdx = 0;

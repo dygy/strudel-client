@@ -260,7 +260,7 @@ export function useReplContext(): ReplContext {
     editorRef.current.repl.evaluate(code);
   };
 
-  const handleShare = async (): Promise<void> => shareCode(replState.code);
+  const handleShare = async (): Promise<void> => shareCode();
 
   const context: ReplContext = {
     started,

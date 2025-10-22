@@ -83,6 +83,23 @@ export interface FilesTranslations {
   trackMoved: string;
   folderMoved: string;
   rootFolder: string;
+  rightClickToCreate: string;
+  exportAll: string;
+  dropToImport: string;
+  trackImported: string;
+  invalidFileType: string;
+  convertToMultitrack: string;
+  convertedToMultitrack: string;
+  addStep: string;
+  stepName: string;
+  stepAdded: string;
+  stepDeleted: string;
+  cannotDeleteLastStep: string;
+  multitrackDownloaded: string;
+  activeStep: string;
+  newMultitrack: string;
+  multitrackCreated: string;
+  stepRenamed: string;
 }
 
 export interface SettingsTranslations {
@@ -176,7 +193,7 @@ export interface Resources {
 export type Namespace = keyof Resources;
 
 // Translation function type for a specific namespace
-export type TranslationFunction<T extends Namespace> = (key: keyof Resources[T]) => string;
+export type TranslationFunction<T extends Namespace> = (key: keyof Resources[T], options?: any) => string;
 
 // Translation function type for multiple namespaces
 export type MultiNamespaceTranslationFunction<T extends Namespace[]> = (
@@ -186,5 +203,6 @@ export type MultiNamespaceTranslationFunction<T extends Namespace[]> = (
         ? `${First}:${keyof Resources[First] & string}` | MultiNamespaceTranslationFunction<Rest>
         : `${First}:${keyof Resources[First] & string}`
       : never
-    : never
+    : never,
+  options?: any
 ) => string;

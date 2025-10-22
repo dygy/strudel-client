@@ -67,5 +67,20 @@
   "folderMoved": "Папка успешно перемещена!",
   "rootFolder": "Корень",
   "rightClickToCreate": "Щелкните правой кнопкой мыши для создания файлов и папок",
-  "exportAll": "Экспортировать Все Треки"
+  "exportAll": "Экспортировать Все Треки",
+  "dropToImport": "Перетащите файлы сюда для импорта",
+  "trackImported": "Трек '{{name}}' успешно импортирован!",
+  "invalidFileType": "Пожалуйста, перетащите только файлы .js или .txt",
+  "convertToMultitrack": "Преобразовать в Мультитрек",
+  "convertedToMultitrack": "Трек успешно преобразован в мультитрек!",
+  "addStep": "Добавить Шаг",
+  "stepName": "Название шага",
+  "stepAdded": "Шаг успешно добавлен!",
+  "stepDeleted": "Шаг успешно удален!",
+  "cannotDeleteLastStep": "Нельзя удалить последний шаг",
+  "multitrackDownloaded": "Мультитрек успешно скачан как ZIP!",
+  "activeStep": "Активный Шаг",
+  "newMultitrack": "Новый Мультитрек",
+  "multitrackCreated": "Мультитрек успешно создан!",
+  "stepRenamed": "Шаг успешно переименован!"
 }

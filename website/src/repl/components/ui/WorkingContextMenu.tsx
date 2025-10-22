@@ -80,26 +80,27 @@ export function WorkingContextMenu({ items, children }: WorkingContextMenuProps)
         >
           {items.map((item, index) => (
             <React.Fragment key={index}>
-              {item.separator && (
+              {item.separator ? (
                 <div className="border-t border-lineHighlight my-1" />
+              ) : (
+                <button
+                  className={`w-full text-left px-3 py-2 flex items-center gap-2 text-sm transition-colors ${
+                    item.disabled 
+                      ? 'text-foreground/50 cursor-not-allowed' 
+                      : 'text-foreground hover:bg-lineHighlight cursor-pointer'
+                  }`}
+                  onClick={() => {
+                    if (!item.disabled) {
+                      item.onClick();
+                      hideMenu();
+                    }
+                  }}
+                  disabled={item.disabled}
+                >
+                  {item.icon && <span className="w-4 h-4 flex-shrink-0">{item.icon}</span>}
+                  {item.label}
+                </button>
               )}
-              <button
-                className={`w-full text-left px-3 py-2 flex items-center gap-2 text-sm transition-colors ${
-                  item.disabled 
-                    ? 'text-foreground/50 cursor-not-allowed' 
-                    : 'text-foreground hover:bg-lineHighlight cursor-pointer'
-                }`}
-                onClick={() => {
-                  if (!item.disabled) {
-                    item.onClick();
-                    hideMenu();
-                  }
-                }}
-                disabled={item.disabled}
-              >
-                {item.icon && <span className="w-4 h-4 flex-shrink-0">{item.icon}</span>}
-                {item.label}
-              </button>
             </React.Fragment>
           ))}
         </div>

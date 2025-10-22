@@ -81,7 +81,7 @@ export function PitchSlider({
   const activeRef = useRef<boolean>(false);
   const freqRef = useRef<number>(initial);
   const historyRef = useRef<number[]>([freqRef.current]);
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number>(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hz, setHz] = useState(freqRef.current);
 

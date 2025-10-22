@@ -29,34 +29,34 @@ interface TranslationResult<T> {
 // Single namespace overload
 export function useTranslation<T extends Namespace>(
     namespace: T
-): TranslationResult<TranslationFunction<T>>;
+): TranslationResult<(key: string, options?: any) => string>;
 
-// Multiple namespaces overload
-export function useTranslation<T extends Namespace[]>(
+// Multiple namespaces overload  
+export function useTranslation<T extends readonly Namespace[]>(
     namespaces: T
-): TranslationResult<MultiNamespaceTranslationFunction<T>>;
+): TranslationResult<(key: string, options?: any) => string>;
 
 // Default namespace overload
-export function useTranslation(): TranslationResult<TranslationFunction<'common'>>;
+export function useTranslation(): TranslationResult<(key: string, options?: any) => string>;
 
 // Implementation
-export function useTranslation<T extends Namespace | Namespace[]>(
+export function useTranslation<T extends Namespace | readonly Namespace[]>(
     namespaces?: T
-): any {
+): TranslationResult<(key: string, options?: any) => string> {
     const { t: originalT, i18n, ready } = useI18nTranslation(namespaces as any);
 
     const currentLanguage = i18n.language as keyof typeof languages;
     const isRTL = languages[currentLanguage]?.rtl || false;
 
-    const typedT = (key: string) => {
+    const typedT = (key: string, options?: any): string => {
         // Handle namespace:key format for multiple namespaces
         if (typeof key === 'string' && key.includes(':')) {
             const [namespace, translationKey] = key.split(':');
-            return originalT(translationKey, { ns: namespace });
+            return originalT(translationKey, { ns: namespace, ...options }) as string;
         }
 
         // Handle single namespace
-        return originalT(key);
+        return originalT(key, options) as string;
     };
 
     return {

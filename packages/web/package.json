@@ -33,15 +33,15 @@
   },
   "homepage": "https://codeberg.org/uzu/strudel#readme",
   "dependencies": {
-    "@strudel/core": "^1.2.4",
-    "@strudel/mini": "^1.2.4",
-    "@strudel/tonal": "^1.2.4",
-    "@strudel/transpiler": "^1.2.4",
-    "@strudel/webaudio": "^1.2.5"
+    "@strudel/core": "workspace:*",
+    "@strudel/mini": "workspace:*",
+    "@strudel/tonal": "workspace:*",
+    "@strudel/transpiler": "workspace:*",
+    "@strudel/webaudio": "workspace:*"
   },
   "devDependencies": {
     "@rollup/plugin-replace": "^6.0.2",
     "vite": "^6.0.11",
-    "vite-plugin-bundle-audioworklet": "^0.1.1"
+    "vite-plugin-bundle-audioworklet": "workspace:*"
   }
 }

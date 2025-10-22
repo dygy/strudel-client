@@ -23,11 +23,27 @@ fi
 # Navigate to website directory
 cd website
 
+# Check if user is logged in to Vercel
+if ! vercel whoami &> /dev/null; then
+    echo "🔐 You need to login to Vercel first."
+    echo "Please run: vercel login"
+    echo "Or set VERCEL_TOKEN environment variable"
+    exit 1
+fi
+
 echo "🔧 Installing dependencies..."
-pnpm install
+if command -v pnpm &> /dev/null; then
+    pnpm install
+else
+    npm install
+fi
 
 echo "🏗️  Building the website..."
-pnpm build
+if command -v pnpm &> /dev/null; then
+    pnpm build
+else
+    npm run build
+fi
 
 echo "🚀 Deploying to Vercel..."
 
@@ -46,3 +62,4 @@ echo "💡 Tips:"
 echo "   • Use './scripts/deploy-vercel.sh --production' for production deployments"
 echo "   • Use 'vercel --help' for more Vercel CLI options"
 echo "   • Configure custom domains in your Vercel dashboard"
+echo "   • Run 'vercel login' if you get authentication errors"

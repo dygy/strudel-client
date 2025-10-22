@@ -67,5 +67,20 @@
   "folderMoved": "תיקייה הועברה בהצלחה!",
   "rootFolder": "שורש",
   "rightClickToCreate": "לחץ לחיצה ימנית ליצירת קבצים ותיקיות",
-  "exportAll": "ייצא את כל הרצועות"
+  "exportAll": "ייצא את כל הרצועות",
+  "dropToImport": "גרור קבצים לכאן לייבוא",
+  "trackImported": "רצועה '{{name}}' יובאה בהצלחה!",
+  "invalidFileType": "אנא גרור רק קבצי .js או .txt",
+  "convertToMultitrack": "המר לרצועה מרובה",
+  "convertedToMultitrack": "רצועה הומרה לרצועה מרובה בהצלחה!",
+  "addStep": "הוסף שלב",
+  "stepName": "שם השלב",
+  "stepAdded": "שלב נוסף בהצלחה!",
+  "stepDeleted": "שלב נמחק בהצלחה!",
+  "cannotDeleteLastStep": "לא ניתן למחוק את השלב האחרון",
+  "multitrackDownloaded": "רצועה מרובה הורדה כ-ZIP בהצלחה!",
+  "activeStep": "שלב פעיל",
+  "newMultitrack": "רצועה מרובה חדשה",
+  "multitrackCreated": "רצועה מרובה נוצרה בהצלחה!",
+  "stepRenamed": "שלב שונה בהצלחה!"
 }

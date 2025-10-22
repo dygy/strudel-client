@@ -1,20 +1,15 @@
 {
-  "buildCommand": "pnpm build",
+  "framework": "astro",
+  "buildCommand": "pnpm run build",
   "outputDirectory": "dist",
   "installCommand": "pnpm install",
-  "framework": "astro",
+  "devCommand": "npm run dev",
   "regions": ["iad1"],
   "functions": {
-    "website/src/pages/api/**/*.ts": {
+    "src/pages/api/**/*.ts": {
       "runtime": "nodejs18.x"
     }
   },
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ],
   "headers": [
     {
       "source": "/sw.js",

@@ -20,6 +20,17 @@ interface Track {
   created: string;
   modified: string;
   folder?: string;
+  isMultitrack?: boolean;
+  steps?: TrackStep[];
+  activeStep?: number;
+}
+
+interface TrackStep {
+  id: string;
+  name: string;
+  code: string;
+  created: string;
+  modified: string;
 }
 
 interface Folder {
@@ -48,6 +59,7 @@ interface FileTreeProps {
   onTrackDelete: (trackId: string) => void;
   onTrackDuplicate: (track: Track) => void;
   onTrackInfo: (track: Track) => void;
+  onTrackCreate: (parentPath?: string) => void;
   onFolderCreate: (parentPath?: string) => void;
   onFolderRename: (folderPath: string) => void;
   onFolderDelete: (folderPath: string) => void;
@@ -59,6 +71,14 @@ interface FileTreeProps {
   onRenameFinish: () => void;
   onRenameCancel: () => void;
   emptySpaceContextItems: Array<{ label: string; icon?: React.ReactNode; onClick: () => void; separator?: boolean }>;
+  onConvertToMultitrack: (track: Track) => void;
+  onAddStep: (trackId: string) => void;
+  onSwitchStep: (trackId: string, stepIndex: number) => void;
+  onRenameStep: (trackId: string, stepIndex: number) => void;
+  onDeleteStep: (trackId: string, stepIndex: number) => void;
+  renamingStep: { trackId: string; stepIndex: number } | null;
+  onRenameStepFinish: () => void;
+  onRenameStepCancel: () => void;
 }
 
 export function FileTree({
@@ -70,6 +90,7 @@ export function FileTree({
   onTrackDelete,
   onTrackDuplicate,
   onTrackInfo,
+  onTrackCreate,
   onFolderCreate,
   onFolderRename,
   onFolderDelete,
@@ -81,6 +102,14 @@ export function FileTree({
   onRenameFinish,
   onRenameCancel,
   emptySpaceContextItems,
+  onConvertToMultitrack,
+  onAddStep,
+  onSwitchStep,
+  onRenameStep,
+  onDeleteStep,
+  renamingStep,
+  onRenameStepFinish,
+  onRenameStepCancel,
 }: FileTreeProps) {
   const { t } = useTranslation(['files', 'common']);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set([''])); // Root is expanded by default
@@ -182,41 +211,69 @@ export function FileTree({
     setDraggedItem(null);
   };
 
-  const getTrackContextItems = (track: Track) => [
-    {
-      label: t('files:load'),
-      icon: <DocumentIcon className="w-4 h-4" />,
-      onClick: () => onTrackSelect(track),
-    },
-    {
-      label: t('files:rename'),
-      icon: <PencilIcon className="w-4 h-4" />,
-      onClick: () => onTrackRename(track.id),
-    },
-    {
-      label: t('files:duplicate'),
-      icon: <DocumentIcon className="w-4 h-4" />,
-      onClick: () => onTrackDuplicate(track),
-    },
-    { separator: true, label: '', onClick: () => {} },
-    {
-      label: t('files:info'),
-      icon: <InformationCircleIcon className="w-4 h-4" />,
-      onClick: () => onTrackInfo(track),
-    },
-    { separator: true, label: '', onClick: () => {} },
-    {
-      label: t('files:delete'),
-      icon: <TrashIcon className="w-4 h-4" />,
-      onClick: () => onTrackDelete(track.id),
-    },
-  ];
+  const getTrackContextItems = (track: Track) => {
+    const baseItems = [
+      {
+        label: t('files:load'),
+        icon: <DocumentIcon className="w-4 h-4" />,
+        onClick: () => onTrackSelect(track),
+      },
+      {
+        label: t('files:rename'),
+        icon: <PencilIcon className="w-4 h-4" />,
+        onClick: () => onTrackRename(track.id),
+      },
+      {
+        label: t('files:duplicate'),
+        icon: <DocumentIcon className="w-4 h-4" />,
+        onClick: () => onTrackDuplicate(track),
+      },
+    ];
+
+    // Add multitrack-specific options
+    if (track.isMultitrack) {
+      baseItems.push(
+        { separator: true, label: '', onClick: () => {} },
+        {
+          label: t('files:addStep'),
+          icon: <PlusIcon className="w-4 h-4" />,
+          onClick: () => onAddStep(track.id),
+        }
+      );
+    } else {
+      baseItems.push(
+        { separator: true, label: '', onClick: () => {} },
+        {
+          label: t('files:convertToMultitrack'),
+          icon: <DocumentIcon className="w-4 h-4" />,
+          onClick: () => onConvertToMultitrack(track),
+        }
+      );
+    }
+
+    baseItems.push(
+      { separator: true, label: '', onClick: () => {} },
+      {
+        label: t('files:info'),
+        icon: <InformationCircleIcon className="w-4 h-4" />,
+        onClick: () => onTrackInfo(track),
+      },
+      { separator: true, label: '', onClick: () => {} },
+      {
+        label: t('files:delete'),
+        icon: <TrashIcon className="w-4 h-4" />,
+        onClick: () => onTrackDelete(track.id),
+      }
+    );
+
+    return baseItems;
+  };
 
   const getFolderContextItems = (folder: Folder) => [
     {
       label: t('files:newTrack'),
       icon: <PlusIcon className="w-4 h-4" />,
-      onClick: () => onFolderCreate(folder.path),
+      onClick: () => onTrackCreate(folder.path),
     },
     {
       label: t('files:newFolder'),
@@ -236,9 +293,29 @@ export function FileTree({
     },
   ];
 
+  const getStepContextItems = (trackId: string, stepIndex: number, step: TrackStep) => [
+    {
+      label: t('files:load'),
+      icon: <DocumentIcon className="w-4 h-4" />,
+      onClick: () => onSwitchStep(trackId, stepIndex),
+    },
+    {
+      label: t('files:rename'),
+      icon: <PencilIcon className="w-4 h-4" />,
+      onClick: () => onRenameStep(trackId, stepIndex),
+    },
+    { separator: true, label: '', onClick: () => {} },
+    {
+      label: t('files:delete'),
+      icon: <TrashIcon className="w-4 h-4" />,
+      onClick: () => onDeleteStep(trackId, stepIndex),
+    },
+  ];
+
   const renderNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
-    const isExpanded = expandedFolders.has(node.path || '');
+    const isExpanded = expandedFolders.has(node.path || node.id);
     const hasChildren = node.children && node.children.length > 0;
+    const hasSteps = node.type === 'track' && (node.data as Track).isMultitrack && (node.data as Track).steps && (node.data as Track).steps!.length > 0;
     const isSelected = node.type === 'track' && selectedTrack === node.id;
     const isRenaming = (node.type === 'track' && renamingTrack === node.id) ||
                       (node.type === 'folder' && renamingFolder === node.path);
@@ -264,14 +341,17 @@ export function FileTree({
               if (node.type === 'folder') {
                 toggleFolder(node.path!);
               } else if (node.type === 'track' && !isRenaming) {
+                if ((node.data as Track).isMultitrack && hasSteps) {
+                  toggleFolder(node.id); // Use track ID for multitrack expansion
+                }
                 onTrackSelect(node.data as Track);
               }
             }}
           >
-            {/* Expand/collapse icon for folders */}
-            {node.type === 'folder' && (
+            {/* Expand/collapse icon for folders and multitrack */}
+            {(node.type === 'folder' || (node.type === 'track' && hasSteps)) && (
               <div className="w-4 h-4 mr-1 flex items-center justify-center">
-                {hasChildren ? (
+                {(hasChildren || hasSteps) ? (
                   isExpanded ? (
                     <ChevronDownIcon className="w-3 h-3" />
                   ) : (
@@ -311,11 +391,71 @@ export function FileTree({
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <span className="text-sm truncate">{node.name}</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm truncate">{node.name}</span>
+                  {node.type === 'track' && (node.data as Track).isMultitrack && (
+                    <span className="text-xs bg-purple-600 text-white px-1 rounded">
+                      M
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>
         </WorkingContextMenu>
+
+        {/* Render multitrack steps */}
+        {node.type === 'track' && (node.data as Track).isMultitrack && isExpanded && (node.data as Track).steps && (
+          <div>
+            {(node.data as Track).steps!.map((step, stepIndex) => {
+              const isRenamingThisStep = renamingStep?.trackId === node.id && renamingStep?.stepIndex === stepIndex;
+              
+              return (
+                <WorkingContextMenu
+                  key={step.id}
+                  items={getStepContextItems(node.id, stepIndex, step)}
+                >
+                  <div
+                    className={`flex items-center py-1 px-2 hover:bg-gray-600 cursor-pointer ${
+                      (node.data as Track).activeStep === stepIndex ? 'bg-purple-700/30' : ''
+                    }`}
+                    style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}
+                    onClick={() => !isRenamingThisStep && onSwitchStep(node.id, stepIndex)}
+                  >
+                    <div className="w-4 h-4 mr-2 flex-shrink-0">
+                      <div className="w-2 h-2 bg-purple-400 rounded-full mx-auto"></div>
+                    </div>
+                    
+                    {/* Step name or rename input */}
+                    <div className="flex-1 min-w-0">
+                      {isRenamingThisStep ? (
+                        <input
+                          type="text"
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') onRenameStepFinish();
+                            if (e.key === 'Escape') onRenameStepCancel();
+                          }}
+                          onBlur={onRenameStepFinish}
+                          className="w-full px-1 py-0 text-xs bg-background border border-gray-600 rounded"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span className="text-xs truncate">{step.name}</span>
+                      )}
+                    </div>
+                    
+                    {(node.data as Track).activeStep === stepIndex && (
+                      <span className="text-xs text-purple-400 ml-1">●</span>
+                    )}
+                  </div>
+                </WorkingContextMenu>
+              );
+            })}
+          </div>
+        )}
 
         {/* Render children */}
         {node.type === 'folder' && isExpanded && node.children && (
@@ -330,23 +470,25 @@ export function FileTree({
   const tree = buildTree();
 
   return (
-    <WorkingContextMenu items={emptySpaceContextItems}>
-      <div className="flex-1 overflow-auto min-h-0 h-full">
-        {tree.length === 0 ? (
+    <div className="flex-1 overflow-auto min-h-0 h-full">
+      {tree.length === 0 ? (
+        <WorkingContextMenu items={emptySpaceContextItems}>
           <div className="p-4 text-center text-gray-400 text-sm h-full flex flex-col justify-center">
             {t('files:noTracksYet')}
             <div className="mt-2 text-xs">
               {t('files:rightClickToCreate')}
             </div>
           </div>
-        ) : (
-          <div className="py-2 min-h-full">
-            {tree.map(node => renderNode(node))}
-            {/* Flexible empty space for context menu that fills remaining height */}
+        </WorkingContextMenu>
+      ) : (
+        <div className="py-2 min-h-full">
+          {tree.map(node => renderNode(node))}
+          {/* Flexible empty space for context menu that fills remaining height */}
+          <WorkingContextMenu items={emptySpaceContextItems}>
             <div className="flex-1 min-h-[100px]"></div>
-          </div>
-        )}
-      </div>
-    </WorkingContextMenu>
+          </WorkingContextMenu>
+        </div>
+      )}
+    </div>
   );
 }

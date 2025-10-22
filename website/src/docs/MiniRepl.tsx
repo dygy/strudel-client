@@ -120,7 +120,7 @@ export function MiniRepl({
 
   const [replState, setReplState] = useState<ReplState>({});
   const { started, isDirty, error } = replState;
-  const editorRef = useRef<any>();
+  const editorRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const client = useClient();
 

@@ -11,7 +11,7 @@ function debounce<T extends (...args: any[]) => any>(fn: T, wait: number): T {
 }
 
 export function useDebounce(callback: () => void): () => void {
-  const ref = useRef<() => void>();
+  const ref = useRef<() => void>(()=> undefined);
   
   useEffect(() => {
     ref.current = callback;

@@ -33,8 +33,8 @@
   "homepage": "https://codeberg.org/uzu/strudel#readme",
   "dependencies": {
     "@csound/browser": "6.18.7",
-    "@strudel/core": "^1.2.4",
-    "@strudel/webaudio": "^1.2.5"
+    "@strudel/core": "workspace:*",
+    "@strudel/webaudio": "workspace:*"
   },
   "devDependencies": {
     "vite": "^6.0.11"

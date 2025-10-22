@@ -67,5 +67,20 @@
   "folderMoved": "تم نقل المجلد بنجاح!",
   "rootFolder": "الجذر",
   "rightClickToCreate": "انقر بزر الماوس الأيمن لإنشاء ملفات ومجلدات",
-  "exportAll": "تصدير جميع المسارات"
+  "exportAll": "تصدير جميع المسارات",
+  "dropToImport": "اسحب الملفات هنا للاستيراد",
+  "trackImported": "تم استيراد المسار '{{name}}' بنجاح!",
+  "invalidFileType": "يرجى سحب ملفات .js أو .txt فقط",
+  "convertToMultitrack": "تحويل إلى مسار متعدد",
+  "convertedToMultitrack": "تم تحويل المسار إلى مسار متعدد بنجاح!",
+  "addStep": "إضافة خطوة",
+  "stepName": "اسم الخطوة",
+  "stepAdded": "تم إضافة الخطوة بنجاح!",
+  "stepDeleted": "تم حذف الخطوة بنجاح!",
+  "cannotDeleteLastStep": "لا يمكن حذف الخطوة الأخيرة",
+  "multitrackDownloaded": "تم تنزيل المسار المتعدد كملف ZIP بنجاح!",
+  "activeStep": "الخطوة النشطة",
+  "newMultitrack": "مسار متعدد جديد",
+  "multitrackCreated": "تم إنشاء المسار المتعدد بنجاح!",
+  "stepRenamed": "تم إعادة تسمية الخطوة بنجاح!"
 }

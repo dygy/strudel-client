@@ -228,7 +228,6 @@ export class StrudelMirror {
     });
     const cmEditor = this.root.querySelector('.cm-editor');
     if (cmEditor) {
-      cmEditor.style.directrion = "ltr";
       this.root.style.display = 'block';
       if (bgFill) {
         this.root.style.backgroundColor = 'var(--background)';

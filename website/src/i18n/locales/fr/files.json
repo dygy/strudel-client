@@ -67,5 +67,20 @@
   "folderMoved": "Dossier déplacé avec succès !",
   "rootFolder": "Racine",
   "rightClickToCreate": "Clic droit pour créer des fichiers et dossiers",
-  "exportAll": "Exporter Toutes les Pistes"
+  "exportAll": "Exporter Toutes les Pistes",
+  "dropToImport": "Déposez les fichiers ici pour importer",
+  "trackImported": "Piste '{{name}}' importée avec succès!",
+  "invalidFileType": "Veuillez déposer uniquement des fichiers .js ou .txt",
+  "convertToMultitrack": "Convertir en Multipiste",
+  "convertedToMultitrack": "Piste convertie en multipiste avec succès!",
+  "addStep": "Ajouter une Étape",
+  "stepName": "Nom de l'étape",
+  "stepAdded": "Étape ajoutée avec succès!",
+  "stepDeleted": "Étape supprimée avec succès!",
+  "cannotDeleteLastStep": "Impossible de supprimer la dernière étape",
+  "multitrackDownloaded": "Multipiste téléchargée en ZIP avec succès!",
+  "activeStep": "Étape Active",
+  "newMultitrack": "Nouvelle Multipiste",
+  "multitrackCreated": "Multipiste créée avec succès!",
+  "stepRenamed": "Étape renommée avec succès!"
 }

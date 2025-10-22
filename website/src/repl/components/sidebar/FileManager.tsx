@@ -3,6 +3,7 @@ import {
   FolderIcon, 
   PlusIcon, 
   ArrowDownTrayIcon,
+  DocumentIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@src/i18n';
 import { formatDateTimeIntl } from '@src/i18n/dateFormat';
@@ -65,6 +66,7 @@ export function FileManager({ context }: FileManagerProps) {
   const [saveStatus, setSaveStatus] = useState('');
   const [renamingTrack, setRenamingTrack] = useState<string | null>(null);
   const [renamingFolder, setRenamingFolder] = useState<string | null>(null);
+  const [renamingStep, setRenamingStep] = useState<{ trackId: string; stepIndex: number } | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoModalData, setInfoModalData] = useState<{ title: string; items: Array<{ label: string; value: string }> }>({ title: '', items: [] });
@@ -224,6 +226,11 @@ export function FileManager({ context }: FileManagerProps) {
   const handleFolderRename = (folderPath: string) => {
     setRenamingFolder(folderPath);
     setRenameValue(folders[folderPath]?.name || '');
+  };
+
+  const handleTrackCreate = (parentPath?: string) => {
+    setNewItemParentPath(parentPath || '');
+    setIsCreating(true);
   };
 
   const handleFolderCreate = (parentPath?: string) => {
@@ -531,6 +538,42 @@ export function FileManager({ context }: FileManagerProps) {
     });
   };
 
+  const startRenameStep = (trackId: string, stepIndex: number) => {
+    const track = tracks[trackId];
+    if (!track || !track.isMultitrack || !track.steps) return;
+    
+    setRenamingStep({ trackId, stepIndex });
+    setRenameValue(track.steps[stepIndex].name);
+  };
+
+  const finishRenameStep = () => {
+    if (renamingStep && renameValue.trim()) {
+      const { trackId, stepIndex } = renamingStep;
+      const track = tracks[trackId];
+      if (track && track.steps && track.steps[stepIndex]) {
+        const updatedSteps = [...track.steps];
+        updatedSteps[stepIndex] = {
+          ...updatedSteps[stepIndex],
+          name: renameValue.trim(),
+          modified: new Date().toISOString(),
+        };
+        
+        setTracks(prev => ({
+          ...prev,
+          [trackId]: {
+            ...prev[trackId],
+            steps: updatedSteps,
+            modified: new Date().toISOString(),
+          }
+        }));
+        
+        toast.success(t('files:stepRenamed'));
+      }
+    }
+    setRenamingStep(null);
+    setRenameValue('');
+  };
+
   const renameStep = (trackId: string, stepIndex: number, newName: string) => {
     const track = tracks[trackId];
     if (!track || !track.isMultitrack || !track.steps) return;
@@ -720,6 +763,7 @@ export function FileManager({ context }: FileManagerProps) {
   const cancelRename = () => {
     setRenamingTrack(null);
     setRenamingFolder(null);
+    setRenamingStep(null);
     setRenameValue('');
   };
 
@@ -750,6 +794,32 @@ export function FileManager({ context }: FileManagerProps) {
 
 
   // Context menu items for empty space
+  const createNewMultitrack = () => {
+    const trackId = Date.now().toString();
+    const newTrack: Track = {
+      id: trackId,
+      name: 'New Multitrack',
+      code: '// New multitrack - Step 1\n',
+      created: new Date().toISOString(),
+      modified: new Date().toISOString(),
+      isMultitrack: true,
+      steps: [
+        {
+          id: `${trackId}-step-1`,
+          name: 'Step 1',
+          code: '// New multitrack - Step 1\n',
+          created: new Date().toISOString(),
+          modified: new Date().toISOString(),
+        }
+      ],
+      activeStep: 0,
+    };
+    
+    setTracks(prev => ({ ...prev, [trackId]: newTrack }));
+    loadTrack(newTrack);
+    toast.success(t('files:multitrackCreated'));
+  };
+
   const getEmptySpaceContextItems = () => [
     {
       label: t('files:newTrack'),
@@ -758,6 +828,11 @@ export function FileManager({ context }: FileManagerProps) {
         setNewItemParentPath('');
         setIsCreating(true);
       },
+    },
+    {
+      label: t('files:newMultitrack'),
+      icon: <DocumentIcon className="w-4 h-4" />,
+      onClick: createNewMultitrack,
     },
     {
       label: t('files:newFolder'),
@@ -802,40 +877,16 @@ export function FileManager({ context }: FileManagerProps) {
       
       {/* Header */}
       <div className="p-3 border-b border-gray-600">
-        <div className="flex items-center justify-between mb-2">
+        <div className="mb-2">
           <h3 className="text-sm font-semibold">{t('tabs:files')}</h3>
-          <div className="flex space-x-1">
-            <button
-              onClick={() => {
-                setNewItemParentPath('');
-                setIsCreating(true);
-              }}
-              className="p-1 hover:bg-gray-600 rounded"
-              title={t('files:newTrack')}
-            >
-              <PlusIcon className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => {
-                setNewItemParentPath('');
-                setIsCreatingFolder(true);
-              }}
-              className="p-1 hover:bg-gray-600 rounded"
-              title={t('files:newFolder')}
-            >
-              <FolderIcon className="w-4 h-4" />
-            </button>
-            <label className="p-1 hover:bg-gray-600 rounded cursor-pointer" title={t('files:importTrack')}>
-              <input
-                id="file-import-input"
-                type="file"
-                accept=".js,.txt"
-                onChange={importTrack}
-                className="hidden"
-              />
-              <ArrowDownTrayIcon className="w-4 h-4 rotate-180" />
-            </label>
-          </div>
+          {/* Hidden file input for drag & drop and context menu import */}
+          <input
+            id="file-import-input"
+            type="file"
+            accept=".js,.txt"
+            onChange={importTrack}
+            className="hidden"
+          />
         </div>
         
         {/* New track input */}
@@ -901,6 +952,46 @@ export function FileManager({ context }: FileManagerProps) {
             </button>
           </div>
         )}
+
+        {/* New step input */}
+        {isCreatingStep && selectedStepTrack && (
+          <div className="flex space-x-1 mb-2">
+            <input
+              type="text"
+              value={newStepName}
+              onChange={(e) => setNewStepName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') addStep(selectedStepTrack);
+                if (e.key === 'Escape') {
+                  setIsCreatingStep(false);
+                  setNewStepName('');
+                  setSelectedStepTrack(null);
+                }
+              }}
+              placeholder={t('files:stepName')}
+              className="flex-1 px-2 py-1 text-xs bg-background border border-gray-600 rounded"
+              autoFocus
+            />
+            <button
+              onClick={() => addStep(selectedStepTrack)}
+              className="px-2 py-1 text-xs bg-purple-600 hover:bg-purple-700 rounded"
+              disabled={!newStepName.trim()}
+            >
+              {t('files:addStep')}
+            </button>
+            <button
+              onClick={() => {
+                setIsCreatingStep(false);
+                setNewStepName('');
+                setSelectedStepTrack(null);
+              }}
+              className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-700 rounded"
+              title={t('common:cancel')}
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
 
       {/* File Tree */}
@@ -913,6 +1004,7 @@ export function FileManager({ context }: FileManagerProps) {
         onTrackDelete={deleteTrack}
         onTrackDuplicate={duplicateTrack}
         onTrackInfo={handleTrackInfo}
+        onTrackCreate={handleTrackCreate}
         onFolderCreate={handleFolderCreate}
         onFolderRename={handleFolderRename}
         onFolderDelete={deleteFolder}
@@ -924,6 +1016,17 @@ export function FileManager({ context }: FileManagerProps) {
         onRenameFinish={renamingTrack ? finishRename : finishRenameFolder}
         onRenameCancel={cancelRename}
         emptySpaceContextItems={getEmptySpaceContextItems()}
+        onConvertToMultitrack={convertToMultitrack}
+        onAddStep={(trackId) => {
+          setSelectedStepTrack(trackId);
+          setIsCreatingStep(true);
+        }}
+        onSwitchStep={switchToStep}
+        onRenameStep={startRenameStep}
+        onDeleteStep={deleteStep}
+        renamingStep={renamingStep}
+        onRenameStepFinish={finishRenameStep}
+        onRenameStepCancel={cancelRename}
       />
 
       {/* Footer with current track info */}

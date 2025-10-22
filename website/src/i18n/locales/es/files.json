@@ -67,5 +67,20 @@
   "folderMoved": "¡Carpeta movida con éxito!",
   "rootFolder": "Raíz",
   "rightClickToCreate": "Clic derecho para crear archivos y carpetas",
-  "exportAll": "Exportar Todas las Pistas"
+  "exportAll": "Exportar Todas las Pistas",
+  "dropToImport": "Arrastra archivos aquí para importar",
+  "trackImported": "Pista '{{name}}' importada exitosamente!",
+  "invalidFileType": "Por favor arrastra solo archivos .js o .txt",
+  "convertToMultitrack": "Convertir a Multipista",
+  "convertedToMultitrack": "¡Pista convertida a multipista exitosamente!",
+  "addStep": "Agregar Paso",
+  "stepName": "Nombre del paso",
+  "stepAdded": "¡Paso agregado exitosamente!",
+  "stepDeleted": "¡Paso eliminado exitosamente!",
+  "cannotDeleteLastStep": "No se puede eliminar el último paso",
+  "multitrackDownloaded": "¡Multipista descargada como ZIP exitosamente!",
+  "activeStep": "Paso Activo",
+  "newMultitrack": "Nueva Multipista",
+  "multitrackCreated": "¡Multipista creada exitosamente!",
+  "stepRenamed": "¡Paso renombrado exitosamente!"
 }

@@ -69,13 +69,32 @@ async function deployToVercel() {
     runCommand('npm install -g vercel');
   }
   
+  // Check if user is logged in
+  try {
+    execSync('vercel whoami', { stdio: 'ignore' });
+  } catch {
+    console.log('🔐 You need to login to Vercel first.');
+    console.log('Please run: vercel login');
+    console.log('Or set VERCEL_TOKEN environment variable');
+    return;
+  }
+  
   const isProduction = await question('Deploy to production? (y/N): ');
   
   console.log('📦 Installing dependencies...');
-  runCommand('pnpm install', './website');
+  try {
+    runCommand('pnpm install', './website');
+  } catch {
+    console.log('📦 pnpm not found, using npm...');
+    runCommand('npm install', './website');
+  }
   
   console.log('🏗️  Building project...');
-  runCommand('pnpm build', './website');
+  try {
+    runCommand('pnpm build', './website');
+  } catch {
+    runCommand('npm run build', './website');
+  }
   
   console.log('🚀 Deploying...');
   const deployCommand = isProduction.toLowerCase() === 'y' ? 'vercel --prod' : 'vercel';

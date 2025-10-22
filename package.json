@@ -30,7 +30,11 @@
     "iclc": "cd paper && pandoc --template=pandoc/iclc.html --citeproc  --number-sections iclc2023.md -o iclc2023.html && pandoc --template=pandoc/iclc.latex --citeproc --number-sections iclc2023.md -o iclc2023.pdf",
     "deploy": "node deploy.js",
     "deploy:vercel": "./scripts/deploy-vercel.sh",
-    "deploy:vercel:prod": "./scripts/deploy-vercel.sh --production"
+    "deploy:vercel:prod": "./scripts/deploy-vercel.sh --production",
+    "setup:workspace": "./scripts/setup-workspace.sh",
+    "sync:packages": "./scripts/sync-packages.sh",
+    "build:packages": "pnpm -r --filter='!website' build",
+    "clean:workspace": "rm -rf node_modules website/node_modules packages/*/node_modules pnpm-lock.yaml"
   },
   "repository": {
     "type": "git",
@@ -50,12 +54,12 @@
   },
   "homepage": "https://strudel.cc",
   "dependencies": {
-    "@strudel/core": "^1.2.4",
-    "@strudel/mini": "^1.2.4",
-    "@strudel/tonal": "^1.2.4",
-    "@strudel/transpiler": "^1.2.4",
-    "@strudel/webaudio": "^1.2.5",
-    "@strudel/xen": "^1.2.4"
+    "@strudel/core": "workspace:*",
+    "@strudel/mini": "workspace:*",
+    "@strudel/tonal": "workspace:*",
+    "@strudel/transpiler": "workspace:*",
+    "@strudel/webaudio": "workspace:*",
+    "@strudel/xen": "workspace:*"
   },
   "devDependencies": {
     "@eslint/compat": "^1.2.5",
