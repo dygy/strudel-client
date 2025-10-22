@@ -14,6 +14,15 @@ import {
 import { useTranslation } from '@src/i18n';
 import { WorkingContextMenu } from '../ui/WorkingContextMenu';
 
+interface ContextMenuItem {
+  label: string
+  icon: JSX.Element
+  onClick: () => void
+  separator?: false
+}
+
+interface Separator  { separator: true, label: string, onClick: () => void }
+
 interface Track {
   id: string;
   name: string;
@@ -216,7 +225,8 @@ export function FileTree({
   };
 
   const getTrackContextItems = (track: Track) => {
-    const baseItems = [
+
+    const baseItems: (ContextMenuItem | Separator)[] = [
       {
         label: t('files:load'),
         icon: <DocumentIcon className="w-4 h-4" />,
