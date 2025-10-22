@@ -60,6 +60,10 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-inview": "^4.5.1",
+    "react-i18next": "^13.5.0",
+    "i18next": "^23.7.16",
+    "i18next-browser-languagedetector": "^7.2.0",
+    "i18next-http-backend": "^2.4.2",
     "react-lite-youtube-embed": "^2.4.0",
     "rehype-autolink-headings": "^7.1.0",
     "rehype-slug": "^6.0.0",
@@ -72,6 +76,7 @@
     "@vite-pwa/astro": "^0.5.0",
     "html-escaper": "^3.0.3",
     "sharp": "^0.33.5",
+    "typescript": "^5.7.3",
     "workbox-window": "^7.3.0",
     "vite-plugin-bundle-audioworklet": "^0.1.1"
   }

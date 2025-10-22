@@ -23,6 +23,7 @@ main {
 }
 
 .cm-editor {
+  direction: ltr!important;
   height: 100%;
 }
 

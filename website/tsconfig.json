@@ -2,18 +2,37 @@
   "extends": "astro/tsconfigs/strict",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "skipLibCheck": true,
     "jsxImportSource": "react",
-    "noImplicitAny": false,
     "baseUrl": ".",
     "typeRoots": ["./node_modules/@types", "./src/types"],
     "paths": {
       "@components/*": ["src/components/*"],
       "@src/*": ["src/*"],
-    }
+    },
+    // TypeScript Migration Settings
+    "allowJs": true,
+    "checkJs": false,
+    "noImplicitAny": false,
+    "strict": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    // Incremental migration settings
+    "noImplicitReturns": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": [
     "src/**/*",
     "src/types/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
   ]
 }
