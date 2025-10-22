@@ -93,6 +93,8 @@ export function FileTree({
   onTrackDelete,
   onTrackDuplicate,
   onTrackInfo,
+  onTrackDownload,
+  onFolderDownload,
   onTrackCreate,
   onFolderCreate,
   onFolderRename,
@@ -520,11 +522,13 @@ export function FileTree({
           </div>
         </WorkingContextMenu>
       ) : (
-        <div className="py-2 min-h-full">
-          {tree.map(node => renderNode(node))}
+        <div className="py-2 min-h-full flex flex-col">
+          <div>
+            {tree.map(node => renderNode(node))}
+          </div>
           {/* Flexible empty space for context menu that fills remaining height */}
           <WorkingContextMenu items={emptySpaceContextItems}>
-            <div className="flex-1 min-h-[100px]"></div>
+            <div className="flex-1 min-h-[200px]"></div>
           </WorkingContextMenu>
         </div>
       )}
