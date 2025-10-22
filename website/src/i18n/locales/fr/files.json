@@ -54,5 +54,18 @@
   "trackName": "Nom de la piste",
   "create": "Créer",
   "noTracksYet": "Aucune piste pour le moment. Créez votre première piste !",
-  "importTrack": "Importer une piste"
+  "importTrack": "Importer une piste",
+  "newFolder": "Nouveau Dossier",
+  "folderName": "Nom du dossier",
+  "createFolder": "Créer le Dossier",
+  "openFolder": "Ouvrir le Dossier",
+  "folderDeleted": "Dossier supprimé avec succès !",
+  "folderRenamed": "Dossier renommé avec succès !",
+  "folderNotEmpty": "Impossible de supprimer le dossier : il contient des fichiers ou des sous-dossiers",
+  "noItemsInFolder": "Ce dossier est vide",
+  "trackMoved": "Piste déplacée avec succès !",
+  "folderMoved": "Dossier déplacé avec succès !",
+  "rootFolder": "Racine",
+  "rightClickToCreate": "Clic droit pour créer des fichiers et dossiers",
+  "exportAll": "Exporter Toutes les Pistes"
 }

@@ -59,6 +59,8 @@ export interface Settings {
   multiChannelOrbits: boolean;
   isFileManagerOpen: boolean;
   language: Language;
+  isAutosaveEnabled: boolean;
+  autosaveInterval: number; // in milliseconds
 }
 
 // Raw settings interface (as stored, with string values for booleans)
@@ -96,6 +98,8 @@ export interface RawSettings {
   multiChannelOrbits: boolean | string;
   isFileManagerOpen: boolean | string;
   language: Language;
+  isAutosaveEnabled: boolean | string;
+  autosaveInterval: number;
 }
 
 export const audioEngineTargets = {
@@ -148,6 +152,8 @@ export const defaultSettings: RawSettings = {
   multiChannelOrbits: false,
   isFileManagerOpen: true,
   language: 'en',
+  isAutosaveEnabled: false,
+  autosaveInterval: 30000, // 30 seconds default
 };
 
 let search: URLSearchParams | null = null;

@@ -31,5 +31,9 @@
   "bottom": "תחתון",
   "right": "ימין",
   "click": "לחיצה",
-  "hover": "ריחוף"
+  "hover": "ריחוף",
+  "autosave": "שמירה אוטומטית",
+  "autosaveEnabled": "הפעל שמירה אוטומטית",
+  "autosaveInterval": "מרווח שמירה אוטומטית (שניות)",
+  "autosaveDescription": "שמור את הרצועה הנוכחית אוטומטית במרווחים קבועים"
 }

@@ -31,5 +31,9 @@
   "bottom": "أسفل",
   "right": "يمين",
   "click": "نقر",
-  "hover": "تحويم"
+  "hover": "تحويم",
+  "autosave": "الحفظ التلقائي",
+  "autosaveEnabled": "تفعيل الحفظ التلقائي",
+  "autosaveInterval": "فترة الحفظ التلقائي (ثواني)",
+  "autosaveDescription": "حفظ المسار الحالي تلقائياً على فترات منتظمة"
 }

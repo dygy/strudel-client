@@ -27,7 +27,10 @@
     "report-undocumented": "npm run jsdoc-json && node jsdoc/undocumented.mjs > undocumented.json",
     "check": "npm run format-check && npm run lint && npm run test",
     "sampler": "cd samples && node ../packages/sampler/sample-server.mjs",
-    "iclc": "cd paper && pandoc --template=pandoc/iclc.html --citeproc  --number-sections iclc2023.md -o iclc2023.html && pandoc --template=pandoc/iclc.latex --citeproc --number-sections iclc2023.md -o iclc2023.pdf"
+    "iclc": "cd paper && pandoc --template=pandoc/iclc.html --citeproc  --number-sections iclc2023.md -o iclc2023.html && pandoc --template=pandoc/iclc.latex --citeproc --number-sections iclc2023.md -o iclc2023.pdf",
+    "deploy": "node deploy.js",
+    "deploy:vercel": "./scripts/deploy-vercel.sh",
+    "deploy:vercel:prod": "./scripts/deploy-vercel.sh --production"
   },
   "repository": {
     "type": "git",

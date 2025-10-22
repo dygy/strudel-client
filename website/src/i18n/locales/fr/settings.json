@@ -31,5 +31,9 @@
   "bottom": "Bas",
   "right": "Droite",
   "click": "Clic",
-  "hover": "Survol"
+  "hover": "Survol",
+  "autosave": "Sauvegarde automatique",
+  "autosaveEnabled": "Activer la sauvegarde automatique",
+  "autosaveInterval": "Intervalle de sauvegarde automatique (secondes)",
+  "autosaveDescription": "Sauvegarder automatiquement la piste actuelle à intervalles réguliers"
 }

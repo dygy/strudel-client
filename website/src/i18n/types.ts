@@ -72,6 +72,17 @@ export interface FilesTranslations {
   create: string;
   noTracksYet: string;
   importTrack: string;
+  newFolder: string;
+  folderName: string;
+  createFolder: string;
+  openFolder: string;
+  folderDeleted: string;
+  folderRenamed: string;
+  folderNotEmpty: string;
+  noItemsInFolder: string;
+  trackMoved: string;
+  folderMoved: string;
+  rootFolder: string;
 }
 
 export interface SettingsTranslations {
@@ -108,6 +119,10 @@ export interface SettingsTranslations {
   right: string;
   click: string;
   hover: string;
+  autosave: string;
+  autosaveEnabled: string;
+  autosaveInterval: string;
+  autosaveDescription: string;
 }
 
 export interface TabsTranslations {

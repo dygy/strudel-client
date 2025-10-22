@@ -31,5 +31,9 @@
   "bottom": "Bottom",
   "right": "Right",
   "click": "Click",
-  "hover": "Hover"
+  "hover": "Hover",
+  "autosave": "Autosave",
+  "autosaveEnabled": "Enable Autosave",
+  "autosaveInterval": "Autosave Interval (seconds)",
+  "autosaveDescription": "Automatically save the current track at regular intervals"
 }

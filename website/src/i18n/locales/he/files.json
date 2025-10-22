@@ -54,5 +54,18 @@
   "trackName": "שם רצועה",
   "create": "צור",
   "noTracksYet": "אין רצועות עדיין. צור את הרצועה הראשונה שלך!",
-  "importTrack": "יבא רצועה"
+  "importTrack": "יבא רצועה",
+  "newFolder": "תיקייה חדשה",
+  "folderName": "שם תיקייה",
+  "createFolder": "צור תיקייה",
+  "openFolder": "פתח תיקייה",
+  "folderDeleted": "תיקייה נמחקה בהצלחה!",
+  "folderRenamed": "תיקייה שונתה בהצלחה!",
+  "folderNotEmpty": "לא ניתן למחוק תיקייה: היא מכילה קבצים או תת-תיקיות",
+  "noItemsInFolder": "תיקייה זו ריקה",
+  "trackMoved": "רצועה הועברה בהצלחה!",
+  "folderMoved": "תיקייה הועברה בהצלחה!",
+  "rootFolder": "שורש",
+  "rightClickToCreate": "לחץ לחיצה ימנית ליצירת קבצים ותיקיות",
+  "exportAll": "ייצא את כל הרצועות"
 }

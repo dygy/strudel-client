@@ -54,5 +54,18 @@
   "trackName": "Track name",
   "create": "Create",
   "noTracksYet": "No tracks yet. Create your first track!",
-  "importTrack": "Import track"
+  "importTrack": "Import track",
+  "newFolder": "New Folder",
+  "folderName": "Folder name",
+  "createFolder": "Create Folder",
+  "openFolder": "Open Folder",
+  "folderDeleted": "Folder deleted successfully!",
+  "folderRenamed": "Folder renamed successfully!",
+  "folderNotEmpty": "Cannot delete folder: it contains files or subfolders",
+  "noItemsInFolder": "This folder is empty",
+  "trackMoved": "Track moved successfully!",
+  "folderMoved": "Folder moved successfully!",
+  "rootFolder": "Root",
+  "rightClickToCreate": "Right-click to create files and folders",
+  "exportAll": "Export All Tracks"
 }

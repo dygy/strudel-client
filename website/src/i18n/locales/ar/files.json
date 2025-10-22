@@ -54,5 +54,18 @@
   "trackName": "اسم المسار",
   "create": "إنشاء",
   "noTracksYet": "لا توجد مسارات بعد. أنشئ مسارك الأول!",
-  "importTrack": "استيراد مسار"
+  "importTrack": "استيراد مسار",
+  "newFolder": "مجلد جديد",
+  "folderName": "اسم المجلد",
+  "createFolder": "إنشاء مجلد",
+  "openFolder": "فتح مجلد",
+  "folderDeleted": "تم حذف المجلد بنجاح!",
+  "folderRenamed": "تم إعادة تسمية المجلد بنجاح!",
+  "folderNotEmpty": "لا يمكن حذف المجلد: يحتوي على ملفات أو مجلدات فرعية",
+  "noItemsInFolder": "هذا المجلد فارغ",
+  "trackMoved": "تم نقل المسار بنجاح!",
+  "folderMoved": "تم نقل المجلد بنجاح!",
+  "rootFolder": "الجذر",
+  "rightClickToCreate": "انقر بزر الماوس الأيمن لإنشاء ملفات ومجلدات",
+  "exportAll": "تصدير جميع المسارات"
 }

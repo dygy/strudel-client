@@ -146,6 +146,8 @@ export function SettingsTab({ started }: SettingsTabProps) {
     isTabIndentationEnabled,
     isMultiCursorEnabled,
     language,
+    isAutosaveEnabled,
+    autosaveInterval,
   } = useSettings();
   const shouldAlwaysSync = isUdels();
   const canChangeAudioDevice = AudioContext.prototype.setSinkId != null;
@@ -220,6 +222,33 @@ export function SettingsTab({ started }: SettingsTabProps) {
           value={multiChannelOrbits}
         />
       </FormItem>
+      
+      <FormItem label={t('autosave')}>
+        <div className="space-y-2">
+          <Checkbox
+            label={t('autosaveEnabled')}
+            onChange={(cbEvent) => {
+              settingsMap.setKey('isAutosaveEnabled', cbEvent.target.checked);
+            }}
+            value={isAutosaveEnabled}
+          />
+          {isAutosaveEnabled && (
+            <div className="ml-6">
+              <FormItem label={t('autosaveInterval')}>
+                <NumberSlider
+                  value={autosaveInterval / 1000} // Convert ms to seconds for UI
+                  onChange={(seconds) => settingsMap.setKey('autosaveInterval', seconds * 1000)}
+                  min={5}
+                  max={300}
+                  step={5}
+                />
+              </FormItem>
+              <p className="text-xs text-gray-400 mt-1">{t('autosaveDescription')}</p>
+            </div>
+          )}
+        </div>
+      </FormItem>
+      
       <FormItem label={t('theme')}>
         <SelectInput options={themeOptions} value={theme} onChange={(theme) => settingsMap.setKey('theme', theme)} />
       </FormItem>

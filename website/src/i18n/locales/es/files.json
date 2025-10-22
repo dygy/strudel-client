@@ -54,5 +54,18 @@
   "trackName": "Nombre de pista",
   "create": "Crear",
   "noTracksYet": "Aún no hay pistas. ¡Crea tu primera pista!",
-  "importTrack": "Importar pista"
+  "importTrack": "Importar pista",
+  "newFolder": "Nueva Carpeta",
+  "folderName": "Nombre de carpeta",
+  "createFolder": "Crear Carpeta",
+  "openFolder": "Abrir Carpeta",
+  "folderDeleted": "¡Carpeta eliminada con éxito!",
+  "folderRenamed": "¡Carpeta renombrada con éxito!",
+  "folderNotEmpty": "No se puede eliminar la carpeta: contiene archivos o subcarpetas",
+  "noItemsInFolder": "Esta carpeta está vacía",
+  "trackMoved": "¡Pista movida con éxito!",
+  "folderMoved": "¡Carpeta movida con éxito!",
+  "rootFolder": "Raíz",
+  "rightClickToCreate": "Clic derecho para crear archivos y carpetas",
+  "exportAll": "Exportar Todas las Pistas"
 }
