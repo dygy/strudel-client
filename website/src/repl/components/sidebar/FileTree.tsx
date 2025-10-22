@@ -439,7 +439,7 @@ export function FileTree({
                     )}
                   </div>
                   {/* Burger menu button */}
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div>
                     <BurgerMenuButton
                       items={node.type === 'track' 
                         ? getTrackContextItems(node.data as Track)
@@ -513,7 +513,7 @@ export function FileTree({
                               <span className="text-xs text-purple-400">●</span>
                             )}
                             {/* Burger menu button for steps */}
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div>
                               <BurgerMenuButton
                                 items={getStepContextItems(node.id, stepIndex, step)}
                                 size="sm"

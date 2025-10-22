@@ -137,7 +137,7 @@ function PatternButton({ showOutline, onClick, pattern, showHiglight, isUserPatt
         <PatternLabel pattern={pattern} />
       </div>
       {isUserPattern && (
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+        <div className="ml-2">
           <BurgerMenuButton
             items={getPatternContextItems()}
             size="sm"

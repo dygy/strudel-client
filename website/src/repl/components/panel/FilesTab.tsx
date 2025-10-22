@@ -194,7 +194,7 @@ export function FilesTab() {
                 <FolderIcon />
                 <span>{folder.name}</span>
               </div>
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+              <div>
                 <BurgerMenuButton
                   items={getFolderContextItems(folder)}
                   size="sm"
@@ -215,7 +215,7 @@ export function FilesTab() {
                 <FileIcon />
                 <span>{file.name}</span>
               </div>
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+              <div>
                 <BurgerMenuButton
                   items={getFileContextItems(file)}
                   size="sm"

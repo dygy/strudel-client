@@ -11,6 +11,7 @@ import { FileTree } from './FileTree';
 import { InfoModal } from '../ui/InfoModal';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import { useToast } from '../ui/Toast';
+import { BurgerMenuButton } from '../ui/BurgerMenuButton';
 import { useSettings } from '@src/settings';
 
 const TRACKS_STORAGE_KEY = 'strudel_tracks';
@@ -1142,8 +1143,13 @@ export function FileManager({ context }: FileManagerProps) {
       
       {/* Header */}
       <div className="p-3 border-b border-gray-600">
-        <div className="mb-2">
+        <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-semibold">{t('tabs:files')}</h3>
+          <BurgerMenuButton
+            items={getEmptySpaceContextItems()}
+            size="sm"
+          />
+        </div>
           {/* Hidden file input for drag & drop and context menu import */}
           <input
             id="file-import-input"
