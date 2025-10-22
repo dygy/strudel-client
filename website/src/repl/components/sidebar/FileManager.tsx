@@ -1112,7 +1112,6 @@ export function FileManager({ context }: FileManagerProps) {
       label: t('files:exportLibraryAsZip'),
       icon: <ArrowDownTrayIcon className="w-4 h-4" />,
       onClick: exportLibraryAsZip,
-      className: "p-3 border-b border-gray-600",
     },
     {
       label: t('files:importLibraryFromZip'),
@@ -1121,7 +1120,6 @@ export function FileManager({ context }: FileManagerProps) {
         const fileInput = document.getElementById('library-import-input') as HTMLInputElement;
         fileInput?.click();
       },
-      className: "p-3 border-b border-gray-600",
     },
   ];
 
@@ -1150,23 +1148,22 @@ export function FileManager({ context }: FileManagerProps) {
             size="sm"
           />
         </div>
-          {/* Hidden file input for drag & drop and context menu import */}
-          <input
-            id="file-import-input"
-            type="file"
-            accept=".js,.txt"
-            onChange={importTrack}
-            className="hidden"
-          />
-          {/* Hidden file input for library import */}
-          <input
-            id="library-import-input"
-            type="file"
-            accept=".zip"
-            onChange={importLibraryFromZip}
-            className="hidden"
-          />
-        </div>
+        {/* Hidden file input for drag & drop and context menu import */}
+        <input
+          id="file-import-input"
+          type="file"
+          accept=".js,.txt"
+          onChange={importTrack}
+          className="hidden"
+        />
+        {/* Hidden file input for library import */}
+        <input
+          id="library-import-input"
+          type="file"
+          accept=".zip"
+          onChange={importLibraryFromZip}
+          className="hidden"
+        />
         
         {/* New track input */}
         {isCreating && (
