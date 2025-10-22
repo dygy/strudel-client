@@ -1,0 +1,21 @@
+{
+  "title": "ברוכים הבאים",
+  "description": "מצאתם את strudel, פלטפורמת live coding חדשה לכתיבת יצירות מוזיקה דינמיות בדפדפן! היא חינמית וקוד פתוח ונוצרה עבור מתחילים ומומחים כאחד. כדי להתחיל:",
+  "steps": "1. לחצו play - 2. שנו משהו - 3. לחצו update",
+  "getStarted": "כדי להתחיל, עיינו ב",
+  "interactiveTutorial": "מדריך אינטראקטיבי",
+  "joinDiscord": "גם אל תהססו להצטרף ל",
+  "discordChannel": "ערוץ discord",
+  "discordText": "כדי לשאול שאלות, לתת משוב או פשוט להגיד שלום.",
+  "aboutTitle": "אודות",
+  "aboutDescription": "strudel הוא גרסת JavaScript של",
+  "tidalcycles": "tidalcycles",
+  "tidalDescription": ", שהוא שפת live coding פופולרית למוזיקה, כתובה ב-Haskell. Strudel הוא תוכנה חופשית/קוד פתוח: אתם יכולים להפיץ ו/או לשנות אותה תחת תנאי",
+  "license": "רישיון GNU Affero General Public License",
+  "sourceCode": "אתם יכולים למצוא את קוד המקור ב",
+  "codeberg": "codeberg",
+  "licensingInfo": "אתם גם יכולים למצוא מידע על רישוי",
+  "defaultSounds": "עבור בנקי הצלילים הברירת מחדל שם. אנא שקלו",
+  "support": "לתמוך בפרויקט הזה",
+  "supportText": "כדי להבטיח פיתוח מתמשך 💖"
+}

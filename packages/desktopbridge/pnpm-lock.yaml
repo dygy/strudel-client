@@ -1,0 +1,37 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@strudel/core':
+        specifier: ^1.2.4
+        version: 1.2.4
+      '@tauri-apps/api':
+        specifier: ^2.2.0
+        version: 2.9.0
+
+packages:
+
+  '@strudel/core@1.2.4':
+    resolution: {integrity: sha512-sUm9/zjEEQuWfW3hNOCcfNbn8jq2G+Ye+mvpLUgcGyLfI5XPlPTn/PBIkv2hFjNs/basnMyrOUvg0Z85AA6+OA==}
+
+  '@tauri-apps/api@2.9.0':
+    resolution: {integrity: sha512-qD5tMjh7utwBk9/5PrTA/aGr3i5QaJ/Mlt7p8NilQ45WgbifUNPyKWsA63iQ8YfQq6R8ajMapU+/Q8nMcPRLNw==}
+
+  fraction.js@5.3.4:
+    resolution: {integrity: sha512-1X1NTtiJphryn/uLQz3whtY6jK3fTqoE3ohKs0tT+Ujr1W59oopxmoEh7Lu5p6vBaPbgoM0bzveAW4Qi5RyWDQ==}
+
+snapshots:
+
+  '@strudel/core@1.2.4':
+    dependencies:
+      fraction.js: 5.3.4
+
+  '@tauri-apps/api@2.9.0': {}
+
+  fraction.js@5.3.4: {}

@@ -1,0 +1,219 @@
+/*
+hap.ts - Core Hap (Event) class for Strudel
+Copyright (C) 2022 Strudel contributors - see <https://codeberg.org/uzu/strudel/src/branch/main/packages/core/hap.mjs>
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details. You should have received a copy of the GNU Affero General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+import Fraction from './fraction.mjs';
+import { stringifyValues } from './util.mjs';
+
+// Type definitions
+export interface TimeSpan {
+  begin: Fraction;
+  end: Fraction;
+  show(): string;
+  equals(other: TimeSpan): boolean;
+}
+
+export interface HapContext {
+  tags?: string[];
+  locations?: any[];
+  [key: string]: any;
+}
+
+export interface HapValue {
+  duration?: number;
+  clip?: number;
+  [key: string]: any;
+}
+
+export type StatefulFunction<T = any> = (state: T) => [T, any];
+
+export class Hap<T = any> {
+  /*
+      Event class, representing a value active during the timespan
+      'part'. This might be a fragment of an event, in which case the
+      timespan will be smaller than the 'whole' timespan, otherwise the
+      two timespans will be the same. The 'part' must never extend outside of the
+      'whole'. If the event represents a continuously changing value
+      then the whole will be returned as None, in which case the given
+      value will have been sampled from the point halfway between the
+      start and end of the 'part' timespan.
+      The context is to store a list of source code locations causing the event.
+
+      The word 'Event' is more or less a reserved word in javascript, hence this
+      class is named called 'Hap'.
+      */
+
+  public whole: TimeSpan | undefined;
+  public part: TimeSpan;
+  public value: T | StatefulFunction<any>;
+  public context: HapContext;
+  public stateful: boolean;
+
+  constructor(
+    whole: TimeSpan | undefined, 
+    part: TimeSpan, 
+    value: T | StatefulFunction<any>, 
+    context: HapContext = {}, 
+    stateful: boolean = false
+  ) {
+    this.whole = whole;
+    this.part = part;
+    this.value = value;
+    this.context = context;
+    this.stateful = stateful;
+    if (stateful) {
+      console.assert(typeof this.value === 'function', 'Stateful values must be functions');
+    }
+  }
+
+  get duration(): Fraction {
+    let duration: Fraction;
+    if (typeof (this.value as HapValue)?.duration === 'number') {
+      duration = Fraction((this.value as HapValue).duration!);
+    } else {
+      duration = this.whole!.end.sub(this.whole!.begin);
+    }
+    if (typeof (this.value as HapValue)?.clip === 'number') {
+      return duration.mul((this.value as HapValue).clip!);
+    }
+    return duration;
+  }
+
+  get endClipped(): Fraction {
+    return this.whole!.begin.add(this.duration);
+  }
+
+  isActive(currentTime: Fraction): boolean {
+    return this.whole!.begin <= currentTime && this.endClipped >= currentTime;
+  }
+
+  isInPast(currentTime: Fraction): boolean {
+    return currentTime > this.endClipped;
+  }
+
+  isInNearPast(margin: Fraction, currentTime: Fraction): boolean {
+    return currentTime - margin <= this.endClipped;
+  }
+
+  isInFuture(currentTime: Fraction): boolean {
+    return currentTime < this.whole!.begin;
+  }
+
+  isInNearFuture(margin: Fraction, currentTime: Fraction): boolean {
+    return currentTime < this.whole!.begin && currentTime > this.whole!.begin - margin;
+  }
+
+  isWithinTime(min: Fraction, max: Fraction): boolean {
+    return this.whole!.begin <= max && this.endClipped >= min;
+  }
+
+  wholeOrPart(): TimeSpan {
+    return this.whole ? this.whole : this.part;
+  }
+
+  withSpan(func: (span: TimeSpan) => TimeSpan): Hap<T> {
+    // Returns a new hap with the function f applies to the hap timespan.
+    const whole = this.whole ? func(this.whole) : undefined;
+    return new Hap(whole, func(this.part), this.value, this.context);
+  }
+
+  withValue<U>(func: (value: T) => U): Hap<U> {
+    // Returns a new hap with the function f applies to the hap value.
+    return new Hap(this.whole, this.part, func(this.value as T), this.context);
+  }
+
+  hasOnset(): boolean {
+    // Test whether the hap contains the onset, i.e that
+    // the beginning of the part is the same as that of the whole timespan.
+    return this.whole != undefined && this.whole.begin.equals(this.part.begin);
+  }
+
+  hasTag(tag: string): boolean {
+    return this.context.tags?.includes(tag) || false;
+  }
+
+  resolveState<S>(state: S): [S, Hap<T>] {
+    if (this.stateful && this.hasOnset()) {
+      console.log('stateful');
+      const func = this.value as StatefulFunction<S>;
+      const [newState, newValue] = func(state);
+      return [newState, new Hap(this.whole, this.part, newValue, this.context, false)];
+    }
+    return [state, this];
+  }
+
+  spanEquals(other: Hap<any>): boolean {
+    return (this.whole == undefined && other.whole == undefined) || 
+           (this.whole != undefined && other.whole != undefined && this.whole.equals(other.whole));
+  }
+
+  equals(other: Hap<any>): boolean {
+    return (
+      this.spanEquals(other) &&
+      this.part.equals(other.part) &&
+      // TODO would == be better ??
+      this.value === other.value
+    );
+  }
+
+  show(compact: boolean = false): string {
+    const value =
+      typeof this.value === 'object'
+        ? compact
+          ? JSON.stringify(this.value).slice(1, -1).replaceAll('"', '').replaceAll(',', ' ')
+          : JSON.stringify(this.value)
+        : this.value;
+    let spans = '';
+    if (this.whole == undefined) {
+      spans = '~' + this.part.show();
+    } else {
+      const is_whole = this.whole.begin.equals(this.part.begin) && this.whole.end.equals(this.part.end);
+      if (!this.whole.begin.equals(this.part.begin)) {
+        spans = this.whole.begin.show() + ' ⇜ ';
+      }
+      if (!is_whole) {
+        spans += '(';
+      }
+      spans += this.part.show();
+      if (!is_whole) {
+        spans += ')';
+      }
+      if (!this.whole.end.equals(this.part.end)) {
+        spans += ' ⇝ ' + this.whole.end.show();
+      }
+    }
+    return '[ ' + spans + ' | ' + value + ' ]';
+  }
+
+  showWhole(compact: boolean = false): string {
+    return `${this.whole == undefined ? '~' : this.whole.show()}: ${stringifyValues(this.value, compact)}`;
+  }
+
+  combineContext(b: Hap<any>): HapContext {
+    const a = this;
+    return { 
+      ...a.context, 
+      ...b.context, 
+      locations: (a.context.locations || []).concat(b.context.locations || []) 
+    };
+  }
+
+  setContext(context: HapContext): Hap<T> {
+    return new Hap(this.whole, this.part, this.value, context);
+  }
+
+  ensureObjectValue(): void {
+    /* if (isNote(hap.value)) {
+      // supports primitive hap values that look like notes
+      hap.value = { note: hap.value };
+    } */
+    if (typeof this.value !== 'object') {
+      throw new Error(
+        `expected hap.value to be an object, but got "${this.value}". Hint: append .note() or .s() to the end`,
+      );
+    }
+  }
+}
+
+export default Hap;

@@ -1,0 +1,5 @@
+{
+  "zenModeHint": "Press Ctrl+. to toggle zen mode",
+  "reloadRequired": "This change requires a page reload. Continue?",
+  "confirmReset": "Are you sure you want to reset all settings to defaults?"
+}

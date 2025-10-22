@@ -11,7 +11,8 @@ import {
   ClipboardDocumentIcon
 } from '@heroicons/react/24/outline';
 import cx from '@src/cx';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@src/i18n';
+import { formatDateTimeIntl } from '@src/i18n/dateFormat';
 import { WorkingContextMenu } from '../ui/WorkingContextMenu';
 import { InfoModal } from '../ui/InfoModal';
 import { ConfirmModal } from '../ui/ConfirmModal';
@@ -49,7 +50,7 @@ export function FileManager({ context }: FileManagerProps) {
   const [infoModalData, setInfoModalData] = useState<{ title: string; items: Array<{ label: string; value: string }> }>({ title: '', items: [] });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
-  const { t } = useTranslation('files');
+  const { t, i18n } = useTranslation(['files', 'common', 'tabs']);
   const toast = useToast();
 
   // Helper function for better date formatting
@@ -123,7 +124,7 @@ export function FileManager({ context }: FileManagerProps) {
     // Get current code from the editor
     const currentCode = context.editorRef?.current?.code || context.activeCode || '';
     if (!currentCode.trim()) {
-      toast.warning(t('noCodeToSave'));
+      toast.warning(t('files:noCodeToSave'));
       return;
     }
     
@@ -136,7 +137,7 @@ export function FileManager({ context }: FileManagerProps) {
       }
     }));
     
-    toast.success(t('trackSaved'));
+    toast.success(t('files:trackSaved'));
   };
 
   const deleteTrack = (trackId: string) => {
@@ -156,7 +157,7 @@ export function FileManager({ context }: FileManagerProps) {
         setSelectedTrack(null);
       }
       setTrackToDelete(null);
-      toast.success(t('files.trackDeleted') || 'Track deleted successfully!');
+      toast.success(t('files:trackDeleted'));
     }
   };
 
@@ -171,7 +172,7 @@ export function FileManager({ context }: FileManagerProps) {
     };
     
     setTracks(prev => ({ ...prev, [trackId]: duplicatedTrack }));
-    toast.success(t('trackDuplicated'));
+    toast.success(t('files:trackDuplicated'));
   };
 
   const downloadTrack = (track: Track) => {
@@ -185,7 +186,7 @@ export function FileManager({ context }: FileManagerProps) {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    toast.success(t('trackDownloaded'));
+    toast.success(t('files:trackDownloaded'));
   };
 
   const importTrack = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -231,7 +232,7 @@ export function FileManager({ context }: FileManagerProps) {
       }));
       
       if (oldName !== renameValue.trim()) {
-        toast.success(t('trackRenamed'));
+        toast.success(t('files:trackRenamed'));
       }
     }
     setRenamingTrack(null);
@@ -263,7 +264,7 @@ export function FileManager({ context }: FileManagerProps) {
   // Context menu items for tracks
   const getTrackContextItems = (track: Track) => [
     {
-      label: selectedTrack === track.id ? t('save') : t('load'),
+      label: selectedTrack === track.id ? t('files:save') : t('files:load'),
       icon: selectedTrack === track.id ? <span>💾</span> : <DocumentIcon className="w-4 h-4" />,
       onClick: () => {
         if (selectedTrack === track.id) {
@@ -275,57 +276,45 @@ export function FileManager({ context }: FileManagerProps) {
     },
     { separator: true, label: '', onClick: () => {} },
     {
-      label: t('rename'),
+      label: t('files:rename'),
       icon: <PencilIcon className="w-4 h-4" />,
       onClick: () => startRename(track),
     },
     {
-      label: t('files.duplicate') || 'Duplicate',
+      label: t('files:duplicate'),
       icon: <DocumentDuplicateIcon className="w-4 h-4" />,
       onClick: () => duplicateTrack(track),
     },
     {
-      label: t('files.copyCode') || 'Copy Code',
+      label: t('files:copyCode'),
       icon: <ClipboardDocumentIcon className="w-4 h-4" />,
       onClick: () => {
         navigator.clipboard.writeText(track.code).then(() => {
-          toast.success(t('files.codeCopied') || 'Code copied to clipboard!');
+          toast.success(t('files:codeCopied'));
         }).catch(() => {
-          toast.error(t('files.copyFailed') || 'Failed to copy code');
+          toast.error(t('files:copyFailed'));
         });
       },
     },
     { separator: true, label: '', onClick: () => {} },
     {
-      label: t('files.download') || 'Download',
+      label: t('files:download'),
       icon: <ArrowDownTrayIcon className="w-4 h-4" />,
       onClick: () => downloadTrack(track),
     },
     {
-      label: t('files.info') || 'Properties',
+      label: t('files:info'),
       icon: <InformationCircleIcon className="w-4 h-4" />,
       onClick: () => {
         setInfoModalData({
-          title: `${t('files.trackProperties') || 'Track Properties'} - ${track.name}`,
+          title: `${t('files:trackProperties')} - ${track.name}`,
           items: [
-            { label: t('files.name') || 'Name', value: track.name },
-            { label: t('files.created') || 'Created', value: new Date(track.created).toLocaleString([], { 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric', 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            }) },
-            { label: t('files.modified') || 'Modified', value: new Date(track.modified).toLocaleString([], { 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric', 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            }) },
-            { label: t('files.linesOfCode') || 'Lines of code', value: track.code.split('\n').length.toString() },
-            { label: t('files.characters') || 'Characters', value: track.code.length.toString() },
-            { label: t('files.size') || 'Size', value: `${(new Blob([track.code]).size / 1024).toFixed(2)} KB` },
+            { label: t('files:name'), value: track.name },
+            { label: t('files:created'), value: formatDateTimeIntl(new Date(track.created), i18n.language) },
+            { label: t('files:modified'), value: formatDateTimeIntl(new Date(track.modified), i18n.language) },
+            { label: t('files:linesOfCode'), value: track.code.split('\n').length.toString() },
+            { label: t('files:characters'), value: track.code.length.toString() },
+            { label: t('files:size'), value: `${(new Blob([track.code]).size / 1024).toFixed(2)} KB` },
           ]
         });
         setShowInfoModal(true);
@@ -333,7 +322,7 @@ export function FileManager({ context }: FileManagerProps) {
     },
     { separator: true, label: '', onClick: () => {} },
     {
-      label: t('files.delete') || 'Delete',
+      label: t('files:delete'),
       icon: <TrashIcon className="w-4 h-4" />,
       onClick: () => deleteTrack(track.id),
     },
@@ -344,16 +333,16 @@ export function FileManager({ context }: FileManagerProps) {
       {/* Header */}
       <div className="p-3 border-b border-gray-600">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold">{t('tabs.files')}</h3>
+          <h3 className="text-sm font-semibold">{t('tabs:files')}</h3>
           <div className="flex space-x-1">
             <button
               onClick={() => setIsCreating(true)}
               className="p-1 hover:bg-gray-600 rounded"
-              title={t('files.newTrack') || 'New track'}
+              title={t('files:newTrack')}
             >
               <PlusIcon className="w-4 h-4" />
             </button>
-            <label className="p-1 hover:bg-gray-600 rounded cursor-pointer" title={t('files.importTrack') || 'Import track'}>
+            <label className="p-1 hover:bg-gray-600 rounded cursor-pointer" title={t('files:importTrack')}>
               <input
                 type="file"
                 accept=".js,.txt"
@@ -379,7 +368,7 @@ export function FileManager({ context }: FileManagerProps) {
                   setNewTrackName('');
                 }
               }}
-              placeholder={t('files.trackName') || 'Track name'}
+              placeholder={t('files:trackName')}
               className="flex-1 px-2 py-1 text-xs bg-background border border-gray-600 rounded"
               autoFocus
             />
@@ -387,7 +376,7 @@ export function FileManager({ context }: FileManagerProps) {
               onClick={createNewTrack}
               className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded"
             >
-              {t('files.create') || 'Create'}
+              {t('files:create')}
             </button>
           </div>
         )}
@@ -397,7 +386,7 @@ export function FileManager({ context }: FileManagerProps) {
       <div className="flex-1 overflow-auto">
         {trackList.length === 0 ? (
           <div className="p-4 text-center text-gray-400 text-sm">
-            {t('files.noTracksYet') || 'No tracks yet. Create your first track!'}
+            {t('files:noTracksYet')}
           </div>
         ) : (
           <div className="p-2 space-y-1">
@@ -440,7 +429,7 @@ export function FileManager({ context }: FileManagerProps) {
             
             {/* Help text */}
             <div className="p-2 text-xs text-gray-400 text-center border-t border-gray-600 mt-2">
-              {t('files.rightClickForOptions') || 'Right-click tracks for more options'}
+              {t('files:rightClickForOptions')}
             </div>
           </div>
         )}
@@ -449,14 +438,14 @@ export function FileManager({ context }: FileManagerProps) {
       {/* Footer with current track info */}
       {selectedTrack && tracks[selectedTrack] && (
         <div className="p-2 border-t border-gray-600 text-xs text-gray-400">
-          <div>{t('files.currentTrack') || 'Current'}: {tracks[selectedTrack].name}</div>
+          <div>{t('files:currentTrack')}: {tracks[selectedTrack].name}</div>
           <div className="flex items-center justify-between mt-1">
             <button
               onClick={saveCurrentTrack}
               className="px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-xs"
-              title={t('files.saveChanges') || 'Save Changes'}
+              title={t('files:saveChanges')}
             >
-              {t('files.saveChanges') || 'Save Changes'}
+              {t('files:saveChanges')}
             </button>
             {saveStatus && (
               <span className={cx(
@@ -485,10 +474,10 @@ export function FileManager({ context }: FileManagerProps) {
           setTrackToDelete(null);
         }}
         onConfirm={confirmDelete}
-        title={t('files.deleteTrack') || 'Delete Track'}
-        message={`${t('files.confirmDeleteTrack') || 'Are you sure you want to delete'} "${trackToDelete ? tracks[trackToDelete]?.name : ''}"? ${t('files.actionCannotBeUndone') || 'This action cannot be undone.'}`}
-        confirmText={t('common.delete') || 'Delete'}
-        cancelText={t('common.cancel') || 'Cancel'}
+        title={t('files:deleteTrack')}
+        message={`${t('files:confirmDeleteTrack')} "${trackToDelete ? tracks[trackToDelete]?.name : ''}"? ${t('files:actionCannotBeUndone')}`}
+        confirmText={t('common:delete')}
+        cancelText={t('common:cancel')}
         variant="danger"
       />
 

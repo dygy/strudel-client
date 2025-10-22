@@ -1,0 +1,21 @@
+{
+  "title": "bienvenido",
+  "description": "¡Has encontrado strudel, una nueva plataforma de live coding para escribir piezas musicales dinámicas en el navegador! Es gratuita y de código abierto, hecha tanto para principiantes como para expertos. Para empezar:",
+  "steps": "1. presiona play - 2. cambia algo - 3. presiona update",
+  "getStarted": "Para empezar, echa un vistazo al",
+  "interactiveTutorial": "tutorial interactivo",
+  "joinDiscord": "También siéntete libre de unirte al",
+  "discordChannel": "canal de discord",
+  "discordText": "para hacer preguntas, dar comentarios o simplemente saludar.",
+  "aboutTitle": "acerca de",
+  "aboutDescription": "strudel es una versión JavaScript de",
+  "tidalcycles": "tidalcycles",
+  "tidalDescription": ", que es un lenguaje popular de live coding para música, escrito en Haskell. Strudel es software libre/código abierto: puedes redistribuirlo y/o modificarlo bajo los términos de la",
+  "license": "Licencia Pública General GNU Affero",
+  "sourceCode": "Puedes encontrar el código fuente en",
+  "codeberg": "codeberg",
+  "licensingInfo": "También puedes encontrar información de licencias",
+  "defaultSounds": "para los bancos de sonidos predeterminados allí. Por favor considera",
+  "support": "apoyar este proyecto",
+  "supportText": "para asegurar el desarrollo continuo 💖"
+}

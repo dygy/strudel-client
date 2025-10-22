@@ -1,0 +1,19 @@
+{
+  "close": "Затвори",
+  "cancel": "Откажи",
+  "confirm": "Потврди",
+  "save": "Сачувај",
+  "delete": "Обриши",
+  "edit": "Уреди",
+  "loading": "Учитава...",
+  "error": "Грешка",
+  "success": "Успех",
+  "selectOption": "Изабери опцију",
+  "play": "пусти",
+  "stop": "заустави",
+  "update": "ажурирај",
+  "shuffle": "помешај",
+  "files": "фајлови",
+  "docs": "DOCS",
+  "toggleFileManager": "Пребаци менаџер фајлова"
+}

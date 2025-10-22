@@ -1,0 +1,19 @@
+{
+  "close": "סגור",
+  "cancel": "ביטול",
+  "confirm": "אישור",
+  "save": "שמור",
+  "delete": "מחק",
+  "edit": "ערוך",
+  "loading": "טוען...",
+  "error": "שגיאה",
+  "success": "הצלחה",
+  "selectOption": "בחר אפשרות",
+  "play": "נגן",
+  "stop": "עצור",
+  "update": "עדכן",
+  "shuffle": "ערבב",
+  "files": "קבצים",
+  "docs": "DOCS",
+  "toggleFileManager": "החלף מנהל קבצים"
+}

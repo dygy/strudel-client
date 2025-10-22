@@ -1,0 +1,19 @@
+{
+  "close": "إغلاق",
+  "cancel": "إلغاء",
+  "confirm": "تأكيد",
+  "save": "حفظ",
+  "delete": "حذف",
+  "edit": "تحرير",
+  "loading": "جاري التحميل...",
+  "error": "خطأ",
+  "success": "نجح",
+  "selectOption": "اختر خياراً",
+  "play": "تشغيل",
+  "stop": "إيقاف",
+  "update": "تحديث",
+  "shuffle": "خلط",
+  "files": "ملفات",
+  "docs": "DOCS",
+  "toggleFileManager": "تبديل مدير الملفات"
+}

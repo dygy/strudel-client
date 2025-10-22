@@ -14,7 +14,7 @@ import {
   InfoIcon,
   DownloadIcon 
 } from '../ui/FileIcons';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@src/i18n';
 
 interface FileEntry {
   name: string;

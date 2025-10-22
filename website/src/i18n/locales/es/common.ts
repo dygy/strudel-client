@@ -1,0 +1,21 @@
+export default {
+  close: "Cerrar",
+  cancel: "Cancelar",
+  confirm: "Confirmar",
+  save: "Guardar", 
+  delete: "Eliminar",
+  edit: "Editar",
+  loading: "Cargando...",
+  error: "Error",
+  success: "Éxito",
+  selectOption: "Selecciona una opción",
+  
+  // Header/Navigation
+  play: "reproducir",
+  stop: "parar",
+  update: "actualizar",
+  shuffle: "mezclar", 
+  files: "archivos",
+  docs: "DOCS",
+  toggleFileManager: "Alternar gestor de archivos"
+} as const;
