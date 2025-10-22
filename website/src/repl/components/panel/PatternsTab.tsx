@@ -18,6 +18,14 @@ import { Pagination } from '../pagination/Pagination';
 import { useState } from 'react';
 import { useDebounce } from '../usedebounce';
 import cx from '@src/cx';
+import { BurgerMenuButton } from '../ui/BurgerMenuButton';
+import { 
+  DocumentIcon, 
+  PencilIcon, 
+  TrashIcon, 
+  DocumentDuplicateIcon,
+  ArrowDownTrayIcon 
+} from '@heroicons/react/24/outline';
 
 interface Pattern {
   id: string;
@@ -61,20 +69,82 @@ interface PatternButtonProps {
   onClick: () => void;
   pattern: Pattern;
   showHiglight: boolean;
+  isUserPattern?: boolean;
+  context?: ReplContext;
 }
 
-function PatternButton({ showOutline, onClick, pattern, showHiglight }: PatternButtonProps) {
+function PatternButton({ showOutline, onClick, pattern, showHiglight, isUserPattern = false, context }: PatternButtonProps) {
+  const getPatternContextItems = () => {
+    const items = [
+      {
+        label: 'Load',
+        icon: <DocumentIcon className="w-4 h-4" />,
+        onClick: () => onClick(),
+      }
+    ];
+
+    if (isUserPattern) {
+      items.push(
+        {
+          label: 'Duplicate',
+          icon: <DocumentDuplicateIcon className="w-4 h-4" />,
+          onClick: () => {
+            const { data } = userPattern.duplicate(pattern);
+            if (context) {
+              updateCodeWindow(context, data);
+            }
+          },
+        },
+        {
+          label: 'Export',
+          icon: <ArrowDownTrayIcon className="w-4 h-4" />,
+          onClick: () => {
+            const blob = new Blob([JSON.stringify({ [pattern.id]: pattern })], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `pattern-${pattern.id}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          },
+        },
+        { separator: true, label: '', onClick: () => {} },
+        {
+          label: 'Delete',
+          icon: <TrashIcon className="w-4 h-4" />,
+          onClick: () => {
+            const { data } = userPattern.delete(pattern.id);
+            if (context) {
+              updateCodeWindow(context, { ...data, collection: userPattern.collection });
+            }
+          },
+        }
+      );
+    }
+
+    return items;
+  };
+
   return (
-    <a
+    <div
       className={cx(
-        'mr-4 hover:opacity-50 cursor-pointer block',
+        'group mr-4 hover:opacity-50 cursor-pointer flex items-center justify-between',
         showOutline && 'outline outline-1',
         showHiglight && 'bg-selection',
       )}
-      onClick={onClick}
     >
-      <PatternLabel pattern={pattern} />
-    </a>
+      <div onClick={onClick} className="flex-1">
+        <PatternLabel pattern={pattern} />
+      </div>
+      {isUserPattern && (
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+          <BurgerMenuButton
+            items={getPatternContextItems()}
+            size="sm"
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -83,9 +153,11 @@ interface PatternButtonsProps {
   activePattern: string;
   onClick: (id: string) => void;
   started: boolean;
+  isUserPatterns?: boolean;
+  context?: ReplContext;
 }
 
-function PatternButtons({ patterns, activePattern, onClick, started }: PatternButtonsProps) {
+function PatternButtons({ patterns, activePattern, onClick, started, isUserPatterns = false, context }: PatternButtonsProps) {
   const viewingPatternStore = useViewingPatternData();
   const viewingPatternData = parseJSON(viewingPatternStore);
   const viewingPatternID = viewingPatternData?.id;
@@ -103,6 +175,8 @@ function PatternButtons({ patterns, activePattern, onClick, started }: PatternBu
               showHiglight={id === viewingPatternID}
               showOutline={id === activePattern && started}
               onClick={() => onClick(id)}
+              isUserPattern={isUserPatterns}
+              context={context}
             />
           );
         })}
@@ -184,6 +258,8 @@ function UserPatterns({ context }: UserPatternsProps) {
           patterns={userPatterns}
           started={context.started}
           activePattern={activePattern}
+          isUserPatterns={true}
+          context={context}
         />
       </div>
     </div>
@@ -224,6 +300,8 @@ function PatternPageWithPagination({
           started={context.started}
           patterns={patterns}
           activePattern={activePattern}
+          isUserPatterns={false}
+          context={context}
         />
       </div>
       <div className="flex items-center gap-2 py-2">

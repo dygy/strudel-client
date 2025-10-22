@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@src/i18n';
 import { WorkingContextMenu } from '../ui/WorkingContextMenu';
+import { BurgerMenuButton } from '../ui/BurgerMenuButton';
 
 interface ContextMenuItem {
   label: string
@@ -353,7 +354,7 @@ export function FileTree({
           }
         >
           <div
-            className={`flex items-center py-1 px-2 hover:bg-gray-600 cursor-pointer ${
+            className={`group flex items-center py-1 px-2 hover:bg-gray-600 cursor-pointer ${
               isSelected ? 'bg-selection' : ''
             } ${draggedItem?.id === node.id ? 'opacity-50' : ''}`}
             style={{ paddingLeft: `${depth * 16 + 8}px` }}
@@ -428,13 +429,25 @@ export function FileTree({
                   onClick={(e) => e.stopPropagation()}
                 />
               ) : (
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm truncate">{node.name}</span>
-                  {node.type === 'track' && (node.data as Track).isMultitrack && (
-                    <span className="text-xs bg-purple-600 text-white px-1 rounded">
-                      M
-                    </span>
-                  )}
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center space-x-2 flex-1 min-w-0">
+                    <span className="text-sm truncate">{node.name}</span>
+                    {node.type === 'track' && (node.data as Track).isMultitrack && (
+                      <span className="text-xs bg-purple-600 text-white px-1 rounded">
+                        M
+                      </span>
+                    )}
+                  </div>
+                  {/* Burger menu button */}
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <BurgerMenuButton
+                      items={node.type === 'track' 
+                        ? getTrackContextItems(node.data as Track)
+                        : getFolderContextItems(node.data as Folder)
+                      }
+                      size="sm"
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -453,7 +466,7 @@ export function FileTree({
                   items={getStepContextItems(node.id, stepIndex, step)}
                 >
                   <div
-                    className={`flex items-center py-1 px-2 hover:bg-gray-600 cursor-pointer ${
+                    className={`group flex items-center py-1 px-2 hover:bg-gray-600 cursor-pointer ${
                       (node.data as Track).activeStep === stepIndex ? 'bg-purple-700/30' : ''
                     }`}
                     style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}
@@ -493,13 +506,23 @@ export function FileTree({
                           onClick={(e) => e.stopPropagation()}
                         />
                       ) : (
-                        <span className="text-xs truncate">{step.name}</span>
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-xs truncate">{step.name}</span>
+                          <div className="flex items-center gap-1">
+                            {(node.data as Track).activeStep === stepIndex && (
+                              <span className="text-xs text-purple-400">●</span>
+                            )}
+                            {/* Burger menu button for steps */}
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              <BurgerMenuButton
+                                items={getStepContextItems(node.id, stepIndex, step)}
+                                size="sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
-                    
-                    {(node.data as Track).activeStep === stepIndex && (
-                      <span className="text-xs text-purple-400 ml-1">●</span>
-                    )}
                   </div>
                 </WorkingContextMenu>
               );

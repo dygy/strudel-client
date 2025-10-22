@@ -15,6 +15,7 @@ import {
   DownloadIcon 
 } from '../ui/FileIcons';
 import { useTranslation } from '@src/i18n';
+import { BurgerMenuButton } from '../ui/BurgerMenuButton';
 
 interface FileEntry {
   name: string;
@@ -186,11 +187,19 @@ export function FilesTab() {
         {folders?.map((folder, i) => (
           <WorkingContextMenu key={`folder-${i}`} items={getFolderContextItems(folder)}>
             <div 
-              className="cursor-pointer hover:bg-lineHighlight px-2 py-1 rounded flex items-center gap-2 transition-colors"
+              className="group cursor-pointer hover:bg-lineHighlight px-2 py-1 rounded flex items-center justify-between transition-colors"
               onClick={() => select(folder)}
             >
-              <FolderIcon />
-              <span>{folder.name}</span>
+              <div className="flex items-center gap-2">
+                <FolderIcon />
+                <span>{folder.name}</span>
+              </div>
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                <BurgerMenuButton
+                  items={getFolderContextItems(folder)}
+                  size="sm"
+                />
+              </div>
             </div>
           </WorkingContextMenu>
         ))}
@@ -199,11 +208,19 @@ export function FilesTab() {
         {files?.map((file, i) => (
           <WorkingContextMenu key={`file-${i}`} items={getFileContextItems(file)}>
             <div
-              className="text-foreground/70 cursor-pointer hover:bg-lineHighlight px-2 py-1 rounded flex items-center gap-2 transition-colors select-none"
+              className="group text-foreground/70 cursor-pointer hover:bg-lineHighlight px-2 py-1 rounded flex items-center justify-between transition-colors select-none"
               onClick={async () => playFile(`${subpath}/${file.name}`)}
             >
-              <FileIcon />
-              <span>{file.name}</span>
+              <div className="flex items-center gap-2">
+                <FileIcon />
+                <span>{file.name}</span>
+              </div>
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                <BurgerMenuButton
+                  items={getFileContextItems(file)}
+                  size="sm"
+                />
+              </div>
             </div>
           </WorkingContextMenu>
         ))}
