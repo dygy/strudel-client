@@ -39,9 +39,10 @@ const iconStyles = {
 };
 
 function ToastItem({ toast, onRemove }: ToastProps) {
+  const duration = toast.duration || 3000; // Ensure we always have a duration
   const [isVisible, setIsVisible] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(toast.duration || 3000);
+  const [timeLeft, setTimeLeft] = useState(duration);
   const [isPaused, setIsPaused] = useState(false);
   const Icon = toastIcons[toast.type];
 
@@ -58,7 +59,7 @@ function ToastItem({ toast, onRemove }: ToastProps) {
   }, []);
 
   useEffect(() => {
-    if (toast.duration && toast.duration > 0 && !isPaused) {
+    if (duration > 0 && !isPaused) {
       // Update countdown every 100ms for smooth progress bar
       const interval = setInterval(() => {
         setTimeLeft(prev => {
@@ -74,9 +75,9 @@ function ToastItem({ toast, onRemove }: ToastProps) {
 
       return () => clearInterval(interval);
     }
-  }, [toast.duration, toast.id, handleRemove, isPaused]);
+  }, [duration, toast.id, handleRemove, isPaused]);
 
-  const progressPercentage = toast.duration ? (timeLeft / toast.duration) * 100 : 0;
+  const progressPercentage = (timeLeft / duration) * 100;
 
   return (
     <div
@@ -92,7 +93,7 @@ function ToastItem({ toast, onRemove }: ToastProps) {
         ${toastStyles[toast.type]}
       `}>
         {/* Progress bar */}
-        {toast.duration && toast.duration > 0 && (
+        {duration > 0 && (
           <div className="absolute bottom-0 left-0 h-1 bg-black/20 w-full">
             <div 
               className="h-full bg-current transition-all duration-100 ease-linear"
@@ -111,7 +112,7 @@ function ToastItem({ toast, onRemove }: ToastProps) {
           </div>
           <div className="flex items-center space-x-2">
             {/* Countdown display */}
-            {toast.duration && toast.duration > 0 && (
+            {duration > 0 && (
               <span className="text-xs opacity-60 font-mono">
                 {Math.ceil(timeLeft / 1000)}s
               </span>
@@ -170,8 +171,8 @@ export function useToast() {
     const id = `toast-${++toastId}`;
     const newToast: Toast = {
       id,
-      duration: 3000, // Default 3 seconds
       ...toast,
+      duration: toast.duration ?? 3000, // Default 3 seconds if not provided or undefined
     };
     
     setToasts(prev => {

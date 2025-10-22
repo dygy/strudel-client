@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import {
-  ChevronRightIcon,
+  ArrowDownTrayIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
+  DocumentIcon,
   FolderIcon,
   FolderOpenIcon,
-  DocumentIcon,
-  PlusIcon,
-  PencilIcon,
-  TrashIcon,
   InformationCircleIcon,
-  ArrowDownTrayIcon,
+  PencilIcon,
+  PlusIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@src/i18n';
 import { WorkingContextMenu } from '../ui/WorkingContextMenu';
@@ -127,7 +127,7 @@ export function FileTree({
 
     // Create folder nodes
     Object.values(folders).forEach(folder => {
-      const node: TreeNode = {
+      folderNodes[folder.path] = {
         id: folder.path,
         name: folder.name,
         type: 'folder',
@@ -135,7 +135,6 @@ export function FileTree({
         children: [],
         data: folder,
       };
-      folderNodes[folder.path] = node;
     });
 
     // Build folder hierarchy
