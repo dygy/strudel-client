@@ -439,7 +439,7 @@ export function FileTree({
                     )}
                   </div>
                   {/* Burger menu button */}
-                  <div>
+                  <div className="ml-2">
                     <BurgerMenuButton
                       items={node.type === 'track' 
                         ? getTrackContextItems(node.data as Track)
@@ -513,7 +513,7 @@ export function FileTree({
                               <span className="text-xs text-purple-400">●</span>
                             )}
                             {/* Burger menu button for steps */}
-                            <div>
+                            <div className="ml-1">
                               <BurgerMenuButton
                                 items={getStepContextItems(node.id, stepIndex, step)}
                                 size="sm"
