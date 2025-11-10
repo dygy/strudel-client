@@ -375,7 +375,7 @@ export function FileTree({
           >
             {/* Expand/collapse icon for folders and multitrack */}
             {(node.type === 'folder' || (node.type === 'track' && hasSteps)) && (
-              <div className="w-4 h-4 mr-1 flex items-center justify-center">
+              <div className="w-4 h-4 me-1 flex items-center justify-center ">
                 {(hasChildren || hasSteps) ? (
                   isExpanded ? (
                     <ChevronDownIcon className="w-3 h-3" />
@@ -387,7 +387,7 @@ export function FileTree({
             )}
 
             {/* Icon */}
-            <div className="w-4 h-4 mr-2 flex-shrink-0">
+            <div className="w-4 h-4 flex-shrink-0 me-1">
               {node.type === 'folder' ? (
                 isExpanded ? (
                   <FolderOpenIcon className="w-4 h-4 text-yellow-400" />
