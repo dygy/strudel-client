@@ -91,6 +91,16 @@ export function transpiler(input, options = {}) {
           });
         return this.replace(sliderWithLocation(node));
       }
+      if (isToggleFunction(node)) {
+        emitWidgets &&
+          widgets.push({
+            from: node.arguments[0].start,
+            to: node.arguments[0].end,
+            value: node.arguments[0].raw,
+            type: 'toggle',
+          });
+        return this.replace(toggleWithLocation(node));
+      }
       if (isWidgetMethod(node)) {
         const type = node.callee.property.name;
         const index = widgets.filter((w) => w.type === type).length;
@@ -186,6 +196,10 @@ function isSliderFunction(node) {
   return node.type === 'CallExpression' && node.callee.name === 'slider';
 }
 
+function isToggleFunction(node) {
+  return node.type === 'CallExpression' && node.callee.name === 'toggle';
+}
+
 function isWidgetMethod(node) {
   return node.type === 'CallExpression' && widgetMethods.includes(node.callee.property?.name);
 }
@@ -200,6 +214,19 @@ function sliderWithLocation(node) {
     raw: id,
   });
   node.callee.name = 'sliderWithID';
+  return node;
+}
+
+function toggleWithLocation(node) {
+  const id = 'toggle_' + node.arguments[0].start; // use loc of first arg for id
+  // add loc as identifier to first argument
+  // the toggleWithID function is assumed to be toggleWithID(id, value)
+  node.arguments.unshift({
+    type: 'Literal',
+    value: id,
+    raw: id,
+  });
+  node.callee.name = 'toggleWithID';
   return node;
 }
 

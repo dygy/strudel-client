@@ -22,6 +22,7 @@ import { highlightMiniLocations, isPatternHighlightingEnabled, updateMiniLocatio
 import { keybindings } from './keybindings.mjs';
 import { initTheme, activateTheme, theme } from './themes.mjs';
 import { sliderPlugin, updateSliderWidgets } from './slider.mjs';
+import { togglePlugin, updateToggleWidgets } from './toggle.mjs';
 import { widgetPlugin, updateWidgets } from './widget.mjs';
 import { persistentAtom } from '@nanostores/persistent';
 import { basicSetup } from './basicSetup.mjs';
@@ -93,6 +94,7 @@ export function initEditor({ initialCode = '', onChange, onEvaluate, onStop, roo
         bracketMatching: { brackets: ['(', '[', '{', "'", '"', '<'] },
       }),
       sliderPlugin,
+      togglePlugin,
       widgetPlugin,
       // indentOnInput(), // works without. already brought with javascript extension?
       // bracketMatching(), // does not do anything
@@ -202,7 +204,9 @@ export class StrudelMirror {
         this.widgets = options.meta?.widgets;
         const sliders = this.widgets.filter((w) => w.type === 'slider');
         updateSliderWidgets(this.editor, sliders);
-        const widgets = this.widgets.filter((w) => w.type !== 'slider');
+        const toggles = this.widgets.filter((w) => w.type === 'toggle');
+        updateToggleWidgets(this.editor, toggles);
+        const widgets = this.widgets.filter((w) => w.type !== 'slider' && w.type !== 'toggle');
         updateWidgets(this.editor, widgets);
         updateMiniLocations(this.editor, this.miniLocations);
         replOptions?.afterEval?.(options);
