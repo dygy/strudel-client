@@ -101,6 +101,18 @@ export function transpiler(input, options = {}) {
           });
         return this.replace(toggleWithLocation(node));
       }
+      if (isRadioFunction(node)) {
+        const options = node.arguments.map(arg => arg.value || arg.raw);
+        emitWidgets &&
+          widgets.push({
+            from: node.arguments[0].start,
+            to: node.arguments[0].end,
+            value: node.arguments[0].raw,
+            options: options,
+            type: 'radio',
+          });
+        return this.replace(radioWithLocation(node));
+      }
       if (isWidgetMethod(node)) {
         const type = node.callee.property.name;
         const index = widgets.filter((w) => w.type === type).length;
@@ -200,6 +212,10 @@ function isToggleFunction(node) {
   return node.type === 'CallExpression' && node.callee.name === 'toggle';
 }
 
+function isRadioFunction(node) {
+  return node.type === 'CallExpression' && node.callee.name === 'radio';
+}
+
 function isWidgetMethod(node) {
   return node.type === 'CallExpression' && widgetMethods.includes(node.callee.property?.name);
 }
@@ -227,6 +243,19 @@ function toggleWithLocation(node) {
     raw: id,
   });
   node.callee.name = 'toggleWithID';
+  return node;
+}
+
+function radioWithLocation(node) {
+  const id = 'radio_' + node.arguments[0].start; // use loc of first arg for id
+  // add loc as identifier to first argument
+  // the radioWithID function is assumed to be radioWithID(id, defaultValue, ...args)
+  node.arguments.unshift({
+    type: 'Literal',
+    value: id,
+    raw: id,
+  });
+  node.callee.name = 'radioWithID';
   return node;
 }
 
