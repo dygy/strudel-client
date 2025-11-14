@@ -24,36 +24,56 @@ export class RadioWidget extends WidgetType {
     let wrap = document.createElement('span');
     wrap.setAttribute('aria-hidden', 'true');
     wrap.className = 'cm-radio';
+    wrap.style = 'display:inline-flex;gap:2px;margin-right:4px;align-items:center';
     
-    let button = wrap.appendChild(document.createElement('button'));
-    button.type = 'button';
-    button.textContent = String(this.value);
-    button.originalValue = this.value;
-    button.options = this.options;
-    button.from = this.from;
-    button.originalFrom = this.originalFrom;
-    button.to = this.to;
-    button.style = 'padding:2px 8px;margin-right:4px;cursor:pointer;border:1px solid #666;border-radius:3px;background:#333;color:#fff;font-size:11px;font-family:monospace';
-    this.button = button;
-    
-    button.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+    // Create a button for each option
+    this.options.forEach((option) => {
+      let button = wrap.appendChild(document.createElement('button'));
+      button.type = 'button';
+      button.textContent = String(option);
+      button.optionValue = option;
+      button.originalValue = this.value;
+      button.options = this.options;
+      button.from = this.from;
+      button.originalFrom = this.originalFrom;
+      button.to = this.to;
       
-      // Cycle to next option
-      const currentIndex = button.options.indexOf(button.originalValue);
-      const nextIndex = (currentIndex + 1) % button.options.length;
-      const nextValue = button.options[nextIndex];
+      // Style based on whether this option is selected
+      const isSelected = String(option) === String(this.value);
+      button.style = `padding:2px 8px;cursor:pointer;border:1px solid ${isSelected ? '#4a9eff' : '#666'};border-radius:3px;background:${isSelected ? '#4a9eff' : '#333'};color:#fff;font-size:11px;font-family:monospace;transition:all 0.2s`;
       
-      let insert = String(nextValue);
-      const to = button.from + String(button.originalValue).length;
-      let change = { from: button.from, to, insert };
-      button.originalValue = nextValue;
-      button.textContent = insert;
-      this.view.dispatch({ changes: change });
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const selectedValue = button.optionValue;
+        let insert = String(selectedValue);
+        const to = button.from + String(button.originalValue).length;
+        let change = { from: button.from, to, insert };
+        
+        // Update all buttons in this group
+        Array.from(wrap.children).forEach((btn) => {
+          const btnIsSelected = String(btn.optionValue) === String(selectedValue);
+          btn.style = `padding:2px 8px;cursor:pointer;border:1px solid ${btnIsSelected ? '#4a9eff' : '#666'};border-radius:3px;background:${btnIsSelected ? '#4a9eff' : '#333'};color:#fff;font-size:11px;font-family:monospace;transition:all 0.2s`;
+          btn.originalValue = selectedValue;
+        });
+        
+        this.view.dispatch({ changes: change });
+        
+        const id = getRadioID(button.originalFrom);
+        window.postMessage({ type: 'cm-radio', value: selectedValue, id });
+      });
       
-      const id = getRadioID(button.originalFrom);
-      window.postMessage({ type: 'cm-radio', value: nextValue, id });
+      button.addEventListener('mouseenter', () => {
+        if (String(button.optionValue) !== String(button.originalValue)) {
+          button.style = `padding:2px 8px;cursor:pointer;border:1px solid #666;border-radius:3px;background:#444;color:#fff;font-size:11px;font-family:monospace;transition:all 0.2s`;
+        }
+      });
+      
+      button.addEventListener('mouseleave', () => {
+        const isSelected = String(button.optionValue) === String(button.originalValue);
+        button.style = `padding:2px 8px;cursor:pointer;border:1px solid ${isSelected ? '#4a9eff' : '#666'};border-radius:3px;background:${isSelected ? '#4a9eff' : '#333'};color:#fff;font-size:11px;font-family:monospace;transition:all 0.2s`;
+      });
     });
     
     return wrap;
