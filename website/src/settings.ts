@@ -34,6 +34,8 @@ export interface Settings {
   isActiveLineHighlighted: boolean;
   isAutoCompletionEnabled: boolean;
   isTooltipEnabled: boolean;
+  isSignatureHelpEnabled: boolean;
+  isLinterEnabled: boolean;
   isFlashEnabled: boolean;
   isSyncEnabled: boolean;
   isLineWrappingEnabled: boolean;
@@ -73,6 +75,8 @@ export interface RawSettings {
   isActiveLineHighlighted: boolean | string;
   isAutoCompletionEnabled: boolean | string;
   isTooltipEnabled: boolean | string;
+  isSignatureHelpEnabled: boolean | string;
+  isLinterEnabled: boolean | string;
   isFlashEnabled: boolean | string;
   isSyncEnabled: boolean | string;
   isLineWrappingEnabled: boolean | string;
@@ -124,8 +128,10 @@ export const defaultSettings: RawSettings = {
   isBracketClosingEnabled: true,
   isLineNumbersDisplayed: true,
   isActiveLineHighlighted: true,
-  isAutoCompletionEnabled: false,
-  isTooltipEnabled: false,
+  isAutoCompletionEnabled: true,
+  isTooltipEnabled: true,
+  isSignatureHelpEnabled: false,
+  isLinterEnabled: true,
   isFlashEnabled: true,
   isSyncEnabled: false,
   isLineWrappingEnabled: false,
@@ -167,6 +173,35 @@ const settings_key = `strudel-settings${instance > 0 ? instance : ''}`;
 
 export const settingsMap = persistentMap(settings_key, defaultSettings as any);
 
+// One-time migration: add new IDE feature settings for existing users
+if (typeof window !== 'undefined') {
+  const MIGRATION_KEY = 'strudel-settings-ide-features-v1';
+  const currentSettings = settingsMap.get();
+  
+  console.log('[settings] loaded settings:', currentSettings);
+  
+  if (!localStorage.getItem(MIGRATION_KEY)) {
+    console.log('[settings] migrating to add IDE features');
+    
+    // Add missing settings with defaults - ensure they're booleans not strings
+    const updated = {
+      ...currentSettings,
+      isAutoCompletionEnabled: currentSettings.isAutoCompletionEnabled === undefined ? true : parseBoolean(currentSettings.isAutoCompletionEnabled),
+      isTooltipEnabled: currentSettings.isTooltipEnabled === undefined ? true : parseBoolean(currentSettings.isTooltipEnabled),
+      isSignatureHelpEnabled: currentSettings.isSignatureHelpEnabled === undefined ? true : parseBoolean(currentSettings.isSignatureHelpEnabled),
+      isLinterEnabled: currentSettings.isLinterEnabled === undefined ? true : parseBoolean(currentSettings.isLinterEnabled),
+    };
+    
+    settingsMap.set(updated);
+    localStorage.setItem(MIGRATION_KEY, 'true');
+    console.log('[settings] migration complete, new settings:', updated);
+  } else {
+    console.log('[settings] isAutoCompletionEnabled:', currentSettings.isAutoCompletionEnabled);
+    console.log('[settings] isSignatureHelpEnabled:', currentSettings.isSignatureHelpEnabled);
+    console.log('[settings] isLinterEnabled:', currentSettings.isLinterEnabled);
+  }
+}
+
 /**
  * Parses a boolean-like value to a proper boolean
  * @param booleanlike - Value that might be a boolean or string representation
@@ -201,11 +236,14 @@ export function useSettings(): Settings {
     isButtonRowHidden: parseBoolean(state.isButtonRowHidden),
     isCSSAnimationDisabled: parseBoolean(state.isCSSAnimationDisabled),
     isTooltipEnabled: parseBoolean(state.isTooltipEnabled),
+    isSignatureHelpEnabled: parseBoolean(state.isSignatureHelpEnabled),
+    isLinterEnabled: parseBoolean(state.isLinterEnabled),
     isLineWrappingEnabled: parseBoolean(state.isLineWrappingEnabled),
     isFlashEnabled: parseBoolean(state.isFlashEnabled),
     isSyncEnabled: isUdels() ? true : parseBoolean(state.isSyncEnabled),
     isTabIndentationEnabled: parseBoolean(state.isTabIndentationEnabled),
     isMultiCursorEnabled: parseBoolean(state.isMultiCursorEnabled),
+    isAutosaveEnabled: parseBoolean(state.isAutosaveEnabled),
     fontSize: Number(state.fontSize),
     panelPosition: (state.activeFooter !== '' && !isUdels() ? state.panelPosition : 'bottom') as PanelPosition, // <-- keep this 'bottom' where it is!
     isPanelPinned: parseBoolean(state.isPanelPinned),

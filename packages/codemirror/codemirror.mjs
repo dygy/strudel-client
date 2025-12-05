@@ -25,6 +25,8 @@ import { sliderPlugin, updateSliderWidgets } from './slider.mjs';
 import { togglePlugin, updateToggleWidgets } from './toggle.mjs';
 import { radioPlugin, updateRadioWidgets } from './radio.mjs';
 import { widgetPlugin, updateWidgets } from './widget.mjs';
+import { isSignatureHelpEnabled } from './signature.mjs';
+import { isLinterEnabled } from './diagnostics.mjs';
 import { persistentAtom } from '@nanostores/persistent';
 import { basicSetup } from './basicSetup.mjs';
 
@@ -36,6 +38,8 @@ const extensions = {
   theme,
   isAutoCompletionEnabled,
   isTooltipEnabled,
+  isSignatureHelpEnabled,
+  isLinterEnabled,
   isPatternHighlightingEnabled,
   isActiveLineHighlighted: (on) => (on ? [highlightActiveLine(), highlightActiveLineGutter()] : []),
   isFlashEnabled,
@@ -57,10 +61,12 @@ export const defaultSettings = {
   isBracketClosingEnabled: true,
   isLineNumbersDisplayed: true,
   isActiveLineHighlighted: false,
-  isAutoCompletionEnabled: false,
+  isAutoCompletionEnabled: true,
   isPatternHighlightingEnabled: true,
   isFlashEnabled: true,
-  isTooltipEnabled: false,
+  isTooltipEnabled: true, // Enable tooltips by default for IDE experience
+  isSignatureHelpEnabled: false, // Disabled - hover tooltip is more informative
+  isLinterEnabled: true, // Enable error highlighting by default
   isLineWrappingEnabled: false,
   isTabIndentationEnabled: false,
   isMultiCursorEnabled: false,
@@ -73,6 +79,22 @@ export const codemirrorSettings = persistentAtom('codemirror-settings', defaultS
   encode: JSON.stringify,
   decode: JSON.parse,
 });
+
+// One-time migration: enable new IDE features for existing users
+// This runs once and sets a migration flag
+const MIGRATION_KEY = 'codemirror-settings-migrated-v1';
+if (!localStorage.getItem(MIGRATION_KEY)) {
+  const savedSettings = codemirrorSettings.get();
+  const updated = {
+    ...savedSettings,
+    isAutoCompletionEnabled: true,
+    isTooltipEnabled: true,
+    isSignatureHelpEnabled: true,
+    isLinterEnabled: true,
+  };
+  codemirrorSettings.set(updated);
+  localStorage.setItem(MIGRATION_KEY, 'true');
+}
 
 // https://codemirror.net/docs/guide/
 export function initEditor({ initialCode = '', onChange, onEvaluate, onStop, root, mondo }) {

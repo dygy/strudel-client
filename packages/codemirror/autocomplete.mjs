@@ -123,6 +123,93 @@ const chordSymbolCompletions = chordSymbols.map((symbol) => {
   };
 });
 
+// Hydra functions with descriptions
+// These show tooltips for both standalone calls and method chains
+const hydraFunctionDocs = {
+  // Sources
+  osc: 'Hydra: Oscillator source - generates wave patterns',
+  solid: 'Hydra: Solid color source',
+  gradient: 'Hydra: Gradient source',
+  noise: 'Hydra: Noise source - generates random patterns',
+  voronoi: 'Hydra: Voronoi pattern source',
+  shape: 'Hydra: Geometric shape source',
+  src: 'Hydra: Use external source or output',
+  
+  // Transforms
+  rotate: 'Hydra: Rotate the visual',
+  scale: 'Hydra: Scale the visual',
+  pixelate: 'Hydra: Pixelate effect',
+  repeat: 'Hydra: Repeat/tile the visual',
+  repeatX: 'Hydra: Repeat horizontally',
+  repeatY: 'Hydra: Repeat vertically',
+  kaleid: 'Hydra: Kaleidoscope effect',
+  scroll: 'Hydra: Scroll the visual',
+  scrollX: 'Hydra: Scroll horizontally',
+  scrollY: 'Hydra: Scroll vertically',
+  
+  // Color
+  invert: 'Hydra: Invert colors',
+  contrast: 'Hydra: Adjust contrast',
+  brightness: 'Hydra: Adjust brightness',
+  luma: 'Hydra: Luminance threshold',
+  thresh: 'Hydra: Threshold effect',
+  color: 'Hydra: Colorize with RGB values',
+  saturate: 'Hydra: Adjust saturation',
+  hue: 'Hydra: Adjust hue',
+  colorama: 'Hydra: Color shift effect',
+  posterize: 'Hydra: Posterize colors',
+  shift: 'Hydra: Shift colors',
+  
+  // Modulation
+  modulate: 'Hydra: Modulate with another source',
+  modulateRotate: 'Hydra: Modulate rotation',
+  modulateScale: 'Hydra: Modulate scale',
+  modulatePixelate: 'Hydra: Modulate pixelation',
+  modulateRepeat: 'Hydra: Modulate repetition',
+  modulateRepeatX: 'Hydra: Modulate horizontal repetition',
+  modulateRepeatY: 'Hydra: Modulate vertical repetition',
+  modulateKaleid: 'Hydra: Modulate kaleidoscope',
+  modulateScrollX: 'Hydra: Modulate horizontal scroll',
+  modulateScrollY: 'Hydra: Modulate vertical scroll',
+  
+  // Blending
+  add: 'Hydra: Add/blend two sources',
+  sub: 'Hydra: Subtract one source from another',
+  mult: 'Hydra: Multiply two sources',
+  blend: 'Hydra: Blend two sources',
+  diff: 'Hydra: Difference between sources',
+  layer: 'Hydra: Layer sources',
+  mask: 'Hydra: Mask with another source',
+  
+  // Output
+  out: 'Hydra: Output to buffer',
+  render: 'Hydra: Render output',
+  speed: 'Hydra: Animation speed',
+  bpm: 'Hydra: Beats per minute',
+};
+
+const hydraFunctions = Object.keys(hydraFunctionDocs).map(name => ({
+  label: name,
+  type: 'function',
+  detail: ` ${hydraFunctionDocs[name]}`,
+}));
+
+const hydraCompletions = hydraFunctions;
+
+// Export for use in tooltip
+export { hydraFunctionDocs };
+
+// Math object methods for global autocomplete
+const mathCompletions = [
+  'abs', 'ceil', 'floor', 'round', 'max', 'min', 'pow', 'sqrt', 'random',
+  'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'exp', 'log', 'log10',
+  'log2', 'sign', 'trunc', 'cbrt', 'hypot', 'PI', 'E'
+].map(name => ({
+  label: `Math.${name}`,
+  type: 'property',
+  info: `Math.${name}`,
+}));
+
 export const getSynonymDoc = (doc, synonym) => {
   const synonyms = doc.synonyms || [];
   const docLabel = getDocLabel(doc);
@@ -150,12 +237,28 @@ const jsdocCompletions = (() => {
       // https://codemirror.net/docs/ref/#autocomplete.Completion
       if (label && !seen.has(label)) {
         seen.add(label);
+        const synonymDoc = getSynonymDoc(doc, label);
+        const cleanDesc = synonymDoc.description ? stripHtml(synonymDoc.description) : '';
         completions.push({
           label,
-          info: () => Autocomplete(getSynonymDoc(doc, label)),
+          detail: cleanDesc ? ` ${cleanDesc.slice(0, 50)}${cleanDesc.length > 50 ? '...' : ''}` : '',
           type: 'function', // https://codemirror.net/docs/ref/#autocomplete.Completion.type
         });
       }
+    }
+  }
+  // Add Hydra functions to completions
+  for (const hydraFunc of hydraCompletions) {
+    if (!seen.has(hydraFunc.label)) {
+      seen.add(hydraFunc.label);
+      completions.push(hydraFunc);
+    }
+  }
+  // Add Math methods to completions
+  for (const mathFunc of mathCompletions) {
+    if (!seen.has(mathFunc.label)) {
+      seen.add(mathFunc.label);
+      completions.push(mathFunc);
     }
   }
   return completions;
@@ -421,6 +524,79 @@ function chordHandler(context) {
   }
 }
 
+// Standard JavaScript methods for common types
+const jsArrayMethods = [
+  'map', 'filter', 'reduce', 'forEach', 'find', 'findIndex', 'some', 'every',
+  'push', 'pop', 'shift', 'unshift', 'slice', 'splice', 'concat', 'join',
+  'reverse', 'sort', 'includes', 'indexOf', 'lastIndexOf', 'flat', 'flatMap',
+  'fill', 'copyWithin', 'entries', 'keys', 'values', 'at', 'length'
+].map(name => ({ label: name, type: 'method', info: `Array method: ${name}` }));
+
+const jsStringMethods = [
+  'charAt', 'charCodeAt', 'concat', 'includes', 'indexOf', 'lastIndexOf',
+  'match', 'matchAll', 'replace', 'replaceAll', 'search', 'slice', 'split',
+  'substring', 'toLowerCase', 'toUpperCase', 'trim', 'trimStart', 'trimEnd',
+  'padStart', 'padEnd', 'repeat', 'startsWith', 'endsWith', 'length'
+].map(name => ({ label: name, type: 'method', info: `String method: ${name}` }));
+
+const jsNumberMethods = [
+  'toFixed', 'toExponential', 'toPrecision', 'toString', 'valueOf'
+].map(name => ({ label: name, type: 'method', info: `Number method: ${name}` }));
+
+const jsObjectMethods = [
+  'hasOwnProperty', 'toString', 'valueOf', 'constructor'
+].map(name => ({ label: name, type: 'method', info: `Object method: ${name}` }));
+
+const allJsMethods = [...jsArrayMethods, ...jsStringMethods, ...jsNumberMethods, ...jsObjectMethods];
+
+// Cached regex patterns for methodHandler
+const METHOD_AFTER_DOT_REGEX = /\.\w*$/;
+const METHOD_WORD_REGEX = /\w*$/;
+
+function methodHandler(context) {
+  // Check if we're after a dot (method call context)
+  const afterDot = context.matchBefore(METHOD_AFTER_DOT_REGEX);
+  if (afterDot) {
+    const word = afterDot.text.slice(1); // Remove the dot
+    // Filter to only show pattern methods (functions that are typically chained)
+    const patternMethods = jsdocCompletions.filter(completion => {
+      const doc = jsdoc.docs.find(d => getDocLabel(d) === completion.label);
+      // Include if it's a common pattern method or has @memberof Pattern
+      return doc && (
+        doc.memberof === 'Pattern' ||
+        doc.tags?.some(t => t.originalTitle === 'patternMethod') ||
+        // Common pattern methods
+        ['gain', 'speed', 'note', 'sound', 's', 'n', 'slow', 'fast', 'rev', 'jux', 
+         'every', 'off', 'layer', 'stack', 'cat', 'seq', 'add', 'sub', 'mul', 'div',
+         'lpf', 'hpf', 'vowel', 'room', 'delay', 'delaytime', 'delayfeedback',
+         'cutoff', 'resonance', 'crush', 'coarse', 'shape', 'pan', 'orbit',
+         'sometimes', 'often', 'rarely', 'almostNever', 'almostAlways', 'never',
+         'degradeBy', 'ply', 'echo', 'echoWith', 'stut', 'chop', 'slice', 'splice',
+         'loopAt', 'fit', 'chunk', 'unchunk', 'inside', 'outside', 'when', 'mask',
+         'struct', 'euclidLegato', 'euclid', 'press', 'pressBy', 'range', 'rangex',
+         'scale', 'scaleWithOctave', 'chord', 'voicing', 'mode', 'transpose',
+         'superimpose', 'arp', 'arpeggiate', 'striate', 'scramble', 'shuffle',
+         'rot', 'iter', 'palindrome', 'swing', 'swingBy', 'hurry', 'compress',
+         'zoom', 'fastGap', 'densityGap', 'sparsity', 'linger', 'segment',
+         'timecat', 'timeCat', 'append', 'firstOf', 'lastOf', 'repeatCycles',
+         'fastcat', 'slowcat', 'fastCat', 'slowCat', 'overlay', 'sine', 'saw',
+         'square', 'tri', 'cosine', 'rand', 'irand', 'perlin', 'sine2', 'saw2',
+         'square2', 'tri2', 'cosine2', 'smooth', 'segment', 'fit', 'quantize'
+        ].includes(completion.label)
+      );
+    });
+    
+    // Combine pattern methods with standard JavaScript methods
+    const allMethods = [...patternMethods, ...allJsMethods];
+    
+    return {
+      from: afterDot.from + 1, // Start after the dot
+      options: allMethods.filter(m => m.label.startsWith(word)),
+    };
+  }
+  return null;
+}
+
 // Cached regex patterns for fallbackHandler
 const FALLBACK_WORD_REGEX = /\w*/;
 
@@ -442,19 +618,35 @@ const handlers = [
   chordHandler,
   scaleHandler,
   modeHandler,
+  methodHandler, // Check for method calls after dot
   // this handler *must* be last
   fallbackHandler,
 ];
 
 export const strudelAutocomplete = (context) => {
+  console.log('[autocomplete] triggered at pos:', context.pos, 'explicit:', context.explicit);
   for (const handler of handlers) {
     const result = handler(context);
     if (result) {
+      console.log('[autocomplete] matched handler, options:', result.options?.length || 0);
       return result;
     }
   }
+  console.log('[autocomplete] no match');
   return null;
 };
 
-export const isAutoCompletionEnabled = (enabled) =>
-  enabled ? [autocompletion({ override: [strudelAutocomplete], closeOnBlur: false })] : [];
+export const isAutoCompletionEnabled = (enabled) => {
+  console.log('[autocomplete] isAutoCompletionEnabled called, enabled:', enabled);
+  if (enabled) {
+    console.log('[autocomplete] registering autocomplete extension');
+    return [autocompletion({ 
+      override: [strudelAutocomplete], 
+      closeOnBlur: false,
+      activateOnTyping: true,
+      maxRenderedOptions: 100,
+    })];
+  }
+  console.log('[autocomplete] autocomplete disabled');
+  return [];
+};

@@ -15,5 +15,8 @@
   "shuffle": "shuffle",
   "files": "files",
   "docs": "DOCS",
-  "toggleFileManager": "Toggle file manager"
+  "toggleFileManager": "Toggle file manager",
+  "reference": {
+    "search": "Search functions..."
+  }
 }

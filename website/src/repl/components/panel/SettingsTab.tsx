@@ -130,6 +130,8 @@ export function SettingsTab({ started }: SettingsTabProps) {
     isActiveLineHighlighted,
     isAutoCompletionEnabled,
     isTooltipEnabled,
+    isSignatureHelpEnabled,
+    isLinterEnabled,
     isFlashEnabled,
     isButtonRowHidden,
     isCSSAnimationDisabled,
@@ -326,6 +328,16 @@ export function SettingsTab({ started }: SettingsTabProps) {
           label={t('tooltips')}
           onChange={(cbEvent) => settingsMap.setKey('isTooltipEnabled', cbEvent.target.checked)}
           value={isTooltipEnabled}
+        />
+        <Checkbox
+          label={t('signatureHelp')}
+          onChange={(cbEvent) => settingsMap.setKey('isSignatureHelpEnabled', cbEvent.target.checked)}
+          value={isSignatureHelpEnabled}
+        />
+        <Checkbox
+          label={t('errorHighlighting')}
+          onChange={(cbEvent) => settingsMap.setKey('isLinterEnabled', cbEvent.target.checked)}
+          value={isLinterEnabled}
         />
         <Checkbox
           label={t('lineWrapping')}

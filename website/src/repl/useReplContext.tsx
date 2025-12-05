@@ -207,6 +207,7 @@ export function useReplContext(): ReplContext {
         editorSettings[key] = (_settings as any)[key];
       }
     });
+    console.log('[repl] updating editor settings:', editorSettings);
     editorRef.current?.updateSettings(editorSettings);
   }, [_settings]);
 

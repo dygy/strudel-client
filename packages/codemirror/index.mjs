@@ -4,5 +4,7 @@ export * from './flash.mjs';
 export * from './slider.mjs';
 export * from './toggle.mjs';
 export * from './radio.mjs';
+export * from './signature.mjs';
+export * from './diagnostics.mjs';
 export * from './themes.mjs';
 export * from './widget.mjs';

@@ -18,6 +18,8 @@
   "highlightEvents": "Highlight Events",
   "autoCompletion": "Auto Completion",
   "tooltips": "Tooltips",
+  "signatureHelp": "Parameter Hints",
+  "errorHighlighting": "Error Highlighting",
   "lineWrapping": "Line Wrapping",
   "tabIndentation": "Tab Indentation",
   "multiCursor": "Multi Cursor",
