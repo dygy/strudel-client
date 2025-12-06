@@ -6,11 +6,12 @@ import { settingsMap } from './settings';
 import { confirmDialog, parseJSON, supabase } from './repl/util';
 
 // Type definitions
-interface PatternData {
+export interface PatternData {
   id: string;
   code: string;
-  collection: string;
-  created_at: number;
+  hash?: string;
+  collection?: string;
+  created_at?: number | string;
   public?: boolean;
   featured?: boolean;
   [key: string]: any;
@@ -47,7 +48,7 @@ export const patternFilterName = {
   public: 'latest',
   featured: 'featured',
   user: 'user',
-  // stock: 'stock examples',
+  stock: 'stock examples',
 } as const;
 
 const sessionAtom = <T>(name: string, initial: T = undefined as T): any => {
@@ -86,7 +87,7 @@ function parsePageNum(page: number | string): number {
   return isNaN(page as number) ? 0 : Number(page);
 }
 
-export function loadPublicPatterns(page: number | string): Promise<SupabaseResponse<PatternData>> {
+export function loadPublicPatterns(page: number | string = 0): Promise<SupabaseResponse<PatternData>> {
   const pageNum = parsePageNum(page);
   const offset = pageNum * patternQueryLimit;
   return supabase
@@ -94,7 +95,7 @@ export function loadPublicPatterns(page: number | string): Promise<SupabaseRespo
     .select()
     .eq('public', true)
     .range(offset, offset + patternQueryLimit)
-    .order('id', { ascending: false });
+    .order('id', { ascending: false }) as any;
 }
 
 export function loadFeaturedPatterns(page: number | string = 0): Promise<SupabaseResponse<PatternData>> {
@@ -105,7 +106,7 @@ export function loadFeaturedPatterns(page: number | string = 0): Promise<Supabas
     .select()
     .eq('featured', true)
     .range(offset, offset + patternQueryLimit)
-    .order('id', { ascending: false });
+    .order('id', { ascending: false }) as any;
 }
 
 export async function loadAndSetPublicPatterns(page?: number | string): Promise<void> {

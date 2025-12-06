@@ -18,7 +18,7 @@ import {
 import { setVersionDefaultsFrom } from './util';
 import { StrudelMirror, defaultSettings } from '@strudel/codemirror';
 import { clearHydra } from '@strudel/hydra';
-import { useCallback, useEffect, useRef, useState, MutableRefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { parseBoolean, settingsMap, useSettings } from '../settings';
 import {
   setActivePattern,
@@ -27,6 +27,7 @@ import {
   userPattern,
   getViewingPatternData,
   setViewingPatternData,
+  type PatternData,
 } from '../user_pattern_utils';
 import { superdirtOutput } from '@strudel/osc/superdirtoutput.js';
 import { audioEngineTargets } from '../settings';
@@ -47,13 +48,6 @@ interface ReplState {
   code?: string;
 }
 
-interface PatternData {
-  id: string;
-  code: string;
-  collection?: string;
-  [key: string]: any;
-}
-
 interface Module {
   packageName: string;
   [key: string]: any;
@@ -65,7 +59,7 @@ interface ReplContext {
   isDirty?: boolean;
   activeCode?: string;
   handleTogglePlay: () => Promise<void>;
-  handleUpdate: (patternData: PatternData, reset?: boolean) => Promise<void>;
+  handleUpdate: (patternData: Partial<PatternData> & { code: string }, reset?: boolean) => Promise<void>;
   handleShuffle: () => Promise<void>;
   handleShare: () => Promise<void>;
   handleEvaluate: () => void;
@@ -235,8 +229,13 @@ export function useReplContext(): ReplContext {
     await prebake(); // declare default samples
   };
 
-  const handleUpdate = async (patternData: PatternData, reset = false): Promise<void> => {
-    setViewingPatternData(patternData);
+  const handleUpdate = async (patternData: Partial<PatternData> & { code: string }, reset = false): Promise<void> => {
+    const fullPatternData: PatternData = {
+      id: patternData.id || '',
+      code: patternData.code,
+      ...patternData,
+    };
+    setViewingPatternData(fullPatternData);
     editorRef.current.setCode(patternData.code);
     if (reset) {
       await resetEditor();
@@ -250,7 +249,7 @@ export function useReplContext(): ReplContext {
 
   const handleShuffle = async (): Promise<void> => {
     const patternData = await getRandomTune();
-    if (!patternData) return;
+    if (!patternData || !patternData.id) return;
     
     const code = patternData.code;
     logger(`[repl] ✨ loading random tune "${patternData.id}"`);

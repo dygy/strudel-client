@@ -32,7 +32,6 @@ export interface FilesTranslations {
   copyCode: string;
   untitled: string;
   confirmDelete: string;
-  openFolder: string;
   playFile: string;
   copyPath: string;
   copySampleCode: string;

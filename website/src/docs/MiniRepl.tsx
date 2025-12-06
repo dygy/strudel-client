@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Icon } from './Icon';
 import { silence, noteToMidi, _mod } from '@strudel/core';
-import { getDrawContext, getPunchcardPainter } from '@strudel/draw';
+import { getDrawContext } from '@strudel/draw';
 import { transpiler } from '@strudel/transpiler';
 import { getAudioContext, webaudioOutput, initAudioOnFirstClick } from '@strudel/webaudio';
 import { StrudelMirror } from '@strudel/codemirror';
@@ -69,7 +69,7 @@ export function MiniRepl({
   const [activeNotes, setActiveNotes] = useState<(string | number)[]>([]);
 
   const init = useCallback(({ code, autodraw }: { code: string; autodraw: boolean }) => {
-    const drawContext = canvasId ? document.querySelector('#' + canvasId)?.getContext('2d') : getDrawContext();
+    const drawContext = canvasId ? document.querySelector<HTMLCanvasElement>('#' + canvasId)?.getContext('2d') : getDrawContext();
 
     const editor = new StrudelMirror({
       id,

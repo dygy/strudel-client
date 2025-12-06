@@ -40,7 +40,7 @@ export function JsDoc({ name, h = 3, hideDescription, punchcard, canvasHeight }:
     return <div />;
   }
   
-  const CustomHeading = `h${h}` as keyof JSX.IntrinsicElements;
+  const CustomHeading = `h${h}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
   const description =
     item.description?.replaceAll(/\{@link ([a-zA-Z\.]+)?#?([a-zA-Z]*)\}/g, (_, a, b) => {
       return `<a href="#${a.replaceAll('.', '').toLowerCase()}${b ? `-${b}` : ''}">${a}${b ? `#${b}` : ''}</a>`;

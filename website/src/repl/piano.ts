@@ -14,13 +14,6 @@ const maxPan = noteToMidi('C8');
  */
 const panwidth = (pan: number, width: number): number => pan * width + (1 - width) / 2;
 
-// Extend Pattern prototype with piano method
-declare module '@strudel/core' {
-  interface Pattern<T> {
-    piano(): Pattern<T>;
-  }
-}
-
 /**
  * Adds piano-specific processing to a pattern
  * - Sets clip to 1

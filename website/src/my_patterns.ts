@@ -1,8 +1,9 @@
 import { getMetadata } from './metadata_parser';
+import type { PatternData } from './user_pattern_utils';
 
 // Type definitions
 interface PatternCollection {
-  [key: string]: string;
+  [key: string]: PatternData;
 }
 
 /**
@@ -14,6 +15,11 @@ export function getMyPatterns(): PatternCollection {
   return Object.fromEntries(
     Object.entries(my)
       .filter(([name]) => name.endsWith('.txt'))
-      .map(([name, raw]) => [getMetadata(raw as string)['title'] || name.split('/').slice(-1), raw as string]),
+      .map(([name, raw]) => {
+        const code = raw as string;
+        const metadata = getMetadata(code);
+        const title = metadata['title'] || name.split('/').slice(-1)[0];
+        return [title, { id: title, code, collection: 'my-patterns' }];
+      }),
   );
 }

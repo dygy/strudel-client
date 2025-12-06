@@ -48,7 +48,7 @@ interface Folder {
 interface ReplContext {
   activeCode?: string;
   editorRef?: React.RefObject<{ code: string }>;
-  handleUpdate: (update: { code: string }, replace?: boolean) => void;
+  handleUpdate: (update: { id?: string; code: string; [key: string]: any }, replace?: boolean) => void;
 }
 
 interface FileManagerProps {
@@ -335,7 +335,7 @@ export function FileManager({ context }: FileManagerProps) {
 
   const loadTrack = (track: Track) => {
     setSelectedTrack(track.id);
-    context.handleUpdate({ code: track.code }, true);
+    context.handleUpdate({ id: track.id, code: track.code }, true);
   };
 
   const saveCurrentTrack = useCallback((showToast: boolean = true) => {

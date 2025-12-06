@@ -186,12 +186,6 @@ const maxPan = noteToMidi('C8');
  */
 const panwidth = (pan: number, width: number): number => pan * width + (1 - width) / 2;
 
-// Extend Pattern prototype with piano method
-declare module '@strudel/core' {
-  interface Pattern<T> {
-    piano(): Pattern<T>;
-  }
-}
 
 (Pattern.prototype as any).piano = function () {
   return this.fmap((v: any) => ({ ...v, clip: v.clip ?? 1 })) // set clip if not already set..

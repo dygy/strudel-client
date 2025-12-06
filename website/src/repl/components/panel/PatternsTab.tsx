@@ -30,14 +30,17 @@ import {
 interface Pattern {
   id: string;
   code: string;
-  created_at: string;
+  hash?: string;
+  created_at?: string | number;
   collection?: string;
+  [key: string]: any;
 }
 
-interface ReplContext {
-  started: boolean;
-  handleUpdate: (data: any, reset?: boolean) => void;
-}
+type ReplContext = {
+  started?: boolean;
+  handleUpdate?: (data: any, reset?: boolean) => void;
+  [key: string]: any;
+};
 
 interface PatternsTabProps {
   context: ReplContext;
@@ -51,13 +54,15 @@ export function PatternLabel({ pattern }: PatternLabelProps) {
   const meta = useMemo(() => getMetadata(pattern.code), [pattern]);
 
   let title = meta.title;
-  if (title == null) {
+  if (title == null && pattern.created_at) {
     const date = new Date(pattern.created_at);
     if (!isNaN(date.getTime())) {
       title = date.toLocaleDateString();
     } else {
       title = 'unnamed';
     }
+  } else if (title == null) {
+    title = 'unnamed';
   }
 
   const author = Array.isArray(meta.by) ? meta.by.join(',') : 'Anonymous';
@@ -72,10 +77,20 @@ interface PatternButtonProps {
   isUserPattern?: boolean;
   context?: ReplContext;
 }
-
+type ContextMenuItem = {
+  label: string;
+  icon?: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+}
+type Separator = {
+  separator: true;
+  label: string;
+  onClick: () => void;
+}
 function PatternButton({ showOutline, onClick, pattern, showHiglight, isUserPattern = false, context }: PatternButtonProps) {
   const getPatternContextItems = () => {
-    const items = [
+    const items: (ContextMenuItem | Separator)[] = [
       {
         label: 'Load',
         icon: <DocumentIcon className="w-4 h-4" />,
@@ -239,8 +254,8 @@ function UserPatterns({ context }: UserPatternsProps) {
 
         <ActionButton
           label="delete-all"
-          onClick={() => {
-            const { data } = userPattern.clearAll();
+          onClick={async () => {
+            const { data } = await userPattern.clearAll();
             updateCodeWindow(context, data);
           }}
         />

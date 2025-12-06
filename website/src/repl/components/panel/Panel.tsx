@@ -11,13 +11,19 @@ import { PatternsTab } from './PatternsTab';
 import { ChevronLeftIcon } from '@heroicons/react/16/solid';
 import { useTranslation } from '@src/i18n';
 
+declare global {
+  interface Window {
+    __TAURI__?: any;
+  }
+}
+
 const TAURI = typeof window !== 'undefined' && window.__TAURI__;
 
 interface ReplContext {
-  started: boolean;
-  pending: boolean;
-  isDirty: boolean;
-  activeCode: string;
+  started?: boolean;
+  pending?: boolean;
+  isDirty?: boolean;
+  activeCode?: string;
   handleTogglePlay: () => void;
   handleEvaluate: () => void;
   handleShuffle: () => void;

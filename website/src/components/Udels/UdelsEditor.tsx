@@ -8,13 +8,13 @@ import React from 'react';
 interface ReplContext {
   containerRef: React.RefObject<HTMLElement>;
   editorRef: React.RefObject<any>;
-  error: Error | null;
+  error?: Error | null;
   init: () => void;
-  pending: boolean;
-  started: boolean;
+  pending?: boolean;
+  started?: boolean;
   handleTogglePlay: () => void;
-  isDirty: boolean;
-  activeCode: string;
+  isDirty?: boolean;
+  activeCode?: string;
   handleEvaluate: () => void;
   handleShuffle: () => void;
   handleShare: () => void;

@@ -9,6 +9,6 @@ interface YoutubeProps {
   [key: string]: any;
 }
 
-export function Youtube(props: YoutubeProps) {
-  return <LiteYouTubeEmbed {...props} />;
+export function Youtube({ title = 'YouTube video', ...props }: YoutubeProps) {
+  return <LiteYouTubeEmbed title={title} {...props} />;
 }

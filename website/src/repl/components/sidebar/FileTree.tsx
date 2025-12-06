@@ -17,7 +17,7 @@ import { BurgerMenuButton } from '../ui/BurgerMenuButton';
 
 interface ContextMenuItem {
   label: string
-  icon: JSX.Element
+  icon?: JSX.Element
   onClick: () => void
   separator?: false
 }
@@ -83,7 +83,7 @@ interface FileTreeProps {
   setRenameValue: (value: string) => void;
   onRenameFinish: () => void;
   onRenameCancel: () => void;
-  emptySpaceContextItems: Array<{ label: string; icon?: React.ReactNode; onClick: () => void; separator?: boolean }>;
+  emptySpaceContextItems: Array<ContextMenuItem | Separator>;
   onConvertToMultitrack: (track: Track) => void;
   onAddStep: (trackId: string) => void;
   onSwitchStep: (trackId: string, stepIndex: number) => void;

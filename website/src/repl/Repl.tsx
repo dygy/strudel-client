@@ -12,7 +12,7 @@ import { useReplContext } from './useReplContext';
 import { useSettings } from '@src/settings';
 import { I18nProvider } from '@src/components/I18nProvider';
 import '@src/i18n'; // Initialize i18n system
-import { CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 
 // Type definitions
 interface ReplProps {

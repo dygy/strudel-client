@@ -40,7 +40,7 @@ export default function Claviature({ options, onClick, onMouseDown, onMouseUp, o
   return (
     <svg {...svg.attributes}>
       {svg.children.map((el, i) => {
-        const TagName = el.name as keyof JSX.IntrinsicElements;
+        const TagName = el.name as React.ElementType;
         const { key, ...attributes } = el.attributes;
         return (
           <TagName key={`${el.name}-${i}`} {...attributes}>

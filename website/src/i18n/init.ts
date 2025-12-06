@@ -1,17 +1,19 @@
 // Initialize i18n system
-import { initializeLanguage, languages, languageStore } from './index';
+import { languages } from './index';
+import i18n from './i18n';
 
 // Initialize language on app start
 if (typeof window !== 'undefined') {
-  // Initialize language from stored preference or browser default
-  initializeLanguage();
-  
   // Listen for language changes and update document attributes
-  languageStore.subscribe((state) => {
-    const config = languages[state.language];
-    document.documentElement.dir = config.rtl ? 'rtl' : 'ltr';
-    document.documentElement.lang = state.language;
+  i18n.on('languageChanged', (lng) => {
+    const config = languages[lng as keyof typeof languages];
+    if (config) {
+      document.documentElement.dir = config.rtl ? 'rtl' : 'ltr';
+      document.documentElement.lang = lng;
+    }
   });
 }
 
-export { initializeLanguage };
+export function initializeLanguage() {
+  // Language is already initialized by i18n.ts
+}

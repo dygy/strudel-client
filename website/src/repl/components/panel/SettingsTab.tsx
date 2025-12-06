@@ -152,7 +152,7 @@ export function SettingsTab({ started }: SettingsTabProps) {
     autosaveInterval,
   } = useSettings();
   const shouldAlwaysSync = isUdels();
-  const canChangeAudioDevice = AudioContext.prototype.setSinkId != null;
+  const canChangeAudioDevice = 'setSinkId' in AudioContext.prototype;
   
   const handleReloadConfirm = (callback: () => void) => {
     confirmDialog(tMessages('reloadRequired')).then((r) => {

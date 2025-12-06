@@ -1,8 +1,9 @@
 // Initialize i18n
 import './i18n';
 
-// Export typed translation hook
-export { useTranslation } from './useTypedTranslation';
+// Import and re-export typed translation hook
+import { useTranslation as useTypedTranslation } from './useTypedTranslation';
+export { useTypedTranslation as useTranslation };
 
 // Export types
 export type * from './types';
@@ -12,19 +13,19 @@ export { formatDateTime, formatDateTimeIntl, useFormattedDate } from './dateForm
 
 // Convenience hooks for specific namespaces
 export function useSettingsTranslation() {
-  return useTranslation('settings');
+  return useTypedTranslation('settings');
 }
 
 export function useFilesTranslation() {
-  return useTranslation('files');
+  return useTypedTranslation('files');
 }
 
 export function useCommonTranslation() {
-  return useTranslation('common');
+  return useTypedTranslation('common');
 }
 
 export function useWelcomeTranslation() {
-  return useTranslation('welcome');
+  return useTypedTranslation('welcome');
 }
 
 // Language configuration

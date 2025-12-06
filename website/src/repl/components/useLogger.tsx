@@ -28,9 +28,9 @@ interface LogEvent {
 
 export const $strudel_log_history = atom<LogEntry[]>([]);
 
-function useLoggerEvent(onTrigger: (event: LogEvent) => void) {
-  useEvent(logger.key, onTrigger);
-}
+  function useLoggerEvent(onTrigger: (event: LogEvent) => void) {
+    useEvent(logger.key, onTrigger as any);
+  }
 
 function getUpdatedLog(log: LogEntry[], event: LogEvent): LogEntry[] {
   const { message, type, data } = event.detail;

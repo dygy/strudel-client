@@ -1,7 +1,6 @@
 import useEvent from '@src/useEvent';
-import { useStore } from '@nanostores/react';
 import { getAudioContext, soundMap, connectToDestination } from '@strudel/webaudio';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { settingsMap, soundFilterType, useSettings } from '../../../settings';
 import { ButtonGroup } from './Forms';
 import ImportSoundsButton from './ImportSoundsButton';
@@ -33,7 +32,14 @@ const getSamples = (samples: any[] | Record<string, any> | undefined): number =>
 };
 
 export function SoundsTab() {
-  const sounds = useStore(soundMap) as SoundMap;
+  const [sounds, setSounds] = useState<SoundMap>(() => soundMap.get());
+
+  useEffect(() => {
+    const unsubscribe = soundMap.subscribe((newSounds) => {
+      setSounds(newSounds);
+    });
+    return unsubscribe;
+  }, []);
 
   const { soundsFilter } = useSettings();
   const [search, setSearch] = useState('');

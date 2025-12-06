@@ -7,8 +7,9 @@ import { logger } from '@strudel/core';
 interface Pattern {
   id: string;
   code: string;
-  hash: string;
-  created_at: string;
+  hash?: string;
+  created_at?: string | number;
+  [key: string]: any;
 }
 
 interface PatternListProps {

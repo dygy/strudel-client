@@ -6,9 +6,9 @@ import { useEffect } from 'react';
  * @param onTrigger - The event handler function
  * @param useCapture - Whether to use capture phase (default: false)
  */
-function useEvent(
+function useEvent<T = any>(
   name: string,
-  onTrigger: (event: Event) => void,
+  onTrigger: (event: CustomEvent<T> | Event) => void,
   useCapture: boolean = false
 ): void {
   useEffect(() => {

@@ -20,6 +20,15 @@ export interface UserPattern {
   // Add other pattern properties as needed
 }
 
+/**
+ * Parses a boolean-like value to a proper boolean
+ * @param booleanlike - Value that might be a boolean or string representation
+ * @returns Parsed boolean value
+ */
+export const parseBoolean = (booleanlike: boolean | string | undefined): boolean =>
+  [true, 'true'].includes(booleanlike as boolean | string) ? true : false;
+
+
 export interface UserPatterns {
   [key: string]: UserPattern;
 }
@@ -55,6 +64,7 @@ export interface Settings {
   togglePanelTrigger: TogglePanelTrigger;
   userPatterns: UserPatterns;
   audioEngineTarget: AudioEngineTarget;
+  audioDeviceName: string;
   isButtonRowHidden: boolean;
   isCSSAnimationDisabled: boolean;
   maxPolyphony: number;
@@ -96,6 +106,7 @@ export interface RawSettings {
   togglePanelTrigger: TogglePanelTrigger;
   userPatterns: string; // JSON string
   audioEngineTarget: AudioEngineTarget;
+  audioDeviceName: string;
   isButtonRowHidden: boolean | string;
   isCSSAnimationDisabled: boolean | string;
   maxPolyphony: number;
@@ -152,6 +163,7 @@ export const defaultSettings: RawSettings = {
   togglePanelTrigger: 'click', //click | hover
   userPatterns: '{}',
   audioEngineTarget: audioEngineTargets.webaudio,
+  audioDeviceName: '',
   isButtonRowHidden: false,
   isCSSAnimationDisabled: false,
   maxPolyphony: 128,
@@ -202,13 +214,6 @@ if (typeof window !== 'undefined') {
   }
 }
 
-/**
- * Parses a boolean-like value to a proper boolean
- * @param booleanlike - Value that might be a boolean or string representation
- * @returns Parsed boolean value
- */
-export const parseBoolean = (booleanlike: boolean | string | undefined): boolean => 
-  [true, 'true'].includes(booleanlike as boolean | string) ? true : false;
 
 /**
  * Custom hook to get processed settings with proper types

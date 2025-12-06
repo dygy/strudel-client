@@ -10,10 +10,10 @@ const { BASE_URL } = import.meta.env;
 const baseNoTrailing = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
 
 interface ReplContext {
-  started: boolean;
-  pending: boolean;
-  isDirty: boolean;
-  activeCode: string;
+  started?: boolean;
+  pending?: boolean;
+  isDirty?: boolean;
+  activeCode?: string;
   handleTogglePlay: () => void;
   handleEvaluate: () => void;
   handleShuffle: () => void;

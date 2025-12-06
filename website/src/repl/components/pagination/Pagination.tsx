@@ -1,7 +1,7 @@
 import { Incrementor } from '../incrementor/Incrementor';
 import React from 'react';
 
-interface PaginationProps extends React.ComponentProps<typeof Incrementor> {
+interface PaginationProps extends Omit<React.ComponentProps<typeof Incrementor>, 'onChange' | 'value'> {
   currPage: number;
   onPageChange: (page: number) => void;
   className?: string;

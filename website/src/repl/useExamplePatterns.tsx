@@ -1,15 +1,9 @@
-import { $featuredPatterns, $publicPatterns, patternFilterName } from '../user_pattern_utils';
+import { $featuredPatterns, $publicPatterns, patternFilterName, type PatternData } from '../user_pattern_utils';
 import { useStore } from '@nanostores/react';
 import { useMemo } from 'react';
 import * as tunes from '../repl/tunes';
 
 // Type definitions
-interface PatternData {
-  id: string | number;
-  code: string;
-  collection: string;
-}
-
 interface PatternCollection {
   [key: string]: PatternData;
 }
@@ -22,7 +16,10 @@ interface UseExamplePatternsReturn {
 }
 
 export const stockPatterns: PatternCollection = Object.fromEntries(
-  Object.entries(tunes).map(([key, code], i) => [i, { id: i, code, collection: 'Stock Examples' }]),
+  Object.entries(tunes).map(([key, code], i) => [
+    String(i),
+    { id: String(i), code, collection: patternFilterName.stock },
+  ]),
 );
 
 export const useExamplePatterns = (): UseExamplePatternsReturn => {

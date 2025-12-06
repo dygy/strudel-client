@@ -11,12 +11,12 @@ import React from 'react';
 interface ReplContext {
   containerRef: React.RefObject<HTMLDivElement>;
   editorRef: React.RefObject<any>;
-  error: Error | null;
+  error?: Error | null;
   init: () => void;
-  pending: boolean;
-  started: boolean;
-  isDirty: boolean;
-  activeCode: string;
+  pending?: boolean;
+  started?: boolean;
+  isDirty?: boolean;
+  activeCode?: string;
   handleTogglePlay: () => void;
   handleEvaluate: () => void;
   handleShuffle: () => void;

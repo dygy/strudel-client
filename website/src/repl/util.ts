@@ -7,7 +7,7 @@ import './Repl.css';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
-import { $featuredPatterns } from '@src/user_pattern_utils';
+import { $featuredPatterns, type PatternData } from '@src/user_pattern_utils';
 
 // Type definitions
 interface CodeRecord {
@@ -19,11 +19,6 @@ interface CodeRecord {
 interface SupabaseResponse<T> {
   data: T[] | null;
   error: any;
-}
-
-interface PatternData {
-  code: string;
-  [key: string]: any;
 }
 
 interface FeaturedPatterns {
@@ -101,10 +96,10 @@ export const parseJSON = (json: string | null | undefined): any => {
  */
 export async function getRandomTune(): Promise<PatternData | undefined> {
   await dbLoaded;
-  const featuredTunes = Object.entries($featuredPatterns.get() as any);
+  const featuredTunes = Object.entries($featuredPatterns.get() as FeaturedPatterns);
   const randomItem = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
   const [_, data] = randomItem(featuredTunes);
-  return data;
+  return data as PatternData;
 }
 
 /**
@@ -219,7 +214,7 @@ export const isUdels = (): boolean => {
 export function setVersionDefaultsFrom(code: string): void {
   try {
     const metadata = getMetadata(code);
-    setVersionDefaults(metadata.version);
+    setVersionDefaults(Array.isArray(metadata.version) ? metadata.version[0] : metadata.version);
   } catch (err) {
     console.error('Error parsing metadata..');
     console.error(err);
