@@ -7,7 +7,13 @@ import { MiniRepl } from '../../docs/MiniRepl';
 
 # Using Hydra inside Strudel
 
-You can write [hydra](https://hydra.ojack.xyz/) code in strudel! All you have to do is to call `await initHydra()` at the top:
+[Hydra](https://hydra.ojack.xyz/) is a live coding video synth that lets you create mesmerizing visuals in real-time. You can use Hydra directly inside Strudel to combine audio and visual live coding!
+
+## Getting Started
+
+To use Hydra in Strudel, simply call `await initHydra()` at the top of your code. This initializes the Hydra video synth and makes all Hydra functions available.
+
+### Basic Example
 
 <MiniRepl
   client:only="react"
@@ -42,9 +48,46 @@ note("[a,c,e,<a4 ab4 g4 gb4>,b4]/2")
 `}
 />
 
-## H patterns
+## Understanding Hydra Basics
 
-There is a special function `H` that allows you to use a pattern as an input to hydra:
+Hydra works by chaining functions together. Here are the main types of functions:
+
+- **Sources**: Generate visuals (`osc()`, `noise()`, `shape()`, `gradient()`)
+- **Geometry**: Transform position/scale (`rotate()`, `scale()`, `pixelate()`, `kaleid()`)
+- **Color**: Modify colors (`color()`, `invert()`, `luma()`, `colorama()`)
+- **Blend**: Combine visuals (`blend()`, `diff()`, `add()`, `mult()`)
+- **Modulate**: Use one source to affect another (`modulate()`, `modulateScale()`, `modulateRotate()`)
+- **Output**: Send to screen (`.out()`)
+
+### Simple Oscillator
+
+<MiniRepl
+  client:only="react"
+  tune={`await initHydra()
+// Create a simple oscillating pattern
+osc(10, 0.1, 1)  // frequency, sync, offset
+  .color(1, 0.5, 0.8)  // add color
+  .out()  // output to screen
+`}
+/>
+
+### Combining Effects
+
+<MiniRepl
+  client:only="react"
+  tune={`await initHydra()
+// Combine multiple effects
+osc(20, 0.05, 0)
+  .kaleid(4)  // create kaleidoscope with 4 sides
+  .color(0.5, 0.3, 0.8)
+  .rotate(0.5)  // rotate slowly
+  .out()
+`}
+/>
+
+## H patterns - Connecting Strudel to Hydra
+
+The special `H()` function allows you to use Strudel patterns as inputs to Hydra. This creates a powerful bridge between audio and visual patterns!
 
 <MiniRepl
   client:only="react"
@@ -55,9 +98,21 @@ n(pattern).scale("A:minor").piano().room(1)
 `}
 />
 
-## detectAudio
+### Pattern-Driven Visuals
 
-To use hydra audio capture, call `initHydra` with `{detectAudio:true}` configuration param:
+<MiniRepl
+  client:only="react"
+  tune={`await initHydra()
+// Use patterns to control visual parameters
+osc(H("10 20 30 40"), 0.1, 0)
+  .kaleid(H("3 4 5 6"))
+  .out()
+`}
+/>
+
+## Audio Reactivity with detectAudio
+
+Make your visuals react to audio! Use `{detectAudio:true}` to enable audio analysis. The `a.fft` array contains frequency data you can use to drive visual parameters.
 
 <MiniRepl
   client:only="react"
@@ -73,13 +128,34 @@ n(pattern).scale("A:minor").piano().room(1)
 `}
 />
 
-You might now be able to see this properly here: [open in REPL](/#YXdhaXQgaW5pdEh5ZHJhKCkKbGV0IHBhdHRlcm4gPSAiMyA0IDUgWzYgN10qMiIKc2hhcGUoSChwYXR0ZXJuKSkub3V0KG8wKQpuKHBhdHRlcm4pLnNjYWxlKCJBOm1pbm9yIikucGlhbm8oKS5yb29tKDEpIA%3D%3D)
+You might not be able to see this properly here: [open in REPL](/#YXdhaXQgaW5pdEh5ZHJhKCkKbGV0IHBhdHRlcm4gPSAiMyA0IDUgWzYgN10qMiIKc2hhcGUoSChwYXR0ZXJuKSkub3V0KG8wKQpuKHBhdHRlcm4pLnNjYWxlKCJBOm1pbm9yIikucGlhbm8oKS5yb29tKDEpIA%3D%3D)
 
-Similar to `detectAudio`, all the [available hydra options](https://github.com/hydra-synth/hydra-synth#api) can be passed to `initHydra`.
+### Audio Frequency Bands
 
-## feedStrudel
+The `a.fft` array has 4 frequency bands:
+- `a.fft[0]` - Bass frequencies
+- `a.fft[1]` - Low-mid frequencies  
+- `a.fft[2]` - High-mid frequencies
+- `a.fft[3]` - Treble frequencies
 
-Using the `feedStrudel` option, you can transform strudel visualizations with hydra:
+<MiniRepl
+  client:only="react"
+  tune={`await initHydra({detectAudio:true})
+// Bass controls rotation, treble controls scale
+osc(10, 0.1, 0)
+  .rotate(() => a.fft[0] * 2)
+  .scale(() => 1 + a.fft[3])
+  .out()
+
+s("bd hh sd hh").bank("RolandTR909")
+`}
+/>
+
+All [available hydra options](https://github.com/hydra-synth/hydra-synth#api) can be passed to `initHydra`.
+
+## feedStrudel - Transform Strudel Visuals
+
+The `feedStrudel` option lets you use Hydra to transform Strudel's built-in visualizations (like pianoroll and scope). This creates a feedback loop between audio visualization and video synthesis!
 
 <MiniRepl
   client:only="react"
@@ -100,3 +176,118 @@ $: note("[<g1!3 <bb1 <f1 d1>>>]\*3").s("sawtooth")
 
 all(x=>x.fft(4).scope({pos:0,smear:.95}))`}
 />
+
+
+## More Hydra Techniques
+
+### Using Multiple Outputs
+
+Hydra has 4 outputs (o0, o1, o2, o3) that you can blend together:
+
+<MiniRepl
+  client:only="react"
+  tune={`await initHydra()
+// Output 1: oscillator
+osc(10, 0.1, 0).out(o0)
+
+// Output 2: noise
+noise(3, 0.1).out(o1)
+
+// Blend them together
+src(o0).blend(src(o1), 0.5).out(o2)
+
+// Show the blend
+render(o2)
+`}
+/>
+
+### Feedback Loops
+
+Create infinite feedback by using `src(o0)` - the output feeds back into itself:
+
+<MiniRepl
+  client:only="react"
+  tune={`await initHydra()
+// Feedback creates trails and accumulation
+osc(20, 0.05, 0)
+  .blend(src(o0).scale(0.99), 0.9)
+  .out()
+`}
+/>
+
+### Modulation
+
+Use one source to modulate another for complex interactions:
+
+<MiniRepl
+  client:only="react"
+  tune={`await initHydra()
+// Use noise to modulate oscillator position
+osc(10, 0.1, 0)
+  .modulate(noise(3), 0.1)
+  .out()
+`}
+/>
+
+### Combining with Strudel Patterns
+
+<MiniRepl
+  client:only="react"
+  tune={`await initHydra()
+// Visuals driven by musical pattern
+let pattern = "0 1 2 [3 4]*2"
+
+osc(H(pattern).range(5, 30), 0.1, 0)
+  .kaleid(H(pattern).range(3, 8))
+  .color(0.8, 0.5, 0.9)
+  .out()
+
+// Play the pattern
+n(pattern).scale("C:minor").piano()
+`}
+/>
+
+## Tips and Tricks
+
+- **Start simple**: Begin with one source and add effects gradually
+- **Use `.range()`**: Convert pattern values to useful ranges with `H(pattern).range(min, max)`
+- **Experiment with blend modes**: Try `.diff()`, `.mult()`, `.add()` for different effects
+- **Layer outputs**: Use multiple outputs and blend them for complex visuals
+- **Audio reactivity**: Use `a.fft` arrays to make visuals respond to sound
+- **Feedback carefully**: Too much feedback can overwhelm - use values like 0.9-0.99 for scale
+
+## Common Hydra Functions
+
+### Sources
+- `osc(freq, sync, offset)` - Oscillating pattern
+- `noise(scale, offset)` - Random noise
+- `shape(sides, radius, smoothing)` - Geometric shapes
+- `gradient(speed)` - Color gradient
+- `solid(r, g, b, a)` - Solid color
+
+### Geometry
+- `rotate(angle, speed)` - Rotate the image
+- `scale(amount, xMult, yMult)` - Scale the image
+- `pixelate(x, y)` - Pixelate effect
+- `kaleid(sides)` - Kaleidoscope effect
+- `repeat(x, y)` - Tile the image
+
+### Color
+- `color(r, g, b)` - Colorize
+- `invert(amount)` - Invert colors
+- `luma(threshold, tolerance)` - Luma key
+- `posterize(bins, gamma)` - Posterize colors
+- `saturate(amount)` - Adjust saturation
+
+### Blend
+- `blend(source, amount)` - Blend with another source
+- `diff(source)` - Difference blend
+- `add(source, amount)` - Additive blend
+- `mult(source, amount)` - Multiply blend
+
+## Learn More
+
+- [Hydra Official Documentation](https://hydra.ojack.xyz/docs/)
+- [Hydra Functions Reference](https://hydra.ojack.xyz/api/)
+- [Hydra Book](https://hydra-book.glitch.me/)
+- [Hydra Examples](https://hydra.ojack.xyz/garden/)

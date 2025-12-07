@@ -1,6 +1,6 @@
 import { hoverTooltip } from '@codemirror/view';
 import jsdoc from '../../doc.json';
-import { Autocomplete, getSynonymDoc, hydraFunctionDocs } from './autocomplete.mjs';
+import { Autocomplete, getSynonymDoc, hydraFunctionDocs, parseHydraDoc } from './autocomplete.mjs';
 
 const getDocLabel = (doc) => doc.name || doc.longname;
 
@@ -143,6 +143,36 @@ export const strudelTooltip = hoverTooltip(
       
       // Show Hydra tooltip if: standalone call OR (method call but no Strudel docs)
       if (!isMethod || !hasStrudelDocs) {
+        // Parse Hydra documentation into structured format
+        const hydraDoc = parseHydraDoc(word, hydraFunctionDocs[word]);
+        
+        // Build params list HTML
+        const paramsHTML = hydraDoc.params.length > 0 ? `
+          <div class="autocomplete-info-params-section">
+            <h4 class="autocomplete-info-section-title">Parameters</h4>
+            <ul class="autocomplete-info-params-list">
+              ${hydraDoc.params.map(param => `
+                <li class="autocomplete-info-param-item">
+                  <span class="autocomplete-info-param-name">${param.name}</span>
+                  <span class="autocomplete-info-param-type">${param.type}</span>
+                  ${param.default ? `<span class="autocomplete-info-param-type" style="background: rgba(129, 199, 132, 0.2); color: #81c784;">default: ${param.default}</span>` : ''}
+                  ${param.description ? `<div class="autocomplete-info-param-desc">${param.description}</div>` : ''}
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        ` : '';
+        
+        // Build examples HTML
+        const examplesHTML = hydraDoc.examples.length > 0 ? `
+          <div class="autocomplete-info-examples-section">
+            <h4 class="autocomplete-info-section-title">Examples</h4>
+            ${hydraDoc.examples.map(example => `
+              <pre class="autocomplete-info-example-code">${example}</pre>
+            `).join('')}
+          </div>
+        ` : '';
+        
         return {
           pos: start,
           end,
@@ -154,10 +184,12 @@ export const strudelTooltip = hoverTooltip(
             dom.innerHTML = `
               <div class="autocomplete-info-container">
                 <h3 class="autocomplete-info-function-name">${word}</h3>
-                <div style="margin-bottom: 8px;">
-                  <span class="autocomplete-info-param-type" style="background: rgba(255, 107, 107, 0.2); color: #ff6b6b;">Hydra</span>
+                <div style="margin-bottom: 12px;">
+                  <span class="autocomplete-info-param-type" style="background: rgba(255, 107, 107, 0.2); color: #ff6b6b; border: 1px solid rgba(255, 107, 107, 0.3);">Hydra</span>
                 </div>
-                <div class="autocomplete-info-function-description">${hydraFunctionDocs[word]}</div>
+                <div class="autocomplete-info-function-description">${hydraDoc.description}</div>
+                ${paramsHTML}
+                ${examplesHTML}
               </div>
             `;
             return { dom };

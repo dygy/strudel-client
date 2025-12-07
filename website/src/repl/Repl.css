@@ -73,29 +73,61 @@
 /* Override default styles from the codemirror inline css for autocomplete info tooltip*/
 .cm-tooltip.cm-completionInfo {
   padding: 0 !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  border-radius: 8px !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
-  max-width: 500px !important;
-  min-width: 300px !important;
-  max-height: 400px !important;
-  background: rgba(30, 30, 30, 0.95) !important;
-  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(79, 195, 247, 0.3) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(79, 195, 247, 0.1) !important;
+  max-width: 550px !important;
+  min-width: 320px !important;
+  max-height: 450px !important;
+  background: linear-gradient(135deg, rgba(25, 25, 35, 0.98), rgba(30, 30, 40, 0.98)) !important;
+  backdrop-filter: blur(16px) !important;
   overflow: hidden;
+  animation: tooltipFadeIn 0.2s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Main tooltip container */
 .autocomplete-info-container {
-  padding: 16px !important;
+  padding: 20px !important;
   color: var(--foreground);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Mono', 'Monaco', monospace;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
   max-width: 600px;
   height: 100%;
   min-width: 400px;
   white-space: normal !important;
   overflow-y: auto !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(79, 195, 247, 0.3) rgba(255, 255, 255, 0.05);
+}
+
+.autocomplete-info-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.autocomplete-info-container::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.autocomplete-info-container::-webkit-scrollbar-thumb {
+  background: rgba(79, 195, 247, 0.3);
+  border-radius: 4px;
+}
+
+.autocomplete-info-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(79, 195, 247, 0.5);
 }
 
 .autocomplete-info-tooltip {
@@ -103,22 +135,27 @@
 }
 
 .autocomplete-info-function-name {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
-  color: #4fc3f7;
-  margin: 0 0 12px 0;
-  letter-spacing: -0.3px;
+  background: linear-gradient(135deg, #4fc3f7, #81c784);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 14px 0;
+  letter-spacing: -0.5px;
+  text-shadow: 0 2px 8px rgba(79, 195, 247, 0.3);
 }
 
 .autocomplete-info-function-synonyms {
-  margin: 0 0 12px 0;
-  padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
-  color: #aaa;
+  margin: 0 0 14px 0;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(79, 195, 247, 0.08), rgba(129, 199, 132, 0.08));
+  border-radius: 8px;
+  color: #b0b0b0;
   font-size: 12px;
-  line-height: 1.5;
-  border-left: 3px solid #4fc3f7;
+  line-height: 1.6;
+  border-left: 4px solid #4fc3f7;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .autocomplete-info-function-description {
@@ -152,16 +189,20 @@
 }
 
 .autocomplete-info-param-item {
-  margin-bottom: 10px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
-  border-left: 3px solid #4fc3f7;
-  transition: all 0.2s ease;
+  margin-bottom: 12px;
+  padding: 14px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  border-radius: 8px;
+  border-left: 4px solid #4fc3f7;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .autocomplete-info-param-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: linear-gradient(135deg, rgba(79, 195, 247, 0.12), rgba(129, 199, 132, 0.08));
+  border-left-color: #81c784;
+  transform: translateX(4px);
+  box-shadow: 0 4px 16px rgba(79, 195, 247, 0.2);
 }
 
 .autocomplete-info-param-item:last-child {
@@ -196,17 +237,38 @@
 }
 
 .autocomplete-info-example-code {
-  background: rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.3));
   color: #e0e0e0;
-  padding: 12px;
-  border-radius: 6px;
+  padding: 14px;
+  border-radius: 8px;
   font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
   font-size: 12px;
-  line-height: 1.6;
-  margin: 8px 0;
+  line-height: 1.7;
+  margin: 10px 0;
   overflow-x: auto;
   white-space: pre;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(79, 195, 247, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Hydra-specific tooltip styling */
+.hydra-tooltip .autocomplete-info-function-name {
+  background: linear-gradient(135deg, #ff6b6b, #ff8e53);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hydra-tooltip .autocomplete-info-param-type {
+  background: rgba(255, 107, 107, 0.2);
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+}
+
+.hydra-tooltip .autocomplete-info-function-description {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #f0f0f0;
 }
 
 .autocomplete-info-tooltip::-webkit-scrollbar {
@@ -227,45 +289,178 @@
   background: rgba(255, 255, 255, 0.3);
 }
 
-/* Autocomplete dropdown styling */
+/* Autocomplete dropdown styling - Modern & Fancy */
 .cm-tooltip-autocomplete {
-  background: var(--background) !important;
-  border: 1px solid var(--foreground, #444) !important;
-  border-radius: 4px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  background: linear-gradient(135deg, rgba(25, 25, 35, 0.98), rgba(30, 30, 40, 0.98)) !important;
+  border: 1px solid rgba(79, 195, 247, 0.4) !important;
+  border-radius: 12px !important;
+  box-shadow: 
+    0 12px 48px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(79, 195, 247, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
   font-family: var(--font-family, 'SF Mono', 'Monaco', monospace) !important;
   font-size: 13px !important;
+  backdrop-filter: blur(16px) !important;
+  padding: 6px !important;
+  animation: autocompleteSlideIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden !important;
+}
+
+@keyframes autocompleteSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .cm-tooltip-autocomplete > ul {
   font-family: inherit !important;
+  max-height: 400px !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(79, 195, 247, 0.3) rgba(255, 255, 255, 0.05);
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.cm-tooltip-autocomplete > ul::-webkit-scrollbar {
+  width: 8px;
+}
+
+.cm-tooltip-autocomplete > ul::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  margin: 4px;
+}
+
+.cm-tooltip-autocomplete > ul::-webkit-scrollbar-thumb {
+  background: rgba(79, 195, 247, 0.3);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.cm-tooltip-autocomplete > ul::-webkit-scrollbar-thumb:hover {
+  background: rgba(79, 195, 247, 0.5);
+  background-clip: padding-box;
 }
 
 .cm-tooltip-autocomplete > ul > li {
-  padding: 4px 8px !important;
-  color: var(--foreground) !important;
+  padding: 10px 14px !important;
+  color: var(--foreground, #e0e0e0) !important;
   cursor: pointer !important;
+  border-radius: 8px !important;
+  margin: 2px 0 !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.cm-tooltip-autocomplete > ul > li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #4fc3f7, #81c784);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.cm-tooltip-autocomplete > ul > li:hover {
+  background: linear-gradient(135deg, rgba(79, 195, 247, 0.08), rgba(129, 199, 132, 0.08)) !important;
+  transform: translateX(4px) !important;
+  box-shadow: 0 2px 8px rgba(79, 195, 247, 0.15) !important;
+}
+
+.cm-tooltip-autocomplete > ul > li:hover::before {
+  opacity: 1;
 }
 
 .cm-tooltip-autocomplete > ul > li[aria-selected] {
-  background: var(--selection, rgba(128, 203, 196, 0.3)) !important;
-  color: var(--foreground) !important;
+  background: linear-gradient(135deg, rgba(79, 195, 247, 0.15), rgba(129, 199, 132, 0.12)) !important;
+  color: var(--foreground, #ffffff) !important;
+  transform: translateX(6px) !important;
+  box-shadow: 
+    0 4px 16px rgba(79, 195, 247, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+.cm-tooltip-autocomplete > ul > li[aria-selected]::before {
+  opacity: 1;
+  width: 4px;
 }
 
 .cm-completionLabel {
-  color: var(--foreground) !important;
+  color: var(--foreground, #e0e0e0) !important;
+  font-weight: 500 !important;
+  flex: 0 0 auto !important;
+}
+
+.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionLabel {
+  color: #ffffff !important;
+  font-weight: 600 !important;
 }
 
 .cm-completionDetail {
-  color: var(--comment, #888) !important;
-  font-style: italic !important;
-  margin-left: 8px !important;
+  color: var(--comment, #999) !important;
+  font-style: normal !important;
+  margin-left: auto !important;
   font-size: 11px !important;
+  opacity: 0.8 !important;
+  flex: 1 1 auto !important;
+  text-align: left !important;
+  padding-left: 12px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail {
+  color: rgba(255, 255, 255, 0.9) !important;
+  opacity: 1 !important;
 }
 
 .cm-completionIcon {
   opacity: 0.7 !important;
-  margin-right: 6px !important;
+  margin-right: 0 !important;
+  flex: 0 0 auto !important;
+  font-size: 14px !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionIcon {
+  opacity: 1 !important;
+  filter: drop-shadow(0 2px 4px rgba(79, 195, 247, 0.4));
+}
+
+/* Type-specific icon colors */
+.cm-completionIcon-function {
+  color: #4fc3f7 !important;
+}
+
+.cm-completionIcon-method {
+  color: #81c784 !important;
+}
+
+.cm-completionIcon-property {
+  color: #ffb74d !important;
+}
+
+.cm-completionIcon-variable {
+  color: #ba68c8 !important;
+}
+
+.cm-completionIcon-type {
+  color: #ff6b6b !important;
 }
 
 /* Hover tooltip styling */

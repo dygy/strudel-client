@@ -123,81 +123,117 @@ const chordSymbolCompletions = chordSymbols.map((symbol) => {
   };
 });
 
-// Hydra functions with descriptions
-// These show tooltips for both standalone calls and method chains
-const hydraFunctionDocs = {
+// Hydra functions with structured documentation (like JSDoc format)
+export const hydraFunctionDocs = {
   // Sources
-  osc: 'Hydra: Oscillator source - generates wave patterns',
-  solid: 'Hydra: Solid color source',
-  gradient: 'Hydra: Gradient source',
-  noise: 'Hydra: Noise source - generates random patterns',
-  voronoi: 'Hydra: Voronoi pattern source',
-  shape: 'Hydra: Geometric shape source',
-  src: 'Hydra: Use external source or output',
+  osc: 'Oscillator source - generates wave patterns. Parameters: frequency (default 60), sync (default 0.1), offset (default 0). Example: osc(10, 0.1, 0)',
+  solid: 'Solid color source. Parameters: r, g, b, a (all 0-1). Example: solid(1, 0, 0, 1) for red',
+  gradient: 'Gradient source. Parameters: speed (default 0). Example: gradient(1)',
+  noise: 'Noise source - generates random patterns. Parameters: scale (default 10), offset (default 0.1). Example: noise(3, 0.1)',
+  voronoi: 'Voronoi pattern source. Parameters: scale (default 5), speed (default 0.3), blending (default 0.3). Example: voronoi(5, 0.3, 0.3)',
+  shape: 'Geometric shape source. Parameters: sides (default 3), radius (default 0.3), smoothing (default 0.01). Example: shape(4, 0.5, 0.01) for square',
+  src: 'Use external source or output buffer. Parameters: source (o0, o1, o2, o3, or s0). Example: src(o0) for feedback',
   
   // Transforms
-  rotate: 'Hydra: Rotate the visual',
-  scale: 'Hydra: Scale the visual',
-  pixelate: 'Hydra: Pixelate effect',
-  repeat: 'Hydra: Repeat/tile the visual',
-  repeatX: 'Hydra: Repeat horizontally',
-  repeatY: 'Hydra: Repeat vertically',
-  kaleid: 'Hydra: Kaleidoscope effect',
-  scroll: 'Hydra: Scroll the visual',
-  scrollX: 'Hydra: Scroll horizontally',
-  scrollY: 'Hydra: Scroll vertically',
+  rotate: 'Rotate the visual. Parameters: angle (radians), speed (default 0). Example: rotate(0.5, 0.1)',
+  scale: 'Scale the visual. Parameters: amount (default 1.5), xMult (default 1), yMult (default 1). Example: scale(2, 1, 1)',
+  pixelate: 'Pixelate effect. Parameters: x (default 20), y (default 20). Example: pixelate(10, 10)',
+  repeat: 'Repeat/tile the visual. Parameters: repeatX (default 3), repeatY (default 3), offsetX (default 0), offsetY (default 0). Example: repeat(4, 4)',
+  repeatX: 'Repeat horizontally. Parameters: reps (default 3), offset (default 0). Example: repeatX(4, 0)',
+  repeatY: 'Repeat vertically. Parameters: reps (default 3), offset (default 0). Example: repeatY(4, 0)',
+  kaleid: 'Kaleidoscope effect. Parameters: nSides (default 4). Example: kaleid(6) for 6-sided kaleidoscope',
+  scroll: 'Scroll the visual. Parameters: scrollX (default 0.5), scrollY (default 0.5), speedX (default 0), speedY (default 0). Example: scroll(0.5, 0.5)',
+  scrollX: 'Scroll horizontally. Parameters: scrollX (default 0.5), speed (default 0). Example: scrollX(0.5, 0.1)',
+  scrollY: 'Scroll vertically. Parameters: scrollY (default 0.5), speed (default 0). Example: scrollY(0.5, 0.1)',
   
   // Color
-  invert: 'Hydra: Invert colors',
-  contrast: 'Hydra: Adjust contrast',
-  brightness: 'Hydra: Adjust brightness',
-  luma: 'Hydra: Luminance threshold',
-  thresh: 'Hydra: Threshold effect',
-  color: 'Hydra: Colorize with RGB values',
-  saturate: 'Hydra: Adjust saturation',
-  hue: 'Hydra: Adjust hue',
-  colorama: 'Hydra: Color shift effect',
-  posterize: 'Hydra: Posterize colors',
-  shift: 'Hydra: Shift colors',
+  invert: 'Invert colors. Parameters: amount (default 1). Example: invert(1)',
+  contrast: 'Adjust contrast. Parameters: amount (default 1.6). Example: contrast(2)',
+  brightness: 'Adjust brightness. Parameters: amount (default 0.4). Example: brightness(0.5)',
+  luma: 'Luminance threshold - creates black/white based on brightness. Parameters: threshold (default 0.5), tolerance (default 0.1). Example: luma(0.5, 0.1)',
+  thresh: 'Threshold effect. Parameters: threshold (default 0.5), tolerance (default 0.04). Example: thresh(0.5, 0.1)',
+  color: 'Colorize with RGB values. Parameters: r (default 1), g (default 1), b (default 1), a (default 1). Example: color(1, 0.5, 0.8)',
+  saturate: 'Adjust saturation. Parameters: amount (default 2). Example: saturate(1.5)',
+  hue: 'Adjust hue. Parameters: amount (default 0.4). Example: hue(0.5)',
+  colorama: 'Color shift effect - cycles through colors. Parameters: amount (default 0.005). Example: colorama(0.01)',
+  posterize: 'Posterize colors - reduce color palette. Parameters: bins (default 3), gamma (default 0.6). Example: posterize(5, 0.6)',
+  shift: 'Shift colors in RGB space. Parameters: r (default 0.5), g (default 0.5), b (default 0.5), a (default 0.5). Example: shift(0.1, 0.2, 0.3)',
   
   // Modulation
-  modulate: 'Hydra: Modulate with another source',
-  modulateRotate: 'Hydra: Modulate rotation',
-  modulateScale: 'Hydra: Modulate scale',
-  modulatePixelate: 'Hydra: Modulate pixelation',
-  modulateRepeat: 'Hydra: Modulate repetition',
-  modulateRepeatX: 'Hydra: Modulate horizontal repetition',
-  modulateRepeatY: 'Hydra: Modulate vertical repetition',
-  modulateKaleid: 'Hydra: Modulate kaleidoscope',
-  modulateScrollX: 'Hydra: Modulate horizontal scroll',
-  modulateScrollY: 'Hydra: Modulate vertical scroll',
+  modulate: 'Modulate position with another source. Parameters: source, amount (default 0.1). Example: modulate(noise(3), 0.1)',
+  modulateRotate: 'Modulate rotation with another source. Parameters: source, multiple (default 1), offset (default 0). Example: modulateRotate(osc(1), 0.5)',
+  modulateScale: 'Modulate scale with another source. Parameters: source, multiple (default 1), offset (default 1). Example: modulateScale(noise(3), 0.5)',
+  modulatePixelate: 'Modulate pixelation with another source. Parameters: source, multiple (default 10), offset (default 3). Example: modulatePixelate(noise(3), 10)',
+  modulateRepeat: 'Modulate repetition with another source. Parameters: source, repeatX (default 3), repeatY (default 3), offsetX (default 0.5), offsetY (default 0.5). Example: modulateRepeat(osc(1), 3, 3)',
+  modulateRepeatX: 'Modulate horizontal repetition. Parameters: source, reps (default 3), offset (default 0.5). Example: modulateRepeatX(osc(1), 3)',
+  modulateRepeatY: 'Modulate vertical repetition. Parameters: source, reps (default 3), offset (default 0.5). Example: modulateRepeatY(osc(1), 3)',
+  modulateKaleid: 'Modulate kaleidoscope with another source. Parameters: source, nSides (default 4). Example: modulateKaleid(osc(1), 4)',
+  modulateScrollX: 'Modulate horizontal scroll. Parameters: source, scrollX (default 0.5), speed (default 0). Example: modulateScrollX(osc(1), 0.5)',
+  modulateScrollY: 'Modulate vertical scroll. Parameters: source, scrollY (default 0.5), speed (default 0). Example: modulateScrollY(osc(1), 0.5)',
   
   // Blending
-  add: 'Hydra: Add/blend two sources',
-  sub: 'Hydra: Subtract one source from another',
-  mult: 'Hydra: Multiply two sources',
-  blend: 'Hydra: Blend two sources',
-  diff: 'Hydra: Difference between sources',
-  layer: 'Hydra: Layer sources',
-  mask: 'Hydra: Mask with another source',
+  add: 'Add/blend two sources together. Parameters: source, amount (default 0.5). Example: add(osc(10), 0.5)',
+  sub: 'Subtract one source from another. Parameters: source, amount (default 1). Example: sub(osc(10), 0.5)',
+  mult: 'Multiply two sources. Parameters: source, amount (default 1). Example: mult(osc(10), 0.5)',
+  blend: 'Blend two sources. Parameters: source, amount (default 0.5). Example: blend(noise(3), 0.5)',
+  diff: 'Difference between sources - creates interesting contrast effects. Parameters: source. Example: diff(osc(10))',
+  layer: 'Layer sources on top of each other. Parameters: source. Example: layer(shape(4))',
+  mask: 'Mask with another source - uses brightness as alpha. Parameters: source, reps (default 3), offset (default 0.5). Example: mask(shape(4))',
   
   // Output
-  out: 'Hydra: Output to buffer',
-  render: 'Hydra: Render output',
-  speed: 'Hydra: Animation speed',
-  bpm: 'Hydra: Beats per minute',
+  out: 'Output to buffer. Parameters: buffer (o0, o1, o2, o3). Example: out(o0) or just out()',
+  render: 'Render specific output buffer to screen. Parameters: buffer (o0, o1, o2, o3). Example: render(o0)',
+  speed: 'Animation speed multiplier. Parameters: speed (default 1). Example: speed(0.5) for half speed',
+  bpm: 'Set beats per minute for time-based animations. Parameters: bpm (default 30). Example: bpm(120)',
+  
+  // Hydra-specific
+  initHydra: 'Initialize Hydra video synth. Call with await at the top of your code. Options: {detectAudio: true} for audio reactivity, {feedStrudel: 1} to process Strudel visuals. Example: await initHydra({detectAudio: true})',
+  H: 'Convert Strudel pattern to Hydra value. Use to drive Hydra parameters with patterns. Example: osc(H("10 20 30"), 0.1, 0)',
+};
+
+// Parse Hydra documentation string into structured format
+export const parseHydraDoc = (name, docString) => {
+  const parts = docString.split('. ');
+  const description = parts[0] + '.';
+  
+  // Extract parameters
+  const paramsMatch = docString.match(/Parameters?: ([^.]+)/);
+  const params = [];
+  if (paramsMatch) {
+    const paramsStr = paramsMatch[1];
+    const paramParts = paramsStr.split(', ');
+    paramParts.forEach(part => {
+      const match = part.match(/(\w+)\s*\(default\s+([^)]+)\)/);
+      if (match) {
+        params.push({
+          name: match[1],
+          type: 'number',
+          default: match[2],
+          description: `${match[1]} parameter`
+        });
+      }
+    });
+  }
+  
+  // Extract example
+  const exampleMatch = docString.match(/Example: (.+)$/);
+  const examples = exampleMatch ? [exampleMatch[1]] : [];
+  
+  return {
+    name,
+    description,
+    params,
+    examples
+  };
 };
 
 const hydraFunctions = Object.keys(hydraFunctionDocs).map(name => ({
   label: name,
   type: 'function',
-  detail: ` ${hydraFunctionDocs[name]}`,
+  detail: ` ${hydraFunctionDocs[name].split('.')[0]}...`, // Show first sentence only
 }));
 
 const hydraCompletions = hydraFunctions;
-
-// Export for use in tooltip
-export { hydraFunctionDocs };
 
 // Math object methods for global autocomplete
 const mathCompletions = [
