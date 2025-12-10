@@ -57,19 +57,19 @@ const compartments = Object.fromEntries(Object.keys(extensions).map((key) => [ke
 
 export const defaultSettings = {
   keybindings: 'codemirror',
-  isBracketMatchingEnabled: false,
+  isBracketMatchingEnabled: true, // Enable bracket matching for better IDE experience
   isBracketClosingEnabled: true,
   isLineNumbersDisplayed: true,
-  isActiveLineHighlighted: false,
+  isActiveLineHighlighted: true, // Enable active line highlighting
   isAutoCompletionEnabled: true,
   isPatternHighlightingEnabled: true,
   isFlashEnabled: true,
   isTooltipEnabled: true, // Enable tooltips by default for IDE experience
-  isSignatureHelpEnabled: false, // Disabled - hover tooltip is more informative
+  isSignatureHelpEnabled: true, // Enable signature help for better IDE experience
   isLinterEnabled: true, // Enable error highlighting by default
   isLineWrappingEnabled: false,
-  isTabIndentationEnabled: false,
-  isMultiCursorEnabled: false,
+  isTabIndentationEnabled: true, // Enable tab indentation for better coding experience
+  isMultiCursorEnabled: true, // Enable multi-cursor for advanced editing
   theme: 'strudelTheme',
   fontFamily: 'monospace',
   fontSize: 18,
@@ -91,6 +91,10 @@ if (typeof localStorage !== 'undefined' && !localStorage.getItem(MIGRATION_KEY))
     isTooltipEnabled: true,
     isSignatureHelpEnabled: true,
     isLinterEnabled: true,
+    isBracketMatchingEnabled: true,
+    isActiveLineHighlighted: true,
+    isTabIndentationEnabled: true,
+    isMultiCursorEnabled: true,
   };
   codemirrorSettings.set(updated);
   localStorage.setItem(MIGRATION_KEY, 'true');

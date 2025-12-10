@@ -141,14 +141,14 @@ export const defaultSettings: RawSettings = {
   isActiveLineHighlighted: true,
   isAutoCompletionEnabled: true,
   isTooltipEnabled: true,
-  isSignatureHelpEnabled: false,
+  isSignatureHelpEnabled: true, // Enable signature help for better IDE experience
   isLinterEnabled: true,
   isFlashEnabled: true,
   isSyncEnabled: false,
   isLineWrappingEnabled: false,
   isPatternHighlightingEnabled: true,
-  isTabIndentationEnabled: false,
-  isMultiCursorEnabled: false,
+  isTabIndentationEnabled: true, // Enable tab indentation
+  isMultiCursorEnabled: true, // Enable multi-cursor editing
   theme: 'strudelTheme',
   fontFamily: 'monospace',
   fontSize: 18,
@@ -202,6 +202,9 @@ if (typeof window !== 'undefined') {
       isTooltipEnabled: currentSettings.isTooltipEnabled === undefined ? true : parseBoolean(currentSettings.isTooltipEnabled),
       isSignatureHelpEnabled: currentSettings.isSignatureHelpEnabled === undefined ? true : parseBoolean(currentSettings.isSignatureHelpEnabled),
       isLinterEnabled: currentSettings.isLinterEnabled === undefined ? true : parseBoolean(currentSettings.isLinterEnabled),
+      isBracketMatchingEnabled: currentSettings.isBracketMatchingEnabled === undefined ? true : parseBoolean(currentSettings.isBracketMatchingEnabled),
+      isTabIndentationEnabled: currentSettings.isTabIndentationEnabled === undefined ? true : parseBoolean(currentSettings.isTabIndentationEnabled),
+      isMultiCursorEnabled: currentSettings.isMultiCursorEnabled === undefined ? true : parseBoolean(currentSettings.isMultiCursorEnabled),
     };
     
     settingsMap.set(updated);
