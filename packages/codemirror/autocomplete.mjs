@@ -12,6 +12,10 @@ const escapeHtml = (str) => {
 };
 
 const stripHtml = (html) => {
+  if (typeof document === 'undefined') {
+    // Server-side: simple regex-based HTML stripping
+    return html.replace(/<[^>]*>/g, '');
+  }
   const div = document.createElement('div');
   div.innerHTML = html;
   return div.textContent || div.innerText || '';
