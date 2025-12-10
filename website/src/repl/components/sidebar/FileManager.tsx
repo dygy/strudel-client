@@ -112,6 +112,8 @@ export function FileManager({ context }: FileManagerProps) {
 
   // Load tracks and folders from localStorage on mount
   useEffect(() => {
+    if (typeof localStorage === 'undefined') return;
+    
     const savedTracks = localStorage.getItem(TRACKS_STORAGE_KEY);
     const savedFolders = localStorage.getItem(FOLDERS_STORAGE_KEY);
     
@@ -134,12 +136,16 @@ export function FileManager({ context }: FileManagerProps) {
 
   // Save tracks to localStorage whenever tracks change
   useEffect(() => {
-    localStorage.setItem(TRACKS_STORAGE_KEY, JSON.stringify(tracks));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(TRACKS_STORAGE_KEY, JSON.stringify(tracks));
+    }
   }, [tracks]);
 
   // Save folders to localStorage whenever folders change
   useEffect(() => {
-    localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(folders));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(folders));
+    }
   }, [folders]);
 
   const createNewTrack = (parentPath?: string) => {

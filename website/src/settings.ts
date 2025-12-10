@@ -192,7 +192,7 @@ if (typeof window !== 'undefined') {
   
   console.log('[settings] loaded settings:', currentSettings);
   
-  if (!localStorage.getItem(MIGRATION_KEY)) {
+  if (typeof localStorage !== 'undefined' && !localStorage.getItem(MIGRATION_KEY)) {
     console.log('[settings] migrating to add IDE features');
     
     // Add missing settings with defaults - ensure they're booleans not strings
@@ -205,7 +205,9 @@ if (typeof window !== 'undefined') {
     };
     
     settingsMap.set(updated);
-    localStorage.setItem(MIGRATION_KEY, 'true');
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(MIGRATION_KEY, 'true');
+    }
     console.log('[settings] migration complete, new settings:', updated);
   } else {
     console.log('[settings] isAutoCompletionEnabled:', currentSettings.isAutoCompletionEnabled);

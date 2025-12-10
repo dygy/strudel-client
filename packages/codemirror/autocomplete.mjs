@@ -6,6 +6,15 @@ import { soundMap } from 'superdough';
 import { complex } from '@strudel/tonal';
 
 const escapeHtml = (str) => {
+  if (typeof document === 'undefined') {
+    // Server-side: manual HTML escaping
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
   const div = document.createElement('div');
   div.innerText = str;
   return div.innerHTML;

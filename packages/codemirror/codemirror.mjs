@@ -83,7 +83,7 @@ export const codemirrorSettings = persistentAtom('codemirror-settings', defaultS
 // One-time migration: enable new IDE features for existing users
 // This runs once and sets a migration flag
 const MIGRATION_KEY = 'codemirror-settings-migrated-v1';
-if (!localStorage.getItem(MIGRATION_KEY)) {
+if (typeof localStorage !== 'undefined' && !localStorage.getItem(MIGRATION_KEY)) {
   const savedSettings = codemirrorSettings.get();
   const updated = {
     ...savedSettings,
