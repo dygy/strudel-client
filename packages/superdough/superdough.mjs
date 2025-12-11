@@ -130,7 +130,7 @@ export function getSound(s) {
 }
 
 export const getAudioDevices = async () => {
-  await navigator.mediaDevices.getUserMedia({ audio: true });
+  // Removed getUserMedia call - we only need output devices, not microphone access
   let mediaDevices = await navigator.mediaDevices.enumerateDevices();
   mediaDevices = mediaDevices.filter((device) => device.kind === 'audiooutput' && device.deviceId !== 'default');
   const devicesMap = new Map();

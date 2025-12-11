@@ -41,10 +41,14 @@ export async function prebake(): Promise<void> {
     // seems to be a problem with soundfont2
     import('@strudel/soundfonts').then(({ registerSoundfonts }) => registerSoundfonts()),
     samples(`${baseNoTrailing}/piano.json`, undefined, { prebake: true }),
-    // https://github.com/sgossner/VCSL/
-    // https://api.github.com/repositories/126427031/contents/
+    // VCSL (VSCO Community Sample Library) - stored locally for reliability
+    // Original: https://github.com/sgossner/VCSL/
     // LICENSE: CC0 general-purpose
-    samples(`${baseNoTrailing}/vcsl.json`, 'github:sgossner/VCSL/master/', { prebake: true }),
+    samples(`${baseNoTrailing}/vcsl.json`, undefined, { prebake: true }),
+    // VSCO-2-CE (VS Chamber Orchestra Community Edition) - high-quality orchestral samples
+    // Original: https://github.com/sgossner/VSCO-2-CE/
+    // LICENSE: Open-source orchestral library
+    samples(`${baseNoTrailing}/vsco2.json`, undefined, { prebake: true, tag: 'orchestral' }),
     samples(`${baseNoTrailing}/tidal-drum-machines.json`, 'github:ritchse/tidal-drum-machines/main/machines/', {
       prebake: true,
       tag: 'drum-machines',
@@ -185,6 +189,8 @@ const maxPan = noteToMidi('C8');
  * @returns Calculated pan position
  */
 const panwidth = (pan: number, width: number): number => pan * width + (1 - width) / 2;
+
+
 
 
 (Pattern.prototype as any).piano = function () {
