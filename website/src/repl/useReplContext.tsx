@@ -69,7 +69,7 @@ interface ReplContext {
   containerRef: MutableRefObject<HTMLDivElement | null>;
 }
 
-const { latestCode, maxPolyphony, audioDeviceName, multiChannelOrbits } = settingsMap.get();
+const { maxPolyphony, audioDeviceName, multiChannelOrbits } = settingsMap.get();
 let modulesLoading: Promise<Module[]> | undefined;
 let presets: Promise<void> | undefined;
 let drawContext: CanvasRenderingContext2D | undefined;
@@ -136,7 +136,6 @@ export function useReplContext(): ReplContext {
         (window.parent as any)?.postMessage(code);
 
         setLatestCode(code);
-        window.location.hash = '#' + code2hash(code);
         setDocumentTitle(code);
         const viewingPatternData = getViewingPatternData();
         setVersionDefaultsFrom(code);
@@ -166,11 +165,46 @@ export function useReplContext(): ReplContext {
     initCode().then(async (decoded) => {
       let code: string;
       let msg: string;
+      
+      // Check if this should be a fresh welcome screen session
+      const shouldShowWelcome = (() => {
+        if (typeof localStorage === 'undefined') return false;
+        
+        const savedTracks = localStorage.getItem('strudel_tracks');
+        const userPatternsKey = localStorage.getItem('strudel-settingsuserPatterns');
+        
+        let hasTracksData = false;
+        let hasUserPatternData = false;
+        
+        if (savedTracks) {
+          try {
+            const tracks = JSON.parse(savedTracks);
+            hasTracksData = Object.keys(tracks).length > 0;
+          } catch (e) {
+            hasTracksData = false;
+          }
+        }
+        
+        if (userPatternsKey) {
+          try {
+            const patterns = JSON.parse(userPatternsKey);
+            hasUserPatternData = patterns && Object.keys(patterns).length > 0;
+          } catch (e) {
+            hasUserPatternData = false;
+          }
+        }
+        
+        return !hasTracksData && !hasUserPatternData;
+      })();
+      
+      // Read latestCode dynamically
+      const currentLatestCode = localStorage.getItem('strudel-settingslatestCode');
+      
       if (decoded) {
         code = decoded;
         msg = `I have loaded the code from the URL.`;
-      } else if (latestCode) {
-        code = latestCode;
+      } else if (currentLatestCode && !shouldShowWelcome) {
+        code = currentLatestCode;
         msg = `Your last session has been loaded!`;
       } else {
         /* const { code: randomTune, name } = await getRandomTune();
@@ -251,7 +285,12 @@ all(x => x.color("cyan"))`;
     clearCanvas?.();
     clearHydra();
     resetLoadedSounds();
-    editorRef.current.repl.setCps(0.5);
+    
+    // Only reset CPS if editor is initialized
+    if (editorRef.current && editorRef.current.repl && editorRef.current.repl.setCps) {
+      editorRef.current.repl.setCps(0.5);
+    }
+    
     await prebake(); // declare default samples
   };
 
@@ -262,15 +301,25 @@ all(x => x.color("cyan"))`;
       ...patternData,
     };
     setViewingPatternData(fullPatternData);
-    editorRef.current.setCode(patternData.code);
+    
+    // Only set code if editor is initialized
+    if (editorRef.current && editorRef.current.setCode) {
+      editorRef.current.setCode(patternData.code);
+    }
+    
     if (reset) {
-      await resetEditor();
-      handleEvaluate();
+      // Only reset if editor is fully initialized
+      if (editorRef.current && editorRef.current.repl) {
+        await resetEditor();
+        handleEvaluate();
+      }
     }
   };
 
   const handleEvaluate = (): void => {
-    editorRef.current.evaluate();
+    if (editorRef.current && editorRef.current.evaluate) {
+      editorRef.current.evaluate();
+    }
   };
 
   const handleShuffle = async (): Promise<void> => {
@@ -282,8 +331,15 @@ all(x => x.color("cyan"))`;
     setActivePattern(patternData.id);
     setViewingPatternData(patternData);
     await resetEditor();
-    editorRef.current.setCode(code);
-    editorRef.current.repl.evaluate(code);
+    
+    // Only set code and evaluate if editor is initialized
+    if (editorRef.current && editorRef.current.setCode) {
+      editorRef.current.setCode(code);
+      
+      if (editorRef.current.repl && editorRef.current.repl.evaluate) {
+        editorRef.current.repl.evaluate(code);
+      }
+    }
   };
 
   const handleShare = async (): Promise<void> => shareCode();

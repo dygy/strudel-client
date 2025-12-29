@@ -41,38 +41,7 @@ let dbLoaded: Promise<void> | undefined;
  * @returns Promise that resolves to the code string or undefined
  */
 export async function initCode(): Promise<string | undefined> {
-  // Load code from url hash (either short hash from database or decode long hash)
-  try {
-    const initialUrl = window.location.href;
-    const hash = initialUrl.split('?')[1]?.split('#')?.[0]?.split('&')[0];
-    const codeParam = window.location.href.split('#')[1] || '';
-    
-    if (codeParam) {
-      // Looking like https://strudel.cc/#ImMzIGUzIg%3D%3D (hash length depends on code length)
-      return hash2code(codeParam);
-    } else if (hash) {
-      // Looking like https://strudel.cc/?J01s5i1J0200 (fixed hash length)
-      const response = await supabase
-        .from('code_v1')
-        .select('code')
-        .eq('hash', hash);
-      
-      const { data, error } = response as SupabaseResponse<CodeRecord>;
-      
-      if (error) {
-        console.warn('failed to load hash', error);
-        return undefined;
-      }
-      
-      if (data && data.length > 0) {
-        // console.log('load hash from database', hash);
-        return data[0].code;
-      }
-    }
-  } catch (err) {
-    console.warn('failed to decode', err);
-  }
-  
+  // URL hash reading disabled - always return undefined to use default code
   return undefined;
 }
 

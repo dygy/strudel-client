@@ -58,6 +58,7 @@ interface FileManagerProps {
 export function FileManager({ context }: FileManagerProps) {
   const [tracks, setTracks] = useState<Record<string, Track>>({});
   const [folders, setFolders] = useState<Record<string, Folder>>({});
+  const [isInitialized, setIsInitialized] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -114,48 +115,104 @@ export function FileManager({ context }: FileManagerProps) {
   useEffect(() => {
     if (typeof localStorage === 'undefined') return;
     
-    const savedTracks = localStorage.getItem(TRACKS_STORAGE_KEY);
-    const savedFolders = localStorage.getItem(FOLDERS_STORAGE_KEY);
-    
-    if (savedTracks) {
-      try {
-        setTracks(JSON.parse(savedTracks));
-      } catch (e) {
-        console.error('Failed to load tracks from localStorage:', e);
+    const loadData = () => {
+      const savedTracks = localStorage.getItem(TRACKS_STORAGE_KEY);
+      const savedFolders = localStorage.getItem(FOLDERS_STORAGE_KEY);
+      
+      if (savedTracks) {
+        try {
+          setTracks(JSON.parse(savedTracks));
+        } catch (e) {
+          console.error('Failed to load tracks from localStorage:', e);
+        }
       }
-    }
-    
-    if (savedFolders) {
-      try {
-        setFolders(JSON.parse(savedFolders));
-      } catch (e) {
-        console.error('Failed to load folders from localStorage:', e);
+      
+      if (savedFolders) {
+        try {
+          setFolders(JSON.parse(savedFolders));
+        } catch (e) {
+          console.error('Failed to load folders from localStorage:', e);
+        }
       }
-    }
+    };
+    
+    // Initial load
+    loadData();
+    
+    // Listen for custom events when tracks are updated externally
+    const handleTracksUpdated = () => {
+      console.log('FileManager - received tracks updated event, reloading...');
+      loadData();
+    };
+    
+    const handleSelectTrack = (event: CustomEvent) => {
+      const { trackId } = event.detail;
+      console.log('FileManager - received select track event:', trackId);
+      setSelectedTrack(trackId);
+    };
+    
+    window.addEventListener('strudel-tracks-updated', handleTracksUpdated);
+    window.addEventListener('strudel-select-track', handleSelectTrack);
+    
+    // Mark as initialized after loading
+    setIsInitialized(true);
+    
+    return () => {
+      window.removeEventListener('strudel-tracks-updated', handleTracksUpdated);
+      window.removeEventListener('strudel-select-track', handleSelectTrack);
+    };
   }, []);
 
-  // Save tracks to localStorage whenever tracks change
+  // Save tracks to localStorage whenever tracks change (but only after initial load)
   useEffect(() => {
-    if (typeof localStorage !== 'undefined') {
+    if (isInitialized && typeof localStorage !== 'undefined') {
       localStorage.setItem(TRACKS_STORAGE_KEY, JSON.stringify(tracks));
     }
-  }, [tracks]);
+  }, [tracks, isInitialized]);
 
-  // Save folders to localStorage whenever folders change
+  // Save folders to localStorage whenever folders change (but only after initial load)
   useEffect(() => {
-    if (typeof localStorage !== 'undefined') {
+    if (isInitialized && typeof localStorage !== 'undefined') {
       localStorage.setItem(FOLDERS_STORAGE_KEY, JSON.stringify(folders));
     }
-  }, [folders]);
+  }, [folders, isInitialized]);
 
   const createNewTrack = (parentPath?: string) => {
     if (!newTrackName.trim()) return;
     
     const trackId = Date.now().toString();
+    const defaultCode = `/* ========== SETUP ========== */
+setcps(160/60/4) // 160 BPM (2.666… cycles per second)
+
+/* ========== DRUM SECTION ========== */
+// Four‑on‑the‑floor kick with some drive and low‑pass
+kick: s("bd*4").bank("RolandTR909").drive(2).lpf(2200).gain(0.85)
+
+// Clap on the 2 and 4 for backbeat punch
+clap: s("~ cp ~ cp").bank("RolandTR909").crush(12).room(0.2).gain(0.5)
+
+// Closed hats: straight 16ths plus a quieter off‑beat shuffle
+hats: stack(
+  s("hh*16").bank("RolandTR909").dec(0.05).gain(0.25),
+  s("~ hh ~ hh").bank("RolandTR909").dec(0.03).gain(0.15).pan(sine.range(-0.4, 0.4).slow(8))
+).gain(1)
+
+/* ========== BASS (DONK) ========== */
+// Donk‑style bass in A major. Tweak note pattern to taste.
+donk: note("<a1 g#1 a1 f#1> <e1 e1 d#1 e1>").sub(12).sound("z_sine").ftype("ladder").lpf(180).lpq(8).euclidRot(3,16,14).drive(3).distort("1.4:.65")
+
+/* ========== STAB CHORDS ========== */
+// A → F#m → D → E progression. Adjust timing/gain by ear.
+stabs: chord("<A F#m D E>").dict("ireal").voicing().sound("square").gain("<0.1 0.15 0.1 0.15>").decay(0.3).room(0.5).delay(".18:.1:.26").gain("<0.1 0.15 0.1 0.15>")
+
+/* ========== GLOBAL TOUCH ========== */
+// Tint everything cyan (optional)
+all(x => x.color("cyan"))`;
+
     const newTrack: Track = {
       id: trackId,
       name: newTrackName.trim(),
-      code: '// New track\n',
+      code: defaultCode,
       created: new Date().toISOString(),
       modified: new Date().toISOString(),
       folder: parentPath || newItemParentPath || undefined,
@@ -341,7 +398,18 @@ export function FileManager({ context }: FileManagerProps) {
 
   const loadTrack = (track: Track) => {
     setSelectedTrack(track.id);
-    context.handleUpdate({ id: track.id, code: track.code }, true);
+    
+    // If editor is not ready, retry after a short delay
+    const tryLoadTrack = () => {
+      if (context.editorRef?.current) {
+        context.handleUpdate({ id: track.id, code: track.code }, true);
+      } else {
+        // Retry after a short delay if editor isn't ready
+        setTimeout(tryLoadTrack, 100);
+      }
+    };
+    
+    tryLoadTrack();
   };
 
   const saveCurrentTrack = useCallback((showToast: boolean = true) => {
@@ -423,6 +491,16 @@ export function FileManager({ context }: FileManagerProps) {
       setTracks(prev => {
         const newTracks = { ...prev };
         delete newTracks[trackToDelete];
+        
+        // Check if this was the last track
+        const remainingTracks = Object.keys(newTracks).length;
+        if (remainingTracks === 0) {
+          // Notify that all tracks are deleted - trigger welcome screen
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('strudel-all-tracks-deleted'));
+          }, 100);
+        }
+        
         return newTracks;
       });
       if (selectedTrack === trackToDelete) {
