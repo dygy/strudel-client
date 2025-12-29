@@ -69,7 +69,6 @@ interface ReplContext {
   containerRef: MutableRefObject<HTMLDivElement | null>;
 }
 
-const { maxPolyphony, audioDeviceName, multiChannelOrbits } = settingsMap.get();
 let modulesLoading: Promise<Module[]> | undefined;
 let presets: Promise<void> | undefined;
 let drawContext: CanvasRenderingContext2D | undefined;
@@ -77,6 +76,7 @@ let clearCanvas: (() => void) | undefined;
 let audioReady: Promise<void> | undefined;
 
 if (typeof window !== 'undefined') {
+  const { maxPolyphony, audioDeviceName, multiChannelOrbits } = settingsMap.get();
   audioReady = initAudioOnFirstClick({
     maxPolyphony,
     audioDeviceName,
@@ -168,7 +168,7 @@ export function useReplContext(): ReplContext {
       
       // Check if this should be a fresh welcome screen session
       const shouldShowWelcome = (() => {
-        if (typeof localStorage === 'undefined') return false;
+        if (typeof window === 'undefined' || typeof localStorage === 'undefined') return false;
         
         const savedTracks = localStorage.getItem('strudel_tracks');
         const userPatternsKey = localStorage.getItem('strudel-settingsuserPatterns');
@@ -198,7 +198,9 @@ export function useReplContext(): ReplContext {
       })();
       
       // Read latestCode dynamically
-      const currentLatestCode = localStorage.getItem('strudel-settingslatestCode');
+      const currentLatestCode = typeof window !== 'undefined' && typeof localStorage !== 'undefined' 
+        ? localStorage.getItem('strudel-settingslatestCode') 
+        : null;
       
       if (decoded) {
         code = decoded;

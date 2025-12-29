@@ -68,8 +68,12 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       workbox: {
-        maximumFileSizeToCacheInBytes: 4194304, // 4MB
+        maximumFileSizeToCacheInBytes: 10485760, // 10MB instead of 4MB
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json,wav,mp3,ogg,ttf,woff2,TTF,otf}'],
+        // Exclude large audio files from precaching to avoid warnings
+        globIgnores: [
+          '**/samples/vcsl/**/*.wav', // Exclude VCSL samples that are too large
+        ],
         runtimeCaching: [
           {
             urlPattern: ({ url }) =>

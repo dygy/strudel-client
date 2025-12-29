@@ -81,23 +81,29 @@ export const codemirrorSettings = persistentAtom('codemirror-settings', defaultS
 });
 
 // One-time migration: enable new IDE features for existing users
-// This runs once and sets a migration flag
-const MIGRATION_KEY = 'codemirror-settings-migrated-v1';
-if (typeof localStorage !== 'undefined' && !localStorage.getItem(MIGRATION_KEY)) {
-  const savedSettings = codemirrorSettings.get();
-  const updated = {
-    ...savedSettings,
-    isAutoCompletionEnabled: true,
-    isTooltipEnabled: true,
-    isSignatureHelpEnabled: true,
-    isLinterEnabled: true,
-    isBracketMatchingEnabled: true,
-    isActiveLineHighlighted: true,
-    isTabIndentationEnabled: true,
-    isMultiCursorEnabled: true,
-  };
-  codemirrorSettings.set(updated);
-  localStorage.setItem(MIGRATION_KEY, 'true');
+// This runs once and sets a migration flag - deferred to avoid SSR issues
+if (typeof window !== 'undefined') {
+  const MIGRATION_KEY = 'codemirror-settings-migrated-v1';
+  
+  // Defer migration to avoid SSR issues
+  setTimeout(() => {
+    if (typeof localStorage !== 'undefined' && !localStorage.getItem(MIGRATION_KEY)) {
+      const savedSettings = codemirrorSettings.get();
+      const updated = {
+        ...savedSettings,
+        isAutoCompletionEnabled: true,
+        isTooltipEnabled: true,
+        isSignatureHelpEnabled: true,
+        isLinterEnabled: true,
+        isBracketMatchingEnabled: true,
+        isActiveLineHighlighted: true,
+        isTabIndentationEnabled: true,
+        isMultiCursorEnabled: true,
+      };
+      codemirrorSettings.set(updated);
+      localStorage.setItem(MIGRATION_KEY, 'true');
+    }
+  }, 0);
 }
 
 // https://codemirror.net/docs/guide/

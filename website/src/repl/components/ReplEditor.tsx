@@ -38,8 +38,8 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
   
   // Check if there are any tracks in the FileManager system
   const [hasTracks, setHasTracks] = useState(() => {
-    // Initialize state directly from localStorage
-    if (typeof localStorage !== 'undefined') {
+    // Initialize state directly from localStorage (only in browser)
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const savedTracks = localStorage.getItem('strudel_tracks');
       if (savedTracks) {
         try {
@@ -54,8 +54,8 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
   });
   
   const [hasUserData, setHasUserData] = useState(() => {
-    // Initialize state directly from localStorage
-    if (typeof localStorage !== 'undefined') {
+    // Initialize state directly from localStorage (only in browser)
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const savedTracks = localStorage.getItem('strudel_tracks');
       const userPatternsKey = localStorage.getItem('strudel-settingsuserPatterns');
       
@@ -97,7 +97,7 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
   });
   
   const checkUserData = () => {
-    if (typeof localStorage !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const savedTracks = localStorage.getItem('strudel_tracks');
       const userPatternsKey = localStorage.getItem('strudel-settingsuserPatterns');
       

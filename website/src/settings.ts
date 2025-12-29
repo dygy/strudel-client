@@ -183,40 +183,59 @@ if (typeof window !== 'undefined') {
 const instance = parseInt(search?.get('instance') ?? '0');
 const settings_key = `strudel-settings${instance > 0 ? instance : ''}`;
 
-export const settingsMap = persistentMap(settings_key, defaultSettings as any);
+// Create settingsMap conditionally to avoid SSR issues
+export const settingsMap = typeof window !== 'undefined' 
+  ? persistentMap(settings_key, defaultSettings as any)
+  : { 
+      get: () => defaultSettings, 
+      set: () => {}, 
+      setKey: () => {},
+      subscribe: () => () => {},
+      // Add any other methods that might be called
+      listen: () => () => {},
+      off: () => {},
+      destroy: () => {}
+    } as any;
 
 // One-time migration: add new IDE feature settings for existing users
 if (typeof window !== 'undefined') {
   const MIGRATION_KEY = 'strudel-settings-ide-features-v1';
-  const currentSettings = settingsMap.get();
   
-  console.log('[settings] loaded settings:', currentSettings);
-  
-  if (typeof localStorage !== 'undefined' && !localStorage.getItem(MIGRATION_KEY)) {
-    console.log('[settings] migrating to add IDE features');
+  // Only run migration in browser environment
+  const runMigration = () => {
+    const currentSettings = settingsMap.get();
     
-    // Add missing settings with defaults - ensure they're booleans not strings
-    const updated = {
-      ...currentSettings,
-      isAutoCompletionEnabled: currentSettings.isAutoCompletionEnabled === undefined ? true : parseBoolean(currentSettings.isAutoCompletionEnabled),
-      isTooltipEnabled: currentSettings.isTooltipEnabled === undefined ? true : parseBoolean(currentSettings.isTooltipEnabled),
-      isSignatureHelpEnabled: currentSettings.isSignatureHelpEnabled === undefined ? true : parseBoolean(currentSettings.isSignatureHelpEnabled),
-      isLinterEnabled: currentSettings.isLinterEnabled === undefined ? true : parseBoolean(currentSettings.isLinterEnabled),
-      isBracketMatchingEnabled: currentSettings.isBracketMatchingEnabled === undefined ? true : parseBoolean(currentSettings.isBracketMatchingEnabled),
-      isTabIndentationEnabled: currentSettings.isTabIndentationEnabled === undefined ? true : parseBoolean(currentSettings.isTabIndentationEnabled),
-      isMultiCursorEnabled: currentSettings.isMultiCursorEnabled === undefined ? true : parseBoolean(currentSettings.isMultiCursorEnabled),
-    };
+    console.log('[settings] loaded settings:', currentSettings);
     
-    settingsMap.set(updated);
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(MIGRATION_KEY, 'true');
+    if (typeof localStorage !== 'undefined' && !localStorage.getItem(MIGRATION_KEY)) {
+      console.log('[settings] migrating to add IDE features');
+      
+      // Add missing settings with defaults - ensure they're booleans not strings
+      const updated = {
+        ...currentSettings,
+        isAutoCompletionEnabled: currentSettings.isAutoCompletionEnabled === undefined ? true : parseBoolean(currentSettings.isAutoCompletionEnabled),
+        isTooltipEnabled: currentSettings.isTooltipEnabled === undefined ? true : parseBoolean(currentSettings.isTooltipEnabled),
+        isSignatureHelpEnabled: currentSettings.isSignatureHelpEnabled === undefined ? true : parseBoolean(currentSettings.isSignatureHelpEnabled),
+        isLinterEnabled: currentSettings.isLinterEnabled === undefined ? true : parseBoolean(currentSettings.isLinterEnabled),
+        isBracketMatchingEnabled: currentSettings.isBracketMatchingEnabled === undefined ? true : parseBoolean(currentSettings.isBracketMatchingEnabled),
+        isTabIndentationEnabled: currentSettings.isTabIndentationEnabled === undefined ? true : parseBoolean(currentSettings.isTabIndentationEnabled),
+        isMultiCursorEnabled: currentSettings.isMultiCursorEnabled === undefined ? true : parseBoolean(currentSettings.isMultiCursorEnabled),
+      };
+      
+      settingsMap.set(updated);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(MIGRATION_KEY, 'true');
+      }
+      console.log('[settings] migration complete, new settings:', updated);
+    } else {
+      console.log('[settings] isAutoCompletionEnabled:', currentSettings.isAutoCompletionEnabled);
+      console.log('[settings] isSignatureHelpEnabled:', currentSettings.isSignatureHelpEnabled);
+      console.log('[settings] isLinterEnabled:', currentSettings.isLinterEnabled);
     }
-    console.log('[settings] migration complete, new settings:', updated);
-  } else {
-    console.log('[settings] isAutoCompletionEnabled:', currentSettings.isAutoCompletionEnabled);
-    console.log('[settings] isSignatureHelpEnabled:', currentSettings.isSignatureHelpEnabled);
-    console.log('[settings] isLinterEnabled:', currentSettings.isLinterEnabled);
-  }
+  };
+  
+  // Run migration after a short delay to ensure everything is initialized
+  setTimeout(runMigration, 0);
 }
 
 

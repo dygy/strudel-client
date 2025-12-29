@@ -112,8 +112,12 @@ const resources = {
   },
 };
 
+// Only use LanguageDetector in browser environment
+if (typeof window !== 'undefined') {
+  i18n.use(LanguageDetector);
+}
+
 i18n
-  .use(LanguageDetector)
   .use(initReactI18next)
   .init({
     resources,
@@ -126,11 +130,14 @@ i18n
       escapeValue: false,
     },
     
-    detection: {
-      order: ['localStorage', 'navigator'],
-      caches: ['localStorage'],
-      lookupLocalStorage: 'strudel-language',
-    },
+    // Only configure detection in browser environment
+    ...(typeof window !== 'undefined' && {
+      detection: {
+        order: ['localStorage', 'navigator'],
+        caches: ['localStorage'],
+        lookupLocalStorage: 'strudel-language',
+      },
+    }),
   });
 
 // Language configuration for RTL support

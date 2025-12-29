@@ -116,6 +116,8 @@ export function FileManager({ context }: FileManagerProps) {
     if (typeof localStorage === 'undefined') return;
     
     const loadData = () => {
+      if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
+      
       const savedTracks = localStorage.getItem(TRACKS_STORAGE_KEY);
       const savedFolders = localStorage.getItem(FOLDERS_STORAGE_KEY);
       
