@@ -15,5 +15,9 @@
   "shuffle": "помешај",
   "files": "фајлови",
   "docs": "DOCS",
-  "toggleFileManager": "Пребаци менаџер фајлова"
+  "toggleFileManager": "Пребаци менаџер фајлова",
+  "reference": {
+    "search": "Претражи функције...",
+    "noResults": "Нема резултата"
+  }
 }

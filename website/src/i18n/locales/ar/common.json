@@ -15,5 +15,9 @@
   "shuffle": "خلط",
   "files": "ملفات",
   "docs": "DOCS",
-  "toggleFileManager": "تبديل مدير الملفات"
+  "toggleFileManager": "تبديل مدير الملفات",
+  "reference": {
+    "search": "البحث عن الوظائف...",
+    "noResults": "لم يتم العثور على نتائج"
+  }
 }

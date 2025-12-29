@@ -15,5 +15,9 @@
   "shuffle": "mélanger",
   "files": "fichiers",
   "docs": "DOCS",
-  "toggleFileManager": "Basculer le gestionnaire de fichiers"
+  "toggleFileManager": "Basculer le gestionnaire de fichiers",
+  "reference": {
+    "search": "Rechercher des fonctions...",
+    "noResults": "Aucun résultat trouvé"
+  }
 }

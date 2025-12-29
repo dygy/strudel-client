@@ -15,5 +15,9 @@
   "shuffle": "mezclar", 
   "files": "archivos",
   "docs": "DOCS",
-  "toggleFileManager": "Alternar gestor de archivos"
+  "toggleFileManager": "Alternar gestor de archivos",
+  "reference": {
+    "search": "Buscar funciones...",
+    "noResults": "No se encontraron resultados"
+  }
 }

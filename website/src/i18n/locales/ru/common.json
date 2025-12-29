@@ -15,5 +15,9 @@
   "shuffle": "перемешать",
   "files": "файлы",
   "docs": "DOCS",
-  "toggleFileManager": "Переключить файловый менеджер"
+  "toggleFileManager": "Переключить файловый менеджер",
+  "reference": {
+    "search": "Поиск функций...",
+    "noResults": "Результаты не найдены"
+  }
 }

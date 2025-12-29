@@ -17,6 +17,7 @@
   "docs": "DOCS",
   "toggleFileManager": "Toggle file manager",
   "reference": {
-    "search": "Search functions..."
+    "search": "Search functions...",
+    "noResults": "No results found"
   }
 }

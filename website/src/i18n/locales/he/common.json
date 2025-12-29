@@ -15,5 +15,9 @@
   "shuffle": "ערבב",
   "files": "קבצים",
   "docs": "DOCS",
-  "toggleFileManager": "החלף מנהל קבצים"
+  "toggleFileManager": "החלף מנהל קבצים",
+  "reference": {
+    "search": "חפש פונקציות...",
+    "noResults": "לא נמצאו תוצאות"
+  }
 }
