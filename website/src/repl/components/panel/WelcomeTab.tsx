@@ -30,7 +30,7 @@ export function WelcomeTab({ context }: WelcomeTabProps) {
         {t('description')}
         <br />
         <br />
-        <span className="underline">{t('steps')}</span>
+        <div className="underline whitespace-pre-line">{t('steps')}</div>
       </p>
       <p>
         {t('getStarted')}{' '}
@@ -59,11 +59,7 @@ export function WelcomeTab({ context }: WelcomeTabProps) {
         </a>
         . {t('licensingInfo')}{' '}
         <a href="https://github.com/felixroos/dough-samples/blob/main/README.md">{t('licensingInfo')}</a>{' '}
-        {t('defaultSounds')}{' '}
-        <a href="https://opencollective.com/tidalcycles" target="_blank">
-          {t('support')}
-        </a>{' '}
-        {t('supportText')}
+        {t('defaultSounds')}
       </p>
     </div>
   );

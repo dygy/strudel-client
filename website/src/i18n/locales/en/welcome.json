@@ -1,7 +1,7 @@
 {
   "title": "welcome",
   "description": "You have found strudel, a new live coding platform to write dynamic music pieces in the browser! It is free and open-source and made for beginners and experts alike. To get started:",
-  "steps": "1. hit play - 2. change something - 3. hit update",
+  "steps": "1. hit play\n2. change something\n3. hit update",
   "getStarted": "To get started, check out the",
   "interactiveTutorial": "interactive tutorial",
   "joinDiscord": "Also feel free to join the",
@@ -15,9 +15,7 @@
   "sourceCode": "You can find the source code at",
   "codeberg": "codeberg",
   "licensingInfo": "You can also find licensing info",
-  "defaultSounds": "for the default sound banks there. Please consider to",
-  "support": "support this project",
-  "supportText": "to ensure ongoing development 💖",
+  "defaultSounds": "for the default sound banks there.",
   "fileManager": {
     "welcomeTitle": "Welcome to Strudel",
     "subtitle": "Live coding patterns on the web",

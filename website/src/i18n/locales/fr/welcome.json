@@ -1,7 +1,7 @@
 {
   "title": "bienvenue",
   "description": "Vous avez trouvé strudel, une nouvelle plateforme de live coding pour écrire des morceaux de musique dynamiques dans le navigateur ! Elle est gratuite et open-source et conçue pour les débutants comme pour les experts. Pour commencer :",
-  "steps": "1. appuyez sur play - 2. changez quelque chose - 3. appuyez sur update",
+  "steps": "1. appuyez sur play\n2. changez quelque chose\n3. appuyez sur update",
   "getStarted": "Pour commencer, consultez le",
   "interactiveTutorial": "tutoriel interactif",
   "joinDiscord": "N'hésitez pas aussi à rejoindre le",
@@ -15,9 +15,7 @@
   "sourceCode": "Vous pouvez trouver le code source sur",
   "codeberg": "codeberg",
   "licensingInfo": "Vous pouvez aussi trouver les informations de licence",
-  "defaultSounds": "pour les banques de sons par défaut là-bas. Veuillez considérer",
-  "support": "soutenir ce projet",
-  "supportText": "pour assurer un développement continu 💖",
+  "defaultSounds": "pour les banques de sons par défaut là-bas.",
   "fileManager": {
     "welcomeTitle": "Bienvenue dans Strudel",
     "subtitle": "Live coding de motifs sur le web",
