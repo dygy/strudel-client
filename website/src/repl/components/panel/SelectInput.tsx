@@ -11,12 +11,12 @@ interface SelectInputProps {
 
 export function SelectInput({ value, options, onChange, onClick, isDisabled }: SelectInputProps) {
   const { t } = useTranslation('common');
-  
+
   return (
     <select
       disabled={isDisabled}
       onClick={onClick}
-      className="p-2 bg-background rounded-md text-foreground  border-foreground"
+      className="w-full p-2 bg-background rounded-xl text-foreground  border-foreground/50"
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value)}
     >

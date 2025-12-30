@@ -17,5 +17,17 @@
   "licensingInfo": "אתם גם יכולים למצוא מידע על רישוי",
   "defaultSounds": "עבור בנקי הצלילים הברירת מחדל שם. אנא שקלו",
   "support": "לתמוך בפרויקט הזה",
-  "supportText": "כדי להבטיח פיתוח מתמשך 💖"
+  "supportText": "כדי להבטיח פיתוח מתמשך 💖",
+  "fileManager": {
+    "welcomeTitle": "ברוכים הבאים ל-Strudel",
+    "subtitle": "Live coding של דפוסים ברשת",
+    "getStartedTitle": "התחלה",
+    "getStartedDescription": "צרו את הרצועה הראשונה שלכם כדי להתחיל live coding של דפוסים מוזיקליים, או ייבאו רצועות קיימות כדי להמשיך את העבודה שלכם.",
+    "createNewTrack": "צור רצועה חדשה",
+    "importTracks": "ייבא רצועות",
+    "quickTipsTitle": "טיפים מהירים",
+    "tip1": "לחצו {{key}} כדי להעריך קוד",
+    "tip2": "השתמשו במנהל הקבצים כדי לארגן את הדפוסים שלכם",
+    "tip3": "בדקו את הדוגמאות בסרגל הצד להשראה"
+  }
 }

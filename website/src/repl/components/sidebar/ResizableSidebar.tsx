@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import cx from '@src/cx';
 import React from 'react';
+import { useTranslation } from '@src/i18n';
 
 interface ResizableSidebarProps {
   children: React.ReactNode;
@@ -22,6 +23,10 @@ export function ResizableSidebar({
   const sidebarRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
   const startWidth = useRef(0);
+  const { i18n } = useTranslation();
+
+  // Check if current language is RTL
+  const isRTL = ['ar', 'he'].includes(i18n.language);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsResizing(true);
@@ -37,8 +42,12 @@ export function ResizableSidebar({
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
       
+      // For RTL: resize from left edge (subtract deltaX)
+      // For LTR: resize from right edge (add deltaX)
       const deltaX = e.clientX - startX.current;
-      const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth.current + deltaX));
+      const newWidth = Math.max(minWidth, Math.min(maxWidth, 
+        isRTL ? startWidth.current - deltaX : startWidth.current + deltaX
+      ));
       setWidth(newWidth);
     };
 
@@ -57,7 +66,7 @@ export function ResizableSidebar({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, minWidth, maxWidth]);
+  }, [isResizing, minWidth, maxWidth, isRTL]);
 
   return (
     <div 
@@ -67,10 +76,11 @@ export function ResizableSidebar({
     >
       {children}
       
-      {/* Resize handle */}
+      {/* Resize handle - position based on RTL/LTR */}
       <div
         className={cx(
-          'absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-500 transition-colors',
+          'absolute top-0 w-1 h-full cursor-col-resize hover:bg-blue-500 transition-colors',
+          isRTL ? 'left-0' : 'right-0',
           isResizing && 'bg-blue-500'
         )}
         onMouseDown={handleMouseDown}

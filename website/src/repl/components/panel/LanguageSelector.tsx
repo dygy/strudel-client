@@ -17,7 +17,7 @@ export function LanguageSelector({ currentLanguage, onChange }: LanguageSelector
 
   return (
     <select
-      className="p-2 bg-background rounded-md text-foreground border-foreground"
+      className="p-2 bg-background rounded-xl text-foreground border-foreground/50"
       value={activeLanguage}
       onChange={(e) => handleLanguageChange(e.target.value as Language)}
     >

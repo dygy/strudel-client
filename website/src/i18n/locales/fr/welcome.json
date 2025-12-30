@@ -17,5 +17,17 @@
   "licensingInfo": "Vous pouvez aussi trouver les informations de licence",
   "defaultSounds": "pour les banques de sons par défaut là-bas. Veuillez considérer",
   "support": "soutenir ce projet",
-  "supportText": "pour assurer un développement continu 💖"
+  "supportText": "pour assurer un développement continu 💖",
+  "fileManager": {
+    "welcomeTitle": "Bienvenue dans Strudel",
+    "subtitle": "Live coding de motifs sur le web",
+    "getStartedTitle": "Commencer",
+    "getStartedDescription": "Créez votre première piste pour commencer le live coding de motifs musicaux, ou importez des pistes existantes pour continuer votre travail.",
+    "createNewTrack": "Créer une Nouvelle Piste",
+    "importTracks": "Importer des Pistes",
+    "quickTipsTitle": "Conseils Rapides",
+    "tip1": "Appuyez sur {{key}} pour évaluer le code",
+    "tip2": "Utilisez le gestionnaire de fichiers pour organiser vos motifs",
+    "tip3": "Consultez les exemples dans la barre latérale pour vous inspirer"
+  }
 }

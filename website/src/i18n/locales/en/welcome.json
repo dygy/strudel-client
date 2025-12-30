@@ -17,5 +17,17 @@
   "licensingInfo": "You can also find licensing info",
   "defaultSounds": "for the default sound banks there. Please consider to",
   "support": "support this project",
-  "supportText": "to ensure ongoing development 💖"
+  "supportText": "to ensure ongoing development 💖",
+  "fileManager": {
+    "welcomeTitle": "Welcome to Strudel",
+    "subtitle": "Live coding patterns on the web",
+    "getStartedTitle": "Get Started",
+    "getStartedDescription": "Create your first track to start live coding musical patterns, or import existing tracks to continue your work.",
+    "createNewTrack": "Create New Track",
+    "importTracks": "Import Tracks",
+    "quickTipsTitle": "Quick Tips",
+    "tip1": "Press {{key}} to evaluate code",
+    "tip2": "Use the file manager to organize your patterns",
+    "tip3": "Check out the examples in the sidebar for inspiration"
+  }
 }

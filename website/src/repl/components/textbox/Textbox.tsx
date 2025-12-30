@@ -10,7 +10,7 @@ export function Textbox({ onChange, className, ...inputProps }: TextboxProps) {
   return (
     <input
       className={cx(
-        'p-2 bg-background rounded-md  border-foreground text-foreground placeholder-foreground',
+        'p-2 bg-background rounded-xl border-foreground/50 text-foreground placeholder-foreground',
         className,
       )}
       onChange={(e) => onChange(e.target.value)}

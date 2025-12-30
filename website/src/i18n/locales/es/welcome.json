@@ -17,5 +17,17 @@
   "licensingInfo": "También puedes encontrar información de licencias",
   "defaultSounds": "para los bancos de sonidos predeterminados allí. Por favor considera",
   "support": "apoyar este proyecto",
-  "supportText": "para asegurar el desarrollo continuo 💖"
+  "supportText": "para asegurar el desarrollo continuo 💖",
+  "fileManager": {
+    "welcomeTitle": "Bienvenido a Strudel",
+    "subtitle": "Live coding de patrones en la web",
+    "getStartedTitle": "Comenzar",
+    "getStartedDescription": "Crea tu primera pista para comenzar a hacer live coding de patrones musicales, o importa pistas existentes para continuar tu trabajo.",
+    "createNewTrack": "Crear Nueva Pista",
+    "importTracks": "Importar Pistas",
+    "quickTipsTitle": "Consejos Rápidos",
+    "tip1": "Presiona {{key}} para evaluar código",
+    "tip2": "Usa el gestor de archivos para organizar tus patrones",
+    "tip3": "Revisa los ejemplos en la barra lateral para inspirarte"
+  }
 }
