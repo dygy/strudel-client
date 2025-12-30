@@ -1,4 +1,4 @@
-import { defaultSettings, settingsMap, useSettings } from '../../../settings';
+import { defaultSettings, settingsMap, useSettings } from '@src/settings.ts';
 import { themes } from '@strudel/codemirror';
 import { Textbox } from '../textbox/Textbox';
 import { isUdels, confirmDialog } from '../../util';
@@ -80,7 +80,7 @@ interface NumberSliderProps {
 function NumberSlider({ value, onChange, step = 1, ...rest }: NumberSliderProps) {
   const min = rest.min || 0;
   const max = rest.max || 100;
-  
+
   const handleNumberChange = (newValue: number) => {
     // Ensure the value is within bounds
     const clampedValue = Math.max(min, Math.min(max, newValue));
@@ -193,6 +193,7 @@ export function SettingsTab({ started }: SettingsTabProps) {
     multiChannelOrbits,
     isTabIndentationEnabled,
     isMultiCursorEnabled,
+    isPrettierEnabled,
     language,
     isAutosaveEnabled,
     autosaveInterval,
@@ -352,6 +353,14 @@ export function SettingsTab({ started }: SettingsTabProps) {
             value={togglePanelTrigger}
             onChange={(value) => settingsMap.setKey('togglePanelTrigger', value)}
             items={{ click: t('click'), hover: t('hover') }}
+          />
+        </FormItem>
+
+        <FormItem label="Code Formatting" sublabel="Automatically format your code with Prettier when saving or autosaving. This ensures consistent code style and readability.">
+          <Checkbox
+            label="Enable Prettier formatting"
+            onChange={(cbEvent) => settingsMap.setKey('isPrettierEnabled', cbEvent.target.checked)}
+            value={isPrettierEnabled}
           />
         </FormItem>
 

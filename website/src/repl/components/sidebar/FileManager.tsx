@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  FolderIcon, 
-  PlusIcon, 
+import {
+  FolderIcon,
+  PlusIcon,
   ArrowDownTrayIcon,
   DocumentIcon,
 } from '@heroicons/react/24/outline';
@@ -13,6 +13,9 @@ import { ConfirmModal } from '../ui/ConfirmModal';
 import { useToast } from '../ui/Toast';
 import { BurgerMenuButton } from '../ui/BurgerMenuButton';
 import { useSettings } from '@src/settings';
+import { formatCode } from '@strudel/codemirror';
+import { useActivePattern } from '@src/user_pattern_utils';
+import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 
 const TRACKS_STORAGE_KEY = 'strudel_tracks';
 const FOLDERS_STORAGE_KEY = 'strudel_folders';
@@ -47,7 +50,7 @@ interface Folder {
 
 interface ReplContext {
   activeCode?: string;
-  editorRef?: React.RefObject<{ code: string }>;
+  editorRef?: React.RefObject<{ code: string; setCode?: (code: string) => void }>;
   handleUpdate: (update: { id?: string; code: string; [key: string]: any }, replace?: boolean) => void;
 }
 
@@ -72,9 +75,9 @@ export function FileManager({ context }: FileManagerProps) {
   const [renameValue, setRenameValue] = useState('');
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoModalData, setInfoModalData] = useState<{ title: string; items: Array<{ label: string; value: string }> }>({ title: '', items: [] });
-  
+
   // Autosave functionality
-  const { isAutosaveEnabled, autosaveInterval } = useSettings();
+  const { isAutosaveEnabled, autosaveInterval, isPrettierEnabled } = useSettings();
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedCodeRef = useRef<string>('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -85,50 +88,41 @@ export function FileManager({ context }: FileManagerProps) {
   const [selectedStepTrack, setSelectedStepTrack] = useState<string | null>(null);
   const { t, i18n } = useTranslation(['files', 'common', 'tabs']);
   const toast = useToast();
+  const activePattern = useActivePattern();
 
   // Helper function for better date formatting
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    // If it's today, show time
-    if (diffDays === 1) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    
-    // If it's this year, show month and day
-    if (date.getFullYear() === now.getFullYear()) {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    }
-    
-    // Otherwise show full date with month name
-    return date.toLocaleDateString([], { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
-
-  // Load tracks and folders from localStorage on mount
+// Load tracks and folders from localStorage on mount
   useEffect(() => {
     if (typeof localStorage === 'undefined') return;
-    
+
     const loadData = () => {
       if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
-      
+
       const savedTracks = localStorage.getItem(TRACKS_STORAGE_KEY);
       const savedFolders = localStorage.getItem(FOLDERS_STORAGE_KEY);
-      
+
       if (savedTracks) {
         try {
-          setTracks(JSON.parse(savedTracks));
+          const loadedTracks: Record<string, Track> = JSON.parse(savedTracks);
+          setTracks(loadedTracks);
+
+          // After loading tracks, check if we need to sync with active pattern
+          setTimeout(() => {
+            const currentActivePattern = activePattern;
+            if (currentActivePattern && !selectedTrack) {
+              console.log('FileManager - post-load sync check for active pattern:', currentActivePattern);
+              const matchingTrack = Object.values(loadedTracks).find(track => track.id === currentActivePattern);
+              if (matchingTrack) {
+                console.log('FileManager - post-load selecting matching track:', matchingTrack.name);
+                setSelectedTrack(matchingTrack.id);
+              }
+            }
+          }, 100);
         } catch (e) {
           console.error('Failed to load tracks from localStorage:', e);
         }
       }
-      
+
       if (savedFolders) {
         try {
           setFolders(JSON.parse(savedFolders));
@@ -137,33 +131,33 @@ export function FileManager({ context }: FileManagerProps) {
         }
       }
     };
-    
+
     // Initial load
     loadData();
-    
+
     // Listen for custom events when tracks are updated externally
     const handleTracksUpdated = () => {
       console.log('FileManager - received tracks updated event, reloading...');
       loadData();
     };
-    
+
     const handleSelectTrack = (event: CustomEvent) => {
       const { trackId } = event.detail;
       console.log('FileManager - received select track event:', trackId);
       setSelectedTrack(trackId);
     };
-    
+
     window.addEventListener('strudel-tracks-updated', handleTracksUpdated);
     window.addEventListener('strudel-select-track', handleSelectTrack);
-    
+
     // Mark as initialized after loading
     setIsInitialized(true);
-    
+
     return () => {
       window.removeEventListener('strudel-tracks-updated', handleTracksUpdated);
       window.removeEventListener('strudel-select-track', handleSelectTrack);
     };
-  }, []);
+  }, [activePattern, selectedTrack]);
 
   // Save tracks to localStorage whenever tracks change (but only after initial load)
   useEffect(() => {
@@ -179,47 +173,56 @@ export function FileManager({ context }: FileManagerProps) {
     }
   }, [folders, isInitialized]);
 
+  // Synchronize with active pattern from user_pattern_utils
+  useEffect(() => {
+    if (!isInitialized || !activePattern) return;
+
+    console.log('FileManager - synchronizing with active pattern:', activePattern);
+
+    // Try to find the track that matches the active pattern ID
+    const matchingTrack = Object.values(tracks).find(track => track.id === activePattern);
+
+    if (matchingTrack) {
+      console.log('FileManager - found matching track:', matchingTrack.name);
+      if (selectedTrack !== matchingTrack.id) {
+        setSelectedTrack(matchingTrack.id);
+      }
+    } else {
+      console.log('FileManager - no exact match found for active pattern:', activePattern);
+      // If no exact match, try to find by name (fallback for legacy patterns)
+      const trackByName = Object.values(tracks).find(track =>
+        track.name.toLowerCase().includes('first') ||
+        track.name.toLowerCase().includes('my first track')
+      );
+
+      if (trackByName) {
+        console.log('FileManager - found track by name fallback:', trackByName.name);
+        if (selectedTrack !== trackByName.id) {
+          setSelectedTrack(trackByName.id);
+        }
+      } else if (Object.keys(tracks).length > 0 && !selectedTrack) {
+        // Select the first available track as fallback only if no track is selected
+        const firstTrackId = Object.keys(tracks)[0];
+        console.log('FileManager - selecting first available track:', tracks[firstTrackId]?.name);
+        setSelectedTrack(firstTrackId);
+      }
+    }
+  }, [activePattern, tracks, isInitialized, selectedTrack]);
+
   const createNewTrack = (parentPath?: string) => {
     if (!newTrackName.trim()) return;
-    
+
     const trackId = Date.now().toString();
-    const defaultCode = `/* ========== SETUP ========== */
-setcps(160/60/4) // 160 BPM (2.666… cycles per second)
-
-/* ========== DRUM SECTION ========== */
-// Four‑on‑the‑floor kick with some drive and low‑pass
-kick: s("bd*4").bank("RolandTR909").drive(2).lpf(2200).gain(0.85)
-
-// Clap on the 2 and 4 for backbeat punch
-clap: s("~ cp ~ cp").bank("RolandTR909").crush(12).room(0.2).gain(0.5)
-
-// Closed hats: straight 16ths plus a quieter off‑beat shuffle
-hats: stack(
-  s("hh*16").bank("RolandTR909").dec(0.05).gain(0.25),
-  s("~ hh ~ hh").bank("RolandTR909").dec(0.03).gain(0.15).pan(sine.range(-0.4, 0.4).slow(8))
-).gain(1)
-
-/* ========== BASS (DONK) ========== */
-// Donk‑style bass in A major. Tweak note pattern to taste.
-donk: note("<a1 g#1 a1 f#1> <e1 e1 d#1 e1>").sub(12).sound("z_sine").ftype("ladder").lpf(180).lpq(8).euclidRot(3,16,14).drive(3).distort("1.4:.65")
-
-/* ========== STAB CHORDS ========== */
-// A → F#m → D → E progression. Adjust timing/gain by ear.
-stabs: chord("<A F#m D E>").dict("ireal").voicing().sound("square").gain("<0.1 0.15 0.1 0.15>").decay(0.3).room(0.5).delay(".18:.1:.26").gain("<0.1 0.15 0.1 0.15>")
-
-/* ========== GLOBAL TOUCH ========== */
-// Tint everything cyan (optional)
-all(x => x.color("cyan"))`;
 
     const newTrack: Track = {
       id: trackId,
       name: newTrackName.trim(),
-      code: defaultCode,
+      code: DEFAULT_TRACK_CODE,
       created: new Date().toISOString(),
       modified: new Date().toISOString(),
       folder: parentPath || newItemParentPath || undefined,
     };
-    
+
     setTracks(prev => ({ ...prev, [trackId]: newTrack }));
     setNewTrackName('');
     setNewItemParentPath('');
@@ -229,11 +232,11 @@ all(x => x.color("cyan"))`;
 
   const createNewFolder = (parentPath?: string) => {
     if (!newFolderName.trim()) return;
-    
+
     const folderId = Date.now().toString();
     const targetParent = parentPath || newItemParentPath;
     const folderPath = targetParent ? `${targetParent}/${newFolderName.trim()}` : newFolderName.trim();
-    
+
     const newFolder: Folder = {
       id: folderId,
       name: newFolderName.trim(),
@@ -241,7 +244,7 @@ all(x => x.color("cyan"))`;
       parent: targetParent || undefined,
       created: new Date().toISOString(),
     };
-    
+
     setFolders(prev => ({ ...prev, [folderPath]: newFolder }));
     setNewFolderName('');
     setNewItemParentPath('');
@@ -263,9 +266,9 @@ all(x => x.color("cyan"))`;
       // Moving folders is more complex - need to update all children
       const folder = folders[itemId];
       if (!folder) return;
-      
+
       const newPath = targetPath ? `${targetPath}/${folder.name}` : folder.name;
-      
+
       // Update the folder itself
       setFolders(prev => {
         const newFolders = { ...prev };
@@ -273,7 +276,7 @@ all(x => x.color("cyan"))`;
         newFolders[newPath] = { ...folder, path: newPath, parent: targetPath || undefined };
         return newFolders;
       });
-      
+
       // Update all children
       updateChildrenPaths(itemId, newPath);
       toast.success(t('files:folderMoved'));
@@ -329,18 +332,18 @@ all(x => x.color("cyan"))`;
     // Check if folder has contents
     const hasSubfolders = Object.values(folders).some(f => f.parent === folderPath);
     const hasTracks = Object.values(tracks).some(t => t.folder === folderPath);
-    
+
     if (hasSubfolders || hasTracks) {
       toast.error(t('files:folderNotEmpty'));
       return;
     }
-    
+
     setFolders(prev => {
       const newFolders = { ...prev };
       delete newFolders[folderPath];
       return newFolders;
     });
-    
+
     toast.success(t('files:folderDeleted'));
   };
 
@@ -349,7 +352,7 @@ all(x => x.color("cyan"))`;
       const folder = folders[renamingFolder];
       if (folder && renameValue.trim() !== folder.name) {
         const newPath = folder.parent ? `${folder.parent}/${renameValue.trim()}` : renameValue.trim();
-        
+
         // Update folder
         const updatedFolder = { ...folder, name: renameValue.trim(), path: newPath };
         setFolders(prev => {
@@ -358,10 +361,10 @@ all(x => x.color("cyan"))`;
           newFolders[newPath] = updatedFolder;
           return newFolders;
         });
-        
+
         // Update all child folders and tracks
         updateChildrenPaths(renamingFolder, newPath);
-        
+
         toast.success(t('files:folderRenamed'));
       }
     }
@@ -383,7 +386,7 @@ all(x => x.color("cyan"))`;
       });
       return newFolders;
     });
-    
+
     // Update tracks in affected folders
     setTracks(prev => {
       const newTracks = { ...prev };
@@ -400,7 +403,7 @@ all(x => x.color("cyan"))`;
 
   const loadTrack = (track: Track) => {
     setSelectedTrack(track.id);
-    
+
     // If editor is not ready, retry after a short delay
     const tryLoadTrack = () => {
       if (context.editorRef?.current) {
@@ -410,25 +413,42 @@ all(x => x.color("cyan"))`;
         setTimeout(tryLoadTrack, 100);
       }
     };
-    
+
     tryLoadTrack();
   };
 
-  const saveCurrentTrack = useCallback((showToast: boolean = true) => {
+  const saveCurrentTrack = useCallback(async (showToast: boolean = true) => {
     if (!selectedTrack) return false;
-    
+
     // Get current code from the editor
-    const currentCode = context.editorRef?.current?.code || context.activeCode || '';
+    let currentCode = context.editorRef?.current?.code || context.activeCode || '';
     if (!currentCode.trim()) {
       if (showToast) toast.warning(t('files:noCodeToSave'));
       return false;
     }
-    
+
+    // Format code with Prettier if enabled
+    if (isPrettierEnabled) {
+      try {
+        const formattedCode = await formatCode(currentCode);
+        if (formattedCode !== currentCode) {
+          currentCode = formattedCode;
+          // Update the editor with formatted code
+          if (context.editorRef?.current?.setCode) {
+            context.editorRef.current.setCode(formattedCode);
+          }
+        }
+      } catch (error) {
+        console.warn('[FileManager] Prettier formatting failed:', error);
+        // Continue with unformatted code if formatting fails
+      }
+    }
+
     // Don't save if code hasn't changed
     if (currentCode === lastSavedCodeRef.current) {
       return false;
     }
-    
+
     setTracks(prev => ({
       ...prev,
       [selectedTrack]: {
@@ -437,17 +457,17 @@ all(x => x.color("cyan"))`;
         modified: new Date().toISOString()
       }
     }));
-    
+
     lastSavedCodeRef.current = currentCode;
-    
+
     if (showToast) {
       toast.success(t('files:trackSaved'));
       setSaveStatus('Saved!');
       setTimeout(() => setSaveStatus(''), 2000);
     }
-    
+
     return true;
-  }, [selectedTrack, context, t, toast]);
+  }, [selectedTrack, context, t, toast, isPrettierEnabled]);
 
   // Autosave effect
   useEffect(() => {
@@ -460,8 +480,8 @@ all(x => x.color("cyan"))`;
     }
 
     // Set up autosave timer
-    autosaveTimerRef.current = setInterval(() => {
-      const saved = saveCurrentTrack(false); // Don't show toast for autosave
+    autosaveTimerRef.current = setInterval(async () => {
+      const saved = await saveCurrentTrack(false); // Don't show toast for autosave
       if (saved) {
         setSaveStatus('Auto-saved');
         setTimeout(() => setSaveStatus(''), 1500);
@@ -482,6 +502,20 @@ all(x => x.color("cyan"))`;
     }
   }, [selectedTrack, tracks]);
 
+  // Listen for save events from keyboard shortcuts
+  useEffect(() => {
+    const handleSaveEvent = async (event: CustomEvent) => {
+      console.log('FileManager - received save event from keyboard shortcut');
+      await saveCurrentTrack(true);
+    };
+
+    document.addEventListener('strudel-save', handleSaveEvent);
+
+    return () => {
+      document.removeEventListener('strudel-save', handleSaveEvent);
+    };
+  }, [saveCurrentTrack]);
+
   const deleteTrack = (trackId: string) => {
     setTrackToDelete(trackId);
     setShowDeleteModal(true);
@@ -493,7 +527,7 @@ all(x => x.color("cyan"))`;
       setTracks(prev => {
         const newTracks = { ...prev };
         delete newTracks[trackToDelete];
-        
+
         // Check if this was the last track
         const remainingTracks = Object.keys(newTracks).length;
         if (remainingTracks === 0) {
@@ -502,7 +536,7 @@ all(x => x.color("cyan"))`;
             window.dispatchEvent(new CustomEvent('strudel-all-tracks-deleted'));
           }, 100);
         }
-        
+
         return newTracks;
       });
       if (selectedTrack === trackToDelete) {
@@ -527,7 +561,7 @@ all(x => x.color("cyan"))`;
         id: `${trackId}-${step.id}`,
       })) : undefined,
     };
-    
+
     setTracks(prev => ({ ...prev, [trackId]: duplicatedTrack }));
     toast.success(t('files:trackDuplicated'));
   };
@@ -548,7 +582,7 @@ all(x => x.color("cyan"))`;
       activeStep: 0,
       modified: new Date().toISOString(),
     };
-    
+
     setTracks(prev => ({ ...prev, [track.id]: updatedTrack }));
     toast.success(t('files:convertedToMultitrack'));
   };
@@ -556,7 +590,7 @@ all(x => x.color("cyan"))`;
   const addStep = (trackId: string) => {
     const track = tracks[trackId];
     if (!track || !track.isMultitrack) return;
-    
+
     const stepNumber = (track.steps?.length || 0) + 1;
     const newStep: TrackStep = {
       id: `${trackId}-step-${stepNumber}`,
@@ -565,7 +599,7 @@ all(x => x.color("cyan"))`;
       created: new Date().toISOString(),
       modified: new Date().toISOString(),
     };
-    
+
     setTracks(prev => ({
       ...prev,
       [trackId]: {
@@ -574,7 +608,7 @@ all(x => x.color("cyan"))`;
         modified: new Date().toISOString(),
       }
     }));
-    
+
     setNewStepName('');
     setIsCreatingStep(false);
     setSelectedStepTrack(null);
@@ -584,7 +618,7 @@ all(x => x.color("cyan"))`;
   const switchToStep = (trackId: string, stepIndex: number) => {
     const track = tracks[trackId];
     if (!track || !track.isMultitrack || !track.steps) return;
-    
+
     // Save current code to active step
     if (selectedTrack === trackId && track.activeStep !== undefined) {
       const currentCode = context.editorRef?.current?.code || context.activeCode || '';
@@ -594,7 +628,7 @@ all(x => x.color("cyan"))`;
         code: currentCode,
         modified: new Date().toISOString(),
       };
-      
+
       setTracks(prev => ({
         ...prev,
         [trackId]: {
@@ -616,7 +650,7 @@ all(x => x.color("cyan"))`;
         }
       }));
     }
-    
+
     // Load the new step
     loadTrack({
       ...track,
@@ -628,7 +662,7 @@ all(x => x.color("cyan"))`;
   const startRenameStep = (trackId: string, stepIndex: number) => {
     const track = tracks[trackId];
     if (!track || !track.isMultitrack || !track.steps) return;
-    
+
     setRenamingStep({ trackId, stepIndex });
     setRenameValue(track.steps[stepIndex].name);
   };
@@ -639,7 +673,7 @@ all(x => x.color("cyan"))`;
       const track = tracks[trackId];
       const step = track?.steps?.[stepIndex];
       const newName = renameValue.trim();
-      
+
       // Only proceed if we have a valid step and the name actually changed
       if (step && step.name !== newName) {
         const updatedSteps = [...track.steps!];
@@ -648,7 +682,7 @@ all(x => x.color("cyan"))`;
           name: newName,
           modified: new Date().toISOString(),
         };
-        
+
         setTracks(prev => ({
           ...prev,
           [trackId]: {
@@ -657,7 +691,7 @@ all(x => x.color("cyan"))`;
             modified: new Date().toISOString(),
           }
         }));
-        
+
         toast.success(t('files:stepRenamed'));
       }
     }
@@ -668,14 +702,14 @@ all(x => x.color("cyan"))`;
   const renameStep = (trackId: string, stepIndex: number, newName: string) => {
     const track = tracks[trackId];
     if (!track || !track.isMultitrack || !track.steps) return;
-    
+
     const updatedSteps = [...track.steps];
     updatedSteps[stepIndex] = {
       ...updatedSteps[stepIndex],
       name: newName.trim(),
       modified: new Date().toISOString(),
     };
-    
+
     setTracks(prev => ({
       ...prev,
       [trackId]: {
@@ -692,11 +726,11 @@ all(x => x.color("cyan"))`;
       toast.error(t('files:cannotDeleteLastStep'));
       return;
     }
-    
+
     const updatedSteps = track.steps.filter((_, index) => index !== stepIndex);
-    const newActiveStep = track.activeStep === stepIndex ? 0 : 
+    const newActiveStep = track.activeStep === stepIndex ? 0 :
                          track.activeStep! > stepIndex ? track.activeStep! - 1 : track.activeStep;
-    
+
     setTracks(prev => ({
       ...prev,
       [trackId]: {
@@ -707,7 +741,7 @@ all(x => x.color("cyan"))`;
         modified: new Date().toISOString(),
       }
     }));
-    
+
     toast.success(t('files:stepDeleted'));
   };
 
@@ -717,7 +751,7 @@ all(x => x.color("cyan"))`;
       const zip = new JSZip();
 
       // Get all tracks in this folder and its subfolders
-      const folderTracks = Object.values(tracks).filter(track => 
+      const folderTracks = Object.values(tracks).filter(track =>
         track.folder === folderPath || track.folder?.startsWith(`${folderPath}/`)
       );
 
@@ -734,7 +768,7 @@ all(x => x.color("cyan"))`;
         if (track.isMultitrack && track.steps) {
           // Create multitrack folder
           const multitrackFolder = zip.folder(`${trackPath}${track.name}`);
-          
+
           // Add each step
           track.steps.forEach((step) => {
             const fileName = `${step.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
@@ -787,13 +821,13 @@ all(x => x.color("cyan"))`;
       // Download as ZIP for multitrack
       const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
-      
+
       // Add each step as a separate file
       track.steps.forEach((step, index) => {
         const fileName = `${step.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
         zip.file(fileName, step.code);
       });
-      
+
       // Add metadata file
       const metadata = {
         trackName: track.name,
@@ -807,7 +841,7 @@ all(x => x.color("cyan"))`;
         modified: track.modified,
       };
       zip.file('metadata.json', JSON.stringify(metadata, null, 2));
-      
+
       const content = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(content);
       const a = document.createElement('a');
@@ -817,7 +851,7 @@ all(x => x.color("cyan"))`;
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
+
       toast.success(t('files:multitrackDownloaded'));
     } else {
       // Regular single file download
@@ -830,7 +864,7 @@ all(x => x.color("cyan"))`;
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      
+
       toast.success(t('files:trackDownloaded'));
     }
   };
@@ -848,7 +882,7 @@ all(x => x.color("cyan"))`;
       const code = e.target?.result as string;
       const trackId = Date.now().toString();
       const trackName = file.name.replace(/\.(js|txt)$/, '');
-      
+
       const newTrack: Track = {
         id: trackId,
         name: trackName,
@@ -857,7 +891,7 @@ all(x => x.color("cyan"))`;
         modified: new Date().toISOString(),
         folder: targetFolder,
       };
-      
+
       setTracks(prev => ({ ...prev, [trackId]: newTrack }));
       loadTrack(newTrack);
       toast.success(t('files:trackImported', { name: trackName }));
@@ -883,7 +917,7 @@ all(x => x.color("cyan"))`;
     setIsDragOver(false);
 
     const files = Array.from(e.dataTransfer.files);
-    
+
     // Check for ZIP files first (library import)
     const zipFiles = files.filter(file => file.name.endsWith('.zip'));
     if (zipFiles.length > 0) {
@@ -892,9 +926,9 @@ all(x => x.color("cyan"))`;
     }
 
     // Handle regular JS/TXT files
-    const jsFiles = files.filter(file => 
-      file.type === 'text/javascript' || 
-      file.name.endsWith('.js') || 
+    const jsFiles = files.filter(file =>
+      file.type === 'text/javascript' ||
+      file.name.endsWith('.js') ||
       file.name.endsWith('.txt')
     );
 
@@ -916,7 +950,7 @@ all(x => x.color("cyan"))`;
       const track = tracks[renamingTrack];
       const oldName = track?.name;
       const newName = renameValue.trim();
-      
+
       // Only proceed if we have a valid track and the name actually changed
       if (track && oldName && oldName !== newName) {
         setTracks(prev => ({
@@ -927,7 +961,7 @@ all(x => x.color("cyan"))`;
             modified: new Date().toISOString()
           }
         }));
-        
+
         toast.success(t('files:trackRenamed'));
       }
     }
@@ -987,7 +1021,7 @@ all(x => x.color("cyan"))`;
         if (track.isMultitrack && track.steps) {
           // Create multitrack folder
           const multitrackFolder = zip.folder(`${trackPath}${track.name}`);
-          
+
           // Add each step
           track.steps.forEach((step) => {
             const fileName = `${step.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
@@ -1102,7 +1136,7 @@ all(x => x.color("cyan"))`;
             zipEntry.async('text').then(content => {
               const fileName = relativePath.split('/').pop() || 'imported.js';
               const trackName = fileName.replace(/\.[^/.]+$/, '');
-              
+
               const trackId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
               const newTrack: Track = {
                 id: trackId,
@@ -1151,7 +1185,7 @@ all(x => x.color("cyan"))`;
       ],
       activeStep: 0,
     };
-    
+
     setTracks(prev => ({ ...prev, [trackId]: newTrack }));
     loadTrack(newTrack);
     toast.success(t('files:multitrackCreated'));
@@ -1210,7 +1244,7 @@ all(x => x.color("cyan"))`;
   ];
 
   return (
-    <div 
+    <div
       className={`h-full flex flex-col bg-lineHighlight text-foreground ${isDragOver ? 'bg-blue-900/20 border-2 border-blue-500 border-dashed' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -1224,7 +1258,7 @@ all(x => x.color("cyan"))`;
           </div>
         </div>
       )}
-      
+
       {/* Header */}
       <div className="p-3 border-b border-gray-600">
         <div className="mb-2 flex items-center justify-between">
@@ -1250,7 +1284,7 @@ all(x => x.color("cyan"))`;
           onChange={importLibraryFromZip}
           className="hidden"
         />
-        
+
         {/* New track input */}
         {isCreating && (
           <div className="flex space-x-1 mb-2">
@@ -1399,7 +1433,7 @@ all(x => x.color("cyan"))`;
           <div>{t('files:currentTrack')}: {tracks[selectedTrack].name}</div>
           <div className="flex items-center justify-between mt-1">
             <button
-              onClick={() => saveCurrentTrack(true)}
+              onClick={async () => await saveCurrentTrack(true)}
               className="px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-xs"
               title={t('files:saveChanges')}
             >

@@ -26,7 +26,7 @@ export interface UserPattern {
  * @returns Parsed boolean value
  */
 export const parseBoolean = (booleanlike: boolean | string | undefined): boolean =>
-  [true, 'true'].includes(booleanlike as boolean | string) ? true : false;
+    [true, 'true'].includes(booleanlike as boolean | string);
 
 
 export interface UserPatterns {
@@ -51,6 +51,7 @@ export interface Settings {
   isPatternHighlightingEnabled: boolean;
   isTabIndentationEnabled: boolean;
   isMultiCursorEnabled: boolean;
+  isPrettierEnabled: boolean;
   theme: Theme;
   fontFamily: string;
   fontSize: number;
@@ -93,6 +94,7 @@ export interface RawSettings {
   isPatternHighlightingEnabled: boolean | string;
   isTabIndentationEnabled: boolean | string;
   isMultiCursorEnabled: boolean | string;
+  isPrettierEnabled: boolean | string;
   theme: Theme;
   fontFamily: string;
   fontSize: number | string;
@@ -149,6 +151,7 @@ export const defaultSettings: RawSettings = {
   isPatternHighlightingEnabled: true,
   isTabIndentationEnabled: true, // Enable tab indentation
   isMultiCursorEnabled: true, // Enable multi-cursor editing
+  isPrettierEnabled: false, // Conservative default - let users opt in
   theme: 'strudelTheme',
   fontFamily: 'monospace',
   fontSize: 18,
@@ -184,11 +187,11 @@ const instance = parseInt(search?.get('instance') ?? '0');
 const settings_key = `strudel-settings${instance > 0 ? instance : ''}`;
 
 // Create settingsMap conditionally to avoid SSR issues
-export const settingsMap = typeof window !== 'undefined' 
+export const settingsMap = typeof window !== 'undefined'
   ? persistentMap(settings_key, defaultSettings as any)
-  : { 
-      get: () => defaultSettings, 
-      set: () => {}, 
+  : {
+      get: () => defaultSettings,
+      set: () => {},
       setKey: () => {},
       subscribe: () => () => {},
       // Add any other methods that might be called
@@ -200,16 +203,16 @@ export const settingsMap = typeof window !== 'undefined'
 // One-time migration: add new IDE feature settings for existing users
 if (typeof window !== 'undefined') {
   const MIGRATION_KEY = 'strudel-settings-ide-features-v1';
-  
+
   // Only run migration in browser environment
   const runMigration = () => {
     const currentSettings = settingsMap.get();
-    
+
     console.log('[settings] loaded settings:', currentSettings);
-    
+
     if (typeof localStorage !== 'undefined' && !localStorage.getItem(MIGRATION_KEY)) {
       console.log('[settings] migrating to add IDE features');
-      
+
       // Add missing settings with defaults - ensure they're booleans not strings
       const updated = {
         ...currentSettings,
@@ -220,8 +223,9 @@ if (typeof window !== 'undefined') {
         isBracketMatchingEnabled: currentSettings.isBracketMatchingEnabled === undefined ? true : parseBoolean(currentSettings.isBracketMatchingEnabled),
         isTabIndentationEnabled: currentSettings.isTabIndentationEnabled === undefined ? true : parseBoolean(currentSettings.isTabIndentationEnabled),
         isMultiCursorEnabled: currentSettings.isMultiCursorEnabled === undefined ? true : parseBoolean(currentSettings.isMultiCursorEnabled),
+        isPrettierEnabled: currentSettings.isPrettierEnabled === undefined ? false : parseBoolean(currentSettings.isPrettierEnabled),
       };
-      
+
       settingsMap.set(updated);
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(MIGRATION_KEY, 'true');
@@ -233,7 +237,7 @@ if (typeof window !== 'undefined') {
       console.log('[settings] isLinterEnabled:', currentSettings.isLinterEnabled);
     }
   };
-  
+
   // Run migration after a short delay to ensure everything is initialized
   setTimeout(runMigration, 0);
 }
@@ -272,6 +276,7 @@ export function useSettings(): Settings {
     isSyncEnabled: isUdels() ? true : parseBoolean(state.isSyncEnabled),
     isTabIndentationEnabled: parseBoolean(state.isTabIndentationEnabled),
     isMultiCursorEnabled: parseBoolean(state.isMultiCursorEnabled),
+    isPrettierEnabled: parseBoolean(state.isPrettierEnabled),
     isAutosaveEnabled: parseBoolean(state.isAutosaveEnabled),
     fontSize: Number(state.fontSize),
     panelPosition: (state.activeFooter !== '' && !isUdels() ? state.panelPosition : 'bottom') as PanelPosition, // <-- keep this 'bottom' where it is!

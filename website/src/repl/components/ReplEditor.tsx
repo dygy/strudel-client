@@ -8,6 +8,7 @@ import { ResizableSidebar } from './sidebar/ResizableSidebar';
 import { FileManager } from './sidebar/FileManager';
 import { WelcomeScreen } from './WelcomeScreen';
 import { useActivePattern, userPattern } from '@src/user_pattern_utils';
+import { DEFAULT_TRACK_CODE, isDefaultCode } from '@src/constants/defaultCode';
 import React, { useState, useEffect } from 'react';
 
 interface ReplContext {
@@ -79,10 +80,8 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
             const hasNonDefaultPatterns = patternValues.some((pattern: any) => {
               if (!pattern.code) return false;
               const code = pattern.code.toString();
-              const isDefaultPattern = code.includes('/* ========== SETUP ========== */') && 
-                                     code.includes('setcps(160/60/4)') && 
-                                     code.includes('all(x => x.color("cyan"))');
-              return !isDefaultPattern;
+              // Check if this is NOT the default welcome pattern
+              return !isDefaultCode(code);
             });
             hasUserPatternData = hasNonDefaultPatterns;
           }
@@ -125,10 +124,7 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
               if (!pattern.code) return false;
               const code = pattern.code.toString();
               // Check if this is NOT the default welcome pattern
-              const isDefaultPattern = code.includes('/* ========== SETUP ========== */') && 
-                                     code.includes('setcps(160/60/4)') && 
-                                     code.includes('all(x => x.color("cyan"))');
-              return !isDefaultPattern;
+              return !isDefaultCode(code);
             });
             hasUserPatternData = hasNonDefaultPatterns;
             console.log('checkUserData - user patterns found:', Object.keys(patterns).length, 'non-default:', hasNonDefaultPatterns);
@@ -192,38 +188,11 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
   const handleCreateTrack = () => {
     // Create a new track with the default code
     const trackId = Date.now().toString();
-    const defaultCode = `/* ========== SETUP ========== */
-setcps(160/60/4) // 160 BPM (2.666… cycles per second)
-
-/* ========== DRUM SECTION ========== */
-// Four‑on‑the‑floor kick with some drive and low‑pass
-kick: s("bd*4").bank("RolandTR909").drive(2).lpf(2200).gain(0.85)
-
-// Clap on the 2 and 4 for backbeat punch
-clap: s("~ cp ~ cp").bank("RolandTR909").crush(12).room(0.2).gain(0.5)
-
-// Closed hats: straight 16ths plus a quieter off‑beat shuffle
-hats: stack(
-  s("hh*16").bank("RolandTR909").dec(0.05).gain(0.25),
-  s("~ hh ~ hh").bank("RolandTR909").dec(0.03).gain(0.15).pan(sine.range(-0.4, 0.4).slow(8))
-).gain(1)
-
-/* ========== BASS (DONK) ========== */
-// Donk‑style bass in A major. Tweak note pattern to taste.
-donk: note("<a1 g#1 a1 f#1> <e1 e1 d#1 e1>").sub(12).sound("z_sine").ftype("ladder").lpf(180).lpq(8).euclidRot(3,16,14).drive(3).distort("1.4:.65")
-
-/* ========== STAB CHORDS ========== */
-// A → F#m → D → E progression. Adjust timing/gain by ear.
-stabs: chord("<A F#m D E>").dict("ireal").voicing().sound("square").gain("<0.1 0.15 0.1 0.15>").decay(0.3).room(0.5).delay(".18:.1:.26").gain("<0.1 0.15 0.1 0.15>")
-
-/* ========== GLOBAL TOUCH ========== */
-// Tint everything cyan (optional)
-all(x => x.color("cyan"))`;
 
     const newTrack = {
       id: trackId,
       name: 'My First Track',
-      code: defaultCode,
+      code: DEFAULT_TRACK_CODE,
       created: new Date().toISOString(),
       modified: new Date().toISOString(),
     };
@@ -252,7 +221,7 @@ all(x => x.color("cyan"))`;
     }
     
     // Also create in user pattern system for consistency
-    const newPattern = userPattern.update(trackId, { code: defaultCode });
+    const newPattern = userPattern.update(trackId, { code: DEFAULT_TRACK_CODE });
     
     // Defer the editor update until after the component re-renders and shows the editor
     // Don't reset since that might cause issues with uninitialized editor
@@ -287,7 +256,7 @@ all(x => x.color("cyan"))`;
             const reader = new FileReader();
             reader.onload = (event) => {
               const content = event.target?.result as string;
-              const trackId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+              const trackId = Date.now().toString() + Math.random().toString(36).substring(2, 11);
               const trackName = file.name.replace(/\.(js|txt|md)$/, '');
               
               const newTrack = {

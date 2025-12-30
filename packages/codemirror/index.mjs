@@ -8,3 +8,5 @@ export * from './signature.mjs';
 export * from './diagnostics.mjs';
 export * from './themes.mjs';
 export * from './widget.mjs';
+export * from './format.mjs';
+export * from './prettier.mjs';

@@ -141,6 +141,9 @@ importers:
       nanostores:
         specifier: ^0.11.3
         version: 0.11.3
+      prettier:
+        specifier: ^3.4.2
+        version: 3.4.2
       superdough:
         specifier: workspace:*
         version: link:../superdough

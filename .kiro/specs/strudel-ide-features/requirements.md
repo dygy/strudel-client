@@ -149,12 +149,29 @@ This feature adds IDE-like capabilities to the Strudel CodeMirror editor, includ
 - Maintain separate documentation database
 - Support user-defined functions
 
+### Requirement 8
+
+**User Story:** As a Strudel user, I want automatic code formatting with Prettier, so that my code is consistently styled and readable.
+
+#### Acceptance Criteria
+
+1. WHEN the user enables prettier in settings, THE system SHALL format code automatically on save
+2. WHEN the user enables prettier in settings, THE system SHALL format code automatically on autosave
+3. WHEN prettier formatting is enabled, THE system SHALL apply consistent formatting rules including:
+   - Proper indentation
+   - Consistent spacing around operators
+   - Standardized quote usage
+   - Line length management
+4. THE prettier formatting SHALL preserve code functionality and semantics
+5. THE user SHALL be able to toggle prettier formatting on/off in settings
+6. THE prettier formatting SHALL work with existing autosave functionality
+7. THE prettier formatting SHALL handle Strudel-specific syntax correctly
+
 ## Future Enhancements
 
 - Jump to definition
 - Find all references
 - Rename refactoring
-- Code formatting
 - Snippet support
 - Multi-file support
 - Import suggestions

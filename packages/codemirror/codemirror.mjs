@@ -27,6 +27,7 @@ import { radioPlugin, updateRadioWidgets } from './radio.mjs';
 import { widgetPlugin, updateWidgets } from './widget.mjs';
 import { isSignatureHelpEnabled } from './signature.mjs';
 import { isLinterEnabled } from './diagnostics.mjs';
+import { isPrettierEnabled } from './prettier.mjs';
 import { persistentAtom } from '@nanostores/persistent';
 import { basicSetup } from './basicSetup.mjs';
 
@@ -40,6 +41,7 @@ const extensions = {
   isTooltipEnabled,
   isSignatureHelpEnabled,
   isLinterEnabled,
+  isPrettierEnabled,
   isPatternHighlightingEnabled,
   isActiveLineHighlighted: (on) => (on ? [highlightActiveLine(), highlightActiveLineGutter()] : []),
   isFlashEnabled,
@@ -84,7 +86,7 @@ export const codemirrorSettings = persistentAtom('codemirror-settings', defaultS
 // This runs once and sets a migration flag - deferred to avoid SSR issues
 if (typeof window !== 'undefined') {
   const MIGRATION_KEY = 'codemirror-settings-migrated-v1';
-  
+
   // Defer migration to avoid SSR issues
   setTimeout(() => {
     if (typeof localStorage !== 'undefined' && !localStorage.getItem(MIGRATION_KEY)) {
@@ -153,6 +155,21 @@ export function initEditor({ initialCode = '', onChange, onEvaluate, onStop, roo
             key: 'Alt-.',
             preventDefault: true,
             run: () => onStop?.(),
+          },
+          {
+            key: 'Mod-s',
+            preventDefault: true,
+            run: (view) => {
+              // Dispatch save event on the editor view for prettier integration
+              const saveEvent = new CustomEvent('strudel-save', {
+                detail: { source: 'keyboard' }
+              });
+              view.dom.dispatchEvent(saveEvent);
+
+              // Also dispatch on document for FileManager
+              document.dispatchEvent(saveEvent);
+              return true;
+            },
           },
           /* {
           key: 'Ctrl-Shift-.',
@@ -378,7 +395,6 @@ export class StrudelMirror {
   changeSetting(key, value) {
     if (extensions[key]) {
       this.reconfigureExtension(key, value);
-      return;
     } else if (key === 'fontFamily') {
       this.setFontFamily(value);
     } else if (key === 'fontSize') {

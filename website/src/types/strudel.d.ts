@@ -101,6 +101,7 @@ declare module '@strudel/codemirror' {
   }
   export const defaultSettings: any;
   export const themes: any;
+  export function formatCode(code: string): Promise<string>;
   // Add other exports as needed
 }
 
