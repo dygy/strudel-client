@@ -196,7 +196,43 @@ export const mini2ast = (code, start = 0, userCode = code) => {
   } catch (error) {
     const region = [error.location.start.offset + start, error.location.end.offset + start];
     const line = userCode.slice(0, region[0]).split('\n').length;
-    throw new Error(`[mini] parse error at line ${line}: ${error.message}`);
+    
+    // Get context around the error position for better debugging
+    const errorPos = error.location.start.offset;
+    const contextStart = Math.max(0, errorPos - 5);
+    const contextEnd = Math.min(code.length, errorPos + 6);
+    const beforeError = code.slice(contextStart, errorPos);
+    const errorChar = code.slice(errorPos, errorPos + 1);
+    const afterError = code.slice(errorPos + 1, contextEnd);
+    
+    // Create a visual representation of the error context
+    const contextStr = `"${beforeError}[${errorChar}]${afterError}"`;
+    const positionIndicator = ' '.repeat(beforeError.length + 1) + '^';
+    
+    // Check for common issues and provide helpful suggestions
+    let suggestion = '';
+    if (contextStr.includes('ttps:[/]') || contextStr.includes('ttp:[/]')) {
+      suggestion = '\nSuggestion: This looks like a URL where "//" was converted to "/". Check for code that might be processing URLs incorrectly.';
+      
+      // Try to auto-fix the URL if possible
+      if (code.includes('ttps:/') && !code.includes('https://')) {
+        console.warn('[mini] Attempting to auto-fix corrupted URL in mini notation');
+        const fixedCode = code.replace(/ttps:\//g, 'https://').replace(/ttp:\//g, 'http://');
+        try {
+          return krill.parse(fixedCode);
+        } catch (fixError) {
+          // If auto-fix fails, continue with original error
+        }
+      }
+    } else if (errorChar === '/') {
+      suggestion = '\nSuggestion: "/" is not valid in mini notation. If this is part of a URL or file path, make sure it\'s not being processed as mini notation.';
+    }
+    
+    throw new Error(
+      `[mini] parse error at line ${line}: ${error.message}\n` +
+      `Context: ${contextStr}\n` +
+      `         ${positionIndicator}${suggestion}`
+    );
   }
 };
 

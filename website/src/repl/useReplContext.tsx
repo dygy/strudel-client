@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 
 import { parseBoolean, settingsMap, useSettings } from '../settings';
 import {
   setActivePattern,
+  getActivePattern,
   setLatestCode,
   createPatternID,
   userPattern,
@@ -203,9 +204,105 @@ export function useReplContext(): ReplContext {
         ? localStorage.getItem('strudel-settingslatestCode') 
         : null;
       
+      // Check if there's an active pattern and corresponding track
+      const currentActivePattern = getActivePattern();
+      let trackCode = null;
+      
+      console.log('[repl] Debug - currentActivePattern:', currentActivePattern);
+      
+      if (currentActivePattern && typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        // First, try to find it in the FileManager tracks
+        const savedTracks = localStorage.getItem('strudel_tracks');
+        console.log('[repl] Debug - savedTracks found:', !!savedTracks);
+        
+        if (savedTracks) {
+          try {
+            const tracks = JSON.parse(savedTracks);
+            console.log('[repl] Debug - parsed tracks:', Object.keys(tracks));
+            const activeTrack = tracks[currentActivePattern];
+            console.log('[repl] Debug - activeTrack found in FileManager:', !!activeTrack, activeTrack?.name);
+            
+            if (activeTrack) {
+              trackCode = activeTrack.code;
+              console.log('[repl] Loading code from FileManager track:', activeTrack.name);
+              
+              // Notify FileManager to select this track
+              setTimeout(() => {
+                console.log('[repl] Dispatching strudel-select-track event for:', currentActivePattern);
+                window.dispatchEvent(new CustomEvent('strudel-select-track', {
+                  detail: { trackId: currentActivePattern }
+                }));
+              }, 100);
+            }
+          } catch (e) {
+            console.warn('[repl] Failed to parse tracks from localStorage:', e);
+          }
+        }
+        
+        // If not found in FileManager tracks, try the old user pattern system
+        if (!trackCode) {
+          try {
+            const userPatternsData = localStorage.getItem('strudel-settingsuserPatterns');
+            if (userPatternsData) {
+              const userPatterns = JSON.parse(userPatternsData);
+              const userPattern = userPatterns[currentActivePattern];
+              console.log('[repl] Debug - activePattern found in userPatterns:', !!userPattern);
+              
+              if (userPattern && userPattern.code) {
+                trackCode = userPattern.code;
+                console.log('[repl] Loading code from user pattern system');
+                
+                // Try to find a matching FileManager track by code content
+                if (savedTracks) {
+                  try {
+                    const tracks = JSON.parse(savedTracks);
+                    const matchingTrack = Object.values(tracks).find((track: any) => 
+                      track.code && track.code.trim() === userPattern.code.trim()
+                    );
+                    
+                    if (matchingTrack) {
+                      console.log('[repl] Found matching FileManager track by code content:', (matchingTrack as any).name);
+                      // Update active pattern to use the FileManager track ID
+                      setActivePattern((matchingTrack as any).id);
+                      
+                      // Notify FileManager to select this track
+                      setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('strudel-select-track', {
+                          detail: { trackId: (matchingTrack as any).id }
+                        }));
+                      }, 100);
+                    } else {
+                      console.log('[repl] No matching FileManager track found, creating new one');
+                      // Create a FileManager track from the old user pattern
+                      setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('strudel-migrate-user-pattern', {
+                          detail: { 
+                            oldPatternId: currentActivePattern,
+                            patternData: userPattern
+                          }
+                        }));
+                      }, 200);
+                    }
+                  } catch (e) {
+                    console.warn('[repl] Failed to parse tracks for matching:', e);
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('[repl] Failed to parse user patterns from localStorage:', e);
+          }
+        }
+      } else {
+        console.log('[repl] Debug - No active pattern or window/localStorage not available');
+      }
+      
       if (decoded) {
         code = decoded;
         msg = `I have loaded the code from the URL.`;
+      } else if (trackCode) {
+        code = trackCode;
+        msg = `Your active track has been loaded!`;
       } else if (currentLatestCode && !shouldShowWelcome) {
         code = currentLatestCode;
         msg = `Your last session has been loaded!`;
@@ -231,6 +328,8 @@ export function useReplContext(): ReplContext {
   // this can be simplified once SettingsTab has been refactored to change codemirrorSettings directly!
   // this will be the case when the main repl is being replaced
   const _settings = useStore(settingsMap, { keys: Object.keys(defaultSettings) });
+  const allSettings = useSettings(); // Get all settings including Prettier settings
+  
   useEffect(() => {
     let editorSettings: any = {};
     Object.keys(defaultSettings).forEach((key) => {
@@ -240,7 +339,12 @@ export function useReplContext(): ReplContext {
     });
     console.log('[repl] updating editor settings:', editorSettings);
     editorRef.current?.updateSettings(editorSettings);
-  }, [_settings]);
+    
+    // Make all settings available globally for Prettier
+    if (typeof window !== 'undefined') {
+      (window as any).strudelSettings = allSettings;
+    }
+  }, [_settings, allSettings]);
 
   //
   // UI Actions

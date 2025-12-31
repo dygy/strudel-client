@@ -3,6 +3,7 @@ import {afterEach, beforeEach, describe, expect, it} from 'vitest';
 // Simple mock for testing prettier functionality
 const mockFormatService = {
   isLoaded: true,
+  userSettings: null,
 
   isEnabled() {
     return this.isLoaded;
@@ -13,12 +14,30 @@ const mockFormatService = {
       throw new Error('Prettier is not available');
     }
 
-    // Simple consistent formatting - just normalize spacing
-    return code
+    // Simple consistent formatting - normalize spacing but NEVER add semicolons
+    let formatted = code
       .replace(/\s+/g, ' ')
       .replace(/\s*=\s*/g, ' = ')
-      .replace(/\s*;\s*/g, '; ')
+      .replace(/;\s*/g, ' ') // Remove semicolons instead of normalizing them
       .trim();
+
+    // Preserve Strudel $: syntax - remove any spaces between $ and :
+    formatted = formatted.replace(/\$\s*:/g, '$:');
+
+    // Handle quote preferences if user settings are provided
+    if (this.userSettings) {
+      if (this.userSettings.prettierSingleQuote === true) {
+        // Convert double quotes to single quotes, but preserve URLs
+        formatted = formatted.replace(/"([^"]*https?:\/\/[^"]*)"/, "'$1'");
+        formatted = formatted.replace(/"/g, "'");
+      } else if (this.userSettings.prettierSingleQuote === false) {
+        // Convert single quotes to double quotes, but preserve URLs  
+        formatted = formatted.replace(/'([^']*https?:\/\/[^']*)'/, '"$1"');
+        formatted = formatted.replace(/'/g, '"');
+      }
+    }
+
+    return formatted;
   }
 };
 
@@ -52,6 +71,7 @@ const mockFileManager = {
   reset() {
     this.isPrettierEnabled = false;
     this.lastSavedCode = '';
+    mockFormatService.userSettings = null;
   }
 };
 
@@ -73,6 +93,63 @@ describe('Prettier Integration', () => {
       expect(formatted1).toBe(formatted2);
       expect(formatted1).toContain('const x = 1');
       expect(formatted1).toContain('const y = 2');
+      // Should remove semicolons for Strudel code
+      expect(formatted1).not.toContain(';');
+    });
+
+    it('should preserve Strudel $: syntax without adding spaces', async () => {
+      const testCases = [
+        '$:n("0 1 3 5").scale("C:major")',
+        '$: s("bd hh")',
+        '$:s("bd*5").bank("RolandTR909")',
+        '$: note("c d e f")'
+      ];
+      
+      for (const code of testCases) {
+        const formatted = await mockFormatService.formatCode(code);
+        
+        // Should preserve $: without spaces between $ and :
+        expect(formatted).toContain('$:');
+        expect(formatted).not.toContain('$ :');
+        
+        // Should NEVER add semicolons - they break Strudel code
+        expect(formatted).not.toContain(';');
+        
+        // Should not add extra spaces after $:
+        if (code.includes('$:s(')) {
+          expect(formatted).toContain('$:s(');
+          expect(formatted).not.toContain('$: s(');
+        }
+      }
+    });
+
+    it('should respect quote preference settings', async () => {
+      // Test with single quotes preference
+      mockFormatService.userSettings = { prettierSingleQuote: true };
+      const codeWithDoubleQuotes = '$:n("0 1 3 5").scale("C:major")';
+      const formattedSingle = await mockFormatService.formatCode(codeWithDoubleQuotes);
+      
+      // Should convert to single quotes when preference is set
+      expect(formattedSingle).toContain("'0 1 3 5'");
+      expect(formattedSingle).toContain("'C:major'");
+      
+      // Test with double quotes preference (default)
+      mockFormatService.userSettings = { prettierSingleQuote: false };
+      const codeWithSingleQuotes = "$:n('0 1 3 5').scale('C:major')";
+      const formattedDouble = await mockFormatService.formatCode(codeWithSingleQuotes);
+      
+      // Should convert to double quotes when preference is false
+      expect(formattedDouble).toContain('"0 1 3 5"');
+      expect(formattedDouble).toContain('"C:major"');
+    });
+
+    it('should preserve URLs with double slashes', async () => {
+      const codeWithUrl = 'samples({ rhodes: "https://cdn.freesound.org/previews/132/132051_316502-lq.mp3" })';
+      const formatted = await mockFormatService.formatCode(codeWithUrl);
+      
+      // Should preserve the URL structure with https://
+      expect(formatted).toContain('https://cdn.freesound.org');
+      expect(formatted).not.toContain('https:/cdn.freesound.org');
     });
 
     /**

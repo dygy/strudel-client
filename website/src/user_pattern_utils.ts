@@ -139,7 +139,15 @@ export async function loadDBPatterns(): Promise<void> {
 const $activePattern = sessionAtom('activePattern', '');
 
 export function setActivePattern(key: string | null): void {
+  const previousPattern = $activePattern.get();
   $activePattern.set(key);
+  
+  // Dispatch event when active pattern changes
+  if (typeof window !== 'undefined' && key !== previousPattern) {
+    window.dispatchEvent(new CustomEvent('strudel-active-pattern-changed', {
+      detail: { patternId: key, previousPatternId: previousPattern }
+    }));
+  }
 }
 
 export function getActivePattern(): string {

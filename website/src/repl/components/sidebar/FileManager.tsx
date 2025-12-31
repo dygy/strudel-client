@@ -14,7 +14,7 @@ import { useToast } from '../ui/Toast';
 import { BurgerMenuButton } from '../ui/BurgerMenuButton';
 import { useSettings } from '@src/settings';
 import { formatCode } from '@strudel/codemirror';
-import { useActivePattern } from '@src/user_pattern_utils';
+import { useActivePattern, setActivePattern } from '@src/user_pattern_utils';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 
 const TRACKS_STORAGE_KEY = 'strudel_tracks';
@@ -62,7 +62,8 @@ export function FileManager({ context }: FileManagerProps) {
   const [tracks, setTracks] = useState<Record<string, Track>>({});
   const [folders, setFolders] = useState<Record<string, Folder>>({});
   const [isInitialized, setIsInitialized] = useState(false);
-  const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
+  const [selectedTrack, setSelectedTrack] = useState<string | null>(null); // Track opened for editing
+  const [hoveredTrack, setHoveredTrack] = useState<string | null>(null); // Track being hovered
   const [isCreating, setIsCreating] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newTrackName, setNewTrackName] = useState('');
@@ -88,7 +89,7 @@ export function FileManager({ context }: FileManagerProps) {
   const [selectedStepTrack, setSelectedStepTrack] = useState<string | null>(null);
   const { t, i18n } = useTranslation(['files', 'common', 'tabs']);
   const toast = useToast();
-  const activePattern = useActivePattern();
+  const activePattern = useActivePattern(); // This is what's currently PLAYING
 
   // Helper function for better date formatting
 // Load tracks and folders from localStorage on mount
@@ -109,10 +110,10 @@ export function FileManager({ context }: FileManagerProps) {
           // After loading tracks, check if we need to sync with active pattern
           setTimeout(() => {
             const currentActivePattern = activePattern;
-            if (currentActivePattern && !selectedTrack) {
+            if (currentActivePattern && loadedTracks[currentActivePattern]) {
               console.log('FileManager - post-load sync check for active pattern:', currentActivePattern);
-              const matchingTrack = Object.values(loadedTracks).find(track => track.id === currentActivePattern);
-              if (matchingTrack) {
+              const matchingTrack = loadedTracks[currentActivePattern];
+              if (matchingTrack && !selectedTrack) {
                 console.log('FileManager - post-load selecting matching track:', matchingTrack.name);
                 setSelectedTrack(matchingTrack.id);
               }
@@ -144,11 +145,47 @@ export function FileManager({ context }: FileManagerProps) {
     const handleSelectTrack = (event: CustomEvent) => {
       const { trackId } = event.detail;
       console.log('FileManager - received select track event:', trackId);
+      console.log('FileManager - tracks available:', Object.keys(tracks));
+      console.log('FileManager - track exists:', !!tracks[trackId]);
       setSelectedTrack(trackId);
+    };
+
+    const handleMigrateUserPattern = (event: CustomEvent) => {
+      const { oldPatternId, patternData } = event.detail;
+      console.log('FileManager - migrating user pattern to FileManager track:', oldPatternId);
+      
+      // Create a new FileManager track from the old user pattern
+      const trackId = Date.now().toString();
+      const newTrack: Track = {
+        id: trackId,
+        name: patternData.name || 'Migrated Pattern',
+        code: patternData.code,
+        created: new Date().toISOString(),
+        modified: new Date().toISOString(),
+      };
+      
+      // Add the track to FileManager
+      setTracks(prev => {
+        const newTracks = { ...prev, [trackId]: newTrack };
+        
+        // After updating tracks, select the new track
+        setTimeout(() => {
+          console.log('FileManager - selecting migrated track:', newTrack.name);
+          setSelectedTrack(trackId);
+        }, 50);
+        
+        return newTracks;
+      });
+      
+      // Update the active pattern to use the new FileManager track ID
+      setActivePattern(trackId);
+      
+      console.log('FileManager - migration complete, new track ID:', trackId);
     };
 
     window.addEventListener('strudel-tracks-updated', handleTracksUpdated);
     window.addEventListener('strudel-select-track', handleSelectTrack);
+    window.addEventListener('strudel-migrate-user-pattern', handleMigrateUserPattern);
 
     // Mark as initialized after loading
     setIsInitialized(true);
@@ -156,6 +193,7 @@ export function FileManager({ context }: FileManagerProps) {
     return () => {
       window.removeEventListener('strudel-tracks-updated', handleTracksUpdated);
       window.removeEventListener('strudel-select-track', handleSelectTrack);
+      window.removeEventListener('strudel-migrate-user-pattern', handleMigrateUserPattern);
     };
   }, [activePattern, selectedTrack]);
 
@@ -174,40 +212,77 @@ export function FileManager({ context }: FileManagerProps) {
   }, [folders, isInitialized]);
 
   // Synchronize with active pattern from user_pattern_utils
+  // NOTE: activePattern represents what's PLAYING, selectedTrack represents what's OPENED for editing
   useEffect(() => {
-    if (!isInitialized || !activePattern) return;
+    if (!isInitialized) return;
 
-    console.log('FileManager - synchronizing with active pattern:', activePattern);
+    console.log('FileManager - synchronization check:', {
+      activePattern,
+      selectedTrack,
+      tracksCount: Object.keys(tracks).length,
+      activePatternExists: !!tracks[activePattern]
+    });
 
-    // Try to find the track that matches the active pattern ID
-    const matchingTrack = Object.values(tracks).find(track => track.id === activePattern);
+    // Only proceed if we have tracks loaded and no track is currently selected
+    if (Object.keys(tracks).length === 0 || selectedTrack) {
+      return;
+    }
 
-    if (matchingTrack) {
-      console.log('FileManager - found matching track:', matchingTrack.name);
-      if (selectedTrack !== matchingTrack.id) {
-        setSelectedTrack(matchingTrack.id);
-      }
-    } else {
-      console.log('FileManager - no exact match found for active pattern:', activePattern);
-      // If no exact match, try to find by name (fallback for legacy patterns)
-      const trackByName = Object.values(tracks).find(track =>
-        track.name.toLowerCase().includes('first') ||
-        track.name.toLowerCase().includes('my first track')
+    // Case 1: Active pattern exists directly in FileManager tracks
+    if (activePattern && tracks[activePattern]) {
+      console.log('FileManager - selecting active pattern directly:', tracks[activePattern].name);
+      setSelectedTrack(activePattern);
+      return;
+    }
+
+    // Case 2: Try to match by current editor code content
+    const currentCode = context.editorRef?.current?.code || context.activeCode;
+    if (currentCode && currentCode.trim()) {
+      const matchingTrack = Object.values(tracks).find(track => 
+        track.code && track.code.trim() === currentCode.trim()
       );
-
-      if (trackByName) {
-        console.log('FileManager - found track by name fallback:', trackByName.name);
-        if (selectedTrack !== trackByName.id) {
-          setSelectedTrack(trackByName.id);
+      
+      if (matchingTrack) {
+        console.log('FileManager - found matching track by editor code:', matchingTrack.name);
+        setSelectedTrack(matchingTrack.id);
+        // Update active pattern to use the FileManager track ID
+        if (activePattern !== matchingTrack.id) {
+          setActivePattern(matchingTrack.id);
         }
-      } else if (Object.keys(tracks).length > 0 && !selectedTrack) {
-        // Select the first available track as fallback only if no track is selected
-        const firstTrackId = Object.keys(tracks)[0];
-        console.log('FileManager - selecting first available track:', tracks[firstTrackId]?.name);
-        setSelectedTrack(firstTrackId);
+        return;
       }
     }
-  }, [activePattern, tracks, isInitialized, selectedTrack]);
+
+    // Case 3: Try to match using old user pattern system
+    if (activePattern && typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        const userPatternsData = localStorage.getItem('strudel-settingsuserPatterns');
+        if (userPatternsData) {
+          const userPatterns = JSON.parse(userPatternsData);
+          const userPattern = userPatterns[activePattern];
+          
+          if (userPattern && userPattern.code) {
+            const matchingTrack = Object.values(tracks).find(track => 
+              track.code && track.code.trim() === userPattern.code.trim()
+            );
+            
+            if (matchingTrack) {
+              console.log('FileManager - found matching track by user pattern code:', matchingTrack.name);
+              setSelectedTrack(matchingTrack.id);
+              // Update active pattern to use the FileManager track ID
+              setActivePattern(matchingTrack.id);
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('FileManager - failed to check user patterns:', e);
+      }
+    }
+
+    console.log('FileManager - no matching track found for synchronization');
+    
+  }, [activePattern, tracks, isInitialized, selectedTrack, context.editorRef, context.activeCode]);
 
   const createNewTrack = (parentPath?: string) => {
     if (!newTrackName.trim()) return;
@@ -284,6 +359,14 @@ export function FileManager({ context }: FileManagerProps) {
   };
 
   const handleTrackSelect = (track: Track) => {
+    console.log('FileManager - handleTrackSelect called for:', track.name);
+    
+    // Save current track before switching if autosave is enabled
+    if (isAutosaveEnabled && selectedTrack && selectedTrack !== track.id) {
+      saveCurrentTrack(false); // Save without showing toast
+    }
+    
+    // Load the new track immediately
     loadTrack(track);
   };
 
@@ -402,19 +485,45 @@ export function FileManager({ context }: FileManagerProps) {
   };
 
   const loadTrack = (track: Track) => {
+    console.log('FileManager - loadTrack called for:', track.name, track.id);
     setSelectedTrack(track.id);
 
-    // If editor is not ready, retry after a short delay
-    const tryLoadTrack = () => {
-      if (context.editorRef?.current) {
-        context.handleUpdate({ id: track.id, code: track.code }, true);
-      } else {
-        // Retry after a short delay if editor isn't ready
-        setTimeout(tryLoadTrack, 100);
+    // Only update CodeMirror editor content and UI state - NO PLAYBACK
+    const applyTrackCode = () => {
+      console.log('FileManager - applying track code to editor (no playback):', track.code.substring(0, 50) + '...');
+      
+      // ONLY update the editor content, do NOT trigger evaluation/playback
+      // Use reset=false to prevent handleEvaluate() from being called
+      context.handleUpdate({ id: track.id, code: track.code }, false);
+      
+      // Also directly set the code in the editor if available (this won't trigger playback)
+      if (context.editorRef?.current?.setCode) {
+        console.log('FileManager - directly setting code in editor (no evaluation)');
+        context.editorRef.current.setCode(track.code);
       }
     };
 
-    tryLoadTrack();
+    // Apply immediately if editor is ready
+    if (context.editorRef?.current) {
+      applyTrackCode();
+    } else {
+      // Retry with increasing delays if editor isn't ready
+      let retryCount = 0;
+      const maxRetries = 10;
+      
+      const tryApplyTrackCode = () => {
+        if (context.editorRef?.current || retryCount >= maxRetries) {
+          applyTrackCode();
+        } else {
+          retryCount++;
+          const delay = Math.min(100 * retryCount, 1000); // Exponential backoff up to 1s
+          console.log(`FileManager - editor not ready, retrying in ${delay}ms (attempt ${retryCount})`);
+          setTimeout(tryApplyTrackCode, delay);
+        }
+      };
+      
+      tryApplyTrackCode();
+    }
   };
 
   const saveCurrentTrack = useCallback(async (showToast: boolean = true) => {
@@ -619,7 +728,9 @@ export function FileManager({ context }: FileManagerProps) {
     const track = tracks[trackId];
     if (!track || !track.isMultitrack || !track.steps) return;
 
-    // Save current code to active step
+    console.log('FileManager - switchToStep called for track:', track.name, 'step:', stepIndex);
+
+    // Save current code to active step if this track is currently selected
     if (selectedTrack === trackId && track.activeStep !== undefined) {
       const currentCode = context.editorRef?.current?.code || context.activeCode || '';
       const updatedSteps = [...track.steps];
@@ -651,12 +762,15 @@ export function FileManager({ context }: FileManagerProps) {
       }));
     }
 
-    // Load the new step
-    loadTrack({
+    // Load the new step immediately
+    const updatedTrack = {
       ...track,
       activeStep: stepIndex,
       code: track.steps[stepIndex].code,
-    });
+    };
+    
+    console.log('FileManager - loading step code:', track.steps[stepIndex].code.substring(0, 50) + '...');
+    loadTrack(updatedTrack);
   };
 
   const startRenameStep = (trackId: string, stepIndex: number) => {
@@ -1395,7 +1509,10 @@ export function FileManager({ context }: FileManagerProps) {
         tracks={tracks}
         folders={folders}
         selectedTrack={selectedTrack}
+        activePattern={activePattern}
+        hoveredTrack={hoveredTrack}
         onTrackSelect={handleTrackSelect}
+        onTrackHover={setHoveredTrack}
         onTrackRename={handleTrackRename}
         onTrackDelete={deleteTrack}
         onTrackDuplicate={duplicateTrack}
@@ -1428,23 +1545,28 @@ export function FileManager({ context }: FileManagerProps) {
       />
 
       {/* Footer with current track info */}
-      {selectedTrack && tracks[selectedTrack] && (
-        <div className="p-2 border-t border-gray-600 text-xs text-gray-400">
-          <div>{t('files:currentTrack')}: {tracks[selectedTrack].name}</div>
-          <div className="flex items-center justify-between mt-1">
-            <button
-              onClick={async () => await saveCurrentTrack(true)}
-              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-xs"
-              title={t('files:saveChanges')}
-            >
-              {t('files:saveChanges')}
-            </button>
-            {saveStatus && (
-              <span className={`text-xs ${saveStatus === 'Saved!' ? 'text-green-400' : 'text-yellow-400'}`}>
-                {saveStatus}
-              </span>
-            )}
-          </div>
+      {(selectedTrack || activePattern) && (
+        <div className="p-2 border-t border-gray-600 text-xs text-gray-400 space-y-1">
+          {selectedTrack && tracks[selectedTrack] && (
+            <div className="flex items-center justify-between">
+              <div>📝 Editing: {tracks[selectedTrack].name}</div>
+              <button
+                onClick={async () => await saveCurrentTrack(true)}
+                className="px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-xs"
+                title={t('files:saveChanges')}
+              >
+                {t('files:saveChanges')}
+              </button>
+            </div>
+          )}
+          {activePattern && tracks[activePattern] && (
+            <div>🎵 Playing: {tracks[activePattern].name}</div>
+          )}
+          {saveStatus && (
+            <div className={`text-xs ${saveStatus === 'Saved!' ? 'text-green-400' : 'text-yellow-400'}`}>
+              {saveStatus}
+            </div>
+          )}
         </div>
       )}
 

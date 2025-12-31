@@ -9,8 +9,8 @@ const DEFAULT_PRETTIER_CONFIG = {
   printWidth: 120,
   useTabs: false,
   tabWidth: 2,
-  semi: true,
-  singleQuote: true,
+  semi: false, // NEVER add semicolons - they break Strudel code
+  singleQuote: false, // Default to double quotes
   jsxSingleQuote: false,
   trailingComma: 'all',
   bracketSpacing: true,
@@ -32,6 +32,50 @@ export class FormatService {
     this.cache = new Map();
     this.isLoaded = false;
     this.loadPromise = null;
+    this.userSettingsProvider = null;
+  }
+
+  /**
+   * Set a function to provide user settings
+   * @param {Function} provider - Function that returns user settings
+   */
+  setUserSettingsProvider(provider) {
+    this.userSettingsProvider = provider;
+    // Clear cache when settings provider changes
+    this.cache.clear();
+  }
+
+  /**
+   * Get current configuration with user settings applied
+   * @returns {Object} Prettier configuration
+   */
+  getCurrentConfig() {
+    let config = { ...this.config };
+    
+    // Apply user settings if available
+    if (this.userSettingsProvider) {
+      try {
+        const userSettings = this.userSettingsProvider();
+        if (userSettings) {
+          config = {
+            ...config,
+            printWidth: userSettings.prettierPrintWidth || config.printWidth,
+            useTabs: userSettings.prettierUseTabs !== undefined ? userSettings.prettierUseTabs : config.useTabs,
+            tabWidth: userSettings.prettierTabWidth || config.tabWidth,
+            // semi: NEVER allow semicolons to be enabled - they break Strudel code
+            singleQuote: userSettings.prettierSingleQuote !== undefined ? userSettings.prettierSingleQuote : config.singleQuote,
+            quoteProps: userSettings.prettierQuoteProps || config.quoteProps,
+            trailingComma: userSettings.prettierTrailingComma || config.trailingComma,
+            bracketSpacing: userSettings.prettierBracketSpacing !== undefined ? userSettings.prettierBracketSpacing : config.bracketSpacing,
+            arrowParens: userSettings.prettierArrowParens || config.arrowParens,
+          };
+        }
+      } catch (error) {
+        console.warn('[FormatService] Failed to get user settings:', error);
+      }
+    }
+    
+    return config;
   }
 
   /**
@@ -99,8 +143,11 @@ export class FormatService {
       throw new Error('Prettier is not available');
     }
 
-    // Create cache key
-    const cacheKey = JSON.stringify({ code, config: this.config, options });
+    // Get current config with user settings
+    const currentConfig = this.getCurrentConfig();
+    
+    // Create cache key including user settings
+    const cacheKey = JSON.stringify({ code, config: currentConfig, options });
     
     // Check cache first
     if (this.cache.has(cacheKey)) {
@@ -108,18 +155,34 @@ export class FormatService {
     }
 
     try {
-      const formatConfig = { ...this.config, ...options };
+      const formatConfig = { ...currentConfig, ...options };
+      
+      // Pre-process: Temporarily replace $: with a placeholder to prevent Prettier from adding spaces
+      const STRUDEL_LABEL_PLACEHOLDER = 'strudelLabel';
+      const URL_PROTOCOL_PLACEHOLDER = 'URLPROTOCOL';
+      
+      // More comprehensive $: protection - replace the entire $: pattern including what follows
+      let preprocessedCode = code.replace(/\$:\s*/g, STRUDEL_LABEL_PLACEHOLDER + ':');
+      
+      // Protect URLs from being processed incorrectly - replace https:// and http:// with placeholders
+      preprocessedCode = preprocessedCode.replace(/https:\/\//g, URL_PROTOCOL_PLACEHOLDER + 'HTTPS');
+      preprocessedCode = preprocessedCode.replace(/http:\/\//g, URL_PROTOCOL_PLACEHOLDER + 'HTTP');
       
       // Add timeout wrapper
-      const formatPromise = prettier.format(code, formatConfig);
+      const formatPromise = prettier.format(preprocessedCode, formatConfig);
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Formatting timeout')), 5000);
       });
 
       const formatted = await Promise.race([formatPromise, timeoutPromise]);
       
+      // Post-process: Restore $: syntax without spaces and restore URLs
+      let finalFormatted = formatted.replace(new RegExp(STRUDEL_LABEL_PLACEHOLDER + ':', 'g'), '$:');
+      finalFormatted = finalFormatted.replace(new RegExp(URL_PROTOCOL_PLACEHOLDER + 'HTTPS', 'g'), 'https://');
+      finalFormatted = finalFormatted.replace(new RegExp(URL_PROTOCOL_PLACEHOLDER + 'HTTP', 'g'), 'http://');
+      
       // Cache the result
-      this.cache.set(cacheKey, formatted);
+      this.cache.set(cacheKey, finalFormatted);
       
       // Limit cache size
       if (this.cache.size > 100) {
@@ -127,7 +190,7 @@ export class FormatService {
         this.cache.delete(firstKey);
       }
 
-      return formatted;
+      return finalFormatted;
     } catch (error) {
       console.error('[FormatService] Formatting error:', error);
       

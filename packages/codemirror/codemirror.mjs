@@ -41,7 +41,11 @@ const extensions = {
   isTooltipEnabled,
   isSignatureHelpEnabled,
   isLinterEnabled,
-  isPrettierEnabled,
+  isPrettierEnabled: (on, strudelMirror) => {
+    // Create a settings provider that gets current settings from the StrudelMirror instance
+    const settingsProvider = strudelMirror?.getSettings ? () => strudelMirror.getSettings() : null;
+    return isPrettierEnabled(on, settingsProvider);
+  },
   isPatternHighlightingEnabled,
   isActiveLineHighlighted: (on) => (on ? [highlightActiveLine(), highlightActiveLineGutter()] : []),
   isFlashEnabled,
@@ -418,6 +422,14 @@ export class StrudelMirror {
     const cursor = this.getCursorLocation();
     this.setCode(this.code + code);
     this.setCursorLocation(cursor);
+  }
+  getSettings() {
+    // Return current settings for Prettier configuration
+    // This will be called by the format service to get user preferences
+    if (typeof window !== 'undefined' && window.strudelSettings) {
+      return window.strudelSettings;
+    }
+    return null;
   }
 }
 

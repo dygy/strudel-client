@@ -191,11 +191,17 @@ export const prettierFormatOnAutosave = [
 /**
  * Main prettier extension that can be configured
  * @param {boolean} enabled - Whether prettier formatting is enabled
+ * @param {Function} settingsProvider - Optional function to get user settings
  * @returns {Extension[]} - Array of CodeMirror extensions
  */
-export function isPrettierEnabled(enabled) {
+export function isPrettierEnabled(enabled, settingsProvider = null) {
   if (!enabled) {
     return [];
+  }
+
+  // Set the settings provider on the format service
+  if (settingsProvider) {
+    formatService.setUserSettingsProvider(settingsProvider);
   }
 
   return [
