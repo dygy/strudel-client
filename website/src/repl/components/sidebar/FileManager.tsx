@@ -16,6 +16,8 @@ import { useSettings } from '@src/settings';
 import { formatCode } from '@strudel/codemirror';
 import { useActivePattern, setActivePattern } from '@src/user_pattern_utils';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
+import { TrackRouter } from '@src/routing';
+import { tooltipActions } from '@src/stores/tooltipStore';
 
 const TRACKS_STORAGE_KEY = 'strudel_tracks';
 const FOLDERS_STORAGE_KEY = 'strudel_folders';
@@ -52,6 +54,7 @@ interface ReplContext {
   activeCode?: string;
   editorRef?: React.RefObject<{ code: string; setCode?: (code: string) => void }>;
   handleUpdate: (update: { id?: string; code: string; [key: string]: any }, replace?: boolean) => void;
+  trackRouter?: TrackRouter; // Add TrackRouter to context
 }
 
 interface FileManagerProps {
@@ -63,7 +66,6 @@ export function FileManager({ context }: FileManagerProps) {
   const [folders, setFolders] = useState<Record<string, Folder>>({});
   const [isInitialized, setIsInitialized] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null); // Track opened for editing
-  const [hoveredTrack, setHoveredTrack] = useState<string | null>(null); // Track being hovered
   const [isCreating, setIsCreating] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newTrackName, setNewTrackName] = useState('');
@@ -330,12 +332,23 @@ export function FileManager({ context }: FileManagerProps) {
     }
   };
 
-  const handleTrackSelect = (track: Track) => {
+  const handleTrackSelect = async (track: Track) => {
     console.log('FileManager - handleTrackSelect called for:', track.name);
     
     // Save current track before switching if autosave is enabled
     if (isAutosaveEnabled && selectedTrack && selectedTrack !== track.id) {
       saveCurrentTrack(false); // Save without showing toast
+    }
+    
+    // Trigger URL routing if TrackRouter is available
+    if (context.trackRouter) {
+      try {
+        console.log('FileManager - triggering URL routing for track:', track.id);
+        await context.trackRouter.navigateToTrack(track.id);
+      } catch (error) {
+        console.error('FileManager - URL routing failed:', error);
+        // Continue with normal track loading even if routing fails
+      }
     }
     
     // Load the new track immediately
@@ -1610,7 +1623,19 @@ export function FileManager({ context }: FileManagerProps) {
             <button
               onClick={cancelCreate}
               className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-700 rounded"
-              title={t('common:cancel')}
+              onMouseEnter={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                tooltipActions.show({
+                  id: 'cancel-create-track',
+                  content: t('common:cancel'),
+                  position: { x: rect.left + rect.width / 2, y: rect.top },
+                  type: 'info',
+                  delay: 500,
+                });
+              }}
+              onMouseLeave={() => {
+                tooltipActions.hide();
+              }}
             >
               ✕
             </button>
@@ -1642,7 +1667,19 @@ export function FileManager({ context }: FileManagerProps) {
             <button
               onClick={cancelCreate}
               className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-700 rounded"
-              title={t('common:cancel')}
+              onMouseEnter={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                tooltipActions.show({
+                  id: 'cancel-create-folder',
+                  content: t('common:cancel'),
+                  position: { x: rect.left + rect.width / 2, y: rect.top },
+                  type: 'info',
+                  delay: 500,
+                });
+              }}
+              onMouseLeave={() => {
+                tooltipActions.hide();
+              }}
             >
               ✕
             </button>
@@ -1682,7 +1719,19 @@ export function FileManager({ context }: FileManagerProps) {
                 setSelectedStepTrack(null);
               }}
               className="px-2 py-1 text-xs bg-gray-600 hover:bg-gray-700 rounded"
-              title={t('common:cancel')}
+              onMouseEnter={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                tooltipActions.show({
+                  id: 'cancel-create-step',
+                  content: t('common:cancel'),
+                  position: { x: rect.left + rect.width / 2, y: rect.top },
+                  type: 'info',
+                  delay: 500,
+                });
+              }}
+              onMouseLeave={() => {
+                tooltipActions.hide();
+              }}
             >
               ✕
             </button>
@@ -1696,9 +1745,7 @@ export function FileManager({ context }: FileManagerProps) {
         folders={folders}
         selectedTrack={selectedTrack}
         activePattern={activePattern}
-        hoveredTrack={hoveredTrack}
         onTrackSelect={handleTrackSelect}
-        onTrackHover={setHoveredTrack}
         onTrackRename={handleTrackRename}
         onTrackDelete={deleteTrack}
         onTrackDuplicate={duplicateTrack}
@@ -1739,7 +1786,19 @@ export function FileManager({ context }: FileManagerProps) {
               <button
                 onClick={async () => await saveCurrentTrack(true)}
                 className="px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-xs"
-                title={t('files:saveChanges')}
+                onMouseEnter={(event) => {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  tooltipActions.show({
+                    id: 'save-button',
+                    content: t('files:saveChanges'),
+                    position: { x: rect.left + rect.width / 2, y: rect.top },
+                    type: 'info',
+                    delay: 500,
+                  });
+                }}
+                onMouseLeave={() => {
+                  tooltipActions.hide();
+                }}
               >
                 {t('files:saveChanges')}
               </button>

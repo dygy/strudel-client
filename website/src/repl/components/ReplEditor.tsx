@@ -10,6 +10,7 @@ import { WelcomeScreen } from './WelcomeScreen';
 import { useActivePattern, userPattern } from '@src/user_pattern_utils';
 import { DEFAULT_TRACK_CODE, isDefaultCode } from '@src/constants/defaultCode';
 import { GlobalToastContainer } from '@src/components/GlobalToastContainer';
+import { GlobalTooltip } from '@src/components/GlobalTooltip';
 import React, { useState, useEffect } from 'react';
 
 interface ReplContext {
@@ -321,6 +322,9 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
       
       {/* Global Toast Container */}
       <GlobalToastContainer />
+      
+      {/* Global Tooltip */}
+      <GlobalTooltip />
     </div>
   );
 }

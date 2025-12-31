@@ -39,6 +39,7 @@ import { DEFAULT_TRACK_CODE } from '../constants/defaultCode';
 import './Repl.css';
 import { setInterval, clearInterval } from 'worker-timers';
 import { getMetadata } from '../metadata_parser';
+import { TrackRouter } from '../routing';
 
 // Type definitions
 interface ReplState {
@@ -69,6 +70,7 @@ interface ReplContext {
   error?: any;
   editorRef: MutableRefObject<any>;
   containerRef: MutableRefObject<HTMLDivElement | null>;
+  trackRouter?: TrackRouter;
 }
 
 let modulesLoading: Promise<Module[]> | undefined;
@@ -315,6 +317,43 @@ export function useReplContext(): ReplContext {
   const { started, isDirty, error, activeCode, pending } = replState;
   const editorRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  
+  // Initialize TrackRouter
+  const trackRouterRef = useRef<TrackRouter | null>(null);
+  
+  // Initialize TrackRouter on first render
+  useEffect(() => {
+    if (!trackRouterRef.current) {
+      console.log('useReplContext - initializing TrackRouter');
+      trackRouterRef.current = new TrackRouter({
+        onTrackChange: (trackId, previousTrackId) => {
+          console.log('TrackRouter - track changed:', { trackId, previousTrackId });
+          // The FileManager will handle the actual track loading
+        },
+        onNavigationStart: (trackId) => {
+          console.log('TrackRouter - navigation started:', trackId);
+        },
+        onNavigationComplete: (trackId) => {
+          console.log('TrackRouter - navigation completed:', trackId);
+        },
+        onNavigationError: (error, trackId) => {
+          console.error('TrackRouter - navigation error:', error, trackId);
+        },
+      });
+      
+      // Initialize the router
+      trackRouterRef.current.initialize().catch(error => {
+        console.error('TrackRouter - initialization failed:', error);
+      });
+    }
+    
+    return () => {
+      if (trackRouterRef.current) {
+        trackRouterRef.current.destroy();
+        trackRouterRef.current = null;
+      }
+    };
+  }, []);
 
   // this can be simplified once SettingsTab has been refactored to change codemirrorSettings directly!
   // this will be the case when the main repl is being replaced
@@ -430,6 +469,7 @@ export function useReplContext(): ReplContext {
     error,
     editorRef,
     containerRef,
+    trackRouter: trackRouterRef.current,
   };
   return context;
 }

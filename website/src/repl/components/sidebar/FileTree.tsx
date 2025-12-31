@@ -14,6 +14,7 @@ import {
 import { useTranslation } from '@src/i18n';
 import { WorkingContextMenu } from '../ui/WorkingContextMenu';
 import { BurgerMenuButton } from '../ui/BurgerMenuButton';
+import { tooltipActions } from '@src/stores/tooltipStore';
 
 interface ContextMenuItem {
   label: string
@@ -66,9 +67,7 @@ interface FileTreeProps {
   folders: Record<string, Folder>;
   selectedTrack: string | null; // Track opened for editing
   activePattern: string; // Track currently playing
-  hoveredTrack: string | null; // Track being hovered
   onTrackSelect: (track: Track) => void;
-  onTrackHover: (trackId: string | null) => void;
   onTrackRename: (trackId: string) => void;
   onTrackDelete: (trackId: string) => void;
   onTrackDuplicate: (track: Track) => void;
@@ -102,9 +101,7 @@ export function FileTree({
   folders,
   selectedTrack,
   activePattern,
-  hoveredTrack,
   onTrackSelect,
-  onTrackHover,
   onTrackRename,
   onTrackDelete,
   onTrackDuplicate,
@@ -349,10 +346,41 @@ export function FileTree({
     const hasSteps = node.type === 'track' && (node.data as Track).isMultitrack && (node.data as Track).steps && (node.data as Track).steps!.length > 0;
     const isSelected = node.type === 'track' && selectedTrack === node.id; // Opened for editing
     const isPlaying = node.type === 'track' && activePattern === node.id; // Currently playing
-    const isHovered = node.type === 'track' && hoveredTrack === node.id; // Being hovered
     
     const isRenaming = (node.type === 'track' && renamingTrack === node.id) ||
                       (node.type === 'folder' && renamingFolder === node.path);
+
+    // Create tooltip props manually for tracks without using hooks
+    const getTooltipProps = () => {
+      if (node.type !== 'track' || isRenaming) {
+        return {};
+      }
+
+      const track = node.data as Track;
+      return {
+        onMouseEnter: (event: React.MouseEvent) => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          tooltipActions.show({
+            id: `track-${track.id}`,
+            content: React.createElement('div', null,
+              React.createElement('div', { className: 'font-medium' }, track.name),
+              track.modified && React.createElement('div', { className: 'text-xs opacity-75 mt-1' },
+                `Modified: ${new Date(track.modified).toLocaleDateString()}`
+              )
+            ),
+            position: {
+              x: rect.left + rect.width / 2,
+              y: rect.top,
+            },
+            type: 'info',
+            delay: 300,
+          });
+        },
+        onMouseLeave: () => {
+          tooltipActions.hide();
+        },
+      };
+    };
 
     return (
       <div key={node.id}>
@@ -366,7 +394,6 @@ export function FileTree({
             className={`group flex items-center py-1 px-2 cursor-pointer ${
               isSelected ? 'bg-selection' : // Opened for editing (blue background)
               isPlaying ? 'bg-green-600/30 border-l-2 border-green-500' : // Currently playing (green accent)
-              isHovered ? 'bg-gray-500' : // Hovered (gray background)
               'hover:bg-gray-600' // Default hover
             } ${draggedItem?.id === node.id ? 'opacity-50' : ''}`}
             style={{ paddingLeft: `${depth * 16 + 8}px` }}
@@ -374,8 +401,7 @@ export function FileTree({
             onDragStart={(e) => handleDragStart(e, node)}
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, node)}
-            onMouseEnter={() => node.type === 'track' && onTrackHover(node.id)}
-            onMouseLeave={() => node.type === 'track' && onTrackHover(null)}
+            {...getTooltipProps()}
             onClick={() => {
               if (node.type === 'folder') {
                 toggleFolder(node.path!);
