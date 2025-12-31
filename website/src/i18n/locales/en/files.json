@@ -90,5 +90,10 @@
   "activeStep": "Active Step",
   "newMultitrack": "New Multitrack",
   "multitrackCreated": "Multitrack created successfully!",
-  "stepRenamed": "Step renamed successfully!"
+  "stepRenamed": "Step renamed successfully!",
+  "multitrackImported": "Multitrack '{{name}}' imported successfully!",
+  "invalidMultitrackFile": "Invalid multitrack file format",
+  "noValidStepsFound": "No valid steps found in multitrack file",
+  "multitrackImportFailed": "Failed to import multitrack file",
+  "invalidZipFile": "Invalid ZIP file format"
 }

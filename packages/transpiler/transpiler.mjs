@@ -29,11 +29,6 @@ export function transpiler(input, options = {}) {
 
   let miniLocations = [];
   const collectMiniLocations = (value, node) => {
-    // Skip URLs to prevent parsing them as mini notation
-    if (typeof value === 'string' && (value.includes('http://') || value.includes('https://'))) {
-      return;
-    }
-    
     const minilang = languages.get('minilang');
     if (minilang) {
       const code = `[${value}]`;
@@ -73,22 +68,12 @@ export function transpiler(input, options = {}) {
       if (isBackTickString(node, parent)) {
         const { quasis } = node;
         const { raw } = quasis[0].value;
-        // Skip URLs to prevent parsing them as mini notation
-        if (typeof raw === 'string' && (raw.includes('http://') || raw.includes('https://'))) {
-          this.skip();
-          return; // Don't process URLs as mini notation
-        }
         this.skip();
         emitMiniLocations && collectMiniLocations(raw, node);
         return this.replace(miniWithLocation(raw, node));
       }
       if (isStringWithDoubleQuotes(node)) {
         const { value } = node;
-        // Skip URLs to prevent parsing them as mini notation
-        if (typeof value === 'string' && (value.includes('http://') || value.includes('https://'))) {
-          this.skip();
-          return; // Don't process URLs as mini notation
-        }
         this.skip();
         emitMiniLocations && collectMiniLocations(value, node);
         return this.replace(miniWithLocation(value, node));

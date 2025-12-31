@@ -27,7 +27,6 @@ import { radioPlugin, updateRadioWidgets } from './radio.mjs';
 import { widgetPlugin, updateWidgets } from './widget.mjs';
 import { isSignatureHelpEnabled } from './signature.mjs';
 import { isLinterEnabled } from './diagnostics.mjs';
-import { isPrettierEnabled } from './prettier.mjs';
 import { persistentAtom } from '@nanostores/persistent';
 import { basicSetup } from './basicSetup.mjs';
 
@@ -41,11 +40,6 @@ const extensions = {
   isTooltipEnabled,
   isSignatureHelpEnabled,
   isLinterEnabled,
-  isPrettierEnabled: (on, strudelMirror) => {
-    // Create a settings provider that gets current settings from the StrudelMirror instance
-    const settingsProvider = strudelMirror?.getSettings ? () => strudelMirror.getSettings() : null;
-    return isPrettierEnabled(on, settingsProvider);
-  },
   isPatternHighlightingEnabled,
   isActiveLineHighlighted: (on) => (on ? [highlightActiveLine(), highlightActiveLineGutter()] : []),
   isFlashEnabled,
@@ -164,13 +158,10 @@ export function initEditor({ initialCode = '', onChange, onEvaluate, onStop, roo
             key: 'Mod-s',
             preventDefault: true,
             run: (view) => {
-              // Dispatch save event on the editor view for prettier integration
+              // Dispatch save event for FileManager
               const saveEvent = new CustomEvent('strudel-save', {
                 detail: { source: 'keyboard' }
               });
-              view.dom.dispatchEvent(saveEvent);
-
-              // Also dispatch on document for FileManager
               document.dispatchEvent(saveEvent);
               return true;
             },
@@ -422,14 +413,6 @@ export class StrudelMirror {
     const cursor = this.getCursorLocation();
     this.setCode(this.code + code);
     this.setCursorLocation(cursor);
-  }
-  getSettings() {
-    // Return current settings for Prettier configuration
-    // This will be called by the format service to get user preferences
-    if (typeof window !== 'undefined' && window.strudelSettings) {
-      return window.strudelSettings;
-    }
-    return null;
   }
 }
 

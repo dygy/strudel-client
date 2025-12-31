@@ -43,15 +43,38 @@ export class URLParser {
   }
 
   /**
-   * Update URL with new track ID
+   * Get current step from URL
    */
-  static updateTrackInURL(trackId: string | null, replace: boolean = false): void {
+  static getCurrentStep(): number | null {
+    const params = this.parseQueryParams();
+    const step = params.step;
+    if (step && !isNaN(parseInt(step))) {
+      const stepNum = parseInt(step);
+      // Only return valid step numbers (>= 0)
+      return stepNum >= 0 ? stepNum : null;
+    }
+    return null;
+  }
+
+  /**
+   * Update URL with new track ID and optional step
+   */
+  static updateTrackInURL(trackId: string | null, replace: boolean = false, step?: number): void {
     const currentParams = this.parseQueryParams();
     
     if (trackId) {
       currentParams.track = trackId;
+      
+      // Add step parameter if provided
+      if (step !== undefined && step >= 0) {
+        currentParams.step = step.toString();
+      } else {
+        // Remove step parameter if not provided or invalid
+        delete currentParams.step;
+      }
     } else {
       delete currentParams.track;
+      delete currentParams.step;
     }
     
     const queryString = this.buildQueryString(currentParams);

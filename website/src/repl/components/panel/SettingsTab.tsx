@@ -193,16 +193,6 @@ export function SettingsTab({ started }: SettingsTabProps) {
     multiChannelOrbits,
     isTabIndentationEnabled,
     isMultiCursorEnabled,
-    isPrettierEnabled,
-    prettierTabWidth,
-    prettierUseTabs,
-    prettierSemi,
-    prettierSingleQuote,
-    prettierQuoteProps,
-    prettierTrailingComma,
-    prettierBracketSpacing,
-    prettierArrowParens,
-    prettierPrintWidth,
     language,
     isAutosaveEnabled,
     autosaveInterval,
@@ -363,119 +353,6 @@ export function SettingsTab({ started }: SettingsTabProps) {
             onChange={(value) => settingsMap.setKey('togglePanelTrigger', value)}
             items={{ click: t('click'), hover: t('hover') }}
           />
-        </FormItem>
-
-        <FormItem label={t('codeFormatting')} sublabel={t('prettierDescription')}>
-          <div className="space-y-4">
-            <Checkbox
-              label={t('prettierEnabled')}
-              onChange={(cbEvent) => settingsMap.setKey('isPrettierEnabled', cbEvent.target.checked)}
-              value={isPrettierEnabled}
-            />
-            
-            {isPrettierEnabled && (
-              <div className="space-y-4 bg-opacity-20 rounded-lg p-4 border border-lineHighlight border-opacity-20">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {t('prettierTabWidth')}
-                    </label>
-                    <NumberSlider
-                      value={prettierTabWidth}
-                      onChange={(value) => settingsMap.setKey('prettierTabWidth', value)}
-                      min={1}
-                      max={8}
-                      step={1}
-                    />
-                    <p className="text-xs text-foreground opacity-60 mt-1">{t('prettierTabWidthDescription')}</p>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {t('prettierPrintWidth')}
-                    </label>
-                    <NumberSlider
-                      value={prettierPrintWidth}
-                      onChange={(value) => settingsMap.setKey('prettierPrintWidth', value)}
-                      min={40}
-                      max={200}
-                      step={10}
-                    />
-                    <p className="text-xs text-foreground opacity-60 mt-1">{t('prettierPrintWidthDescription')}</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Checkbox
-                    label={t('prettierUseTabs')}
-                    onChange={(cbEvent) => settingsMap.setKey('prettierUseTabs', cbEvent.target.checked)}
-                    value={prettierUseTabs}
-                  />
-                  <Checkbox
-                    label={t('prettierSemi')}
-                    onChange={(cbEvent) => settingsMap.setKey('prettierSemi', cbEvent.target.checked)}
-                    value={prettierSemi}
-                  />
-                  <Checkbox
-                    label={t('prettierSingleQuote')}
-                    onChange={(cbEvent) => settingsMap.setKey('prettierSingleQuote', cbEvent.target.checked)}
-                    value={prettierSingleQuote}
-                  />
-                  <Checkbox
-                    label={t('prettierBracketSpacing')}
-                    onChange={(cbEvent) => settingsMap.setKey('prettierBracketSpacing', cbEvent.target.checked)}
-                    value={prettierBracketSpacing}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {t('prettierQuoteProps')}
-                    </label>
-                    <SelectInput
-                      options={{
-                        'as-needed': t('prettierQuotePropsAsNeeded'),
-                        'consistent': t('prettierQuotePropsConsistent'),
-                        'preserve': t('prettierQuotePropsPreserve')
-                      }}
-                      value={prettierQuoteProps}
-                      onChange={(value) => settingsMap.setKey('prettierQuoteProps', value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {t('prettierTrailingComma')}
-                    </label>
-                    <SelectInput
-                      options={{
-                        'none': t('prettierTrailingCommaNone'),
-                        'es5': t('prettierTrailingCommaEs5'),
-                        'all': t('prettierTrailingCommaAll')
-                      }}
-                      value={prettierTrailingComma}
-                      onChange={(value) => settingsMap.setKey('prettierTrailingComma', value)}
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    {t('prettierArrowParens')}
-                  </label>
-                  <SelectInput
-                    options={{
-                      'avoid': t('prettierArrowParensAvoid'),
-                      'always': t('prettierArrowParensAlways')
-                    }}
-                    value={prettierArrowParens}
-                    onChange={(value) => settingsMap.setKey('prettierArrowParens', value)}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
         </FormItem>
 
         <FormItem label={t('moreSettings')}>

@@ -5,7 +5,7 @@ import { NavigationStateManager, type NavigationState } from './NavigationState'
  * Track routing configuration
  */
 export interface TrackRouterConfig {
-  onTrackChange?: (trackId: string | null, previousTrackId: string | null) => void;
+  onTrackChange?: (trackId: string | null, previousTrackId: string | null, step?: number) => void;
   onNavigationStart?: (trackId: string) => void;
   onNavigationComplete?: (trackId: string) => void;
   onNavigationError?: (error: Error, trackId: string) => void;
@@ -36,12 +36,13 @@ export class TrackRouter {
     }
 
     try {
-      // Get track ID from URL
+      // Get track ID and step from URL
       const trackId = URLParser.getCurrentTrackId();
+      const step = URLParser.getCurrentStep();
       
       if (trackId) {
-        console.log('TrackRouter: Restoring track from URL:', trackId);
-        await this.navigateToTrack(trackId, { replace: true, skipUrlUpdate: true });
+        console.log('TrackRouter: Restoring track from URL:', trackId, step !== null ? `step ${step}` : '');
+        await this.navigateToTrack(trackId, { replace: true, skipUrlUpdate: true, step: step || undefined });
       }
       
       this.isInitialized = true;
@@ -53,7 +54,7 @@ export class TrackRouter {
   }
 
   /**
-   * Navigate to a specific track
+   * Navigate to a specific track with optional step
    */
   async navigateToTrack(
     trackId: string, 
@@ -61,9 +62,10 @@ export class TrackRouter {
       replace?: boolean; 
       skipUrlUpdate?: boolean;
       skipPlaybackChange?: boolean;
+      step?: number;
     } = {}
   ): Promise<void> {
-    const { replace = false, skipUrlUpdate = false, skipPlaybackChange = false } = options;
+    const { replace = false, skipUrlUpdate = false, skipPlaybackChange = false, step } = options;
     
     try {
       // Start navigation
@@ -78,12 +80,12 @@ export class TrackRouter {
       
       // Update URL if not skipped
       if (!skipUrlUpdate) {
-        URLParser.updateTrackInURL(trackId, replace);
+        URLParser.updateTrackInURL(trackId, replace, step);
         this.updatePageTitle(trackId);
       }
       
       // Notify track change
-      this.config.onTrackChange?.(trackId, previousTrackId);
+      this.config.onTrackChange?.(trackId, previousTrackId, step);
       
       // Complete navigation
       this.navigationState.setNavigating(false);
@@ -126,7 +128,7 @@ export class TrackRouter {
       this.updatePageTitle(null);
       
       // Notify change
-      this.config.onTrackChange?.(null, previousTrackId);
+      this.config.onTrackChange?.(null, previousTrackId, undefined);
       
       this.navigationState.setNavigating(false);
       console.log('TrackRouter: Cleared current track');
@@ -172,14 +174,18 @@ export class TrackRouter {
     window.addEventListener('popstate', async (event) => {
       try {
         const trackId = URLParser.getCurrentTrackId();
+        const step = URLParser.getCurrentStep();
         const currentState = this.navigationState.getState();
         
-        // Only navigate if track actually changed
-        if (trackId !== currentState.currentTrackId) {
-          console.log('TrackRouter: Browser navigation detected, navigating to:', trackId);
+        // Check if track or step changed
+        const trackChanged = trackId !== currentState.currentTrackId;
+        const stepChanged = step !== null; // If step is in URL, we need to handle it
+        
+        if (trackChanged || stepChanged) {
+          console.log('TrackRouter: Browser navigation detected, navigating to:', trackId, step !== null ? `step ${step}` : '');
           
           if (trackId) {
-            await this.navigateToTrack(trackId, { skipUrlUpdate: true });
+            await this.navigateToTrack(trackId, { skipUrlUpdate: true, step: step || undefined });
           } else {
             await this.clearCurrentTrack(true);
           }

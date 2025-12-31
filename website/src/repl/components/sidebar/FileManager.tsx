@@ -13,7 +13,6 @@ import { ConfirmModal } from '../ui/ConfirmModal';
 import { toastActions } from '@src/stores/toastStore';
 import { BurgerMenuButton } from '../ui/BurgerMenuButton';
 import { useSettings } from '@src/settings';
-import { formatCode } from '@strudel/codemirror';
 import { useActivePattern, setActivePattern } from '@src/user_pattern_utils';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 import { TrackRouter } from '@src/routing';
@@ -80,7 +79,7 @@ export function FileManager({ context }: FileManagerProps) {
   const [infoModalData, setInfoModalData] = useState<{ title: string; items: Array<{ label: string; value: string }> }>({ title: '', items: [] });
 
   // Autosave functionality
-  const { isAutosaveEnabled, autosaveInterval, isPrettierEnabled } = useSettings();
+  const { isAutosaveEnabled, autosaveInterval } = useSettings();
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const autosaveTrackIdRef = useRef<string | null>(null); // Track which track the autosave is for
   const lastSavedCodeRef = useRef<string>('');
@@ -335,9 +334,19 @@ export function FileManager({ context }: FileManagerProps) {
   const handleTrackSelect = async (track: Track) => {
     console.log('FileManager - handleTrackSelect called for:', track.name);
     
-    // Save current track before switching if autosave is enabled
+    // CRITICAL: Save current track before switching if autosave is enabled
+    // This prevents saving old code to the new track
     if (isAutosaveEnabled && selectedTrack && selectedTrack !== track.id) {
-      saveCurrentTrack(false); // Save without showing toast
+      console.log('FileManager - force saving current track before switching:', tracks[selectedTrack]?.name);
+      await saveCurrentTrack(false); // AWAIT the save to complete before switching
+    }
+    
+    // Clear autosave timer to prevent any pending saves
+    if (autosaveTimerRef.current) {
+      clearInterval(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+      autosaveTrackIdRef.current = null;
+      console.log('FileManager - cleared autosave timer before track switch');
     }
     
     // Trigger URL routing if TrackRouter is available
@@ -604,6 +613,9 @@ export function FileManager({ context }: FileManagerProps) {
     console.log('FileManager - loadTrack called for:', track.name, track.id);
     setSelectedTrack(track.id);
 
+    // Update the last saved code reference immediately to prevent autosave issues
+    lastSavedCodeRef.current = track.code;
+
     // Only update CodeMirror editor content and UI state - NO PLAYBACK
     const applyTrackCode = () => {
       console.log('FileManager - applying track code to editor (no playback):', track.code.substring(0, 50) + '...');
@@ -617,6 +629,9 @@ export function FileManager({ context }: FileManagerProps) {
         console.log('FileManager - directly setting code in editor (no evaluation)');
         context.editorRef.current.setCode(track.code);
       }
+      
+      // Update last saved code reference after setting the code
+      lastSavedCodeRef.current = track.code;
     };
 
     // Apply immediately if editor is ready
@@ -653,13 +668,6 @@ export function FileManager({ context }: FileManagerProps) {
       return false;
     }
 
-    // Get current code from the editor
-    let currentCode = context.editorRef?.current?.code || context.activeCode || '';
-    if (!currentCode.trim()) {
-      if (showToast) toastActions.warning(t('files:noCodeToSave'));
-      return false;
-    }
-
     // CRITICAL: Only save if this track is currently being edited
     // This prevents saving old code to a different track
     if (selectedTrack !== trackId) {
@@ -667,25 +675,25 @@ export function FileManager({ context }: FileManagerProps) {
       return false;
     }
 
-    // Format code with Prettier if enabled
-    if (isPrettierEnabled) {
-      try {
-        const formattedCode = await formatCode(currentCode);
-        if (formattedCode !== currentCode) {
-          currentCode = formattedCode;
-          // Update the editor with formatted code
-          if (context.editorRef?.current?.setCode) {
-            context.editorRef.current.setCode(formattedCode);
-          }
-        }
-      } catch (error) {
-        console.warn('[FileManager] Prettier formatting failed:', error);
-        // Continue with unformatted code if formatting fails
-      }
+    // Get current code from the editor
+    let currentCode = context.editorRef?.current?.code || context.activeCode || '';
+    if (!currentCode.trim()) {
+      if (showToast) toastActions.warning(t('files:noCodeToSave'));
+      return false;
     }
 
     // Don't save if code hasn't changed
     if (currentCode === lastSavedCodeRef.current) {
+      return false;
+    }
+
+    // Additional safety check: ensure the editor content matches what we expect for this track
+    const expectedCode = tracks[trackId].code;
+    if (lastSavedCodeRef.current !== expectedCode && lastSavedCodeRef.current !== currentCode) {
+      console.warn('FileManager - saveSpecificTrack: code mismatch detected, skipping save to prevent corruption');
+      console.warn('FileManager - expected:', expectedCode.substring(0, 50));
+      console.warn('FileManager - lastSaved:', lastSavedCodeRef.current.substring(0, 50));
+      console.warn('FileManager - current:', currentCode.substring(0, 50));
       return false;
     }
 
@@ -709,7 +717,7 @@ export function FileManager({ context }: FileManagerProps) {
     }
 
     return true;
-  }, [tracks, context, t, isPrettierEnabled, selectedTrack]);
+  }, [tracks, context, t, selectedTrack]);
 
   // Autosave effect
   useEffect(() => {
@@ -921,7 +929,7 @@ export function FileManager({ context }: FileManagerProps) {
     toastActions.success(t('files:stepAdded'));
   };
 
-  const switchToStep = (trackId: string, stepIndex: number) => {
+  const switchToStep = async (trackId: string, stepIndex: number) => {
     const track = tracks[trackId];
     if (!track || !track.isMultitrack || !track.steps) return;
 
@@ -968,6 +976,16 @@ export function FileManager({ context }: FileManagerProps) {
     
     console.log('FileManager - loading step code:', track.steps[stepIndex].code.substring(0, 50) + '...');
     loadTrack(updatedTrack);
+    
+    // Update URL with step information if TrackRouter is available
+    if (context.trackRouter && selectedTrack === trackId) {
+      try {
+        console.log('FileManager - updating URL for step:', stepIndex);
+        await context.trackRouter.navigateToTrack(trackId, { step: stepIndex, replace: true, skipUrlUpdate: false });
+      } catch (error) {
+        console.error('FileManager - Failed to update URL for step:', error);
+      }
+    }
   };
 
   const startRenameStep = (trackId: string, stepIndex: number) => {
@@ -1183,8 +1201,84 @@ export function FileManager({ context }: FileManagerProps) {
   const importTrack = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    processFileImport(file);
+    
+    // Handle ZIP files (multitrack)
+    if (file.name.endsWith('.zip')) {
+      processMultitrackImport(file);
+    } else {
+      // Handle single files
+      processFileImport(file);
+    }
+    
     event.target.value = ''; // Reset input
+  };
+
+  const processMultitrackImport = async (file: File) => {
+    try {
+      const JSZip = (await import('jszip')).default;
+      const zip = await JSZip.loadAsync(file);
+      
+      // Look for metadata.json to identify multitrack structure
+      const metadataFile = zip.file('metadata.json');
+      if (!metadataFile) {
+        toastActions.error(t('files:invalidMultitrackFile'));
+        return;
+      }
+      
+      const metadataContent = await metadataFile.async('text');
+      const metadata = JSON.parse(metadataContent);
+      
+      if (!metadata.isMultitrack || !metadata.steps) {
+        toastActions.error(t('files:invalidMultitrackFile'));
+        return;
+      }
+      
+      // Create new track ID
+      const trackId = Date.now().toString();
+      
+      // Load step files
+      const steps = [];
+      for (const stepMeta of metadata.steps) {
+        const stepFileName = `${stepMeta.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
+        const stepFile = zip.file(stepFileName);
+        
+        if (stepFile) {
+          const stepCode = await stepFile.async('text');
+          steps.push({
+            id: `${trackId}-step-${steps.length + 1}`,
+            name: stepMeta.name,
+            code: stepCode,
+            created: stepMeta.created || new Date().toISOString(),
+            modified: stepMeta.modified || new Date().toISOString(),
+          });
+        }
+      }
+      
+      if (steps.length === 0) {
+        toastActions.error(t('files:noValidStepsFound'));
+        return;
+      }
+      
+      // Create multitrack
+      const newTrack: Track = {
+        id: trackId,
+        name: metadata.name || file.name.replace('.zip', ''),
+        code: steps[0].code, // Use first step's code as main code
+        created: new Date().toISOString(),
+        modified: new Date().toISOString(),
+        isMultitrack: true,
+        steps: steps,
+        activeStep: metadata.activeStep || 0,
+      };
+      
+      setTracks(prev => ({ ...prev, [trackId]: newTrack }));
+      loadTrack(newTrack);
+      toastActions.success(t('files:multitrackImported', { name: newTrack.name }));
+      
+    } catch (error) {
+      console.error('Failed to import multitrack:', error);
+      toastActions.error(t('files:multitrackImportFailed'));
+    }
   };
 
   const processFileImport = (file: File, targetFolder?: string) => {
@@ -1229,10 +1323,40 @@ export function FileManager({ context }: FileManagerProps) {
 
     const files = Array.from(e.dataTransfer.files);
 
-    // Check for ZIP files first (library import)
+    // Check for ZIP files - could be library or multitrack
     const zipFiles = files.filter(file => file.name.endsWith('.zip'));
     if (zipFiles.length > 0) {
-      zipFiles.forEach(file => processLibraryImport(file));
+      zipFiles.forEach(async (file) => {
+        // Try to determine if it's a multitrack or library by checking contents
+        try {
+          const JSZip = (await import('jszip')).default;
+          const zip = await JSZip.loadAsync(file);
+          
+          // Check if it has metadata.json (multitrack)
+          const metadataFile = zip.file('metadata.json');
+          if (metadataFile) {
+            const metadataContent = await metadataFile.async('text');
+            const metadata = JSON.parse(metadataContent);
+            if (metadata.isMultitrack) {
+              processMultitrackImport(file);
+              return;
+            }
+          }
+          
+          // Check if it has library.json (library export)
+          const libraryFile = zip.file('library.json');
+          if (libraryFile) {
+            processLibraryImport(file);
+            return;
+          }
+          
+          // Default to library import for other ZIP files
+          processLibraryImport(file);
+        } catch (error) {
+          console.error('Failed to analyze ZIP file:', error);
+          toastActions.error(t('files:invalidZipFile'));
+        }
+      });
       return;
     }
 
@@ -1585,7 +1709,7 @@ export function FileManager({ context }: FileManagerProps) {
         <input
           id="file-import-input"
           type="file"
-          accept=".js,.txt"
+          accept=".js,.txt,.zip"
           onChange={importTrack}
           className="hidden"
         />

@@ -51,16 +51,6 @@ export interface Settings {
   isPatternHighlightingEnabled: boolean;
   isTabIndentationEnabled: boolean;
   isMultiCursorEnabled: boolean;
-  isPrettierEnabled: boolean;
-  prettierTabWidth: number;
-  prettierUseTabs: boolean;
-  prettierSemi: boolean;
-  prettierSingleQuote: boolean;
-  prettierQuoteProps: 'as-needed' | 'consistent' | 'preserve';
-  prettierTrailingComma: 'none' | 'es5' | 'all';
-  prettierBracketSpacing: boolean;
-  prettierArrowParens: 'avoid' | 'always';
-  prettierPrintWidth: number;
   theme: Theme;
   fontFamily: string;
   fontSize: number;
@@ -103,16 +93,6 @@ export interface RawSettings {
   isPatternHighlightingEnabled: boolean | string;
   isTabIndentationEnabled: boolean | string;
   isMultiCursorEnabled: boolean | string;
-  isPrettierEnabled: boolean | string;
-  prettierTabWidth: number | string;
-  prettierUseTabs: boolean | string;
-  prettierSemi: boolean | string;
-  prettierSingleQuote: boolean | string;
-  prettierQuoteProps: 'as-needed' | 'consistent' | 'preserve';
-  prettierTrailingComma: 'none' | 'es5' | 'all';
-  prettierBracketSpacing: boolean | string;
-  prettierArrowParens: 'avoid' | 'always';
-  prettierPrintWidth: number | string;
   theme: Theme;
   fontFamily: string;
   fontSize: number | string;
@@ -169,16 +149,6 @@ export const defaultSettings: RawSettings = {
   isPatternHighlightingEnabled: true,
   isTabIndentationEnabled: true, // Enable tab indentation
   isMultiCursorEnabled: true, // Enable multi-cursor editing
-  isPrettierEnabled: false, // Conservative default - let users opt in
-  prettierTabWidth: 2,
-  prettierUseTabs: false,
-  prettierSemi: true,
-  prettierSingleQuote: false,
-  prettierQuoteProps: 'as-needed',
-  prettierTrailingComma: 'es5',
-  prettierBracketSpacing: true,
-  prettierArrowParens: 'always',
-  prettierPrintWidth: 80,
   theme: 'strudelTheme',
   fontFamily: 'monospace',
   fontSize: 18,
@@ -250,16 +220,6 @@ if (typeof window !== 'undefined') {
         isBracketMatchingEnabled: currentSettings.isBracketMatchingEnabled === undefined ? true : parseBoolean(currentSettings.isBracketMatchingEnabled),
         isTabIndentationEnabled: currentSettings.isTabIndentationEnabled === undefined ? true : parseBoolean(currentSettings.isTabIndentationEnabled),
         isMultiCursorEnabled: currentSettings.isMultiCursorEnabled === undefined ? true : parseBoolean(currentSettings.isMultiCursorEnabled),
-        isPrettierEnabled: currentSettings.isPrettierEnabled === undefined ? false : parseBoolean(currentSettings.isPrettierEnabled),
-        prettierTabWidth: currentSettings.prettierTabWidth === undefined ? 2 : Number(currentSettings.prettierTabWidth),
-        prettierUseTabs: currentSettings.prettierUseTabs === undefined ? false : parseBoolean(currentSettings.prettierUseTabs),
-        prettierSemi: currentSettings.prettierSemi === undefined ? true : parseBoolean(currentSettings.prettierSemi),
-        prettierSingleQuote: currentSettings.prettierSingleQuote === undefined ? false : parseBoolean(currentSettings.prettierSingleQuote),
-        prettierQuoteProps: currentSettings.prettierQuoteProps === undefined ? 'as-needed' : currentSettings.prettierQuoteProps,
-        prettierTrailingComma: currentSettings.prettierTrailingComma === undefined ? 'es5' : currentSettings.prettierTrailingComma,
-        prettierBracketSpacing: currentSettings.prettierBracketSpacing === undefined ? true : parseBoolean(currentSettings.prettierBracketSpacing),
-        prettierArrowParens: currentSettings.prettierArrowParens === undefined ? 'always' : currentSettings.prettierArrowParens,
-        prettierPrintWidth: currentSettings.prettierPrintWidth === undefined ? 80 : Number(currentSettings.prettierPrintWidth),
       };
 
       settingsMap.set(updated);
@@ -312,16 +272,6 @@ export function useSettings(): Settings {
     isSyncEnabled: isUdels() ? true : parseBoolean(state.isSyncEnabled),
     isTabIndentationEnabled: parseBoolean(state.isTabIndentationEnabled),
     isMultiCursorEnabled: parseBoolean(state.isMultiCursorEnabled),
-    isPrettierEnabled: parseBoolean(state.isPrettierEnabled),
-    prettierTabWidth: Number(state.prettierTabWidth),
-    prettierUseTabs: parseBoolean(state.prettierUseTabs),
-    prettierSemi: parseBoolean(state.prettierSemi),
-    prettierSingleQuote: parseBoolean(state.prettierSingleQuote),
-    prettierQuoteProps: state.prettierQuoteProps as 'as-needed' | 'consistent' | 'preserve',
-    prettierTrailingComma: state.prettierTrailingComma as 'none' | 'es5' | 'all',
-    prettierBracketSpacing: parseBoolean(state.prettierBracketSpacing),
-    prettierArrowParens: state.prettierArrowParens as 'avoid' | 'always',
-    prettierPrintWidth: Number(state.prettierPrintWidth),
     isAutosaveEnabled: parseBoolean(state.isAutosaveEnabled),
     fontSize: Number(state.fontSize),
     panelPosition: (state.activeFooter !== '' && !isUdels() ? state.panelPosition : 'bottom') as PanelPosition, // <-- keep this 'bottom' where it is!
