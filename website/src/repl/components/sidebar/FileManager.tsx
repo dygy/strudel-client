@@ -80,6 +80,7 @@ export function FileManager({ context }: FileManagerProps) {
   // Autosave functionality
   const { isAutosaveEnabled, autosaveInterval, isPrettierEnabled } = useSettings();
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autosaveTrackIdRef = useRef<string | null>(null); // Track which track the autosave is for
   const lastSavedCodeRef = useRef<string>('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
@@ -528,11 +529,26 @@ export function FileManager({ context }: FileManagerProps) {
 
   const saveCurrentTrack = useCallback(async (showToast: boolean = true) => {
     if (!selectedTrack) return false;
+    return await saveSpecificTrack(selectedTrack, showToast);
+  }, [selectedTrack]);
+
+  const saveSpecificTrack = useCallback(async (trackId: string, showToast: boolean = true) => {
+    if (!trackId || !tracks[trackId]) {
+      console.warn('FileManager - saveSpecificTrack: invalid track ID:', trackId);
+      return false;
+    }
 
     // Get current code from the editor
     let currentCode = context.editorRef?.current?.code || context.activeCode || '';
     if (!currentCode.trim()) {
       if (showToast) toast.warning(t('files:noCodeToSave'));
+      return false;
+    }
+
+    // CRITICAL: Only save if this track is currently being edited
+    // This prevents saving old code to a different track
+    if (selectedTrack !== trackId) {
+      console.log('FileManager - saveSpecificTrack: track changed, skipping autosave for:', tracks[trackId]?.name);
       return false;
     }
 
@@ -558,10 +574,12 @@ export function FileManager({ context }: FileManagerProps) {
       return false;
     }
 
+    console.log('FileManager - saving to track:', tracks[trackId]?.name, 'ID:', trackId);
+
     setTracks(prev => ({
       ...prev,
-      [selectedTrack]: {
-        ...prev[selectedTrack],
+      [trackId]: {
+        ...prev[trackId],
         code: currentCode,
         modified: new Date().toISOString()
       }
@@ -576,7 +594,7 @@ export function FileManager({ context }: FileManagerProps) {
     }
 
     return true;
-  }, [selectedTrack, context, t, toast, isPrettierEnabled]);
+  }, [tracks, context, t, toast, isPrettierEnabled, selectedTrack]);
 
   // Autosave effect
   useEffect(() => {
@@ -584,25 +602,42 @@ export function FileManager({ context }: FileManagerProps) {
       if (autosaveTimerRef.current) {
         clearInterval(autosaveTimerRef.current);
         autosaveTimerRef.current = null;
+        autosaveTrackIdRef.current = null;
       }
       return;
     }
 
-    // Set up autosave timer
-    autosaveTimerRef.current = setInterval(async () => {
-      const saved = await saveCurrentTrack(false); // Don't show toast for autosave
-      if (saved) {
-        setSaveStatus('Auto-saved');
-        setTimeout(() => setSaveStatus(''), 1500);
-      }
-    }, autosaveInterval);
+    // Clear existing timer if it's for a different track
+    if (autosaveTimerRef.current && autosaveTrackIdRef.current !== selectedTrack) {
+      clearInterval(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+
+    // Set up autosave timer for the current track
+    if (!autosaveTimerRef.current) {
+      const trackIdForAutosave = selectedTrack; // Capture the track ID at timer creation
+      autosaveTrackIdRef.current = trackIdForAutosave;
+      
+      console.log('FileManager - setting up autosave for track:', tracks[trackIdForAutosave]?.name);
+      
+      autosaveTimerRef.current = setInterval(async () => {
+        // CRITICAL: Save to the specific track that was selected when timer started
+        const saved = await saveSpecificTrack(trackIdForAutosave, false);
+        if (saved) {
+          setSaveStatus('Auto-saved');
+          setTimeout(() => setSaveStatus(''), 1500);
+        }
+      }, autosaveInterval);
+    }
 
     return () => {
       if (autosaveTimerRef.current) {
         clearInterval(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+        autosaveTrackIdRef.current = null;
       }
     };
-  }, [isAutosaveEnabled, autosaveInterval, selectedTrack, saveCurrentTrack]);
+  }, [isAutosaveEnabled, autosaveInterval, selectedTrack]);
 
   // Update last saved code when track changes
   useEffect(() => {
