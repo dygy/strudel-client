@@ -272,16 +272,7 @@ export function useReplContext(): ReplContext {
                         }));
                       }, 100);
                     } else {
-                      console.log('[repl] No matching FileManager track found, creating new one');
-                      // Create a FileManager track from the old user pattern
-                      setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent('strudel-migrate-user-pattern', {
-                          detail: { 
-                            oldPatternId: currentActivePattern,
-                            patternData: userPattern
-                          }
-                        }));
-                      }, 200);
+                      console.log('[repl] No matching FileManager track found');
                     }
                   } catch (e) {
                     console.warn('[repl] Failed to parse tracks for matching:', e);

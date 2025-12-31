@@ -8,7 +8,7 @@ interface ConfirmModalProps {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  message: string;
+  message: string | React.ReactNode;
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'warning' | 'info';
@@ -52,7 +52,7 @@ export function ConfirmModal({
           />
         </div>
         <div className="flex-1">
-          <p className="text-foreground dark:text-foreground/90 leading-relaxed">{message}</p>
+          <div className="text-foreground dark:text-foreground/90 leading-relaxed">{message}</div>
         </div>
       </div>
       

@@ -9,6 +9,7 @@ import { FileManager } from './sidebar/FileManager';
 import { WelcomeScreen } from './WelcomeScreen';
 import { useActivePattern, userPattern } from '@src/user_pattern_utils';
 import { DEFAULT_TRACK_CODE, isDefaultCode } from '@src/constants/defaultCode';
+import { GlobalToastContainer } from '@src/components/GlobalToastContainer';
 import React, { useState, useEffect } from 'react';
 
 interface ReplContext {
@@ -317,6 +318,9 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
       </div>
       <UserFacingErrorMessage error={error} />
       {!isZen && panelPosition === 'bottom' && <HorizontalPanel context={context} />}
+      
+      {/* Global Toast Container */}
+      <GlobalToastContainer />
     </div>
   );
 }

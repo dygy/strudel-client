@@ -13,10 +13,10 @@ import { ChevronLeftIcon } from '@heroicons/react/16/solid';
 import { useTranslation } from '@src/i18n';
 import { useState, useRef, useEffect, createContext, useContext } from 'react';
 import React from 'react';
-import { useToast } from '../ui/Toast';
+import { toastActions } from '@src/stores/toastStore';
 
-// Toast context for sharing toast instance across panel components
-const ToastContext = createContext<ReturnType<typeof useToast> | null>(null);
+// Toast context for sharing toast actions across panel components
+const ToastContext = createContext<typeof toastActions | null>(null);
 
 export const useToastContext = () => {
   const context = useContext(ToastContext);
@@ -59,10 +59,9 @@ interface Settings {
 export function HorizontalPanel({ context }: PanelProps) {
   const settings = useSettings();
   const { isPanelOpen, activeFooter: tab } = settings;
-  const toast = useToast();
 
   return (
-    <ToastContext.Provider value={toast}>
+    <ToastContext.Provider value={toastActions}>
       <PanelNav
         settings={settings}
         className={cx(isPanelOpen ? `min-h-[360px] max-h-[360px]` : 'min-h-12 max-h-12', 'overflow-hidden flex flex-col')}
@@ -81,9 +80,6 @@ export function HorizontalPanel({ context }: PanelProps) {
           <Tabs setTab={setTab} tab={tab} />
         </div>
       </PanelNav>
-      
-      {/* Toast notifications */}
-      <toast.ToastContainer />
     </ToastContext.Provider>
   );
 }
@@ -97,7 +93,6 @@ export function VerticalPanel({ context }: PanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
   const startWidth = useRef(0);
-  const toast = useToast();
 
   const minWidth = 400;
   const maxWidth = Math.min(1200, typeof window !== 'undefined' ? window.innerWidth * 0.8 : 1200);
@@ -146,7 +141,7 @@ export function VerticalPanel({ context }: PanelProps) {
   }, [isResizing, minWidth, maxWidth, isRTL]);
 
   return (
-    <ToastContext.Provider value={toast}>
+    <ToastContext.Provider value={toastActions}>
       <PanelNav
         settings={settings}
         className={cx(
@@ -196,9 +191,6 @@ export function VerticalPanel({ context }: PanelProps) {
           </button>
         )}
       </PanelNav>
-      
-      {/* Toast notifications */}
-      <toast.ToastContainer />
     </ToastContext.Provider>
   );
 }

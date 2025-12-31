@@ -10,7 +10,7 @@ import { formatDateTimeIntl } from '@src/i18n/dateFormat';
 import { FileTree } from './FileTree';
 import { InfoModal } from '../ui/InfoModal';
 import { ConfirmModal } from '../ui/ConfirmModal';
-import { useToast } from '../ui/Toast';
+import { toastActions } from '@src/stores/toastStore';
 import { BurgerMenuButton } from '../ui/BurgerMenuButton';
 import { useSettings } from '@src/settings';
 import { formatCode } from '@strudel/codemirror';
@@ -84,13 +84,19 @@ export function FileManager({ context }: FileManagerProps) {
   const lastSavedCodeRef = useRef<string>('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
+  const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
+  const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
+  const [folderContents, setFolderContents] = useState<{subfolders: string[], tracks: string[]}>({subfolders: [], tracks: []});
+  const [isDeletingTrack, setIsDeletingTrack] = useState(false); // Prevent multiple deletions
   const [isDragOver, setIsDragOver] = useState(false);
   const [isCreatingStep, setIsCreatingStep] = useState(false);
   const [newStepName, setNewStepName] = useState('');
   const [selectedStepTrack, setSelectedStepTrack] = useState<string | null>(null);
   const { t, i18n } = useTranslation(['files', 'common', 'tabs']);
-  const toast = useToast();
   const activePattern = useActivePattern(); // This is what's currently PLAYING
+  
+  // Prevent multiple folder deletions
+  const isDeletingFolderRef = useRef<Set<string>>(new Set());
 
   // Helper function for better date formatting
 // Load tracks and folders from localStorage on mount
@@ -151,42 +157,8 @@ export function FileManager({ context }: FileManagerProps) {
       setSelectedTrack(trackId);
     };
 
-    const handleMigrateUserPattern = (event: CustomEvent) => {
-      const { oldPatternId, patternData } = event.detail;
-      console.log('FileManager - migrating user pattern to FileManager track:', oldPatternId);
-      
-      // Create a new FileManager track from the old user pattern
-      const trackId = Date.now().toString();
-      const newTrack: Track = {
-        id: trackId,
-        name: patternData.name || 'Migrated Pattern',
-        code: patternData.code,
-        created: new Date().toISOString(),
-        modified: new Date().toISOString(),
-      };
-      
-      // Add the track to FileManager
-      setTracks(prev => {
-        const newTracks = { ...prev, [trackId]: newTrack };
-        
-        // After updating tracks, select the new track
-        setTimeout(() => {
-          console.log('FileManager - selecting migrated track:', newTrack.name);
-          setSelectedTrack(trackId);
-        }, 50);
-        
-        return newTracks;
-      });
-      
-      // Update the active pattern to use the new FileManager track ID
-      setActivePattern(trackId);
-      
-      console.log('FileManager - migration complete, new track ID:', trackId);
-    };
-
     window.addEventListener('strudel-tracks-updated', handleTracksUpdated);
     window.addEventListener('strudel-select-track', handleSelectTrack);
-    window.addEventListener('strudel-migrate-user-pattern', handleMigrateUserPattern);
 
     // Mark as initialized after loading
     setIsInitialized(true);
@@ -194,7 +166,6 @@ export function FileManager({ context }: FileManagerProps) {
     return () => {
       window.removeEventListener('strudel-tracks-updated', handleTracksUpdated);
       window.removeEventListener('strudel-select-track', handleSelectTrack);
-      window.removeEventListener('strudel-migrate-user-pattern', handleMigrateUserPattern);
     };
   }, [activePattern, selectedTrack]);
 
@@ -337,7 +308,7 @@ export function FileManager({ context }: FileManagerProps) {
           modified: new Date().toISOString(),
         }
       }));
-      toast.success(t('files:trackMoved'));
+      toastActions.success(t('files:trackMoved'));
     } else {
       // Moving folders is more complex - need to update all children
       const folder = folders[itemId];
@@ -355,7 +326,7 @@ export function FileManager({ context }: FileManagerProps) {
 
       // Update all children
       updateChildrenPaths(itemId, newPath);
-      toast.success(t('files:folderMoved'));
+      toastActions.success(t('files:folderMoved'));
     }
   };
 
@@ -413,22 +384,153 @@ export function FileManager({ context }: FileManagerProps) {
   };
 
   const deleteFolder = (folderPath: string) => {
-    // Check if folder has contents
-    const hasSubfolders = Object.values(folders).some(f => f.parent === folderPath);
-    const hasTracks = Object.values(tracks).some(t => t.folder === folderPath);
+    console.log('FileManager - deleteFolder called for:', folderPath);
+    console.log('FileManager - all folders:', folders);
+    
+    // Get folder contents - check for both direct children and nested subfolders
+    // Handle both path-keyed and ID-keyed folders
+    const subfolders = Object.values(folders).filter(f => 
+      f.parent === folderPath || f.path.startsWith(folderPath + '/')
+    ).map(f => f.name);
+    
+    // Get tracks in this folder and all subfolders
+    const folderTracks = Object.values(tracks).filter(t => 
+      t.folder === folderPath || (t.folder && t.folder.startsWith(folderPath + '/'))
+    ).map(t => t.name);
 
-    if (hasSubfolders || hasTracks) {
-      toast.error(t('files:folderNotEmpty'));
+    console.log('FileManager - found subfolders:', subfolders);
+    console.log('FileManager - found tracks:', folderTracks);
+
+    if (subfolders.length > 0 || folderTracks.length > 0) {
+      // Show confirmation dialog with contents list
+      setFolderToDelete(folderPath);
+      setFolderContents({ subfolders, tracks: folderTracks });
+      setShowDeleteFolderModal(true);
       return;
     }
 
+    // Empty folder - delete immediately
+    performFolderDeletion(folderPath);
+  };
+
+  const performFolderDeletion = (folderPath: string) => {
+    // Prevent multiple deletions of the same folder
+    if (isDeletingFolderRef.current.has(folderPath)) {
+      console.log('FileManager - folder deletion already in progress for:', folderPath);
+      return;
+    }
+    
+    // Mark this folder as being deleted
+    isDeletingFolderRef.current.add(folderPath);
+    
+    console.log('FileManager - STARTING folder deletion for path:', folderPath);
+    console.log('FileManager - all folders before deletion:', folders);
+    console.log('FileManager - folder keys before deletion:', Object.keys(folders));
+    
+    // Get all items that will be deleted - handle both path-keyed and ID-keyed folders
+    const foldersToDelete = Object.entries(folders).filter(([key, folder]) => {
+      // Check if this folder should be deleted:
+      // 1. If key matches the folderPath (path-keyed folders)
+      // 2. If folder.path matches the folderPath (ID-keyed folders)
+      // 3. If it's a subfolder of the folder being deleted
+      return key === folderPath || 
+             folder.path === folderPath || 
+             folder.path.startsWith(folderPath + '/') ||
+             key.startsWith(folderPath + '/');
+    }).map(([key, folder]) => key);
+    
+    console.log('FileManager - folders to delete:', foldersToDelete);
+    
+    const tracksToDelete = Object.values(tracks).filter(track => 
+      track.folder === folderPath || (track.folder && track.folder.startsWith(folderPath + '/'))
+    );
+
+    console.log('FileManager - tracks to delete:', tracksToDelete.map(t => t.name));
+
+    // Check if the currently selected track will be deleted
+    const selectedTrackWillBeDeleted = selectedTrack && tracksToDelete.some(track => track.id === selectedTrack);
+    
+    if (selectedTrackWillBeDeleted) {
+      console.log('FileManager - selected track will be deleted, switching to another track');
+      
+      // Find a track that won't be deleted
+      const remainingTracks = Object.values(tracks).filter(track => 
+        !tracksToDelete.some(deletedTrack => deletedTrack.id === track.id)
+      );
+      
+      if (remainingTracks.length > 0) {
+        // Switch to the first remaining track
+        const nextTrack = remainingTracks[0];
+        console.log('FileManager - switching to safe track before folder deletion:', nextTrack.name);
+        loadTrack(nextTrack);
+      } else {
+        // No tracks left - clear selection and show welcome screen
+        console.log('FileManager - no tracks left after folder deletion, clearing selection');
+        setSelectedTrack(null);
+        
+        // Clear the editor
+        if (context.editorRef?.current?.setCode) {
+          context.editorRef.current.setCode('');
+        }
+        
+        // Trigger welcome screen
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('strudel-all-tracks-deleted'));
+        }, 100);
+      }
+    }
+
+    // Update folders state - ensure we're deleting the right folders
     setFolders(prev => {
       const newFolders = { ...prev };
-      delete newFolders[folderPath];
+      console.log('FileManager - folders before deletion operation:', Object.keys(newFolders));
+      
+      foldersToDelete.forEach(key => {
+        console.log('FileManager - deleting folder key:', key, 'exists:', !!newFolders[key]);
+        if (newFolders[key]) {
+          const wasDeleted = delete newFolders[key];
+          console.log('FileManager - folder deletion result:', wasDeleted);
+        } else {
+          console.warn('FileManager - folder not found for deletion:', key);
+        }
+      });
+      
+      console.log('FileManager - folders after deletion operation:', Object.keys(newFolders));
       return newFolders;
     });
 
-    toast.success(t('files:folderDeleted'));
+    // Update tracks state
+    if (tracksToDelete.length > 0) {
+      setTracks(prev => {
+        const newTracks = { ...prev };
+        tracksToDelete.forEach(track => {
+          console.log('FileManager - deleting track:', track.name, 'ID:', track.id);
+          delete newTracks[track.id];
+        });
+        console.log('FileManager - tracks remaining after deletion:', Object.keys(newTracks).length);
+        return newTracks;
+      });
+    }
+
+    // Use a unique ID to prevent duplicate toasts for this specific folder deletion
+    const toastId = `folder-deleted-${folderPath}-${Date.now()}`;
+    toastActions.success(t('files:folderDeleted'), undefined, undefined, toastId);
+    console.log('FileManager - toastActions.success called for folder deletion:', toastId);
+    
+    // Clean up the deletion tracking after a short delay
+    setTimeout(() => {
+      isDeletingFolderRef.current.delete(folderPath);
+      console.log('FileManager - cleaned up deletion tracking for:', folderPath);
+    }, 1000);
+  };
+
+  const confirmFolderDelete = () => {
+    if (folderToDelete) {
+      performFolderDeletion(folderToDelete);
+      setShowDeleteFolderModal(false);
+      setFolderToDelete(null);
+      setFolderContents({subfolders: [], tracks: []});
+    }
   };
 
   const finishRenameFolder = () => {
@@ -449,7 +551,7 @@ export function FileManager({ context }: FileManagerProps) {
         // Update all child folders and tracks
         updateChildrenPaths(renamingFolder, newPath);
 
-        toast.success(t('files:folderRenamed'));
+        toastActions.success(t('files:folderRenamed'));
       }
     }
     setRenamingFolder(null);
@@ -541,7 +643,7 @@ export function FileManager({ context }: FileManagerProps) {
     // Get current code from the editor
     let currentCode = context.editorRef?.current?.code || context.activeCode || '';
     if (!currentCode.trim()) {
-      if (showToast) toast.warning(t('files:noCodeToSave'));
+      if (showToast) toastActions.warning(t('files:noCodeToSave'));
       return false;
     }
 
@@ -588,13 +690,13 @@ export function FileManager({ context }: FileManagerProps) {
     lastSavedCodeRef.current = currentCode;
 
     if (showToast) {
-      toast.success(t('files:trackSaved'));
+      toastActions.success(t('files:trackSaved'));
       setSaveStatus('Saved!');
       setTimeout(() => setSaveStatus(''), 2000);
     }
 
     return true;
-  }, [tracks, context, t, toast, isPrettierEnabled, selectedTrack]);
+  }, [tracks, context, t, isPrettierEnabled, selectedTrack]);
 
   // Autosave effect
   useEffect(() => {
@@ -666,28 +768,75 @@ export function FileManager({ context }: FileManagerProps) {
   };
 
   const confirmDelete = () => {
-    if (trackToDelete) {
-      const trackName = tracks[trackToDelete]?.name;
+    if (!trackToDelete || isDeletingTrack) {
+      console.log('FileManager - confirmDelete called but already deleting or no track to delete');
+      return;
+    }
+
+    setIsDeletingTrack(true); // Prevent multiple deletions
+    
+    const trackName = tracks[trackToDelete]?.name;
+    const isSelectedTrack = selectedTrack === trackToDelete;
+    
+    console.log('FileManager - STARTING deletion process for track:', trackName, 'ID:', trackToDelete);
+    console.log('FileManager - isSelected:', isSelectedTrack);
+    console.log('FileManager - tracks before deletion:', Object.keys(tracks));
+    
+    // Function to actually delete the track
+    const performDeletion = () => {
+      console.log('FileManager - PERFORMING actual deletion of track:', trackToDelete);
+      
       setTracks(prev => {
         const newTracks = { ...prev };
-        delete newTracks[trackToDelete];
-
-        // Check if this was the last track
-        const remainingTracks = Object.keys(newTracks).length;
-        if (remainingTracks === 0) {
-          // Notify that all tracks are deleted - trigger welcome screen
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('strudel-all-tracks-deleted'));
-          }, 100);
-        }
-
+        const wasDeleted = delete newTracks[trackToDelete];
+        console.log('FileManager - deletion successful:', wasDeleted);
+        console.log('FileManager - remaining tracks after deletion:', Object.keys(newTracks));
         return newTracks;
       });
-      if (selectedTrack === trackToDelete) {
-        setSelectedTrack(null);
-      }
+      
       setTrackToDelete(null);
-      toast.success(t('files:trackDeleted'));
+      setIsDeletingTrack(false); // Reset deletion flag
+      toastActions.success(t('files:trackDeleted'));
+    };
+    
+    // If we're deleting the currently selected track, switch to another track first
+    if (isSelectedTrack) {
+      const remainingTrackIds = Object.keys(tracks).filter(id => id !== trackToDelete);
+      
+      if (remainingTrackIds.length > 0) {
+        // Switch to the first available track
+        const nextTrackId = remainingTrackIds[0];
+        const nextTrack = tracks[nextTrackId];
+        console.log('FileManager - switching to next track before deletion:', nextTrack.name, 'ID:', nextTrackId);
+        
+        // Load the next track and then delete after a short delay
+        loadTrack(nextTrack);
+        
+        // Delay the deletion to ensure track switching completes
+        setTimeout(() => {
+          performDeletion();
+        }, 100);
+      } else {
+        // No tracks left - clear selection and show welcome screen
+        console.log('FileManager - no tracks left, clearing selection');
+        setSelectedTrack(null);
+        
+        // Clear the editor
+        if (context.editorRef?.current?.setCode) {
+          context.editorRef.current.setCode('');
+        }
+        
+        // Delete the track and then trigger welcome screen
+        performDeletion();
+        
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('strudel-all-tracks-deleted'));
+        }, 100);
+      }
+    } else {
+      // Not the selected track - delete immediately
+      console.log('FileManager - deleting non-selected track immediately');
+      performDeletion();
     }
   };
 
@@ -707,7 +856,7 @@ export function FileManager({ context }: FileManagerProps) {
     };
 
     setTracks(prev => ({ ...prev, [trackId]: duplicatedTrack }));
-    toast.success(t('files:trackDuplicated'));
+    toastActions.success(t('files:trackDuplicated'));
   };
 
   const convertToMultitrack = (track: Track) => {
@@ -728,7 +877,7 @@ export function FileManager({ context }: FileManagerProps) {
     };
 
     setTracks(prev => ({ ...prev, [track.id]: updatedTrack }));
-    toast.success(t('files:convertedToMultitrack'));
+    toastActions.success(t('files:convertedToMultitrack'));
   };
 
   const addStep = (trackId: string) => {
@@ -756,7 +905,7 @@ export function FileManager({ context }: FileManagerProps) {
     setNewStepName('');
     setIsCreatingStep(false);
     setSelectedStepTrack(null);
-    toast.success(t('files:stepAdded'));
+    toastActions.success(t('files:stepAdded'));
   };
 
   const switchToStep = (trackId: string, stepIndex: number) => {
@@ -841,7 +990,7 @@ export function FileManager({ context }: FileManagerProps) {
           }
         }));
 
-        toast.success(t('files:stepRenamed'));
+        toastActions.success(t('files:stepRenamed'));
       }
     }
     setRenamingStep(null);
@@ -872,7 +1021,7 @@ export function FileManager({ context }: FileManagerProps) {
   const deleteStep = (trackId: string, stepIndex: number) => {
     const track = tracks[trackId];
     if (!track || !track.isMultitrack || !track.steps || track.steps.length <= 1) {
-      toast.error(t('files:cannotDeleteLastStep'));
+      toastActions.error(t('files:cannotDeleteLastStep'));
       return;
     }
 
@@ -891,7 +1040,7 @@ export function FileManager({ context }: FileManagerProps) {
       }
     }));
 
-    toast.success(t('files:stepDeleted'));
+    toastActions.success(t('files:stepDeleted'));
   };
 
   const downloadFolder = async (folderPath: string) => {
@@ -905,7 +1054,7 @@ export function FileManager({ context }: FileManagerProps) {
       );
 
       if (folderTracks.length === 0) {
-        toast.error(t('files:emptyFolder'));
+        toastActions.error(t('files:emptyFolder'));
         return;
       }
 
@@ -958,10 +1107,10 @@ export function FileManager({ context }: FileManagerProps) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success(t('files:folderDownloaded'));
+      toastActions.success(t('files:folderDownloaded'));
     } catch (error) {
       console.error('Folder download failed:', error);
-      toast.error('Folder download failed');
+      toastActions.error('Folder download failed');
     }
   };
 
@@ -1001,7 +1150,7 @@ export function FileManager({ context }: FileManagerProps) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success(t('files:multitrackDownloaded'));
+      toastActions.success(t('files:multitrackDownloaded'));
     } else {
       // Regular single file download
       const blob = new Blob([track.code], { type: 'text/javascript' });
@@ -1014,7 +1163,7 @@ export function FileManager({ context }: FileManagerProps) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success(t('files:trackDownloaded'));
+      toastActions.success(t('files:trackDownloaded'));
     }
   };
 
@@ -1043,7 +1192,7 @@ export function FileManager({ context }: FileManagerProps) {
 
       setTracks(prev => ({ ...prev, [trackId]: newTrack }));
       loadTrack(newTrack);
-      toast.success(t('files:trackImported', { name: trackName }));
+      toastActions.success(t('files:trackImported', { name: trackName }));
     };
     reader.readAsText(file);
   };
@@ -1082,7 +1231,7 @@ export function FileManager({ context }: FileManagerProps) {
     );
 
     if (jsFiles.length === 0) {
-      toast.error(t('files:invalidFileType'));
+      toastActions.error(t('files:invalidFileType'));
       return;
     }
 
@@ -1111,7 +1260,7 @@ export function FileManager({ context }: FileManagerProps) {
           }
         }));
 
-        toast.success(t('files:trackRenamed'));
+        toastActions.success(t('files:trackRenamed'));
       }
     }
     setRenamingTrack(null);
@@ -1210,10 +1359,10 @@ export function FileManager({ context }: FileManagerProps) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success(t('files:libraryExported'));
+      toastActions.success(t('files:libraryExported'));
     } catch (error) {
       console.error('Export failed:', error);
-      toast.error('Export failed');
+      toastActions.error('Export failed');
     }
   };
 
@@ -1222,7 +1371,7 @@ export function FileManager({ context }: FileManagerProps) {
     if (!file) return;
 
     if (!file.name.endsWith('.zip')) {
-      toast.error(t('files:invalidLibraryFile'));
+      toastActions.error(t('files:invalidLibraryFile'));
       return;
     }
 
@@ -1247,10 +1396,12 @@ export function FileManager({ context }: FileManagerProps) {
           const newTracks = { ...tracks };
           const newFolders = { ...folders };
 
-          // Import folders
+          // Import folders - fix to use path as key instead of ID
           Object.values(libraryData.folders).forEach((folder: any) => {
-            if (!newFolders[folder.id]) {
-              newFolders[folder.id] = folder;
+            // Use folder.path as key for consistency, not folder.id
+            const folderKey = folder.path || folder.id;
+            if (!newFolders[folderKey]) {
+              newFolders[folderKey] = folder;
             }
           });
 
@@ -1272,9 +1423,9 @@ export function FileManager({ context }: FileManagerProps) {
 
           setTracks(newTracks);
           setFolders(newFolders);
-          toast.success(t('files:libraryImported'));
+          toastActions.success(t('files:libraryImported'));
         } else {
-          toast.error(t('files:invalidLibraryFile'));
+          toastActions.error(t('files:invalidLibraryFile'));
         }
       } else {
         // Try to import as individual files
@@ -1300,11 +1451,11 @@ export function FileManager({ context }: FileManagerProps) {
           }
         });
 
-        toast.success(t('files:libraryImported'));
+        toastActions.success(t('files:libraryImported'));
       }
     } catch (error) {
       console.error('Import failed:', error);
-      toast.error(t('files:invalidLibraryFile'));
+      toastActions.error(t('files:invalidLibraryFile'));
     }
   };
 
@@ -1337,7 +1488,7 @@ export function FileManager({ context }: FileManagerProps) {
 
     setTracks(prev => ({ ...prev, [trackId]: newTrack }));
     loadTrack(newTrack);
-    toast.success(t('files:multitrackCreated'));
+    toastActions.success(t('files:multitrackCreated'));
   };
 
   const getEmptySpaceContextItems = () => [
@@ -1618,6 +1769,7 @@ export function FileManager({ context }: FileManagerProps) {
         onClose={() => {
           setShowDeleteModal(false);
           setTrackToDelete(null);
+          setIsDeletingTrack(false); // Reset deletion flag when modal is closed
         }}
         onConfirm={confirmDelete}
         title={t('files:deleteTrack')}
@@ -1627,8 +1779,36 @@ export function FileManager({ context }: FileManagerProps) {
         variant="danger"
       />
 
-      {/* Toast notifications */}
-      <toast.ToastContainer />
+      <ConfirmModal
+        isOpen={showDeleteFolderModal}
+        onClose={() => {
+          setShowDeleteFolderModal(false);
+          setFolderToDelete(null);
+          setFolderContents({subfolders: [], tracks: []});
+        }}
+        onConfirm={confirmFolderDelete}
+        title={t('files:deleteFolder')}
+        message={
+          folderToDelete ? (
+            <div>
+              <p>{t('files:confirmDeleteFolder')} "{folders[folderToDelete]?.name}"?</p>
+              <p className="mt-2 text-sm text-gray-400">{t('files:folderContainsItems')}:</p>
+              <ul className="mt-1 text-sm text-gray-300 list-disc list-inside">
+                {folderContents.subfolders.map(name => (
+                  <li key={name}>📁 {name}</li>
+                ))}
+                {folderContents.tracks.map(name => (
+                  <li key={name}>📄 {name}</li>
+                ))}
+              </ul>
+              <p className="mt-2 text-sm text-red-400">{t('files:actionCannotBeUndone')}</p>
+            </div>
+          ) : ''
+        }
+        confirmText={t('common:delete')}
+        cancelText={t('common:cancel')}
+        variant="danger"
+      />
     </div>
   );
 }

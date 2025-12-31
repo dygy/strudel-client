@@ -153,27 +153,70 @@ export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
 
 // Toast manager hook
 let toastId = 0;
+const recentToasts = new Map<string, number>(); // Track recent toasts to prevent rapid duplicates
+const activeToasts = new Set<string>(); // Track currently active toasts
 
 export function useToast() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const addToast = (toast: Omit<Toast, 'id'>) => {
-    // Check for duplicate toasts with the same title and type
+  const addToast = (toast: Omit<Toast, 'id'>, customId?: string) => {
+    const toastKey = `${toast.type}:${toast.title}`;
+    const now = Date.now();
+    
+    // If a custom ID is provided, use it for more specific deduplication
+    const effectiveKey = customId || toastKey;
+    
+    console.log('Toast - addToast called:', {
+      effectiveKey,
+      customId,
+      title: toast.title,
+      activeToasts: Array.from(activeToasts),
+      recentToasts: Array.from(recentToasts.entries())
+    });
+    
+    // Check for recent duplicates (within 2 seconds)
+    const lastToastTime = recentToasts.get(effectiveKey);
+    if (lastToastTime && now - lastToastTime < 2000) {
+      console.log('Toast - blocked duplicate toast within 2 seconds:', effectiveKey);
+      return; // Don't add duplicate toast within 2 seconds
+    }
+    
+    // Check for existing active toasts with the same key
+    if (activeToasts.has(effectiveKey)) {
+      console.log('Toast - blocked duplicate active toast:', effectiveKey);
+      return; // Don't add duplicate active toast
+    }
+    
+    // Check for existing toasts with the same title and type in current toasts array
     const isDuplicate = toasts.some(existingToast => 
       existingToast.title === toast.title && 
       existingToast.type === toast.type
     );
     
     if (isDuplicate) {
+      console.log('Toast - blocked duplicate in current toasts array:', toastKey);
       return; // Don't add duplicate toast
     }
 
-    const id = `toast-${++toastId}`;
+    // Record this toast to prevent rapid duplicates
+    recentToasts.set(effectiveKey, now);
+    activeToasts.add(effectiveKey);
+    
+    // Clean up old entries (older than 10 seconds)
+    for (const [key, time] of recentToasts.entries()) {
+      if (now - time > 10000) {
+        recentToasts.delete(key);
+      }
+    }
+
+    const id = customId || `toast-${++toastId}`;
     const newToast: Toast = {
       id,
       ...toast,
       duration: toast.duration ?? 3000, // Default 3 seconds if not provided or undefined
     };
+    
+    console.log('Toast - adding new toast:', { id, title: toast.title, effectiveKey });
     
     setToasts(prev => {
       // Limit to maximum 5 toasts to prevent overflow
@@ -184,24 +227,40 @@ export function useToast() {
   };
 
   const removeToast = (id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
+    console.log('Toast - removing toast:', id);
+    
+    setToasts(prev => {
+      const toastToRemove = prev.find(t => t.id === id);
+      if (toastToRemove) {
+        // Clean up active toasts tracking
+        const toastKey = `${toastToRemove.type}:${toastToRemove.title}`;
+        activeToasts.delete(id); // Remove by ID
+        activeToasts.delete(toastKey); // Remove by key as well
+        console.log('Toast - cleaned up active toast tracking for:', { id, toastKey });
+      }
+      
+      return prev.filter(toast => toast.id !== id);
+    });
   };
 
   const clearAllToasts = () => {
+    console.log('Toast - clearing all toasts');
     setToasts([]);
+    recentToasts.clear(); // Also clear the recent toasts cache
+    activeToasts.clear(); // Clear active toasts tracking
   };
 
-  const success = (title: string, message?: string, duration?: number) => 
-    addToast({ type: 'success', title, message, duration });
+  const success = (title: string, message?: string, duration?: number, customId?: string) => 
+    addToast({ type: 'success', title, message, duration }, customId);
 
-  const error = (title: string, message?: string, duration?: number) => 
-    addToast({ type: 'error', title, message, duration });
+  const error = (title: string, message?: string, duration?: number, customId?: string) => 
+    addToast({ type: 'error', title, message, duration }, customId);
 
-  const warning = (title: string, message?: string, duration?: number) => 
-    addToast({ type: 'warning', title, message, duration });
+  const warning = (title: string, message?: string, duration?: number, customId?: string) => 
+    addToast({ type: 'warning', title, message, duration }, customId);
 
-  const info = (title: string, message?: string, duration?: number) => 
-    addToast({ type: 'info', title, message, duration });
+  const info = (title: string, message?: string, duration?: number, customId?: string) => 
+    addToast({ type: 'info', title, message, duration }, customId);
 
   return {
     toasts,

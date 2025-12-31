@@ -4,7 +4,7 @@ import { isAudioFile, readDir, dir, playFile } from '../../files';
 import { logger } from '@strudel/core';
 import { WorkingContextMenu } from '../ui/WorkingContextMenu';
 import { InfoModal } from '../ui/InfoModal';
-import { useToast } from '../ui/Toast';
+import { toastActions } from '@src/stores/toastStore';
 import { 
   PlayIcon, 
   CopyIcon, 
@@ -32,7 +32,6 @@ export function FilesTab() {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoModalData, setInfoModalData] = useState<{ title: string; items: Array<{ label: string; value: string }> }>({ title: '', items: [] });
   const { t } = useTranslation('files');
-  const toast = useToast();
   
   useEffect(() => {
     let init = false;
@@ -66,10 +65,10 @@ export function FilesTab() {
   // Helper functions for context menu actions
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
-      toast.success(t('pathCopied'));
+      toastActions.success(t('pathCopied'));
       logger(`Copied "${text}" to clipboard`, 'success');
     }).catch(() => {
-      toast.error(t('copyFailed'));
+      toastActions.error(t('copyFailed'));
       logger('Failed to copy to clipboard', 'error');
     });
   };
@@ -238,9 +237,6 @@ export function FilesTab() {
         title={infoModalData.title}
         items={infoModalData.items}
       />
-
-      {/* Toast notifications */}
-      <toast.ToastContainer />
     </div>
   );
 }
