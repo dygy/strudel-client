@@ -231,12 +231,14 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
       const hasLibraryMetadata = allFiles.includes('library-metadata.json');
       console.log('ZIP Import Debug - Has library metadata:', hasLibraryMetadata);
       
+      // If it has library metadata, it's ALWAYS a library, regardless of what's inside
       if (hasLibraryMetadata) {
         console.log('ZIP Import Debug - Treating as library (has library-metadata.json)');
         await handleLibraryImport(zipContent);
         return;
       }
       
+      // Only check for multitrack if it's NOT a library
       // Look for multitrack-specific metadata.json files (not library-metadata.json)
       const multitrackMetadataFiles = allFiles.filter(f => 
         f.endsWith('metadata.json') && 
@@ -245,24 +247,29 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
       );
       console.log('ZIP Import Debug - Found multitrack metadata files:', multitrackMetadataFiles);
       
-      // Check for step files pattern anywhere
-      const hasStepFiles = allFiles.some(filename => 
-        filename.match(/step_\d+\.js$/i) || 
-        filename.match(/Step\s*_?\d+\.js$/i) ||
-        filename.match(/\/step_\d+\.js$/i) ||
-        filename.match(/\/Step\s*_?\d+\.js$/i)
+      // For single multitrack detection, check if we have exactly one metadata file at root level
+      const rootMetadataFiles = multitrackMetadataFiles.filter(f => !f.includes('/'));
+      const hasRootMetadata = rootMetadataFiles.length === 1;
+      
+      // Check for step files pattern at root level only (for single multitrack)
+      const hasRootStepFiles = allFiles.some(filename => 
+        !filename.includes('/') && (
+          filename.match(/^step_\d+\.js$/i) || 
+          filename.match(/^Step\s*_?\d+\.js$/i)
+        )
       );
-      console.log('ZIP Import Debug - Has step files pattern:', hasStepFiles);
+      console.log('ZIP Import Debug - Has root step files pattern:', hasRootStepFiles);
+      console.log('ZIP Import Debug - Has root metadata:', hasRootMetadata);
       
-      // Only treat as multitrack if we have multitrack metadata OR step files (but not library metadata)
-      const isMultitrack = multitrackMetadataFiles.length > 0 || hasStepFiles;
-      console.log('ZIP Import Debug - Detected as multitrack:', isMultitrack);
+      // Only treat as single multitrack if we have root-level metadata OR root-level step files
+      const isSingleMultitrack = hasRootMetadata || hasRootStepFiles;
+      console.log('ZIP Import Debug - Detected as single multitrack:', isSingleMultitrack);
       
-      if (isMultitrack) {
-        console.log('ZIP Import Debug - Treating as multitrack');
-        await handleMultitrackImport(zipContent, multitrackMetadataFiles[0]);
+      if (isSingleMultitrack) {
+        console.log('ZIP Import Debug - Treating as single multitrack');
+        await handleMultitrackImport(zipContent, rootMetadataFiles[0]);
       } else {
-        console.log('ZIP Import Debug - Treating as library');
+        console.log('ZIP Import Debug - Treating as library (no library metadata but contains multiple items)');
         await handleLibraryImport(zipContent);
       }
     } catch (error) {
@@ -545,6 +552,14 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
           }
           
           if (steps.length > 0) {
+            // Calculate the correct folder path for the multitrack
+            // For "trance/Looking for a miracle/", the parent folder should be "trance"
+            let parentFolder: string | undefined = undefined;
+            if (folderPath.includes('/')) {
+              parentFolder = folderPath.substring(0, folderPath.lastIndexOf('/'));
+              console.log('Library Import Debug - Calculated parent folder for multitrack:', parentFolder);
+            }
+            
             const multitrackData = {
               id: Date.now().toString() + Math.random().toString(36).substring(2, 11),
               name: trackName,
@@ -554,8 +569,14 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
               isMultitrack: true,
               steps,
               activeStep: metadata.activeStep || 0,
-              folder: folderPath.includes('/') ? folderPath.substring(0, folderPath.lastIndexOf('/')) : undefined, // Preserve parent folder
+              folder: parentFolder, // This should be "trance" for "trance/Looking for a miracle"
             };
+
+            console.log('Library Import Debug - Creating multitrack with data:', {
+              name: multitrackData.name,
+              folder: multitrackData.folder,
+              stepsCount: steps.length
+            });
 
             // Import multitrack to appropriate storage
             if (fileManagerHook && fileManagerHook.isAuthenticated && fileManagerHook.createTrack) {
