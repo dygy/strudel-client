@@ -48,6 +48,16 @@ declare module '@strudel/webaudio' {
   export function registerSamplesPrefix(prefix: string, resolve: (path: string) => Promise<void> | void): void;
   export function processSampleMap(sampleMap: any, fn: (key: string, bank: any) => void, baseUrl?: string): void;
   export function loadBuffer(url: string, audioContext: AudioContext, s?: string, n?: number): Promise<AudioBuffer>;
+  
+  // Sample Cache Functions
+  export function configureSampleCache(config: any): void;
+  export function getCacheConfig(): any;
+  export function getCacheStats(): any;
+  export function addCacheListener(callback: (event: any) => void): void;
+  export function removeCacheListener(callback: (event: any) => void): void;
+  export function clearCache(): void;
+  export function preloadTrackSamples(code: string, trackName?: string): Promise<void>;
+  
   // Add other exports as needed
 }
 

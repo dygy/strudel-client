@@ -6,6 +6,7 @@ import { ButtonGroup } from './Forms';
 import { AudioDeviceSelector } from './AudioDeviceSelector';
 import { AudioEngineTargetSelector } from './AudioEngineTargetSelector';
 import { LanguageSelector } from './LanguageSelector';
+import { SampleCacheSettings } from './SampleCacheSettings';
 import { DEFAULT_MAX_POLYPHONY, setMaxPolyphony, setMultiChannelOrbits } from '@strudel/webaudio';
 import { useTranslation } from '@src/i18n';
 
@@ -277,6 +278,10 @@ export function SettingsTab({ started }: SettingsTabProps) {
             }}
             value={multiChannelOrbits}
           />
+        </FormItem>
+
+        <FormItem>
+          <SampleCacheSettings />
         </FormItem>
 
         <FormItem label={t('autosave')}>

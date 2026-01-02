@@ -4,7 +4,6 @@ import { setVersionDefaults } from '@strudel/webaudio';
 import { getMetadata } from '../metadata_parser';
 import { isTauri } from '../tauri';
 import './Repl.css';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { $featuredPatterns, type PatternData } from '@src/user_pattern_utils';
@@ -24,12 +23,6 @@ interface SupabaseResponse<T> {
 interface FeaturedPatterns {
   [key: string]: PatternData;
 }
-
-// Create a single supabase client for interacting with your database
-export const supabase: SupabaseClient = createClient(
-  'https://pidxdsxphlhzjnzmifth.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBpZHhkc3hwaGxoempuem1pZnRoIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NTYyMzA1NTYsImV4cCI6MTk3MTgwNjU1Nn0.bqlw7802fsWRnqU5BLYtmXk_k-D1VFmbkHMywWc15NM',
-);
 
 let dbLoaded: Promise<void> | undefined;
 /* if (typeof window !== 'undefined') {

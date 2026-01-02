@@ -328,7 +328,10 @@ export function useReplContext(): ReplContext {
       trackRouterRef.current = new TrackRouter({
         onTrackChange: (trackId, previousTrackId) => {
           console.log('TrackRouter - track changed:', { trackId, previousTrackId });
-          // The FileManager will handle the actual track loading
+          // Update activePattern to trigger FileManager synchronization
+          if (trackId) {
+            setActivePattern(trackId);
+          }
         },
         onNavigationStart: (trackId) => {
           console.log('TrackRouter - navigation started:', trackId);
@@ -413,7 +416,7 @@ export function useReplContext(): ReplContext {
     };
     setViewingPatternData(fullPatternData);
     
-    // Only set code if editor is initialized
+    // Simple, direct approach - just set the code
     if (editorRef.current && editorRef.current.setCode) {
       editorRef.current.setCode(patternData.code);
     }

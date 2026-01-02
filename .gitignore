@@ -145,3 +145,9 @@ fabric.properties
 samples/*
 !samples/README.md
 .idea/
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development

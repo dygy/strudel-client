@@ -7,6 +7,7 @@ This program is free software: you can redistribute it and/or modify it under th
 import { isIframe, isUdels } from './util';
 import UdelsEditor from '@components/Udels/UdelsEditor';
 import ReplEditor from './components/ReplEditor';
+import AuthenticatedReplEditor from './components/AuthenticatedReplEditor';
 import EmbeddedReplEditor from './components/EmbeddedReplEditor';
 import { useReplContext } from './useReplContext';
 import { useSettings } from '@src/settings';
@@ -26,9 +27,23 @@ interface EditorProps {
 
 export function Repl({ embedded = false }: ReplProps) {
   const isEmbedded = embedded || isIframe();
-  const Editor = isUdels() ? UdelsEditor : isEmbedded ? EmbeddedReplEditor : ReplEditor;
   const context = useReplContext();
   const { fontFamily } = useSettings();
+  
+  // Check if there's a track parameter in the URL
+  const hasTrackParam = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('track');
+  
+  // Choose the appropriate editor based on context
+  let Editor;
+  if (isUdels()) {
+    Editor = UdelsEditor;
+  } else if (isEmbedded) {
+    Editor = EmbeddedReplEditor;
+  } else {
+    // Always use regular editor - no authentication required
+    // Users can sign in via header button if they want cloud features
+    Editor = ReplEditor;
+  }
   
   return (
     <I18nProvider>

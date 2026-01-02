@@ -90,5 +90,19 @@
   "activeStep": "Paso Activo",
   "newMultitrack": "Nueva Multipista",
   "multitrackCreated": "¡Multipista creada exitosamente!",
-  "stepRenamed": "¡Paso renombrado exitosamente!"
+  "stepRenamed": "¡Paso renombrado exitosamente!",
+  "multitrackImported": "¡Multipista '{{name}}' importada exitosamente!",
+  "invalidMultitrackFile": "Formato de archivo de multipista inválido",
+  "noValidStepsFound": "No se encontraron pasos válidos en el archivo de multipista",
+  "multitrackImportFailed": "Error al importar archivo de multipista",
+  "invalidZipFile": "Formato de archivo ZIP inválido",
+  "deleteAllTracks": "Eliminar Todas las Pistas y Carpetas",
+  "confirmDeleteAllTracks": "¿Estás seguro de que quieres eliminar TODAS las pistas y carpetas?",
+  "deleteAllTracksWarning": "Esto eliminará permanentemente todas las {{count}} pistas. Esta acción no se puede deshacer.",
+  "deleteAllFoldersWarning": "Esto eliminará permanentemente todas las {{count}} carpetas. Esta acción no se puede deshacer.",
+  "deleteAllTracksAndFoldersWarning": "Esto eliminará permanentemente todas las {{trackCount}} pistas y {{folderCount}} carpetas. Esta acción no se puede deshacer.",
+  "allTracksDeleted": "¡Todas las pistas eliminadas exitosamente!",
+  "allFoldersDeleted": "¡Todas las carpetas eliminadas exitosamente!",
+  "allTracksAndFoldersDeleted": "¡Todas las pistas y carpetas eliminadas exitosamente!",
+  "noTracksToExport": "No hay pistas para exportar"
 }

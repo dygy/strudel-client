@@ -41,6 +41,7 @@
   
   "noCodeToSave": "No code to save",
   "trackSaved": "Track saved successfully!",
+  "trackCreatedAndSaved": "Track '{{name}}' created and saved!",
   "trackDuplicated": "Track duplicated successfully!",
   "trackDownloaded": "Track downloaded successfully!",
   "trackRenamed": "Track renamed successfully!",
@@ -59,7 +60,7 @@
   "newFolder": "New Folder",
   "folderName": "Folder name",
   "createFolder": "Create Folder",
-  "openFolder": "Open Folder",
+  "ts": "Open Folder",
   "folderDeleted": "Folder deleted successfully!",
   "folderRenamed": "Folder renamed successfully!",
   "folderNotEmpty": "Cannot delete folder: it contains files or subfolders",
@@ -87,6 +88,7 @@
   "multitrackDownloaded": "Multitrack downloaded as ZIP successfully!",
   "folderDownloaded": "Folder downloaded as ZIP successfully!",
   "emptyFolder": "Folder is empty - nothing to download",
+  "noTracksToExport": "No tracks to export",
   "activeStep": "Active Step",
   "newMultitrack": "New Multitrack",
   "multitrackCreated": "Multitrack created successfully!",
@@ -95,5 +97,13 @@
   "invalidMultitrackFile": "Invalid multitrack file format",
   "noValidStepsFound": "No valid steps found in multitrack file",
   "multitrackImportFailed": "Failed to import multitrack file",
-  "invalidZipFile": "Invalid ZIP file format"
+  "invalidZipFile": "Invalid ZIP file format",
+  "deleteAllTracks": "Delete All Tracks & Folders",
+  "confirmDeleteAllTracks": "Are you sure you want to delete ALL tracks and folders?",
+  "deleteAllTracksWarning": "This will permanently delete all {{count}} tracks. This action cannot be undone.",
+  "deleteAllFoldersWarning": "This will permanently delete all {{count}} folders. This action cannot be undone.",
+  "deleteAllTracksAndFoldersWarning": "This will permanently delete all {{trackCount}} tracks and {{folderCount}} folders. This action cannot be undone.",
+  "allTracksDeleted": "All tracks deleted successfully!",
+  "allFoldersDeleted": "All folders deleted successfully!",
+  "allTracksAndFoldersDeleted": "All tracks and folders deleted successfully!"
 }

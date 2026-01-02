@@ -90,5 +90,19 @@
   "activeStep": "שלב פעיל",
   "newMultitrack": "רצועה מרובה חדשה",
   "multitrackCreated": "רצועה מרובה נוצרה בהצלחה!",
-  "stepRenamed": "שלב שונה בהצלחה!"
+  "stepRenamed": "שלב שונה בהצלחה!",
+  "multitrackImported": "רצועה מרובה '{{name}}' יובאה בהצלחה!",
+  "invalidMultitrackFile": "פורמט קובץ רצועה מרובה לא תקין",
+  "noValidStepsFound": "לא נמצאו שלבים תקינים בקובץ הרצועה המרובה",
+  "multitrackImportFailed": "ייבוא קובץ רצועה מרובה נכשל",
+  "invalidZipFile": "פורמט קובץ ZIP לא תקין",
+  "deleteAllTracks": "מחק את כל הרצועות והתיקיות",
+  "confirmDeleteAllTracks": "האם אתה בטוח שברצונך למחוק את כל הרצועות והתיקיות?",
+  "deleteAllTracksWarning": "זה ימחק לצמיתות את כל {{count}} הרצועות. לא ניתן לבטל פעולה זו.",
+  "deleteAllFoldersWarning": "זה ימחק לצמיתות את כל {{count}} התיקיות. לא ניתן לבטל פעולה זו.",
+  "deleteAllTracksAndFoldersWarning": "זה ימחק לצמיתות את כל {{trackCount}} הרצועות ו-{{folderCount}} התיקיות. לא ניתן לבטל פעולה זו.",
+  "allTracksDeleted": "כל הרצועות נמחקו בהצלחה!",
+  "allFoldersDeleted": "כל התיקיות נמחקו בהצלחה!",
+  "allTracksAndFoldersDeleted": "כל הרצועות והתיקיות נמחקו בהצלחה!",
+  "noTracksToExport": "אין רצועות לייצוא"
 }

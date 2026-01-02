@@ -9,6 +9,7 @@ import enSettings from './locales/en/settings.json';
 import enTabs from './locales/en/tabs.json';
 import enMessages from './locales/en/messages.json';
 import enWelcome from './locales/en/welcome.json';
+import enAuth from './locales/en/auth.json';
 
 import frCommon from './locales/fr/common.json';
 import frFiles from './locales/fr/files.json';
@@ -16,6 +17,7 @@ import frSettings from './locales/fr/settings.json';
 import frTabs from './locales/fr/tabs.json';
 import frMessages from './locales/fr/messages.json';
 import frWelcome from './locales/fr/welcome.json';
+import frAuth from './locales/fr/auth.json';
 
 import esCommon from './locales/es/common.json';
 import esFiles from './locales/es/files.json';
@@ -23,6 +25,7 @@ import esSettings from './locales/es/settings.json';
 import esTabs from './locales/es/tabs.json';
 import esMessages from './locales/es/messages.json';
 import esWelcome from './locales/es/welcome.json';
+import esAuth from './locales/es/auth.json';
 
 // Import other language files
 import ruCommon from './locales/ru/common.json';
@@ -31,6 +34,7 @@ import ruSettings from './locales/ru/settings.json';
 import ruTabs from './locales/ru/tabs.json';
 import ruMessages from './locales/ru/messages.json';
 import ruWelcome from './locales/ru/welcome.json';
+import ruAuth from './locales/ru/auth.json';
 
 import heCommon from './locales/he/common.json';
 import heFiles from './locales/he/files.json';
@@ -38,6 +42,7 @@ import heSettings from './locales/he/settings.json';
 import heTabs from './locales/he/tabs.json';
 import heMessages from './locales/he/messages.json';
 import heWelcome from './locales/he/welcome.json';
+import heAuth from './locales/he/auth.json';
 
 import arCommon from './locales/ar/common.json';
 import arFiles from './locales/ar/files.json';
@@ -45,6 +50,7 @@ import arSettings from './locales/ar/settings.json';
 import arTabs from './locales/ar/tabs.json';
 import arMessages from './locales/ar/messages.json';
 import arWelcome from './locales/ar/welcome.json';
+import arAuth from './locales/ar/auth.json';
 
 import srCommon from './locales/sr/common.json';
 import srFiles from './locales/sr/files.json';
@@ -52,6 +58,7 @@ import srSettings from './locales/sr/settings.json';
 import srTabs from './locales/sr/tabs.json';
 import srMessages from './locales/sr/messages.json';
 import srWelcome from './locales/sr/welcome.json';
+import srAuth from './locales/sr/auth.json';
 
 const resources = {
   en: {
@@ -61,6 +68,7 @@ const resources = {
     tabs: enTabs,
     messages: enMessages,
     welcome: enWelcome,
+    auth: enAuth,
   },
   fr: {
     common: frCommon,
@@ -69,6 +77,7 @@ const resources = {
     tabs: frTabs,
     messages: frMessages,
     welcome: frWelcome,
+    auth: frAuth,
   },
   es: {
     common: esCommon,
@@ -77,6 +86,7 @@ const resources = {
     tabs: esTabs,
     messages: esMessages,
     welcome: esWelcome,
+    auth: esAuth,
   },
   ru: {
     common: ruCommon,
@@ -85,6 +95,7 @@ const resources = {
     tabs: ruTabs,
     messages: ruMessages,
     welcome: ruWelcome,
+    auth: ruAuth,
   },
   he: {
     common: heCommon,
@@ -93,6 +104,7 @@ const resources = {
     tabs: heTabs,
     messages: heMessages,
     welcome: heWelcome,
+    auth: heAuth,
   },
   ar: {
     common: arCommon,
@@ -101,6 +113,7 @@ const resources = {
     tabs: arTabs,
     messages: arMessages,
     welcome: arWelcome,
+    auth: arAuth,
   },
   sr: {
     common: srCommon,
@@ -109,6 +122,7 @@ const resources = {
     tabs: srTabs,
     messages: srMessages,
     welcome: srWelcome,
+    auth: srAuth,
   },
 };
 
@@ -123,7 +137,7 @@ i18n
     resources,
     fallbackLng: 'en',
     defaultNS: 'common',
-    ns: ['common', 'files', 'settings', 'tabs', 'messages', 'welcome'],
+    ns: ['common', 'files', 'settings', 'tabs', 'messages', 'welcome', 'auth'],
     debug: false,
     
     interpolation: {

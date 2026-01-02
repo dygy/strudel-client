@@ -5,12 +5,11 @@ import UserFacingErrorMessage from '@src/repl/components/UserFacingErrorMessage'
 import { Header } from './Header';
 import { useSettings } from '@src/settings';
 import { ResizableSidebar } from './sidebar/ResizableSidebar';
-import { FileManager } from './sidebar/FileManager';
+import { FileManagerRefactored as FileManager } from './sidebar/FileManagerRefactored';
 import { WelcomeScreen } from './WelcomeScreen';
 import { useActivePattern, userPattern } from '@src/user_pattern_utils';
 import { DEFAULT_TRACK_CODE, isDefaultCode } from '@src/constants/defaultCode';
 import { GlobalToastContainer } from '@src/components/GlobalToastContainer';
-import { GlobalTooltip } from '@src/components/GlobalTooltip';
 import React, { useState, useEffect } from 'react';
 
 interface ReplContext {
@@ -98,6 +97,7 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
   });
   
   const checkUserData = () => {
+    console.log('checkUserData - starting check');
     if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
       const savedTracks = localStorage.getItem('strudel_tracks');
       const userPatternsKey = localStorage.getItem('strudel-settingsuserPatterns');
@@ -105,15 +105,19 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
       let hasTracksData = false;
       let hasUserPatternData = false;
       
+      console.log('checkUserData - savedTracks raw:', savedTracks);
+      
       if (savedTracks) {
         try {
           const tracks = JSON.parse(savedTracks);
           hasTracksData = Object.keys(tracks).length > 0;
-          console.log('checkUserData - tracks found:', Object.keys(tracks).length, tracks);
+          console.log('checkUserData - tracks found:', Object.keys(tracks).length, 'hasTracksData:', hasTracksData);
         } catch (e) {
           hasTracksData = false;
           console.log('checkUserData - error parsing tracks:', e);
         }
+      } else {
+        console.log('checkUserData - no savedTracks found in localStorage');
       }
       
       if (userPatternsKey) {
@@ -141,15 +145,38 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
       const hasAnyUserData = hasTracksData || hasUserPatternData;
       
       console.log('checkUserData - final result:', { hasTracksData, hasUserPatternData, hasAnyUserData });
+      console.log('checkUserData - about to call setHasTracks with:', hasTracksData);
+      console.log('checkUserData - about to call setHasUserData with:', hasAnyUserData);
       
       setHasTracks(hasTracksData);
       setHasUserData(hasAnyUserData);
+      
+      console.log('checkUserData - state setters called');
+    } else {
+      console.log('checkUserData - window or localStorage not available');
     }
   };
   
   useEffect(() => {
     console.log('ReplEditor useEffect - calling checkUserData on mount');
     checkUserData();
+    
+    // Set up a periodic check for user data changes (as a fallback)
+    const periodicCheck = setInterval(() => {
+      const currentTracks = typeof localStorage !== 'undefined' ? localStorage.getItem('strudel_tracks') : null;
+      if (currentTracks) {
+        try {
+          const tracks = JSON.parse(currentTracks);
+          const trackCount = Object.keys(tracks).length;
+          if (trackCount > 0 && !hasUserData) {
+            console.log('ReplEditor - periodic check found tracks, updating state');
+            checkUserData();
+          }
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      }
+    }, 1000); // Check every second
     
     // Listen for localStorage changes
     const handleStorageChange = () => {
@@ -164,14 +191,40 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
       setHasUserData(false);
     };
     
+    // Listen for when tracks are imported
+    const handleTracksImported = () => {
+      console.log('ReplEditor - tracks imported event received, checking user data');
+      // Add a small delay to ensure localStorage has been updated
+      setTimeout(() => {
+        console.log('ReplEditor - calling checkUserData after delay');
+        checkUserData();
+      }, 100);
+    };
+    
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('strudel-all-tracks-deleted', handleAllTracksDeleted);
+    window.addEventListener('strudel-tracks-imported', handleTracksImported);
+    
+    // Debug: Log that we've set up the event listener
+    console.log('ReplEditor - event listeners set up, including strudel-tracks-imported');
     
     return () => {
+      clearInterval(periodicCheck);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('strudel-all-tracks-deleted', handleAllTracksDeleted);
+      window.removeEventListener('strudel-tracks-imported', handleTracksImported);
     };
   }, []);
+  
+  // Debug: Track when hasTracks state changes
+  useEffect(() => {
+    console.log('ReplEditor - hasTracks state changed to:', hasTracks);
+  }, [hasTracks]);
+  
+  // Debug: Track when hasUserData state changes
+  useEffect(() => {
+    console.log('ReplEditor - hasUserData state changed to:', hasUserData);
+  }, [hasUserData]);
   
   // Check if we should show the welcome screen
   // Show welcome if this is a fresh session with no user data
@@ -186,6 +239,17 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
     localStorage_tracks: typeof localStorage !== 'undefined' ? localStorage.getItem('strudel_tracks') : 'undefined',
     localStorage_settings: typeof localStorage !== 'undefined' ? localStorage.getItem('strudel_settings') : 'undefined'
   });
+  
+  // Debug: Add a manual refresh function
+  const forceRefreshUserData = () => {
+    console.log('ReplEditor - manually forcing checkUserData');
+    checkUserData();
+  };
+  
+  // Debug: Expose the function to window for manual testing
+  if (typeof window !== 'undefined') {
+    (window as any).forceRefreshUserData = forceRefreshUserData;
+  }
   
   const handleCreateTrack = () => {
     // Create a new track with the default code
@@ -212,7 +276,7 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
       
       // Trigger a custom event to notify FileManager
       window.dispatchEvent(new CustomEvent('strudel-tracks-updated', { 
-        detail: { tracks } 
+        detail: { tracks, selectTrackId: trackId } 
       }));
       
       // Also trigger a recheck to be sure
@@ -323,8 +387,8 @@ export default function ReplEditor({ context, ...editorProps }: ReplEditorProps)
       {/* Global Toast Container */}
       <GlobalToastContainer />
       
-      {/* Global Tooltip */}
-      <GlobalTooltip />
+      {/* Global Tooltip - Temporarily disabled for cleaner UX */}
+      {/* <GlobalTooltip /> */}
     </div>
   );
 }

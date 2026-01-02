@@ -39,5 +39,24 @@
   "autosaveInterval": "Autosave Interval (seconds)",
   "autosaveDescription": "Automatically save the current track at regular intervals",
   "settingsTitle": "Settings",
-  "settingsSubtitle": "Customize your Strudel experience"
+  "settingsSubtitle": "Customize your Strudel experience",
+  "sampleCache": {
+    "title": "Sample Cache",
+    "description": "Configure audio sample caching to improve performance and reduce loading delays.",
+    "notSupported": "Sample caching is not available in this environment.",
+    "status": "Cache Status",
+    "configuration": "Configuration",
+    "cacheSize": "Cache Size",
+    "hitRate": "Hit Rate",
+    "hits": "Cache Hits",
+    "misses": "Cache Misses",
+    "preloaded": "Preloaded",
+    "evicted": "Evicted",
+    "usage": "Cache Usage",
+    "enabled": "Enable Cache",
+    "preloadEnabled": "Enable Preloading",
+    "maxSize": "Max Cache Size",
+    "preloadDelay": "Preload Delay",
+    "clearCache": "Clear Cache"
+  }
 }

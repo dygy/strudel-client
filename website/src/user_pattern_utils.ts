@@ -3,7 +3,8 @@ import { useStore } from '@nanostores/react';
 import { logger } from '@strudel/core';
 import { nanoid } from 'nanoid';
 import { settingsMap } from './settings';
-import { confirmDialog, parseJSON, supabase } from './repl/util';
+import { confirmDialog, parseJSON } from './repl/util';
+import { supabase } from './lib/supabase';
 import { DEFAULT_TRACK_CODE } from './constants/defaultCode';
 
 // Type definitions
@@ -91,23 +92,37 @@ function parsePageNum(page: number | string): number {
 export function loadPublicPatterns(page: number | string = 0): Promise<SupabaseResponse<PatternData>> {
   const pageNum = parsePageNum(page);
   const offset = pageNum * patternQueryLimit;
-  return supabase
-    .from('code_v1')
-    .select()
-    .eq('public', true)
-    .range(offset, offset + patternQueryLimit)
-    .order('id', { ascending: false }) as any;
+  
+  // Note: This functionality is currently disabled as it requires a different database
+  // with a 'code_v1' table that contains public patterns
+  console.warn('loadPublicPatterns: Public patterns functionality is currently disabled');
+  return Promise.resolve({ data: [], error: null });
+  
+  // Original implementation (commented out):
+  // return supabase
+  //   .from('code_v1')
+  //   .select()
+  //   .eq('public', true)
+  //   .range(offset, offset + patternQueryLimit)
+  //   .order('id', { ascending: false }) as any;
 }
 
 export function loadFeaturedPatterns(page: number | string = 0): Promise<SupabaseResponse<PatternData>> {
   const pageNum = parsePageNum(page);
   const offset = pageNum * patternQueryLimit;
-  return supabase
-    .from('code_v1')
-    .select()
-    .eq('featured', true)
-    .range(offset, offset + patternQueryLimit)
-    .order('id', { ascending: false }) as any;
+  
+  // Note: This functionality is currently disabled as it requires a different database
+  // with a 'code_v1' table that contains featured patterns
+  console.warn('loadFeaturedPatterns: Featured patterns functionality is currently disabled');
+  return Promise.resolve({ data: [], error: null });
+  
+  // Original implementation (commented out):
+  // return supabase
+  //   .from('code_v1')
+  //   .select()
+  //   .eq('featured', true)
+  //   .range(offset, offset + patternQueryLimit)
+  //   .order('id', { ascending: false }) as any;
 }
 
 export async function loadAndSetPublicPatterns(page?: number | string): Promise<void> {
@@ -139,7 +154,21 @@ export async function loadDBPatterns(): Promise<void> {
 const $activePattern = sessionAtom('activePattern', '');
 
 export function setActivePattern(key: string | null): void {
+  const oldPattern = $activePattern.get();
   $activePattern.set(key);
+  
+  // If this is a new pattern (not just switching between existing ones), 
+  // trigger synchronization check
+  if (key && key !== oldPattern && typeof window !== 'undefined') {
+    console.log('setActivePattern - pattern changed from', oldPattern, 'to', key);
+    
+    // Dispatch event to trigger FileManager synchronization
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('strudel-active-pattern-changed', {
+        detail: { newPattern: key, oldPattern }
+      }));
+    }, 50);
+  }
 }
 
 export function getActivePattern(): string {
@@ -195,12 +224,22 @@ export const userPattern: UserPatternMethods = {
 
   update(id: string, data: Partial<PatternData>): { id: string; data: PatternData } {
     const userPatterns = this.getAll();
+    const isNewPattern = !userPatterns[id];
     const updatedData: PatternData = { 
       ...data as PatternData, 
       id, 
       collection: this.collection 
     };
     setUserPatterns({ ...userPatterns, [id]: updatedData });
+    
+    // Dispatch event for new patterns to notify FileManager
+    if (isNewPattern && typeof window !== 'undefined') {
+      console.log('userPattern.update - dispatching user pattern created event for:', id);
+      window.dispatchEvent(new CustomEvent('strudel-user-pattern-created', {
+        detail: { patternId: id, patternData: updatedData }
+      }));
+    }
+    
     return { id, data: updatedData };
   },
   

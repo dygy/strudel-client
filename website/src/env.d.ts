@@ -5,6 +5,16 @@
 
 declare module 'date-fns';
 
+// Environment variables
+interface ImportMetaEnv {
+  readonly PUBLIC_SUPABASE_URL: string;
+  readonly PUBLIC_SUPABASE_ANON_KEY: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
 // Fix JSX types for React components
 import type { DetailedHTMLProps, HTMLAttributes } from 'react';
 

@@ -90,5 +90,19 @@
   "activeStep": "Étape Active",
   "newMultitrack": "Nouvelle Multipiste",
   "multitrackCreated": "Multipiste créée avec succès!",
-  "stepRenamed": "Étape renommée avec succès!"
+  "stepRenamed": "Étape renommée avec succès!",
+  "multitrackImported": "Multipiste '{{name}}' importée avec succès!",
+  "invalidMultitrackFile": "Format de fichier multipiste invalide",
+  "noValidStepsFound": "Aucune étape valide trouvée dans le fichier multipiste",
+  "multitrackImportFailed": "Échec de l'importation du fichier multipiste",
+  "invalidZipFile": "Format de fichier ZIP invalide",
+  "deleteAllTracks": "Supprimer Toutes les Pistes et Dossiers",
+  "confirmDeleteAllTracks": "Êtes-vous sûr de vouloir supprimer TOUTES les pistes et dossiers ?",
+  "deleteAllTracksWarning": "Cela supprimera définitivement toutes les {{count}} pistes. Cette action ne peut pas être annulée.",
+  "deleteAllFoldersWarning": "Cela supprimera définitivement tous les {{count}} dossiers. Cette action ne peut pas être annulée.",
+  "deleteAllTracksAndFoldersWarning": "Cela supprimera définitivement toutes les {{trackCount}} pistes et {{folderCount}} dossiers. Cette action ne peut pas être annulée.",
+  "allTracksDeleted": "Toutes les pistes supprimées avec succès !",
+  "allFoldersDeleted": "Tous les dossiers supprimés avec succès !",
+  "allTracksAndFoldersDeleted": "Toutes les pistes et dossiers supprimés avec succès !",
+  "noTracksToExport": "Aucune piste à exporter"
 }

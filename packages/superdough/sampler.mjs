@@ -3,6 +3,7 @@ import { registerSound, registerWaveTable } from './index.mjs';
 import { getAudioContext } from './audioContext.mjs';
 import { getADSRValues, getParamADSR, getPitchEnvelope, getVibratoOscillator } from './helpers.mjs';
 import { logger } from './logger.mjs';
+import { trackSampleAccess } from './sampleCache.mjs';
 
 const bufferCache = {}; // string: Promise<ArrayBuffer>
 const loadCache = {}; // string: Promise<ArrayBuffer>
@@ -90,8 +91,15 @@ export const loadBuffer = (url, ac, s, n = 0) => {
         logger(`[sampler] load ${label}... done! loaded ${size} in ${took}ms`, 'loaded-sample', { url });
         const decoded = await ac.decodeAudioData(res);
         bufferCache[url] = decoded;
+        
+        // Track cache access for the new caching system
+        trackSampleAccess(url, decoded);
+        
         return decoded;
       });
+  } else {
+    // Track cache hit
+    trackSampleAccess(url);
   }
   return loadCache[url];
 };

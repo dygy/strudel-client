@@ -168,11 +168,39 @@ export function transpiler(input, options = {}) {
   return { output, miniLocations, widgets };
 }
 
+function isURL(value) {
+  // Check if the string looks like a URL
+  if (typeof value !== 'string') return false;
+  
+  // Common URL patterns
+  const urlPatterns = [
+    /^https?:\/\//,           // http:// or https://
+    /^ftp:\/\//,              // ftp://
+    /^file:\/\//,             // file://
+    /^data:/,                 // data: URLs
+    /^blob:/,                 // blob: URLs
+    /^\/\//,                  // protocol-relative URLs
+  ];
+  
+  return urlPatterns.some(pattern => pattern.test(value));
+}
+
 function isStringWithDoubleQuotes(node, locations, code) {
   if (node.type !== 'Literal') {
     return false;
   }
-  return node.raw[0] === '"';
+  
+  // Check if it's a double-quoted string
+  if (node.raw[0] !== '"') {
+    return false;
+  }
+  
+  // Skip URL strings - don't convert them to mini notation
+  if (isURL(node.value)) {
+    return false;
+  }
+  
+  return true;
 }
 
 function isBackTickString(node, parent) {

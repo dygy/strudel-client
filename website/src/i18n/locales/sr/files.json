@@ -90,5 +90,19 @@
   "activeStep": "Активни Корак",
   "newMultitrack": "Нова Мултинумера",
   "multitrackCreated": "Мултинумера је успешно креирана!",
-  "stepRenamed": "Корак је успешно преименован!"
+  "stepRenamed": "Корак је успешно преименован!",
+  "multitrackImported": "Мултинумера '{{name}}' је успешно увезена!",
+  "invalidMultitrackFile": "Неисправан формат фајла мултинумере",
+  "noValidStepsFound": "Нису пронађени важећи кораци у фајлу мултинумере",
+  "multitrackImportFailed": "Неуспешан увоз фајла мултинумере",
+  "invalidZipFile": "Неисправан формат ZIP фајла",
+  "deleteAllTracks": "Обриши Све Нумере и Фасцикле",
+  "confirmDeleteAllTracks": "Да ли сте сигурни да желите да обришете СВЕ нумере и фасцикле?",
+  "deleteAllTracksWarning": "Ово ће трајно обрисати свих {{count}} нумера. Ова акција се не може опозвати.",
+  "deleteAllFoldersWarning": "Ово ће трајно обрисати свих {{count}} фасцикли. Ова акција се не може опозвати.",
+  "deleteAllTracksAndFoldersWarning": "Ово ће трајно обрисати свих {{trackCount}} нумера и {{folderCount}} фасцикли. Ова акција се не може опозвати.",
+  "allTracksDeleted": "Све нумере су успешно обрисане!",
+  "allFoldersDeleted": "Све фасцикле су успешно обрисане!",
+  "allTracksAndFoldersDeleted": "Све нумере и фасцикле су успешно обрисане!",
+  "noTracksToExport": "Нема нумера за извоз"
 }

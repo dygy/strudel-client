@@ -90,5 +90,19 @@
   "activeStep": "Активный Шаг",
   "newMultitrack": "Новый Мультитрек",
   "multitrackCreated": "Мультитрек успешно создан!",
-  "stepRenamed": "Шаг успешно переименован!"
+  "stepRenamed": "Шаг успешно переименован!",
+  "multitrackImported": "Мультитрек '{{name}}' успешно импортирован!",
+  "invalidMultitrackFile": "Неверный формат файла мультитрека",
+  "noValidStepsFound": "В файле мультитрека не найдено действительных шагов",
+  "multitrackImportFailed": "Не удалось импортировать файл мультитрека",
+  "invalidZipFile": "Неверный формат ZIP файла",
+  "deleteAllTracks": "Удалить Все Треки и Папки",
+  "confirmDeleteAllTracks": "Вы уверены, что хотите удалить ВСЕ треки и папки?",
+  "deleteAllTracksWarning": "Это навсегда удалит все {{count}} треков. Это действие нельзя отменить.",
+  "deleteAllFoldersWarning": "Это навсегда удалит все {{count}} папок. Это действие нельзя отменить.",
+  "deleteAllTracksAndFoldersWarning": "Это навсегда удалит все {{trackCount}} треков и {{folderCount}} папок. Это действие нельзя отменить.",
+  "allTracksDeleted": "Все треки успешно удалены!",
+  "allFoldersDeleted": "Все папки успешно удалены!",
+  "allTracksAndFoldersDeleted": "Все треки и папки успешно удалены!",
+  "noTracksToExport": "Нет треков для экспорта"
 }

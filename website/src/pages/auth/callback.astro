@@ -1,0 +1,91 @@
+---
+// Simple callback page - let Supabase handle OAuth automatically
+---
+
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Authenticating... | Strudel</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #f8fafc;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e5e7eb;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="spinner"></div>
+        <h2>Authenticating...</h2>
+        <p>Please wait while we complete your sign in.</p>
+    </div>
+
+    <script type="module">
+        async function handleCallback() {
+            console.log('OAuth callback page loaded');
+            
+            try {
+                // Import Supabase client
+                const { supabase } = await import('/src/lib/supabase.ts');
+                
+                // Let Supabase automatically detect and process the session from URL
+                console.log('Waiting for Supabase to process OAuth callback...');
+                
+                // Wait a moment for Supabase to process the URL automatically
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Check if session was created
+                const { data: { session }, error } = await supabase.auth.getSession();
+                
+                if (session) {
+                    console.log('Session created successfully:', session.user.email);
+                } else {
+                    console.log('No session found, Supabase may still be processing...');
+                }
+                
+                // Redirect regardless - AuthContext will handle session detection
+                const redirectUrl = sessionStorage.getItem('strudel_redirect_after_auth') || '/';
+                console.log('Redirecting to:', redirectUrl);
+                sessionStorage.removeItem('strudel_redirect_after_auth');
+                window.location.href = redirectUrl;
+                
+            } catch (error) {
+                console.error('Error in callback:', error);
+                // Redirect anyway
+                const redirectUrl = sessionStorage.getItem('strudel_redirect_after_auth') || '/';
+                window.location.href = redirectUrl;
+            }
+        }
+        
+        // Start callback handling
+        handleCallback();
+    </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowDownTrayIcon,
   ChevronDownIcon,
@@ -132,6 +132,48 @@ export function FileTree({
   const { t } = useTranslation(['files', 'common']);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set([''])); // Root is expanded by default
   const [draggedItem, setDraggedItem] = useState<{ id: string; type: 'track' | 'folder' } | null>(null);
+
+  // Auto-expand parent directories when a track is selected
+  React.useEffect(() => {
+    if (selectedTrack && tracks[selectedTrack]) {
+      const track = tracks[selectedTrack];
+      if (track.folder) {
+        expandParentDirectories(track.folder);
+      }
+    }
+  }, [selectedTrack, tracks, folders]);
+
+  // Function to expand all parent directories for a given folder path
+  const expandParentDirectories = (folderPath: string) => {
+    const pathsToExpand = new Set<string>();
+    
+    // Add the direct folder
+    pathsToExpand.add(folderPath);
+    
+    // Add all parent folders by walking up the hierarchy
+    let currentPath = folderPath;
+    while (currentPath) {
+      pathsToExpand.add(currentPath);
+      
+      // Find parent folder
+      const folder = folders[currentPath];
+      if (folder && folder.parent) {
+        currentPath = folder.parent;
+      } else {
+        break;
+      }
+    }
+    
+    // Add root folder (empty string)
+    pathsToExpand.add('');
+    
+    // Update expanded folders state
+    setExpandedFolders(prev => {
+      const newSet = new Set(prev);
+      pathsToExpand.forEach(path => newSet.add(path));
+      return newSet;
+    });
+  };
 
   // Build tree structure
   const buildTree = (): TreeNode[] => {

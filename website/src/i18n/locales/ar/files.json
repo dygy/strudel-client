@@ -90,5 +90,18 @@
   "activeStep": "الخطوة النشطة",
   "newMultitrack": "مسار متعدد جديد",
   "multitrackCreated": "تم إنشاء المسار المتعدد بنجاح!",
-  "stepRenamed": "تم إعادة تسمية الخطوة بنجاح!"
+  "multitrackImported": "تم استيراد المسار المتعدد '{{name}}' بنجاح!",
+  "invalidMultitrackFile": "تنسيق ملف المسار المتعدد غير صالح",
+  "noValidStepsFound": "لم يتم العثور على خطوات صالحة في ملف المسار المتعدد",
+  "multitrackImportFailed": "فشل في استيراد ملف المسار المتعدد",
+  "invalidZipFile": "تنسيق ملف ZIP غير صالح",
+  "deleteAllTracks": "حذف جميع المسارات والمجلدات",
+  "confirmDeleteAllTracks": "هل أنت متأكد من أنك تريد حذف جميع المسارات والمجلدات؟",
+  "deleteAllTracksWarning": "سيؤدي هذا إلى حذف جميع {{count}} مسار نهائياً. لا يمكن التراجع عن هذا الإجراء.",
+  "deleteAllFoldersWarning": "سيؤدي هذا إلى حذف جميع {{count}} مجلد نهائياً. لا يمكن التراجع عن هذا الإجراء.",
+  "deleteAllTracksAndFoldersWarning": "سيؤدي هذا إلى حذف جميع {{trackCount}} مسار و {{folderCount}} مجلد نهائياً. لا يمكن التراجع عن هذا الإجراء.",
+  "allTracksDeleted": "تم حذف جميع المسارات بنجاح!",
+  "allFoldersDeleted": "تم حذف جميع المجلدات بنجاح!",
+  "allTracksAndFoldersDeleted": "تم حذف جميع المسارات والمجلدات بنجاح!",
+  "noTracksToExport": "لا توجد مسارات للتصدير"
 }
