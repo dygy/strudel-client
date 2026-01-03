@@ -21,3 +21,5 @@ pnpm-debug.log*
 
 public/tree-sitter.wasm
 public/tree-sitter-haskell.wasm
+.vercel
+.env*.local
