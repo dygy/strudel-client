@@ -376,11 +376,12 @@ export function FileTree({
       targetId = targetNode.id;
       console.log('handleDrop: Dropping onto folder', { targetNodeId: targetNode.id, targetId });
     } else {
-      // Dropping onto a track - use the track's parent folder (if any)
+      // Dropping onto a track - use the track's parent folder UUID (if any)
       const track = targetNode.data as Track;
       if (track.folder) {
-        // Try to find the folder by path (for backward compatibility) or UUID
-        const targetFolder = Object.values(folders).find(f => f.path === track.folder || f.id === track.folder);
+        // Try to find the folder by path first, then by UUID
+        const targetFolder = Object.values(folders).find(f => f.path === track.folder) || 
+                             Object.values(folders).find(f => f.id === track.folder);
         targetId = targetFolder?.id || '';
         console.log('handleDrop: Dropping onto track', { trackFolder: track.folder, targetFolder, targetId });
       } else {

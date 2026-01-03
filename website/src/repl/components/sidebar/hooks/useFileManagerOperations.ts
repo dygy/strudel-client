@@ -347,11 +347,11 @@ export function useFileManagerOperations({
     setRenameValue('');
   }, [renamingFolder, renameValue, folders, setFolders, setRenamingFolder, setRenameValue, t]);
 
-  const handleMoveItem = useCallback(async (itemId: string, itemType: 'track' | 'folder', targetPath: string) => {
+  const handleMoveItem = useCallback(async (itemId: string, itemType: 'track' | 'folder', targetId: string) => {
     console.log('handleMoveItem called:', { 
       itemId, 
       itemType, 
-      targetPath, 
+      targetId, 
       availableFolders: Object.keys(folders),
       foldersData: Object.entries(folders).map(([key, folder]) => ({ 
         key, 
@@ -362,6 +362,25 @@ export function useFileManagerOperations({
     });
     
     if (itemType === 'track') {
+      // Store original folder for potential revert
+      const originalTrack = tracks[itemId];
+      const originalFolder = originalTrack?.folder;
+      
+      // Convert targetId to folder path for local state (UI expects paths)
+      let targetPath: string | undefined;
+      if (targetId) {
+        // Find the target folder by UUID and get its path
+        const targetFolder = folders[targetId] || Object.values(folders).find(f => f.id === targetId);
+        if (targetFolder) {
+          targetPath = targetFolder.path;
+          console.log(`handleMoveItem - Found target folder UUID "${targetId}" with path: ${targetPath}`);
+        } else {
+          console.warn(`handleMoveItem - Target folder not found for UUID: ${targetId}`);
+          // If we can't find the folder by UUID, assume targetId is already a path
+          targetPath = targetId;
+        }
+      }
+      
       // Update local state immediately for responsive UI
       setTracks(prev => ({
         ...prev,
@@ -374,22 +393,8 @@ export function useFileManagerOperations({
       
       // Update the database using the corrected legacy update endpoint
       try {
-        // Convert targetPath to targetUuid for database storage
-        let targetUuid = null;
-        if (targetPath) {
-          // Find the target folder by path and get its UUID
-          const targetFolder = Object.values(folders).find(f => f.path === targetPath);
-          if (targetFolder) {
-            targetUuid = targetFolder.id;
-            console.log(`handleMoveItem - Found target folder "${targetPath}" with UUID: ${targetUuid}`);
-          } else {
-            console.warn(`handleMoveItem - Target folder not found for path: ${targetPath}`);
-            // If we can't find the folder, it might be a UUID already
-            targetUuid = targetPath;
-          }
-        }
+        console.log(`handleMoveItem - Updating database: trackId=${itemId}, folder=${targetId || null}`);
 
-        // Use the corrected legacy update endpoint
         const updateResponse = await fetch('/api/tracks/legacy-update', {
           method: 'PUT',
           headers: {
@@ -398,21 +403,31 @@ export function useFileManagerOperations({
           credentials: 'include',
           body: JSON.stringify({
             trackId: itemId,
-            folder: targetUuid, // Use UUID for folder reference
+            folder: targetId || null, // Use UUID directly for database storage
             modified: new Date().toISOString()
           }),
         });
 
         if (!updateResponse.ok) {
-          const errorData = await updateResponse.json();
-          console.error('handleMoveItem - Failed to update track in database:', errorData);
+          const errorText = await updateResponse.text();
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText };
+          }
+          console.error('handleMoveItem - Failed to update track in database:', {
+            status: updateResponse.status,
+            statusText: updateResponse.statusText,
+            error: errorData
+          });
           
           // Revert local state on database error
           setTracks(prev => ({
             ...prev,
             [itemId]: {
               ...prev[itemId],
-              folder: prev[itemId].folder, // Revert to original folder
+              folder: originalFolder, // Revert to original folder
             }
           }));
           
@@ -431,7 +446,7 @@ export function useFileManagerOperations({
           ...prev,
           [itemId]: {
             ...prev[itemId],
-            folder: prev[itemId].folder, // Revert to original folder
+            folder: originalFolder, // Revert to original folder
           }
         }));
         
@@ -440,7 +455,7 @@ export function useFileManagerOperations({
       }
     }
     // TODO: Implement folder moving
-  }, [setTracks, folders, t]);
+  }, [setTracks, folders, tracks, t]);
 
   const convertToMultitrack = useCallback((track: Track) => {
     const updatedTrack: Track = {

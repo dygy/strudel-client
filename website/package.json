@@ -17,6 +17,7 @@
     "@astrojs/react": "^4.1.6",
     "@astrojs/rss": "^4.0.11",
     "@astrojs/tailwind": "^5.1.5",
+    "@astrojs/vercel": "^8.1.0",
     "@docsearch/css": "^3.8.3",
     "@docsearch/react": "^3.8.3",
     "@headlessui/react": "^2.2.0",
