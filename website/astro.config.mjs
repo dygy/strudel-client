@@ -61,10 +61,7 @@ const options = {
 // https://astro.build/config
 export default defineConfig({
   output: 'server',
-  adapter: vercel({
-    edgeMiddleware: false,
-    functionPerRoute: false,
-  }),
+  adapter: vercel(),
   integrations: [
     react(),
     mdx(options),
