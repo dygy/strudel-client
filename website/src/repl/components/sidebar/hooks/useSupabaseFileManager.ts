@@ -283,6 +283,22 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
         sampleFolders: sampleFolders.map(f => ({ name: f.name, path: f.path }))
       });
 
+      // CRITICAL: Also update the global tracksStore so ReplEditor can see the data
+      tracksStore.set({
+        tracks: tracksObj,
+        folders: foldersObj,
+        isInitialized: true,
+        isLoading: false,
+        selectedTrack: null,
+        error: null
+      });
+
+      console.log('SupabaseFileManager - Updated global tracksStore with client-side data:', {
+        tracksCount: Object.keys(tracksObj).length,
+        foldersCount: Object.keys(foldersObj).length,
+        hasTracks: Object.keys(tracksObj).length > 0
+      });
+
       // Force a small delay to ensure state updates are processed
       await new Promise(resolve => setTimeout(resolve, 50));
     } catch (error) {

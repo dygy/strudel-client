@@ -395,7 +395,7 @@ export function useFileManagerOperations({
       try {
         console.log(`handleMoveItem - Updating database: trackId=${itemId}, folder=${targetId || null}`);
 
-        const updateResponse = await fetch('/api/tracks/legacy-update', {
+        const updateResponse = await fetch('/api/tracks/update', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -403,8 +403,10 @@ export function useFileManagerOperations({
           credentials: 'include',
           body: JSON.stringify({
             trackId: itemId,
-            folder: targetId || null, // Use UUID directly for database storage
-            modified: new Date().toISOString()
+            updates: {
+              folder: targetId || null, // Use UUID directly for database storage
+              modified: new Date().toISOString()
+            }
           }),
         });
 
@@ -453,9 +455,86 @@ export function useFileManagerOperations({
         toastActions.error('Failed to move track. Please try again.');
         return;
       }
+    } else if (itemType === 'folder') {
+      // Handle folder moving
+      const originalFolder = folders[itemId];
+      const originalParent = originalFolder?.parent;
+      
+      // Update local state immediately for responsive UI
+      setFolders(prev => ({
+        ...prev,
+        [itemId]: {
+          ...prev[itemId],
+          parent: targetId || null,
+        }
+      }));
+      
+      // Update the database using the folders update endpoint
+      try {
+        console.log(`handleMoveItem - Updating folder in database: folderId=${itemId}, parent=${targetId || null}`);
+
+        const updateResponse = await fetch('/api/folders/update', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            folderId: itemId,
+            updates: {
+              parent: targetId || null, // Use UUID directly for database storage
+            }
+          }),
+        });
+
+        if (!updateResponse.ok) {
+          const errorText = await updateResponse.text();
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText };
+          }
+          console.error('handleMoveItem - Failed to update folder in database:', {
+            status: updateResponse.status,
+            statusText: updateResponse.statusText,
+            error: errorData
+          });
+          
+          // Revert local state on database error
+          setFolders(prev => ({
+            ...prev,
+            [itemId]: {
+              ...prev[itemId],
+              parent: originalParent, // Revert to original parent
+            }
+          }));
+          
+          toastActions.error('Failed to move folder. Please try again.');
+          return;
+        }
+
+        const result = await updateResponse.json();
+        console.log('handleMoveItem - Folder updated successfully in database:', result);
+        toastActions.success(t('files:folderMoved'));
+      } catch (error) {
+        console.error('handleMoveItem - Error updating folder in database:', error);
+        
+        // Revert local state on error
+        setFolders(prev => ({
+          ...prev,
+          [itemId]: {
+            ...prev[itemId],
+            parent: originalParent, // Revert to original parent
+          }
+        }));
+        
+        toastActions.error('Failed to move folder. Please try again.');
+        return;
+      }
     }
     // TODO: Implement folder moving
-  }, [setTracks, folders, tracks, t]);
+  }, [setTracks, setFolders, folders, tracks, t]);
 
   const convertToMultitrack = useCallback((track: Track) => {
     const updatedTrack: Track = {

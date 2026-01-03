@@ -74,8 +74,9 @@ function ReplEditorClean({ context, fileManagerHook, ssrData, ...editorProps }: 
   // CRITICAL: Only initialize state once and prevent re-renders
   const [codeComponentKey] = useState(() => Math.random().toString(36));
 
-  // Simple welcome screen logic using tracks store
-  const shouldShowWelcome = tracks.isInitialized && !tracks.hasTracks() && !tracks.isLoading;
+  // Simple welcome screen logic using tracks store and file manager loading state
+  const fileManagerLoading = fileManagerHook && typeof fileManagerHook === 'object' && fileManagerHook.isLoading;
+  const shouldShowWelcome = tracks.isInitialized && !tracks.hasTracks() && !tracks.isLoading && !fileManagerLoading;
 
   const handleCreateTrack = useCallback(async (trackName?: string) => {
     const name = trackName || 'New Track';
@@ -140,7 +141,13 @@ function ReplEditorClean({ context, fileManagerHook, ssrData, ...editorProps }: 
     <Code key={codeComponentKey} containerRef={containerRef} editorRef={editorRef} init={init} />
   );
 
-  console.log('🔥 ReplEditor: Rendering', shouldShowWelcome ? 'WelcomeScreen' : 'Code component');
+  console.log('🔥 ReplEditor: Rendering', shouldShowWelcome ? 'WelcomeScreen' : 'Code component', {
+    isInitialized: tracks.isInitialized,
+    hasTracks: tracks.hasTracks(),
+    isLoading: tracks.isLoading,
+    fileManagerLoading,
+    shouldShowWelcome
+  });
 
   if (isZen) {
     return (

@@ -63,13 +63,15 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
   // CRITICAL: Only initialize state once and prevent re-renders
   const [codeComponentKey] = useState(() => Math.random().toString(36));
 
-  // Simple welcome screen logic using tracks store
-  const shouldShowWelcome = tracks.isInitialized && !tracks.hasTracks() && !tracks.isLoading;
+  // Simple welcome screen logic using tracks store and file manager loading state
+  const fileManagerLoading = fileManagerHook && typeof fileManagerHook === 'object' && fileManagerHook.isLoading;
+  const shouldShowWelcome = tracks.isInitialized && !tracks.hasTracks() && !tracks.isLoading && !fileManagerLoading;
 
   console.log('🔥 ReplEditor: State check:', {
     isInitialized: tracks.isInitialized,
     hasTracks: tracks.hasTracks(),
     isLoading: tracks.isLoading,
+    fileManagerLoading,
     shouldShowWelcome,
     tracksCount: tracks.getTracksCount(),
     foldersCount: tracks.getFoldersCount(),

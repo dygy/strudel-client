@@ -1,5 +1,4 @@
 import type { APIRoute } from 'astro';
-import { TreeManager } from '../../../lib/TreeManager';
 import { createClient } from '@supabase/supabase-js';
 
 export const prerender = false;
@@ -40,17 +39,9 @@ async function getAuthenticatedUser(request: Request) {
   return user;
 }
 
-function createTreeManager(userId: string): TreeManager {
-  return new TreeManager({
-    userId,
-    supabase
-  });
-}
-
 export const PUT: APIRoute = async ({ request }) => {
   try {
     const user = await getAuthenticatedUser(request);
-    const treeManager = createTreeManager(user.id);
 
     // Parse request body
     const body = await request.json();
@@ -63,49 +54,54 @@ export const PUT: APIRoute = async ({ request }) => {
       });
     }
 
-    // Get the existing track to verify ownership and type
-    const existingTrack = await treeManager.getNode(trackId);
+    // Create Supabase client with service role for database operations
+    const supabaseAdmin = createClient(
+      import.meta.env.PUBLIC_SUPABASE_URL,
+      import.meta.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
+    // Update the track in the tracks table
+    const updateData: any = {};
     
-    if (!existingTrack) {
+    if (updates.folder !== undefined) {
+      updateData.folder = updates.folder;
+    }
+    if (updates.name !== undefined) {
+      updateData.name = updates.name;
+    }
+    if (updates.code !== undefined) {
+      updateData.code = updates.code;
+    }
+    if (updates.isMultitrack !== undefined) {
+      updateData.isMultitrack = updates.isMultitrack;
+    }
+    if (updates.steps !== undefined) {
+      updateData.steps = updates.steps;
+    }
+    if (updates.activeStep !== undefined) {
+      updateData.activeStep = updates.activeStep;
+    }
+    
+    // Always update modified timestamp
+    updateData.modified = new Date().toISOString();
+
+    const { data, error } = await supabaseAdmin
+      .from('tracks')
+      .update(updateData)
+      .eq('id', trackId)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Database error:', error);
       return new Response(JSON.stringify({ error: 'Track not found' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    if (existingTrack.type !== 'track') {
-      return new Response(JSON.stringify({ error: 'Node is not a track' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Update the track using TreeManager
-    const updatedTrack = await treeManager.updateNode(trackId, {
-      name: updates.name,
-      code: updates.code,
-      isMultitrack: updates.isMultitrack,
-      steps: updates.steps,
-      activeStep: updates.activeStep,
-      parentId: updates.folder, // Map folder to parentId
-      metadata: updates.metadata
-    });
-
-    // Transform to UI format
-    const transformedTrack = {
-      id: updatedTrack.id,
-      name: updatedTrack.name,
-      code: (updatedTrack as any).code || '',
-      created: updatedTrack.created,
-      modified: updatedTrack.modified,
-      folder: updatedTrack.parentId,
-      isMultitrack: (updatedTrack as any).isMultitrack || false,
-      steps: (updatedTrack as any).steps || [],
-      activeStep: (updatedTrack as any).activeStep || 0,
-      path: await treeManager.getPath(updatedTrack.id)
-    };
-
-    return new Response(JSON.stringify({ track: transformedTrack }), {
+    return new Response(JSON.stringify({ track: data }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
