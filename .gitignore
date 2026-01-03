@@ -151,3 +151,4 @@ samples/*
 .env.local
 .env.production
 .env.development
+/website/.vercel/
