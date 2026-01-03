@@ -74,8 +74,6 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
   // Load data from Supabase when user is authenticated
   useEffect(() => {
-    console.log('SupabaseFileManager - useEffect triggered:', { isAuthenticated, user: !!user, hasLoadedData, ssrData: !!ssrData });
-
     if (!isAuthenticated || !user) {
       // Clear data when not authenticated
       setTracks({});

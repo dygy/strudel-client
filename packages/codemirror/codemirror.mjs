@@ -186,7 +186,6 @@ export function initEditor({ initialCode = '', onChange, onEvaluate, onStop, roo
     parent: root,
   });
 
-  console.log('[initEditor] EditorView created:', !!editorView, 'parent:', !!root);
   return editorView;
 }
 

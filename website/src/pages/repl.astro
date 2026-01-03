@@ -130,11 +130,9 @@ console.log('User ID:', authenticatedUser?.id || 'none');
 console.log('Has track param:', hasTrackParam);
 console.log('Is dev:', isDev);
 
-// Require authentication for all REPL access
-const skipAuth = url.searchParams.has('noauth'); // Only skip if explicitly requested
-const shouldRedirectToLogin = !authenticatedUser && !skipAuth;
+// Require authentication for all REPL access - NO EXCEPTIONS
+const shouldRedirectToLogin = !authenticatedUser;
 
-console.log('Skip auth:', skipAuth);
 console.log('Should redirect to login:', shouldRedirectToLogin);
 
 // Fetch tracks server-side for authenticated users
@@ -143,14 +141,12 @@ const ssrData = await fetchTracksSSR(Astro.request, authenticatedUser);
 console.log('SSR data:', ssrData ? `${ssrData.tracks?.length || 0} tracks, ${ssrData.folders?.length || 0} folders` : 'null');
 console.log('=== END REPL.ASTRO DEBUG ===');
 
-// Only redirect if we're absolutely sure the user needs to authenticate
+// Redirect to login if not authenticated - NO EXCEPTIONS
 if (shouldRedirectToLogin) {
   const loginUrl = `/login${url.search}`;
   console.log('Redirecting to login:', loginUrl);
   return Astro.redirect(loginUrl);
 }
-
-// For all other cases, let the client-side handle authentication
 ---
 
 <html lang="en" class="m-0 dark">

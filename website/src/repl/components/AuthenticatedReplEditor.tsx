@@ -48,12 +48,25 @@ function AuthenticatedReplContent({ context: externalContext, ssrData, ...editor
     );
   }
 
-  // Allow unauthenticated users to use the app with localStorage
-  // Authenticated users automatically get Supabase storage
+  // Require authentication - redirect to login if not authenticated
+  if (!isAuthenticated) {
+    // This should not happen due to server-side redirect, but handle it as fallback
+    window.location.href = '/login';
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+          <p className="text-sm text-gray-600">Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Only authenticated users can access the REPL - always use Supabase storage
   return (
     <div className="h-full flex flex-col relative" {...editorProps}>
       {/* Migration Modal */}
-      {isAuthenticated && supabaseFileManager && typeof supabaseFileManager === 'object' && supabaseFileManager.isAuthenticated && (
+      {supabaseFileManager && typeof supabaseFileManager === 'object' && supabaseFileManager.isAuthenticated && (
         <MigrationModal
           isOpen={supabaseFileManager.showMigrationModal}
           onClose={() => supabaseFileManager.setShowMigrationModal(false)}
@@ -62,7 +75,7 @@ function AuthenticatedReplContent({ context: externalContext, ssrData, ...editor
       )}
 
       {/* Sync Error Display */}
-      {isAuthenticated && supabaseFileManager && typeof supabaseFileManager === 'object' && supabaseFileManager.isAuthenticated && supabaseFileManager.syncError && (
+      {supabaseFileManager && typeof supabaseFileManager === 'object' && supabaseFileManager.isAuthenticated && supabaseFileManager.syncError && (
         <div className="absolute top-16 right-4 z-40 bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded-lg max-w-sm">
           <div className="flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -79,10 +92,10 @@ function AuthenticatedReplContent({ context: externalContext, ssrData, ...editor
         </div>
       )}
 
-      {/* Main REPL Editor with appropriate FileManager */}
+      {/* Main REPL Editor - always use Supabase FileManager for authenticated users */}
       <ReplEditor
         context={replContext}
-        fileManagerHook={isAuthenticated ? supabaseFileManager : undefined}
+        fileManagerHook={supabaseFileManager}
         ssrData={ssrData}
         {...editorProps}
       />

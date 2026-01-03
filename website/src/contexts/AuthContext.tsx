@@ -54,13 +54,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     let mounted = true;
-    
+
     // Get initial session using secure API
     const getInitialSession = async () => {
       try {
-        console.log('AuthContext - Getting initial session via secure API...');
         const isAuthenticated = await checkAuth();
-        
+
         if (!mounted) return;
 
         if (isAuthenticated) {
@@ -82,8 +81,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Listen for auth changes from OAuth callback
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('AuthContext - Auth state change:', event, !!session);
-      
       if (!mounted) return;
 
       if (event === 'SIGNED_IN' && session) {
@@ -92,7 +89,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
       }
-      
+
       setLoading(false);
     });
 
@@ -140,10 +137,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.error('Error signing out:', error);
         throw error;
       }
-      
+
       // Clear user state
       setUser(null);
-      
+
       // Notify other tabs
       localStorage.setItem('auth-change', Date.now().toString());
       localStorage.removeItem('auth-change');

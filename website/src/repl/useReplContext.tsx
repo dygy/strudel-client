@@ -89,11 +89,17 @@ const cleanupCanvasElements = async () => {
   if (typeof window === 'undefined') return;
   
   try {
-    console.log('[canvas-cleanup] Starting proper canvas cleanup');
+    console.log('[canvas-cleanup] Starting comprehensive canvas cleanup');
     
-    // Use the proper cleanupDraw function from @strudel/draw
+    // 1. Cancel global animation frame (from animate.mjs)
+    if ((window as any).frame) {
+      cancelAnimationFrame((window as any).frame);
+      (window as any).frame = null;
+      console.log('[canvas-cleanup] Cancelled global window.frame');
+    }
+    
+    // 2. Use the proper cleanupDraw function from @strudel/draw
     try {
-      // Import the entire module and access cleanupDraw
       const drawModule = await import('@strudel/draw');
       // @ts-ignore - TypeScript doesn't recognize cleanupDraw but it exists
       if (drawModule.cleanupDraw) {
@@ -105,7 +111,7 @@ const cleanupCanvasElements = async () => {
       console.warn('[canvas-cleanup] Could not use cleanupDraw:', error);
     }
     
-    // Clear Hydra properly (this already works well)
+    // 3. Clear Hydra properly (this already works well)
     try {
       clearHydra();
       console.log('[canvas-cleanup] Cleared Hydra canvases');
@@ -113,13 +119,13 @@ const cleanupCanvasElements = async () => {
       console.warn('[canvas-cleanup] Error clearing hydra:', error);
     }
     
-    // Clear the main draw context if it exists
+    // 4. Clear the main draw context if it exists
     if (clearCanvas) {
       clearCanvas();
       console.log('[canvas-cleanup] Cleared main draw context');
     }
     
-    // Only remove duplicate or orphaned test-canvas elements, not the main one
+    // 5. Only remove duplicate or orphaned test-canvas elements, not the main one
     const testCanvases = document.querySelectorAll('canvas[id="test-canvas"]');
     if (testCanvases.length > 1) {
       // Keep the first one, remove duplicates
@@ -129,7 +135,7 @@ const cleanupCanvasElements = async () => {
       }
     }
     
-    // Remove any orphaned graphics canvases that don't have proper cleanup
+    // 6. Remove any orphaned graphics canvases that don't have proper cleanup
     const orphanedSelectors = [
       'canvas[id*="graphics"]:not(#test-canvas):not(#hydra-canvas)',
       'canvas[id*="visual"]:not(#test-canvas):not(#hydra-canvas)',
@@ -149,6 +155,8 @@ const cleanupCanvasElements = async () => {
     if (cleanedCount > 0) {
       console.log(`[canvas-cleanup] Removed ${cleanedCount} orphaned canvas elements`);
     }
+    
+    console.log('[canvas-cleanup] Comprehensive canvas cleanup completed');
     
   } catch (error) {
     console.error('[canvas-cleanup] Error during canvas cleanup:', error);
@@ -211,8 +219,22 @@ export function useReplContext(): ReplContext {
         setReplState({ ...state });
       },
       onToggle: (playing: boolean) => {
+        console.log('[canvas-cleanup] onToggle called, playing:', playing);
         if (!playing) {
+          console.log('[canvas-cleanup] Pattern stopped, cleaning up canvas elements and resetting CPS');
+          
+          // Reset CPS to default to prevent BPM from carrying over between tracks
+          if (editor?.repl?.setCps) {
+            editor.repl.setCps(0.5);
+            console.log('[canvas-cleanup] Reset CPS to default 0.5');
+          }
+          
           clearHydra();
+          
+          // Clean up canvas elements when stopping
+          cleanupCanvasElements().catch(error => {
+            console.warn('[canvas-cleanup] Error during cleanup:', error);
+          });
         }
       },
       beforeEval: () => audioReady,
@@ -276,10 +298,10 @@ export function useReplContext(): ReplContext {
       const currentActivePattern = getActivePattern();
 
       console.log('[repl] Debug - currentActivePattern:', currentActivePattern);
-      console.log('[repl] Debug - NO localStorage access for authenticated users');
+      console.log('[repl] Debug - Authentication required - no localStorage access');
 
-      // For authenticated users, track loading will be handled by the FileManager
-      // For unauthenticated users, this will be handled by the regular ReplEditor
+      // Authentication is required - all track loading is handled by Supabase FileManager
+      // No localStorage fallback - users must be authenticated
 
       if (decoded) {
         code = decoded;
@@ -293,9 +315,9 @@ export function useReplContext(): ReplContext {
           console.log('[repl] Using pending code for initialization:', code.substring(0, 50) + '...');
           clearPendingCode(); // Clear it
         } else {
-          // Always start with default code - no localStorage fallback
+          // Always start with default code - authentication required, no localStorage
           code = DEFAULT_TRACK_CODE;
-          msg = `Default code has been loaded`;
+          msg = `Default code loaded - authentication required`;
         }
       }
       editor.setCode(code);
@@ -395,12 +417,6 @@ export function useReplContext(): ReplContext {
   };
 
   const handleTogglePlay = async (): Promise<void> => {
-    // If currently playing, clean up canvas elements when stopping
-    if (editorRef.current?.repl?.scheduler?.started) {
-      console.log('[canvas-cleanup] Stopping playback, cleaning up canvas elements');
-      await cleanupCanvasElements();
-    }
-    
     editorRef.current?.toggle();
   };
 

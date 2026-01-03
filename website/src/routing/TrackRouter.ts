@@ -41,7 +41,6 @@ export class TrackRouter {
       const step = URLParser.getCurrentStep();
 
       if (trackId) {
-        console.log('TrackRouter: Restoring track from URL:', trackId, step !== null ? `step ${step}` : '');
         await this.navigateToTrack(trackId, { replace: true, skipUrlUpdate: true, step: step || undefined });
       }
 
@@ -89,8 +88,6 @@ export class TrackRouter {
       // Complete navigation
       this.navigationState.setNavigating(false);
       this.config.onNavigationComplete?.(trackId);
-
-      console.log('TrackRouter: Successfully navigated to track:', trackId);
     } catch (error) {
       this.navigationState.setNavigating(false);
       console.error('TrackRouter: Navigation failed:', error);
@@ -219,6 +216,5 @@ export class TrackRouter {
     // Remove event listeners and cleanup
     this.navigationState.reset();
     this.isInitialized = false;
-    console.log('TrackRouter: Destroyed');
   }
 }

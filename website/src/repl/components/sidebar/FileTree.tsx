@@ -220,22 +220,22 @@ export function FileTree({
     // Step 2: Build folder hierarchy using UUIDs for parent-child relationships
     Object.values(folders).forEach(folder => {
       const node = folderNodesById[folder.id];
-      
+
       if (folder.parent) {
         // Try to find parent by UUID first
         let parentNode = folderNodesById[folder.parent];
-        
+
         if (!parentNode) {
           // Fallback: try to find parent by path (for backward compatibility)
           parentNode = Object.values(folderNodesById).find(f => f.path === folder.parent);
-          
+
           if (parentNode) {
             console.log(`FileTree - buildTree: Found parent by path fallback: "${folder.parent}" -> UUID: ${parentNode.id}`);
           } else {
             console.warn(`FileTree - buildTree: Parent not found for folder "${folder.name}" (${folder.id}), parent reference: "${folder.parent}"`);
           }
         }
-        
+
         if (parentNode) {
           // This folder has a parent - add it to parent's children
           parentNode.children!.push(node);
@@ -265,7 +265,7 @@ export function FileTree({
         // Fallback: find folder by path (for backward compatibility)
         // CRITICAL FIX: Find the most specific path match, prioritizing root-level folders
         const candidateFolders = Object.values(folderNodesById).filter(f => f.path === track.folder);
-        
+
         if (candidateFolders.length === 1) {
           // Only one match - use it
           targetFolder = candidateFolders[0];
@@ -276,12 +276,8 @@ export function FileTree({
             const currentDepth = (current.path?.split('/') || []).length;
             return currentDepth < bestDepth ? current : best;
           });
-          
+
           console.warn(`FileTree - buildTree: Multiple folders found for path "${track.folder}", using root-level folder:`, targetFolder.id, targetFolder.path);
-        }
-        
-        if (targetFolder) {
-          console.log(`FileTree - buildTree: Found folder by path fallback: "${track.folder}" -> UUID: ${targetFolder.id}`);
         }
       }
 
@@ -291,7 +287,7 @@ export function FileTree({
       } else {
         // Track is at root level
         tree.push(trackNode);
-        
+
         if (track.folder) {
           console.warn(`FileTree - buildTree: Folder not found for track "${track.name}", folder reference: "${track.folder}", placing in root`);
         }
@@ -380,7 +376,7 @@ export function FileTree({
       const track = targetNode.data as Track;
       if (track.folder) {
         // Try to find the folder by path first, then by UUID
-        const targetFolder = Object.values(folders).find(f => f.path === track.folder) || 
+        const targetFolder = Object.values(folders).find(f => f.path === track.folder) ||
                              Object.values(folders).find(f => f.id === track.folder);
         targetId = targetFolder?.id || '';
         console.log('handleDrop: Dropping onto track', { trackFolder: track.folder, targetFolder, targetId });
