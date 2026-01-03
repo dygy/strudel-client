@@ -60,7 +60,7 @@ const options = {
 
 // https://astro.build/config
 export default defineConfig({
-  output: 'static',
+  output: 'server',
   adapter: vercelAdapter({
     webAnalytics: { enabled: true }
   }),
