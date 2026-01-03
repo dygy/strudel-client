@@ -1,11 +1,11 @@
 ---
 // Main REPL page with client-side authentication
-// Static page - authentication handled in React components
-export const prerender = true;
-
+// Static build - authentication handled in React components
 import HeadCommon from '../components/HeadCommon.astro';
-import { Repl } from '../repl/Repl';
+import { Repl as ReplComponent } from '../repl/Repl';
 import { I18nProvider } from '../components/I18nProvider';
+
+export const prerender = true;
 ---
 
 <html lang="en" class="m-0 dark">
@@ -15,7 +15,7 @@ import { I18nProvider } from '../components/I18nProvider';
   </head>
   <body class="h-app-height bg-background m-0">
     <I18nProvider client:only="react">
-      <Repl client:only="react" />
+      <ReplComponent client:only="react" />
     </I18nProvider>
   </body>
 </html>

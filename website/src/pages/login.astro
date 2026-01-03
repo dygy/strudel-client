@@ -1,9 +1,10 @@
 ---
 // Dedicated login page with proper internationalization
-// Static page - no server-side rendering needed
-export const prerender = true;
+// Static build - no server-side rendering needed
 
 import HeadCommon from '../components/HeadCommon.astro';
+
+export const prerender = true;
 
 // Get any error or redirect info from URL params
 const url = new URL(Astro.request.url);
