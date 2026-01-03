@@ -45,5 +45,24 @@
   "prettierArrowParensAvoid": "Избегать",
   "prettierArrowParensAlways": "Всегда",
   "settingsTitle": "Настройки",
-  "settingsSubtitle": "Настройте ваш опыт работы со Strudel"
+  "settingsSubtitle": "Настройте ваш опыт работы со Strudel",
+  "sampleCache": {
+    "title": "Кэш образцов",
+    "description": "Настройте кэширование аудио образцов для улучшения производительности и уменьшения задержек загрузки.",
+    "notSupported": "Кэширование образцов недоступно в этой среде.",
+    "status": "Статус кэша",
+    "configuration": "Конфигурация",
+    "cacheSize": "Размер кэша",
+    "hitRate": "Частота попаданий",
+    "hits": "Попадания в кэш",
+    "misses": "Промахи кэша",
+    "preloaded": "Предзагружено",
+    "evicted": "Вытеснено",
+    "usage": "Использование кэша",
+    "enabled": "Включить кэш",
+    "preloadEnabled": "Включить предзагрузку",
+    "maxSize": "Максимальный размер кэша",
+    "preloadDelay": "Задержка предзагрузки",
+    "clearCache": "Очистить кэш"
+  }
 }

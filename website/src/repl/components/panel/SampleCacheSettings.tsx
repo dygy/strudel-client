@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@src/i18n';
 
 // Import cache functions from @strudel/webaudio (which re-exports superdough)
 let cacheAPI: any = null;
@@ -44,7 +44,7 @@ interface CacheConfig {
 }
 
 export function SampleCacheSettings() {
-  const { t } = useTranslation();
+  const { t } = useTranslation('settings');
   const [config, setConfig] = useState<CacheConfig>({
     maxSizeMB: 100,
     preloadDelay: 100,
@@ -148,60 +148,60 @@ export function SampleCacheSettings() {
 
   if (!isSupported) {
     return (
-      <div className="p-4 text-gray-500">
-        <p>{t('settings.sampleCache.notSupported')}</p>
+      <div className="p-4 text-foreground">
+        <p>{t('sampleCache.notSupported')}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-foreground">
       <div>
-        <h3 className="text-lg font-medium mb-4">{t('settings.sampleCache.title')}</h3>
-        <p className="text-sm text-gray-600 mb-4">
-          {t('settings.sampleCache.description')}
+        <h3 className="text-lg font-medium mb-4 text-foreground">{t('sampleCache.title')}</h3>
+        <p className="text-sm text-foreground/70 mb-4">
+          {t('sampleCache.description')}
         </p>
       </div>
 
       {/* Cache Status */}
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <h4 className="font-medium mb-3">{t('settings.sampleCache.status')}</h4>
+      <div className="bg-background/50 border border-border p-4 rounded-lg">
+        <h4 className="font-medium mb-3 text-foreground">{t('sampleCache.status')}</h4>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-gray-600">{t('settings.sampleCache.cacheSize')}:</span>
-            <span className="ml-2 font-mono">
+            <span className="text-foreground/70">{t('sampleCache.cacheSize')}:</span>
+            <span className="ml-2 font-mono text-foreground">
               {stats.currentSizeMB.toFixed(1)} / {stats.maxSizeMB} MB
             </span>
           </div>
           <div>
-            <span className="text-gray-600">{t('settings.sampleCache.hitRate')}:</span>
-            <span className="ml-2 font-mono">{stats.hitRate}%</span>
+            <span className="text-foreground/70">{t('sampleCache.hitRate')}:</span>
+            <span className="ml-2 font-mono text-foreground">{stats.hitRate}%</span>
           </div>
           <div>
-            <span className="text-gray-600">{t('settings.sampleCache.hits')}:</span>
-            <span className="ml-2 font-mono">{stats.hitCount}</span>
+            <span className="text-foreground/70">{t('sampleCache.hits')}:</span>
+            <span className="ml-2 font-mono text-foreground">{stats.hitCount}</span>
           </div>
           <div>
-            <span className="text-gray-600">{t('settings.sampleCache.misses')}:</span>
-            <span className="ml-2 font-mono">{stats.missCount}</span>
+            <span className="text-foreground/70">{t('sampleCache.misses')}:</span>
+            <span className="ml-2 font-mono text-foreground">{stats.missCount}</span>
           </div>
           <div>
-            <span className="text-gray-600">{t('settings.sampleCache.preloaded')}:</span>
-            <span className="ml-2 font-mono">{stats.preloadCount}</span>
+            <span className="text-foreground/70">{t('sampleCache.preloaded')}:</span>
+            <span className="ml-2 font-mono text-foreground">{stats.preloadCount}</span>
           </div>
           <div>
-            <span className="text-gray-600">{t('settings.sampleCache.evicted')}:</span>
-            <span className="ml-2 font-mono">{stats.evictionCount}</span>
+            <span className="text-foreground/70">{t('sampleCache.evicted')}:</span>
+            <span className="ml-2 font-mono text-foreground">{stats.evictionCount}</span>
           </div>
         </div>
         
         {/* Cache usage bar */}
         <div className="mt-3">
-          <div className="flex justify-between text-xs text-gray-600 mb-1">
-            <span>{t('settings.sampleCache.usage')}</span>
+          <div className="flex justify-between text-xs text-foreground/70 mb-1">
+            <span>{t('sampleCache.usage')}</span>
             <span>{((stats.currentSizeMB / stats.maxSizeMB) * 100).toFixed(1)}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-background rounded-full h-2 border border-border">
             <div
               className="bg-blue-500 h-2 rounded-full transition-all duration-300"
               style={{ width: `${Math.min((stats.currentSizeMB / stats.maxSizeMB) * 100, 100)}%` }}
@@ -212,39 +212,39 @@ export function SampleCacheSettings() {
 
       {/* Cache Settings */}
       <div className="space-y-4">
-        <h4 className="font-medium">{t('settings.sampleCache.configuration')}</h4>
+        <h4 className="font-medium text-foreground">{t('sampleCache.configuration')}</h4>
         
         {/* Enable Cache */}
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium">
-            {t('settings.sampleCache.enabled')}
+          <label className="text-sm font-medium text-foreground">
+            {t('sampleCache.enabled')}
           </label>
           <input
             type="checkbox"
             checked={config.enabled}
             onChange={(e) => handleConfigChange('enabled', e.target.checked)}
-            className="rounded"
+            className="rounded border-border bg-background text-blue-500 focus:ring-blue-500"
           />
         </div>
 
         {/* Enable Preloading */}
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium">
-            {t('settings.sampleCache.preloadEnabled')}
+          <label className="text-sm font-medium text-foreground">
+            {t('sampleCache.preloadEnabled')}
           </label>
           <input
             type="checkbox"
             checked={config.preloadEnabled}
             disabled={!config.enabled}
             onChange={(e) => handleConfigChange('preloadEnabled', e.target.checked)}
-            className="rounded"
+            className="rounded border-border bg-background text-blue-500 focus:ring-blue-500 disabled:opacity-50"
           />
         </div>
 
         {/* Max Cache Size */}
         <div>
-          <label className="block text-sm font-medium mb-2">
-            {t('settings.sampleCache.maxSize')} ({config.maxSizeMB} MB)
+          <label className="block text-sm font-medium mb-2 text-foreground">
+            {t('sampleCache.maxSize')} ({config.maxSizeMB} MB)
           </label>
           <input
             type="range"
@@ -254,9 +254,9 @@ export function SampleCacheSettings() {
             value={config.maxSizeMB}
             disabled={!config.enabled}
             onChange={(e) => handleConfigChange('maxSizeMB', parseInt(e.target.value))}
-            className="w-full"
+            className="w-full accent-blue-500 disabled:opacity-50"
           />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <div className="flex justify-between text-xs text-foreground/70 mt-1">
             <span>10 MB</span>
             <span>500 MB</span>
           </div>
@@ -264,8 +264,8 @@ export function SampleCacheSettings() {
 
         {/* Preload Delay */}
         <div>
-          <label className="block text-sm font-medium mb-2">
-            {t('settings.sampleCache.preloadDelay')} ({config.preloadDelay} ms)
+          <label className="block text-sm font-medium mb-2 text-foreground">
+            {t('sampleCache.preloadDelay')} ({config.preloadDelay} ms)
           </label>
           <input
             type="range"
@@ -275,9 +275,9 @@ export function SampleCacheSettings() {
             value={config.preloadDelay}
             disabled={!config.enabled || !config.preloadEnabled}
             onChange={(e) => handleConfigChange('preloadDelay', parseInt(e.target.value))}
-            className="w-full"
+            className="w-full accent-blue-500 disabled:opacity-50"
           />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <div className="flex justify-between text-xs text-foreground/70 mt-1">
             <span>50 ms</span>
             <span>1000 ms</span>
           </div>
@@ -285,13 +285,13 @@ export function SampleCacheSettings() {
       </div>
 
       {/* Actions */}
-      <div className="pt-4 border-t">
+      <div className="pt-4 border-t border-border">
         <button
           onClick={handleClearCache}
           disabled={!config.enabled}
-          className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+          className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors"
         >
-          {t('settings.sampleCache.clearCache')}
+          {t('sampleCache.clearCache')}
         </button>
       </div>
     </div>

@@ -63,5 +63,24 @@
   "prettierArrowParensAvoid": "Éviter",
   "prettierArrowParensAlways": "Toujours",
   "settingsTitle": "Paramètres",
-  "settingsSubtitle": "Personnalisez votre expérience Strudel"
+  "settingsSubtitle": "Personnalisez votre expérience Strudel",
+  "sampleCache": {
+    "title": "Cache d'échantillons",
+    "description": "Configurez la mise en cache des échantillons audio pour améliorer les performances et réduire les délais de chargement.",
+    "notSupported": "La mise en cache des échantillons n'est pas disponible dans cet environnement.",
+    "status": "État du cache",
+    "configuration": "Configuration",
+    "cacheSize": "Taille du cache",
+    "hitRate": "Taux de réussite",
+    "hits": "Réussites du cache",
+    "misses": "Échecs du cache",
+    "preloaded": "Préchargé",
+    "evicted": "Évincé",
+    "usage": "Utilisation du cache",
+    "enabled": "Activer le cache",
+    "preloadEnabled": "Activer le préchargement",
+    "maxSize": "Taille maximale du cache",
+    "preloadDelay": "Délai de préchargement",
+    "clearCache": "Vider le cache"
+  }
 }

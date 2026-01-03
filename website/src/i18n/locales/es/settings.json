@@ -39,5 +39,24 @@
   "signatureHelp": "Sugerencias de parámetros",
   "errorHighlighting": "Resaltado de errores",
   "settingsTitle": "Configuración",
-  "settingsSubtitle": "Personaliza tu experiencia con Strudel"
+  "settingsSubtitle": "Personaliza tu experiencia con Strudel",
+  "sampleCache": {
+    "title": "Caché de muestras",
+    "description": "Configura el almacenamiento en caché de muestras de audio para mejorar el rendimiento y reducir los retrasos de carga.",
+    "notSupported": "El almacenamiento en caché de muestras no está disponible en este entorno.",
+    "status": "Estado del caché",
+    "configuration": "Configuración",
+    "cacheSize": "Tamaño del caché",
+    "hitRate": "Tasa de aciertos",
+    "hits": "Aciertos del caché",
+    "misses": "Fallos del caché",
+    "preloaded": "Precargado",
+    "evicted": "Expulsado",
+    "usage": "Uso del caché",
+    "enabled": "Habilitar caché",
+    "preloadEnabled": "Habilitar precarga",
+    "maxSize": "Tamaño máximo del caché",
+    "preloadDelay": "Retraso de precarga",
+    "clearCache": "Limpiar caché"
+  }
 }

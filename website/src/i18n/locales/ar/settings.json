@@ -65,5 +65,24 @@
   "prettierArrowParensAvoid": "تجنب",
   "prettierArrowParensAlways": "دائماً",
   "settingsTitle": "الإعدادات",
-  "settingsSubtitle": "خصص تجربتك مع Strudel"
+  "settingsSubtitle": "خصص تجربتك مع Strudel",
+  "sampleCache": {
+    "title": "ذاكرة التخزين المؤقت للعينات",
+    "description": "قم بتكوين التخزين المؤقت لعينات الصوت لتحسين الأداء وتقليل تأخير التحميل.",
+    "notSupported": "التخزين المؤقت للعينات غير متاح في هذه البيئة.",
+    "status": "حالة ذاكرة التخزين المؤقت",
+    "configuration": "التكوين",
+    "cacheSize": "حجم ذاكرة التخزين المؤقت",
+    "hitRate": "معدل الإصابة",
+    "hits": "إصابات ذاكرة التخزين المؤقت",
+    "misses": "إخفاقات ذاكرة التخزين المؤقت",
+    "preloaded": "محمل مسبقاً",
+    "evicted": "مطرود",
+    "usage": "استخدام ذاكرة التخزين المؤقت",
+    "enabled": "تفعيل ذاكرة التخزين المؤقت",
+    "preloadEnabled": "تفعيل التحميل المسبق",
+    "maxSize": "الحد الأقصى لحجم ذاكرة التخزين المؤقت",
+    "preloadDelay": "تأخير التحميل المسبق",
+    "clearCache": "مسح ذاكرة التخزين المؤقت"
+  }
 }

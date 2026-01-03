@@ -39,5 +39,24 @@
   "signatureHelp": "רמזי פרמטרים",
   "errorHighlighting": "הדגשת שגיאות",
   "settingsTitle": "הגדרות",
-  "settingsSubtitle": "התאם את חוויית Strudel שלך"
+  "settingsSubtitle": "התאם את חוויית Strudel שלך",
+  "sampleCache": {
+    "title": "מטמון דגימות",
+    "description": "הגדר מטמון דגימות שמע לשיפור ביצועים והפחתת עיכובי טעינה.",
+    "notSupported": "מטמון דגימות אינו זמין בסביבה זו.",
+    "status": "מצב מטמון",
+    "configuration": "תצורה",
+    "cacheSize": "גודל מטמון",
+    "hitRate": "שיעור פגיעות",
+    "hits": "פגיעות מטמון",
+    "misses": "החמצות מטמון",
+    "preloaded": "נטען מראש",
+    "evicted": "הוצא",
+    "usage": "שימוש במטמון",
+    "enabled": "הפעל מטמון",
+    "preloadEnabled": "הפעל טעינה מראש",
+    "maxSize": "גודל מטמון מקסימלי",
+    "preloadDelay": "עיכוב טעינה מראש",
+    "clearCache": "נקה מטמון"
+  }
 }

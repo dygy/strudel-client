@@ -65,5 +65,24 @@
   "prettierArrowParensAvoid": "Избегавај",
   "prettierArrowParensAlways": "Увек",
   "settingsTitle": "Подешавања",
-  "settingsSubtitle": "Прилагодите ваше Strudel искуство"
+  "settingsSubtitle": "Прилагодите ваше Strudel искуство",
+  "sampleCache": {
+    "title": "Кеш узорака",
+    "description": "Подесите кеширање аудио узорака за побољшање перформанси и смањење кашњења учитавања.",
+    "notSupported": "Кеширање узорака није доступно у овом окружењу.",
+    "status": "Статус кеша",
+    "configuration": "Конфигурација",
+    "cacheSize": "Величина кеша",
+    "hitRate": "Стопа погодака",
+    "hits": "Погоци кеша",
+    "misses": "Промашаји кеша",
+    "preloaded": "Унапред учитано",
+    "evicted": "Избачено",
+    "usage": "Коришћење кеша",
+    "enabled": "Омогући кеш",
+    "preloadEnabled": "Омогући претходно учитавање",
+    "maxSize": "Максимална величина кеша",
+    "preloadDelay": "Кашњење претходног учитавања",
+    "clearCache": "Обриши кеш"
+  }
 }
