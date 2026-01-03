@@ -1,8 +1,10 @@
 ---
 // Main entry point - redirect to REPL
-export const prerender = false;
-
-// Always redirect to the main REPL page
-// It will handle authentication internally
-return Astro.redirect('/repl' + (Astro.url.search || ''));
+// Static page - client-side redirect
+export const prerender = true;
 ---
+
+<script>
+// Client-side redirect to REPL
+window.location.href = '/repl' + (window.location.search || '');
+</script>
