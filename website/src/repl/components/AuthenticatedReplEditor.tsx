@@ -1,14 +1,10 @@
 import React from 'react';
-import { AuthProvider } from '../../contexts/AuthContext';
-import { AuthButton } from '../../components/auth/AuthButton';
-import { MigrationModal } from '../../components/auth/MigrationModal';
+import { AuthProvider, useAuth } from '../../contexts/AuthContext';
+import { MigrationModal } from '@components/auth/MigrationModal';
 import ReplEditor from './ReplEditor';
-import { useAuth } from '../../contexts/AuthContext';
 import { useSupabaseFileManager } from './sidebar/hooks/useSupabaseFileManager';
-import { FileManagerRefactored as FileManager } from './sidebar/FileManagerRefactored';
-import { ResizableSidebar } from './sidebar/ResizableSidebar';
-import { useSettings } from '@src/settings';
-import { useTranslation } from 'react-i18next';
+import { useReplContext } from '../useReplContext';
+import type { SSRData } from '@src/types/ssr';
 
 interface ReplContext {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -28,32 +24,22 @@ interface ReplContext {
 }
 
 interface AuthenticatedReplEditorProps extends React.HTMLAttributes<HTMLDivElement> {
-  context: ReplContext;
+  context?: ReplContext; // Make context optional since we'll create our own
+  ssrData?: SSRData | null;
 }
 
-function AuthenticatedReplContent({ context, ...editorProps }: AuthenticatedReplEditorProps) {
+function AuthenticatedReplContent({ context: externalContext, ssrData, ...editorProps }: AuthenticatedReplEditorProps) {
   const { isAuthenticated, loading } = useAuth();
-  const settings = useSettings();
-  const { isZen, isFileManagerOpen } = settings;
-  const { t } = useTranslation('auth');
-  
-  // Always call the hook - it will handle authentication state internally
-  const supabaseFileManager = useSupabaseFileManager(context);
 
-  // Check if there's a track parameter in the URL
-  React.useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      // Store the current URL for redirect after authentication
-      const currentUrl = window.location.href;
-      sessionStorage.setItem('strudel_redirect_after_auth', currentUrl);
-      
-      console.log('User needs to login to access Strudel');
-    }
-  }, [loading, isAuthenticated]);
+  // Create standard REPL context
+  const replContext = useReplContext();
+
+  // Always call the hook - it will handle authentication state internally
+  const supabaseFileManager = useSupabaseFileManager(replContext, ssrData);
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
+      <div className="h-full w-full flex items-center justify-center">
         <div className="text-center">
           <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
           <p className="text-sm text-gray-600">Loading...</p>
@@ -63,52 +49,7 @@ function AuthenticatedReplContent({ context, ...editorProps }: AuthenticatedRepl
   }
 
   // Allow unauthenticated users to use the app with localStorage
-  // Only show login prompt for track URLs that require authentication
-  if (!isAuthenticated) {
-    const urlParams = new URLSearchParams(window.location.search);
-    const trackParam = urlParams.get('track');
-    
-    // Only require authentication for specific track URLs
-    if (trackParam) {
-      return (
-        <div className="h-full flex items-center justify-center bg-gray-50">
-          <div className="max-w-md mx-auto text-center p-8 bg-white rounded-lg shadow-lg">
-            <div className="mb-6">
-              <svg className="w-16 h-16 mx-auto text-blue-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                {t('trackAccess.title')}
-              </h2>
-              <p className="text-gray-600 mb-6">
-                {t('trackAccess.description')}
-              </p>
-            </div>
-            
-            <div className="space-y-4">
-              <AuthButton />
-              <button
-                onClick={() => {
-                  // Clear track parameter and continue without authentication
-                  const newUrl = new URL(window.location.href);
-                  newUrl.searchParams.delete('track');
-                  window.history.replaceState({}, '', newUrl.toString());
-                  window.location.reload();
-                }}
-                className="w-full px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Continue without signing in
-              </button>
-              <p className="text-sm text-gray-500">
-                {t('trackAccess.redirectMessage')}
-              </p>
-            </div>
-          </div>
-        </div>
-      );
-    }
-  }
-
+  // Authenticated users automatically get Supabase storage
   return (
     <div className="h-full flex flex-col relative" {...editorProps}>
       {/* Migration Modal */}
@@ -138,20 +79,13 @@ function AuthenticatedReplContent({ context, ...editorProps }: AuthenticatedRepl
         </div>
       )}
 
-      {/* Main REPL Editor */}
-      <ReplEditor context={context} {...editorProps} />
-
-      {/* Override FileManager with Supabase version when authenticated */}
-      {isAuthenticated && supabaseFileManager && typeof supabaseFileManager === 'object' && supabaseFileManager.isAuthenticated && !isZen && isFileManagerOpen && (
-        <div className="absolute left-0 top-0 bottom-0 z-30">
-          <ResizableSidebar defaultWidth={300} minWidth={200} maxWidth={500}>
-            <FileManager 
-              context={context}
-              fileManagerHook={supabaseFileManager}
-            />
-          </ResizableSidebar>
-        </div>
-      )}
+      {/* Main REPL Editor with appropriate FileManager */}
+      <ReplEditor
+        context={replContext}
+        fileManagerHook={isAuthenticated ? supabaseFileManager : undefined}
+        ssrData={ssrData}
+        {...editorProps}
+      />
     </div>
   );
 }

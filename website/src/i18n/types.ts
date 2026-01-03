@@ -58,6 +58,8 @@ export interface FilesTranslations {
   unknown: string;
   noCodeToSave: string;
   trackSaved: string;
+  trackCreated: string;
+  trackCreatedAndSaved: string;
   trackDuplicated: string;
   trackDownloaded: string;
   trackRenamed: string;
@@ -85,6 +87,11 @@ export interface FilesTranslations {
   rootFolder: string;
   rightClickToCreate: string;
   exportAll: string;
+  exportLibraryAsZip: string;
+  importLibraryFromZip: string;
+  libraryExported: string;
+  libraryImported: string;
+  invalidLibraryFile: string;
   dropToImport: string;
   trackImported: string;
   invalidFileType: string;
@@ -98,10 +105,45 @@ export interface FilesTranslations {
   multitrackDownloaded: string;
   folderDownloaded: string;
   emptyFolder: string;
+  noTracksToExport: string;
   activeStep: string;
   newMultitrack: string;
   multitrackCreated: string;
   stepRenamed: string;
+  multitrackImported: string;
+  invalidMultitrackFile: string;
+  noValidStepsFound: string;
+  multitrackImportFailed: string;
+  invalidZipFile: string;
+  deleteAllTracks: string;
+  confirmDeleteAllTracks: string;
+  deleteAllTracksWarning: string;
+  deleteAllFoldersWarning: string;
+  deleteAllTracksAndFoldersWarning: string;
+  allTracksDeleted: string;
+  allFoldersDeleted: string;
+  allTracksAndFoldersDeleted: string;
+  loadingTracks: string;
+  loadingTracksDescription: string;
+  
+  // Nested objects for better organization
+  errors: {
+    loadFailed: string;
+    createTrackFailed: string;
+    createFolderFailed: string;
+    deleteFailed: string;
+    moveFailed: string;
+    importFailed: string;
+    exportFailed: string;
+    saveFailed: string;
+    renameFailed: string;
+  };
+  
+  success: {
+    folderCreated: string;
+    itemMoved: string;
+    itemDeleted: string;
+  };
 }
 
 export interface SettingsTranslations {
@@ -182,6 +224,65 @@ export interface WelcomeTranslations {
   supportText: string;
 }
 
+export interface AuthTranslations {
+  signInWithGoogle: string;
+  signOut: string;
+  signingIn: string;
+  welcome: string;
+  signInRequired: string;
+  signInDescription: string;
+  trackAccess: {
+    title: string;
+    description: string;
+    redirectMessage: string;
+  };
+  login: {
+    title: string;
+    welcomeTitle: string;
+    welcomeSubtitle: string;
+    errorPrefix: string;
+    errorSuffix: string;
+    trackAccessDescription: string;
+    signInDescription: string;
+    signInButton: string;
+    signInFooter: string;
+  };
+  migration: {
+    title: string;
+    subtitle: string;
+    hasLocalData: string;
+    noLocalData: string;
+    migrationDescription: string;
+    migrate: string;
+    skip: string;
+    checking: string;
+    migrating: string;
+    success: string;
+    error: string;
+    retry: string;
+    migratedTracks: string;
+    migratedFolders: string;
+  };
+  profile: {
+    title: string;
+    email: string;
+    name: string;
+    joinedDate: string;
+    trackCount: string;
+    folderCount: string;
+  };
+  errors: {
+    signInFailed: string;
+    signOutFailed: string;
+    migrationFailed: string;
+    notAuthenticated: string;
+    sessionExpired: string;
+    networkError: string;
+    databaseSetupRequired: string;
+    databaseSetupInstructions: string;
+  };
+}
+
 export interface Resources {
   common: CommonTranslations;
   files: FilesTranslations;
@@ -189,6 +290,7 @@ export interface Resources {
   tabs: TabsTranslations;
   messages: MessagesTranslations;
   welcome: WelcomeTranslations;
+  auth: AuthTranslations;
 }
 
 // Namespace type

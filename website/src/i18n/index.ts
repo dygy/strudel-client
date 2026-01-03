@@ -28,6 +28,10 @@ export function useWelcomeTranslation() {
   return useTypedTranslation('welcome');
 }
 
+export function useAuthTranslation() {
+  return useTypedTranslation('auth');
+}
+
 // Language configuration
 export const languages = {
   en: { name: 'English', nativeName: 'English', rtl: false },

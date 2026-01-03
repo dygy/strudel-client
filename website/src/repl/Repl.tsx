@@ -11,28 +11,21 @@ import AuthenticatedReplEditor from './components/AuthenticatedReplEditor';
 import EmbeddedReplEditor from './components/EmbeddedReplEditor';
 import { useReplContext } from './useReplContext';
 import { useSettings } from '@src/settings';
-import { I18nProvider } from '@src/components/I18nProvider';
 import '@src/i18n'; // Initialize i18n system
 import type { CSSProperties } from 'react';
+import type { SSRData } from '@src/types/ssr';
 
 // Type definitions
 interface ReplProps {
   embedded?: boolean;
+  ssrData?: SSRData | null;
 }
 
-interface EditorProps {
-  context: any;
-  style: CSSProperties;
-}
-
-export function Repl({ embedded = false }: ReplProps) {
+export function Repl({ embedded = false, ssrData = null }: ReplProps) {
   const isEmbedded = embedded || isIframe();
   const context = useReplContext();
   const { fontFamily } = useSettings();
-  
-  // Check if there's a track parameter in the URL
-  const hasTrackParam = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('track');
-  
+
   // Choose the appropriate editor based on context
   let Editor;
   if (isUdels()) {
@@ -40,14 +33,12 @@ export function Repl({ embedded = false }: ReplProps) {
   } else if (isEmbedded) {
     Editor = EmbeddedReplEditor;
   } else {
-    // Always use regular editor - no authentication required
-    // Users can sign in via header button if they want cloud features
-    Editor = ReplEditor;
+    // Use authenticated editor for full cloud features
+    // This handles both authenticated and unauthenticated users
+    Editor = AuthenticatedReplEditor;
   }
-  
+
   return (
-    <I18nProvider>
-      <Editor context={context} style={{ fontFamily }} />
-    </I18nProvider>
+    <Editor context={context} style={{ fontFamily }} ssrData={ssrData} />
   );
 }

@@ -4,17 +4,18 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 
-// Create Supabase client with default session storage (more reliable)
+// Create Supabase client with proper OAuth configuration
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
-    // Use default localStorage-based storage for better reliability
-    // storage: window.localStorage (this is the default)
+    persistSession: true, // Enable session persistence for OAuth
+    detectSessionInUrl: true, // Let Supabase detect OAuth callback automatically
+    flowType: 'pkce', // Use PKCE flow for security
   },
 });
+
+// Use standard Supabase auth - no custom overrides needed
+export const auth = supabase.auth;
 
 // Database types
 // Database types (snake_case to match PostgreSQL)
@@ -58,6 +59,7 @@ export interface UserProfile {
   avatar_url?: string;
   created_at: string;
   updated_at: string;
+  migrated_from_localstorage?: boolean; // Track if user has migrated from localStorage
 }
 
 // Database table names
@@ -66,56 +68,6 @@ export const TABLES = {
   FOLDERS: 'folders',
   PROFILES: 'profiles',
 } as const;
-
-// Auth helper functions
-export const auth = {
-  // Sign in with Google
-  signInWithGoogle: async () => {
-    // Get the current origin, but ensure we use the correct callback URL
-    const origin = window.location.origin;
-    const callbackUrl = `${origin}/auth/callback`;
-
-    console.log('=== SIGN IN WITH GOOGLE DEBUG ===');
-    console.log('Origin:', origin);
-    console.log('Callback URL:', callbackUrl);
-    console.log('Starting OAuth flow...');
-
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: callbackUrl,
-      },
-    });
-    
-    console.log('OAuth result:', { data, error });
-    console.log('=== END SIGN IN WITH GOOGLE DEBUG ===');
-    
-    return { data, error };
-  },
-
-  // Sign out
-  signOut: async () => {
-    const { error } = await supabase.auth.signOut();
-    return { error };
-  },
-
-  // Get current user
-  getCurrentUser: async () => {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    return { user, error };
-  },
-
-  // Get current session
-  getCurrentSession: async () => {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    return { session, error };
-  },
-
-  // Listen to auth changes
-  onAuthStateChange: (callback: (event: string, session: any) => void) => {
-    return supabase.auth.onAuthStateChange(callback);
-  },
-};
 
 // Database helper functions
 // Helper functions to convert between database format and UI format
@@ -147,14 +99,33 @@ export const db = {
   tracks: {
     // Get all tracks for current user
     getAll: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      // First check session and refresh if needed
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (session?.expires_at && Date.now() / 1000 > session.expires_at) {
+        console.log('db.tracks.getAll - Session expired, attempting refresh...');
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          console.error('db.tracks.getAll - Failed to refresh session:', refreshError);
+        }
+      }
+      
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('db.tracks.getAll - No authenticated user found');
+        throw new Error('Not authenticated');
+      }
 
       const { data, error } = await supabase
         .from(TABLES.TRACKS)
         .select('*')
         .eq('user_id', user.id)
         .order('modified', { ascending: false });
+
+      if (error) {
+        console.error('db.tracks.getAll - Database error:', error);
+      }
 
       // Convert database format to UI format
       const convertedData = data?.map(convertTrackFromDB) || null;
@@ -172,7 +143,7 @@ export const db = {
         .select('*')
         .eq('id', id)
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to handle 0 rows
 
       // Convert database format to UI format
       const convertedData = data ? convertTrackFromDB(data) : null;
@@ -192,7 +163,7 @@ export const db = {
         .from(TABLES.TRACKS)
         .insert({ ...dbTrack, user_id: user.id })
         .select()
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single()
 
       // Convert database format back to UI format
       const convertedData = data ? convertTrackFromDB(data) : null;
@@ -214,7 +185,7 @@ export const db = {
         .eq('id', id)
         .eq('user_id', user.id)
         .select()
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single()
 
       // Convert database format back to UI format
       const convertedData = data ? convertTrackFromDB(data) : null;
@@ -281,7 +252,7 @@ export const db = {
         .from(TABLES.FOLDERS)
         .insert({ ...folder, user_id: user.id })
         .select()
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single()
 
       return { data, error };
     },
@@ -297,7 +268,7 @@ export const db = {
         .eq('id', id)
         .eq('user_id', user.id)
         .select()
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single()
 
       return { data, error };
     },
@@ -343,7 +314,7 @@ export const db = {
         .from(TABLES.PROFILES)
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to handle 0 rows
 
       return { data, error };
     },
@@ -358,7 +329,7 @@ export const db = {
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', user.id)
         .select()
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single()
 
       return { data, error };
     },
@@ -367,18 +338,39 @@ export const db = {
 
 // Migration helpers
 export const migration = {
-  // Check if user has migrated
+  // Check if user has migrated from localStorage
   hasMigrated: async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return false;
 
-    const { data, error } = await supabase
+    // Check if user has any tracks (indicates migration has happened)
+    const { data: tracks, error: tracksError } = await supabase
       .from(TABLES.TRACKS)
       .select('id')
       .eq('user_id', user.id)
       .limit(1);
 
-    return !error && data && data.length > 0;
+    if (tracksError) {
+      console.error('Error checking for migrated tracks:', tracksError);
+      return false;
+    }
+
+    // Also check the profile migration flag
+    const { data: profile, error: profileError } = await supabase
+      .from(TABLES.PROFILES)
+      .select('migrated_from_localstorage')
+      .eq('id', user.id)
+      .maybeSingle(); // Use maybeSingle() instead of single()
+
+    if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows returned
+      console.error('Error checking profile migration flag:', profileError);
+    }
+
+    // User has migrated if they have tracks OR the migration flag is set
+    const hasTracks = tracks && tracks.length > 0;
+    const migrationFlagSet = profile?.migrated_from_localstorage === true;
+    
+    return hasTracks || migrationFlagSet;
   },
 
   // Migrate localStorage data to Supabase
@@ -437,6 +429,17 @@ export const migration = {
       }
     }
 
+    // Set migration flag in user profile
+    try {
+      await db.profiles.update({
+        migrated_from_localstorage: true,
+        updated_at: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error setting migration flag:', error);
+      // Don't fail the migration if we can't set the flag
+    }
+
     return results;
   },
 
@@ -445,14 +448,15 @@ export const migration = {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('strudel_tracks');
       localStorage.removeItem('strudel_folders');
-      localStorage.setItem('strudel_migrated_to_supabase', 'true');
+      // Don't set a localStorage flag - we use Supabase profile flag instead
     }
   },
 
-  // Check if localStorage has been cleared
+  // Check if localStorage has been cleared (deprecated - use hasMigrated instead)
   isLocalStorageCleared: () => {
-    if (typeof localStorage === 'undefined') return true;
-    return localStorage.getItem('strudel_migrated_to_supabase') === 'true';
+    // Always return true since we don't use localStorage flags anymore
+    // Migration status is tracked in Supabase profile
+    return true;
   },
 };
 

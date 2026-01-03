@@ -40,6 +40,7 @@
   
   "noCodeToSave": "لا يوجد كود للحفظ",
   "trackSaved": "تم حفظ المسار بنجاح!",
+  "trackCreatedAndSaved": "تم إنشاء وحفظ المسار '{{name}}'!",
   "trackDuplicated": "تم نسخ المسار بنجاح!",
   "trackDownloaded": "تم تنزيل المسار بنجاح!",
   "trackRenamed": "تم إعادة تسمية المسار بنجاح!",
@@ -58,7 +59,7 @@
   "newFolder": "مجلد جديد",
   "folderName": "اسم المجلد",
   "createFolder": "إنشاء مجلد",
-  "openFolder": "فتح مجلد",
+  "ts": "فتح مجلد",
   "folderDeleted": "تم حذف المجلد بنجاح!",
   "folderRenamed": "تم إعادة تسمية المجلد بنجاح!",
   "folderNotEmpty": "لا يمكن حذف المجلد: يحتوي على ملفات أو مجلدات فرعية",
@@ -90,6 +91,7 @@
   "activeStep": "الخطوة النشطة",
   "newMultitrack": "مسار متعدد جديد",
   "multitrackCreated": "تم إنشاء المسار المتعدد بنجاح!",
+  "stepRenamed": "تم إعادة تسمية الخطوة بنجاح!",
   "multitrackImported": "تم استيراد المسار المتعدد '{{name}}' بنجاح!",
   "invalidMultitrackFile": "تنسيق ملف المسار المتعدد غير صالح",
   "noValidStepsFound": "لم يتم العثور على خطوات صالحة في ملف المسار المتعدد",
@@ -103,5 +105,8 @@
   "allTracksDeleted": "تم حذف جميع المسارات بنجاح!",
   "allFoldersDeleted": "تم حذف جميع المجلدات بنجاح!",
   "allTracksAndFoldersDeleted": "تم حذف جميع المسارات والمجلدات بنجاح!",
-  "noTracksToExport": "لا توجد مسارات للتصدير"
+  "noTracksToExport": "لا توجد مسارات للتصدير",
+  
+  "loadingTracks": "جاري تحميل مساراتك...",
+  "loadingTracksDescription": "يرجى الانتظار بينما نحصل على بياناتك من السحابة"
 }

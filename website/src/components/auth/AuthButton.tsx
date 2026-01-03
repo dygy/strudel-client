@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import type { User } from '../../lib/secureApi';
 
 interface AuthButtonProps {
   className?: string;
@@ -8,7 +9,7 @@ interface AuthButtonProps {
 }
 
 export function AuthButton({ className = '', showProfile = true }: AuthButtonProps) {
-  const { user, signInWithGoogle, signOut, loading, profile } = useAuth();
+  const { user, signInWithGoogle, signOut, loading } = useAuth();
   const { t } = useTranslation(['auth', 'common']);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -54,10 +55,10 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
     if (!user) return null;
 
     const metadata = user.user_metadata || {};
-    const fullName = metadata.full_name || metadata.name || '';
+    const fullName = metadata.full_name || metadata.name || user.name || '';
     const firstName = metadata.given_name || '';
     const lastName = metadata.family_name || '';
-    const avatarUrl = metadata.avatar_url || metadata.picture || '';
+    const avatarUrl = metadata.avatar_url || metadata.picture || user.avatar || '';
     const email = user.email || '';
 
     // Try to construct full name from parts if not available

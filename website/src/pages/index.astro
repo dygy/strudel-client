@@ -1,15 +1,8 @@
 ---
-import HeadCommon from '../components/HeadCommon.astro';
-import { Repl } from '../repl/Repl';
----
+// Main entry point - redirect to REPL
+export const prerender = false;
 
-<html lang="en" class="m-0 dark">
-  <head>
-    <HeadCommon />
-    <title>Strudel REPL</title>
-  </head>
-  <body class="h-app-height bg-background m-0">
-    <Repl client:only="react" />
-    <a rel="me" href="https://social.toplap.org/@strudel" target="_blank" class="hidden">mastodon</a>
-  </body>
-</html>
+// Always redirect to the main REPL page
+// It will handle authentication internally
+return Astro.redirect('/repl' + (Astro.url.search || ''));
+---

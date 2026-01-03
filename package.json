@@ -59,7 +59,8 @@
     "@strudel/tonal": "workspace:*",
     "@strudel/transpiler": "workspace:*",
     "@strudel/webaudio": "workspace:*",
-    "@strudel/xen": "workspace:*"
+    "@strudel/xen": "workspace:*",
+    "nanoid": "^5.0.9"
   },
   "devDependencies": {
     "@eslint/compat": "^1.2.5",
@@ -73,13 +74,14 @@
     "eslint": "^9.19.0",
     "eslint-plugin-import": "^2.31.0",
     "events": "^3.3.0",
-    "fast-check": "^3.15.1",
+    "fast-check": "^3.23.2",
     "globals": "^15.14.0",
     "jsdoc": "^4.0.4",
     "jsdoc-json": "^2.0.2",
+    "jsdom": "^27.4.0",
     "lerna": "^8.1.9",
     "prettier": "^3.4.2",
-    "vitest": "^3.0.4",
-    "vite-plugin-bundle-audioworklet": "^0.1.1"
+    "vite-plugin-bundle-audioworklet": "^0.1.1",
+    "vitest": "^3.0.4"
   }
 }

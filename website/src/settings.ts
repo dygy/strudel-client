@@ -205,8 +205,6 @@ if (typeof window !== 'undefined') {
   const runMigration = () => {
     const currentSettings = settingsMap.get();
 
-    console.log('[settings] loaded settings:', currentSettings);
-
     if (typeof localStorage !== 'undefined' && !localStorage.getItem(MIGRATION_KEY)) {
       console.log('[settings] migrating to add IDE features');
 
@@ -226,11 +224,6 @@ if (typeof window !== 'undefined') {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(MIGRATION_KEY, 'true');
       }
-      console.log('[settings] migration complete, new settings:', updated);
-    } else {
-      console.log('[settings] isAutoCompletionEnabled:', currentSettings.isAutoCompletionEnabled);
-      console.log('[settings] isSignatureHelpEnabled:', currentSettings.isSignatureHelpEnabled);
-      console.log('[settings] isLinterEnabled:', currentSettings.isLinterEnabled);
     }
   };
 

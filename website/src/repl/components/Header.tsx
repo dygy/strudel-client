@@ -4,7 +4,6 @@ import { Bars3Icon } from '@heroicons/react/24/outline';
 import cx from '@src/cx';
 import { useSettings, setIsZen, setIsFileManagerOpen } from '../../settings';
 import { useTranslation } from '@src/i18n';
-import { AuthProvider } from '../../contexts/AuthContext';
 import { AuthButton } from '../../components/auth/AuthButton';
 import '../Repl.css';
 
@@ -35,17 +34,16 @@ export function Header({ context, embedded = false }: HeaderProps) {
   const { t } = useTranslation('common');
 
   return (
-    <AuthProvider>
-      <header
-        id="header"
-        className={cx(
-          'flex-none text-black  z-[100] text-lg select-none h-20 md:h-14',
-          !isZen && !isEmbedded && 'bg-lineHighlight',
-          isZen ? 'h-12 w-8 fixed top-0 left-0' : 'sticky top-0 w-full py-1 justify-between',
-          isEmbedded ? 'flex' : 'md:flex',
-        )}
-        style={{ fontFamily }}
-      >
+    <header
+      id="header"
+      className={cx(
+        'flex-none text-black  z-[100] text-lg select-none h-20 md:h-14',
+        !isZen && !isEmbedded && 'bg-lineHighlight',
+        isZen ? 'h-12 w-8 fixed top-0 left-0' : 'sticky top-0 w-full py-1 justify-between',
+        isEmbedded ? 'flex' : 'md:flex',
+      )}
+      style={{ fontFamily }}
+    >
         <div className="px-4 flex space-x-2 md:pt-0 select-none">
           <h1
             dir="ltr"
@@ -76,11 +74,6 @@ export function Header({ context, embedded = false }: HeaderProps) {
               <div className="space-x-2">
                 <span className="">strudel</span>
                 <span className="text-sm font-medium">by Dygy</span>
-                {!isEmbedded && isButtonRowHidden && (
-                  <a href={`${baseNoTrailing}/learn`} className="text-sm opacity-25 font-medium">
-                    {t('docs')}
-                  </a>
-                )}
               </div>
             )}
           </h1>
@@ -140,6 +133,5 @@ export function Header({ context, embedded = false }: HeaderProps) {
           )}
         </div>
       </header>
-    </AuthProvider>
-  );
-}
+    );
+  }

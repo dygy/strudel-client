@@ -42,7 +42,7 @@ interface ReplContext {
 const TRACKS_STORAGE_KEY = 'strudel_tracks';
 const FOLDERS_STORAGE_KEY = 'strudel_folders';
 
-export function useFileManager(context: ReplContext) {
+export function useFileManager(context: ReplContext, options: { disabled?: boolean } = {}) {
   const [tracks, setTracks] = useState<Record<string, Track>>({});
   const [folders, setFolders] = useState<Record<string, Folder>>({});
   const [isInitialized, setIsInitialized] = useState(false);
@@ -165,18 +165,28 @@ export function useFileManager(context: ReplContext) {
       selectTrackWithRetry();
     };
 
-    window.addEventListener('strudel-tracks-updated', handleTracksUpdated);
-    window.addEventListener('strudel-select-track', handleSelectTrack);
-    window.addEventListener('strudel-tracks-imported', handleTracksUpdated);
+    // Only set up event listeners if not disabled (i.e., when Supabase is not being used)
+    if (!options.disabled) {
+      window.addEventListener('strudel-tracks-updated', handleTracksUpdated);
+      window.addEventListener('strudel-select-track', handleSelectTrack);
+      window.addEventListener('strudel-tracks-imported', handleTracksUpdated);
+      
+      // Store the handler for cleanup
+      const cleanup = () => {
+        window.removeEventListener('strudel-tracks-updated', handleTracksUpdated);
+        window.removeEventListener('strudel-select-track', handleSelectTrack);
+        window.removeEventListener('strudel-tracks-imported', handleTracksUpdated);
+      };
+      
+      return cleanup;
+    }
 
     setIsInitialized(true);
 
     return () => {
-      window.removeEventListener('strudel-tracks-updated', handleTracksUpdated);
-      window.removeEventListener('strudel-select-track', handleSelectTrack);
-      window.removeEventListener('strudel-tracks-imported', handleTracksUpdated);
+      // No cleanup needed when disabled
     };
-  }, []); // This should only run once on mount
+  }, [options.disabled]); // Remove saveCurrentTrack from dependencies
 
   const loadTrack = useCallback((track: Track) => {
     console.log('FileManager - loadTrack called for:', track.name, track.id);
@@ -371,6 +381,22 @@ export function useFileManager(context: ReplContext) {
     if (!selectedTrack) return false;
     return await saveSpecificTrack(selectedTrack, showToast);
   }, [selectedTrack]);
+
+  // Set up save event listener for Cmd+S functionality (only when not disabled)
+  useEffect(() => {
+    if (options.disabled) return; // Don't set up when Supabase is being used
+
+    const handleSave = (event: CustomEvent) => {
+      console.log('FileManager - received save event:', event.detail);
+      saveCurrentTrack(true); // Show toast on manual save
+    };
+
+    document.addEventListener('strudel-save', handleSave as EventListener);
+
+    return () => {
+      document.removeEventListener('strudel-save', handleSave as EventListener);
+    };
+  }, [options.disabled, saveCurrentTrack]);
 
   const saveSpecificTrack = useCallback(async (trackId: string, showToast: boolean = true) => {
     if (!trackId) {

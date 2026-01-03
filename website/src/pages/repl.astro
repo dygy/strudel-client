@@ -1,0 +1,166 @@
+---
+// Main REPL page with SSR authentication check and track data fetching
+export const prerender = false;
+
+import HeadCommon from '../components/HeadCommon.astro';
+import { Repl } from '../repl/Repl';
+import { I18nProvider } from '../components/I18nProvider';
+import type { SSRTrack, SSRFolder, TreeResponse, TreeItem } from '../types/ssr';
+
+interface AuthenticatedUser {
+  id: string;
+  email: string;
+  name?: string;
+  avatar?: string;
+}
+
+// Check if user has valid session using secure API route
+async function getAuthenticatedUser(request: Request): Promise<AuthenticatedUser | null> {
+  try {
+    const baseUrl = new URL(request.url).origin;
+    const response = await fetch(`${baseUrl}/api/auth/user`, {
+      headers: {
+        'Cookie': request.headers.get('cookie') || '',
+        'User-Agent': request.headers.get('user-agent') || '',
+      },
+    });
+
+    if (!response.ok) {
+      console.log('SSR: Auth API failed:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('SSR: Auth API response:', data.user ? 'authenticated' : 'not authenticated');
+
+    return data.user || null;
+  } catch (error) {
+    console.error('SSR: Error checking authentication:', error);
+    return null;
+  }
+}
+
+// Fetch tracks server-side for authenticated users using secure API
+async function fetchTracksSSR(request: Request, user: AuthenticatedUser | null): Promise<{ tracks: SSRTrack[]; folders: SSRFolder[] } | null> {
+  if (!user) {
+    console.log('SSR: No authenticated user, skipping track fetch');
+    return null;
+  }
+
+  try {
+    const baseUrl = new URL(request.url).origin;
+    const response = await fetch(`${baseUrl}/api/tracks/list`, {
+      headers: {
+        'Cookie': request.headers.get('cookie') || '',
+        'User-Agent': request.headers.get('user-agent') || '',
+      },
+    });
+
+    if (!response.ok) {
+      console.log('SSR: Failed to fetch tracks:', response.status, response.statusText);
+      const errorText = await response.text();
+      console.log('SSR: Error response:', errorText);
+      return null;
+    }
+
+    // API returns hierarchical tree structure: { id: "root", children: [...] }
+    const treeData: TreeResponse = await response.json();
+    console.log('SSR: Fetched hierarchical tree data:', treeData.id, 'children:', treeData.children?.length || 0);
+
+    // Convert hierarchical data back to flat format for component compatibility
+    const tracks: SSRTrack[] = [];
+    const folders: SSRFolder[] = [];
+
+    function extractFromTree(items: TreeItem[], parentPath: string | null = null) {
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.type === 'track') {
+          tracks.push({
+            id: item.id,
+            name: item.name,
+            code: item.code || '',
+            created: item.created,
+            modified: item.modified || item.created,
+            folder: parentPath,
+            isMultitrack: item.isMultitrack || false,
+            steps: item.steps || [],
+            activeStep: item.activeStep || 0,
+            user_id: item.user_id
+          });
+        } else if (item.type === 'folder') {
+          const folderPath = item.path || item.name;
+          folders.push({
+            id: item.id,
+            name: item.name,
+            path: folderPath,
+            parent: parentPath,
+            created: item.created,
+            user_id: item.user_id
+          });
+
+          if (item.children && item.children.length > 0) {
+            extractFromTree(item.children, folderPath);
+          }
+        }
+      }
+    }
+
+    extractFromTree(treeData.children);
+
+    console.log('SSR: Converted to flat format:', { tracksCount: tracks.length, foldersCount: folders.length });
+
+    // Return properly typed SSR data
+    return { tracks, folders };
+  } catch (error) {
+    console.error('SSR: Error fetching tracks:', error);
+    return null;
+  }
+}
+
+const url = new URL(Astro.request.url);
+const authenticatedUser = await getAuthenticatedUser(Astro.request);
+const hasTrackParam = url.searchParams.has('track');
+const isDev = import.meta.env.DEV;
+
+console.log('=== REPL.ASTRO DEBUG ===');
+console.log('URL:', url.toString());
+console.log('Has authenticated user:', !!authenticatedUser);
+console.log('User ID:', authenticatedUser?.id || 'none');
+console.log('Has track param:', hasTrackParam);
+console.log('Is dev:', isDev);
+
+// Require authentication for all REPL access
+const skipAuth = url.searchParams.has('noauth'); // Only skip if explicitly requested
+const shouldRedirectToLogin = !authenticatedUser && !skipAuth;
+
+console.log('Skip auth:', skipAuth);
+console.log('Should redirect to login:', shouldRedirectToLogin);
+
+// Fetch tracks server-side for authenticated users
+const ssrData = await fetchTracksSSR(Astro.request, authenticatedUser);
+
+console.log('SSR data:', ssrData ? `${ssrData.tracks?.length || 0} tracks, ${ssrData.folders?.length || 0} folders` : 'null');
+console.log('=== END REPL.ASTRO DEBUG ===');
+
+// Only redirect if we're absolutely sure the user needs to authenticate
+if (shouldRedirectToLogin) {
+  const loginUrl = `/login${url.search}`;
+  console.log('Redirecting to login:', loginUrl);
+  return Astro.redirect(loginUrl);
+}
+
+// For all other cases, let the client-side handle authentication
+---
+
+<html lang="en" class="m-0 dark">
+  <head>
+    <HeadCommon />
+    <title>Strudel REPL</title>
+  </head>
+  <body class="h-app-height bg-background m-0">
+    <I18nProvider client:only="react">
+      <Repl client:only="react" ssrData={ssrData} />
+    </I18nProvider>
+  </body>
+</html>

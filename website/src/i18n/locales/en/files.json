@@ -41,6 +41,7 @@
   
   "noCodeToSave": "No code to save",
   "trackSaved": "Track saved successfully!",
+  "trackCreated": "Track created successfully!",
   "trackCreatedAndSaved": "Track '{{name}}' created and saved!",
   "trackDuplicated": "Track duplicated successfully!",
   "trackDownloaded": "Track downloaded successfully!",
@@ -67,6 +68,8 @@
   "noItemsInFolder": "This folder is empty",
   "trackMoved": "Track moved successfully!",
   "folderMoved": "Folder moved successfully!",
+  "folderNotFound": "Folder not found",
+  "cannotMoveIntoSelf": "Cannot move folder into itself or its subfolders",
   "rootFolder": "Root",
   "rightClickToCreate": "Right-click to create files and folders",
   "exportAll": "Export All Tracks",
@@ -105,5 +108,27 @@
   "deleteAllTracksAndFoldersWarning": "This will permanently delete all {{trackCount}} tracks and {{folderCount}} folders. This action cannot be undone.",
   "allTracksDeleted": "All tracks deleted successfully!",
   "allFoldersDeleted": "All folders deleted successfully!",
-  "allTracksAndFoldersDeleted": "All tracks and folders deleted successfully!"
+  "allTracksAndFoldersDeleted": "All tracks and folders deleted successfully!",
+  
+  "loadingTracks": "Loading your tracks...",
+  "loadingTracksDescription": "Please wait while we fetch your data from the cloud",
+  
+  "errors": {
+    "loadFailed": "Failed to load files",
+    "createTrackFailed": "Failed to create track",
+    "createFolderFailed": "Failed to create folder",
+    "deleteFailed": "Failed to delete item",
+    "moveFailed": "Failed to move item",
+    "updateFailed": "Failed to update item",
+    "importFailed": "Failed to import file",
+    "exportFailed": "Failed to export file",
+    "saveFailed": "Failed to save track",
+    "renameFailed": "Failed to rename item"
+  },
+  
+  "success": {
+    "folderCreated": "Folder '{{name}}' created successfully",
+    "itemMoved": "Item moved successfully",
+    "itemDeleted": "Item '{{name}}' deleted successfully"
+  }
 }

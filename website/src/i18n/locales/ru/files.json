@@ -41,6 +41,7 @@
   
   "noCodeToSave": "Нет кода для сохранения",
   "trackSaved": "Трек успешно сохранен!",
+  "trackCreatedAndSaved": "Трек '{{name}}' создан и сохранен!",
   "trackDuplicated": "Трек успешно дублирован!",
   "trackDownloaded": "Трек успешно скачан!",
   "trackRenamed": "Трек успешно переименован!",
@@ -59,7 +60,7 @@
   "newFolder": "Новая Папка",
   "folderName": "Название папки",
   "createFolder": "Создать Папку",
-  "openFolder": "Открыть Папку",
+  "ts": "Открыть Папку",
   "folderDeleted": "Папка успешно удалена!",
   "folderRenamed": "Папка успешно переименована!",
   "folderNotEmpty": "Невозможно удалить папку: она содержит файлы или подпапки",
@@ -104,5 +105,8 @@
   "allTracksDeleted": "Все треки успешно удалены!",
   "allFoldersDeleted": "Все папки успешно удалены!",
   "allTracksAndFoldersDeleted": "Все треки и папки успешно удалены!",
-  "noTracksToExport": "Нет треков для экспорта"
+  "noTracksToExport": "Нет треков для экспорта",
+  
+  "loadingTracks": "Загружаем ваши треки...",
+  "loadingTracksDescription": "Пожалуйста, подождите, пока мы получаем ваши данные из облака"
 }

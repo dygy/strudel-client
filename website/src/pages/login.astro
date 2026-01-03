@@ -1,0 +1,409 @@
+---
+// Dedicated login page with proper internationalization
+export const prerender = false;
+
+import HeadCommon from '../components/HeadCommon.astro';
+
+// Get any error or redirect info from URL params
+const url = new URL(Astro.request.url);
+const error = url.searchParams.get('error');
+const hasTrack = url.searchParams.has('track');
+const trackId = url.searchParams.get('track');
+
+// Store redirect info for after authentication
+const redirectParams = trackId ? `?track=${trackId}` : '';
+---
+
+<html lang="en">
+<head>
+    <HeadCommon />
+    <title>Sign In - Strudel REPL</title>
+    <!-- Use proper favicon files -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" href="/icon.png">
+    <link rel="icon" type="image/svg+xml" href="/logo.svg">
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: white;
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+        .logo img {
+            width: 32px;
+            height: 32px;
+        }
+        .language-selector {
+            position: relative;
+        }
+        .language-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .language-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .language-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 0.5rem;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            min-width: 150px;
+            display: none;
+            z-index: 10;
+        }
+        .language-dropdown.show {
+            display: block;
+        }
+        .language-option {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            color: #374151;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .language-option:last-child {
+            border-bottom: none;
+        }
+        .language-option:hover {
+            background: #f9fafb;
+        }
+        .main-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        .auth-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            text-align: center;
+            color: #1a1a1a;
+        }
+        .auth-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #4285f4;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.2s;
+            margin: 0.5rem;
+        }
+        .auth-button:hover {
+            background: #3367d6;
+        }
+        .error-message {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 0.75rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <img src="/logo.svg" alt="Strudel Logo" />
+            <span data-i18n="title">Strudel</span>
+        </div>
+        
+        <div class="language-selector">
+            <button class="language-button" onclick="toggleLanguageDropdown()">
+                <span id="current-language">English</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+            </button>
+            <div class="language-dropdown" id="language-dropdown">
+                <div class="language-option" onclick="setLanguage('en', 'English')">🇺🇸 English</div>
+                <div class="language-option" onclick="setLanguage('es', 'Español')">🇪🇸 Español</div>
+                <div class="language-option" onclick="setLanguage('fr', 'Français')">🇫🇷 Français</div>
+                <div class="language-option" onclick="setLanguage('ru', 'Русский')">🇷🇺 Русский</div>
+                <div class="language-option" onclick="setLanguage('ar', 'العربية')">🇸🇦 العربية</div>
+                <div class="language-option" onclick="setLanguage('he', 'עברית')">🇮🇱 עברית</div>
+                <div class="language-option" onclick="setLanguage('sr', 'Српски')">🇷🇸 Српски</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="auth-card">
+            <div style="margin-bottom: 2rem;">
+                <img src="/logo.svg" alt="Strudel Logo" width="64" height="64" style="margin: 0 auto 1rem; color: #667eea;" />
+                <h1 style="margin: 0 0 0.5rem; font-size: 2rem; font-weight: bold;" data-i18n="welcome-title">Welcome to Strudel</h1>
+                <p style="margin: 0; color: #6b7280;" data-i18n="welcome-subtitle">Live coding environment for musical patterns</p>
+            </div>
+            
+            {error && (
+              <div class="error-message">
+                <span data-i18n="error-prefix">Authentication issue:</span> {error}. <span data-i18n="error-suffix">Please sign in again.</span>
+              </div>
+            )}
+            
+            <div style="margin-bottom: 1.5rem;">
+                <p style="margin: 0 0 1rem; color: #374151;" data-i18n={hasTrack ? "track-access-description" : "sign-in-description"}>
+                  {hasTrack 
+                    ? 'Sign in to access this shared track and sync your music across devices.'
+                    : 'Sign in to sync your tracks across devices and access cloud features.'
+                  }
+                </p>
+                
+                <button class="auth-button" onclick="signInWithGoogle()">
+                    <svg width="20" height="20" viewBox="0 0 24 24">
+                        <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    <span data-i18n="sign-in-button">Continue with Google</span>
+                </button>
+            </div>
+            
+            <p style="margin: 0; font-size: 0.875rem; color: #6b7280;" data-i18n="sign-in-footer">
+                Sign in to access all features and sync your tracks to the cloud.
+            </p>
+        </div>
+    </div>
+    
+    <script type="module">
+        // Import translations from the existing auth.json files
+        const translations = {
+            en: {
+                'title': 'Strudel',
+                'welcome-title': 'Welcome to Strudel',
+                'welcome-subtitle': 'Live coding environment for musical patterns',
+                'error-prefix': 'Authentication issue:',
+                'error-suffix': 'Please sign in again.',
+                'track-access-description': 'Sign in to access this shared track and sync your music across devices.',
+                'sign-in-description': 'Sign in to sync your tracks across devices and access cloud features.',
+                'sign-in-button': 'Continue with Google',
+                'sign-in-footer': 'Sign in to access all features and sync your tracks to the cloud.'
+            },
+            es: {
+                'title': 'Strudel',
+                'welcome-title': 'Bienvenido a Strudel',
+                'welcome-subtitle': 'Entorno de codificación en vivo para patrones musicales',
+                'error-prefix': 'Problema de autenticación:',
+                'error-suffix': 'Por favor, inicia sesión de nuevo.',
+                'track-access-description': 'Inicia sesión para acceder a esta pista compartida y sincronizar tu música en todos los dispositivos.',
+                'sign-in-description': 'Inicia sesión para sincronizar tus pistas en todos los dispositivos y acceder a las funciones de la nube.',
+                'sign-in-button': 'Continuar con Google',
+                'sign-in-footer': 'Inicia sesión para acceder a todas las funciones y sincronizar tus pistas en la nube.'
+            },
+            fr: {
+                'title': 'Strudel',
+                'welcome-title': 'Bienvenue sur Strudel',
+                'welcome-subtitle': 'Environnement de codage en direct pour les motifs musicaux',
+                'error-prefix': 'Problème d\'authentification:',
+                'error-suffix': 'Veuillez vous reconnecter.',
+                'track-access-description': 'Connectez-vous pour accéder à cette piste partagée et synchroniser votre musique sur tous vos appareils.',
+                'sign-in-description': 'Connectez-vous pour synchroniser vos pistes sur tous vos appareils et accéder aux fonctionnalités cloud.',
+                'sign-in-button': 'Continuer avec Google',
+                'sign-in-footer': 'Connectez-vous pour accéder à toutes les fonctionnalités et synchroniser vos pistes dans le cloud.'
+            },
+            ru: {
+                'title': 'Strudel',
+                'welcome-title': 'Добро пожаловать в Strudel',
+                'welcome-subtitle': 'Среда живого кодирования для музыкальных паттернов',
+                'error-prefix': 'Проблема аутентификации:',
+                'error-suffix': 'Пожалуйста, войдите снова.',
+                'track-access-description': 'Войдите, чтобы получить доступ к этому общему треку и синхронизировать музыку на всех устройствах.',
+                'sign-in-description': 'Войдите, чтобы синхронизировать треки на всех устройствах и получить доступ к облачным функциям.',
+                'sign-in-button': 'Продолжить с Google',
+                'sign-in-footer': 'Войдите, чтобы получить доступ ко всем функциям и синхронизировать треки в облаке.'
+            },
+            ar: {
+                'title': 'Strudel',
+                'welcome-title': 'مرحباً بك في Strudel',
+                'welcome-subtitle': 'بيئة البرمجة المباشرة للأنماط الموسيقية',
+                'error-prefix': 'مشكلة في المصادقة:',
+                'error-suffix': 'يرجى تسجيل الدخول مرة أخرى.',
+                'track-access-description': 'سجل الدخول للوصول إلى هذا المسار المشترك ومزامنة موسيقاك عبر الأجهزة.',
+                'sign-in-description': 'سجل الدخول لمزامنة مساراتك عبر الأجهزة والوصول إلى ميزات السحابة.',
+                'sign-in-button': 'المتابعة مع Google',
+                'sign-in-footer': 'سجل الدخول للوصول إلى جميع الميزات ومزامنة مساراتك في السحابة.'
+            },
+            he: {
+                'title': 'Strudel',
+                'welcome-title': 'ברוכים הבאים ל-Strudel',
+                'welcome-subtitle': 'סביבת קידוד חי לדפוסים מוזיקליים',
+                'error-prefix': 'בעיית אימות:',
+                'error-suffix': 'אנא התחבר שוב.',
+                'track-access-description': 'התחבר כדי לגשת לרצועה המשותפת הזו ולסנכרן את המוזיקה שלך בין המכשירים.',
+                'sign-in-description': 'התחבר כדי לסנכרן את הרצועות שלך בין המכשירים ולגשת לתכונות הענן.',
+                'sign-in-button': 'המשך עם Google',
+                'sign-in-footer': 'התחבר כדי לגשת לכל התכונות ולסנכרן את הרצועות שלך בענן.'
+            },
+            sr: {
+                'title': 'Strudel',
+                'welcome-title': 'Добродошли у Strudel',
+                'welcome-subtitle': 'Окружење за живо кодирање музичких образаца',
+                'error-prefix': 'Проблем са аутентификацијом:',
+                'error-suffix': 'Молимо пријавите се поново.',
+                'track-access-description': 'Пријавите се да приступите овој дељеној нумери и синхронизујете музику на свим уређајима.',
+                'sign-in-description': 'Пријавите се да синхронизујете нумере на свим уређајима и приступите функцијама облака.',
+                'sign-in-button': 'Настави са Google',
+                'sign-in-footer': 'Пријавите се да приступите свим функцијама и синхронизујете нумере у облаку.'
+            }
+        };
+
+        // TODO: Replace hardcoded translations with dynamic loading from auth.json files
+        // This is a temporary solution - ideally we should load from:
+        // /src/i18n/locales/{lang}/auth.json files
+
+        // Language names mapping
+        const languageNames = {
+            'en': 'English',
+            'es': 'Español', 
+            'fr': 'Français',
+            'ru': 'Русский',
+            'ar': 'العربية',
+            'he': 'עברית',
+            'sr': 'Српски'
+        };
+
+        let currentLanguage = 'en';
+
+        // Apply translations
+        function applyTranslations(lang) {
+            const langTranslations = translations[lang] || translations.en;
+            document.querySelectorAll('[data-i18n]').forEach(element => {
+                const key = element.getAttribute('data-i18n');
+                if (langTranslations[key]) {
+                    element.textContent = langTranslations[key];
+                }
+            });
+            
+            // Set document direction for RTL languages
+            if (lang === 'ar' || lang === 'he') {
+                document.documentElement.dir = 'rtl';
+                document.documentElement.classList.add('rtl');
+            } else {
+                document.documentElement.dir = 'ltr';
+                document.documentElement.classList.remove('rtl');
+            }
+            
+            document.documentElement.lang = lang;
+        }
+
+        async function signInWithGoogle() {
+            try {
+                // Store redirect URL if we have track parameter
+                const urlParams = new URLSearchParams(window.location.search);
+                const trackId = urlParams.get('track');
+                if (trackId) {
+                    sessionStorage.setItem('strudel_redirect_after_auth', `/repl?track=${trackId}`);
+                } else {
+                    sessionStorage.setItem('strudel_redirect_after_auth', '/repl');
+                }
+                
+                const { supabase } = await import('/src/lib/supabase.ts');
+                
+                console.log('=== SIGN IN WITH GOOGLE DEBUG ===');
+                const currentOrigin = window.location.origin;
+                const callbackUrl = currentOrigin + '/auth/callback';
+                console.log('Current origin:', currentOrigin);
+                console.log('Callback URL:', callbackUrl);
+                console.log('Starting OAuth flow...');
+                
+                // Use the standard Supabase auth method
+                const { data, error } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: callbackUrl
+                    }
+                });
+                
+                console.log('OAuth result:', { data, error });
+                console.log('=== END SIGN IN WITH GOOGLE DEBUG ===');
+                
+                if (error) {
+                    console.error('Sign in error:', error);
+                    alert('Sign in failed: ' + error.message);
+                }
+            } catch (error) {
+                console.error('Sign in error:', error);
+                alert('Sign in failed. Please try again.');
+            }
+        }
+        
+        function toggleLanguageDropdown() {
+            const dropdown = document.getElementById('language-dropdown');
+            dropdown.classList.toggle('show');
+        }
+        
+        function setLanguage(code, name) {
+            currentLanguage = code;
+            document.getElementById('current-language').textContent = name;
+            document.getElementById('language-dropdown').classList.remove('show');
+            
+            // Store language preference
+            localStorage.setItem('strudel-language', code);
+            
+            // Apply translations
+            applyTranslations(code);
+        }
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const selector = document.querySelector('.language-selector');
+            if (!selector.contains(event.target)) {
+                document.getElementById('language-dropdown').classList.remove('show');
+            }
+        });
+        
+        // Load saved language preference and apply translations
+        const savedLanguage = localStorage.getItem('strudel-language') || 'en';
+        if (languageNames[savedLanguage]) {
+            currentLanguage = savedLanguage;
+            document.getElementById('current-language').textContent = languageNames[savedLanguage];
+            applyTranslations(savedLanguage);
+        }
+        
+        // Make functions global
+        window.signInWithGoogle = signInWithGoogle;
+        window.toggleLanguageDropdown = toggleLanguageDropdown;
+        window.setLanguage = setLanguage;
+    </script>
+</body>
+</html>

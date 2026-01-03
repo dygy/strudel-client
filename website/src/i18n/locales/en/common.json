@@ -16,6 +16,7 @@
   "files": "files",
   "docs": "DOCS",
   "toggleFileManager": "Toggle file manager",
+  "clickAuthButtonToSignIn": "Click the sign in button in the top right to get started",
   "reference": {
     "search": "Search functions...",
     "noResults": "No results found"

@@ -4,7 +4,7 @@ Copyright (C) 2022 Strudel contributors - see <https://codeberg.org/uzu/strudel/
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details. You should have received a copy of the GNU Affero General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { code2hash, getPerformanceTimeSeconds, logger, silence } from '@strudel/core';
+import { getPerformanceTimeSeconds, logger, silence } from '@strudel/core';
 import { getDrawContext } from '@strudel/draw';
 import { transpiler } from '@strudel/transpiler';
 import {
@@ -40,6 +40,7 @@ import './Repl.css';
 import { setInterval, clearInterval } from 'worker-timers';
 import { getMetadata } from '../metadata_parser';
 import { TrackRouter } from '../routing';
+import { setEditorInstance, setPendingCode, getPendingCode, clearPendingCode, setActiveCode, getEditorInstance } from '../stores/editorStore';
 
 // Type definitions
 interface ReplState {
@@ -71,6 +72,10 @@ interface ReplContext {
   editorRef: MutableRefObject<any>;
   containerRef: MutableRefObject<HTMLDivElement | null>;
   trackRouter?: TrackRouter;
+  authInfo?: {
+    isAuthenticated: boolean;
+    fileManagerHook?: any;
+  };
 }
 
 let modulesLoading: Promise<Module[]> | undefined;
@@ -109,6 +114,12 @@ export function useReplContext(): ReplContext {
   const getTime = shouldUseWebaudio ? getAudioContextCurrentTime : getPerformanceTimeSeconds;
 
   const init = useCallback(() => {
+
+    if (!containerRef.current) {
+      console.error('[repl] init called but containerRef.current is null!');
+      return;
+    }
+
     const drawTime = [-2, 2];
     const drawContext = getDrawContext();
     const editor = new StrudelMirror({
@@ -163,147 +174,58 @@ export function useReplContext(): ReplContext {
       },
       bgFill: false,
     });
-    (window as any).strudelMirror = editor;
+
+    console.log('[repl] StrudelMirror created:', !!editor, 'root element:', !!containerRef.current);
+    setEditorInstance(editor);
+
+    // Store editor in editorRef for component access
+    editorRef.current = editor;
+    console.log('[repl] Editor stored in refs and nano store');
+
+    // DEBUG: Add global function to test CodeMirror
+    if (typeof window !== 'undefined') {
+      (window as any).testCodeMirror = (testCode = 'console.log("test from nano store")') => {
+        console.log('Testing CodeMirror with code:', testCode);
+        if (editor && editor.setCode) {
+          editor.setCode(testCode);
+          setActiveCode(testCode);
+          console.log('CodeMirror setCode called successfully');
+        } else {
+          console.error('CodeMirror editor or setCode method not available');
+        }
+      };
+    }
 
     // init settings
     initCode().then(async (decoded) => {
       let code: string;
       let msg: string;
-      
-      // Check if this should be a fresh welcome screen session
-      const shouldShowWelcome = (() => {
-        if (typeof window === 'undefined' || typeof localStorage === 'undefined') return false;
-        
-        const savedTracks = localStorage.getItem('strudel_tracks');
-        const userPatternsKey = localStorage.getItem('strudel-settingsuserPatterns');
-        
-        let hasTracksData = false;
-        let hasUserPatternData = false;
-        
-        if (savedTracks) {
-          try {
-            const tracks = JSON.parse(savedTracks);
-            hasTracksData = Object.keys(tracks).length > 0;
-          } catch (e) {
-            hasTracksData = false;
-          }
-        }
-        
-        if (userPatternsKey) {
-          try {
-            const patterns = JSON.parse(userPatternsKey);
-            hasUserPatternData = patterns && Object.keys(patterns).length > 0;
-          } catch (e) {
-            hasUserPatternData = false;
-          }
-        }
-        
-        return !hasTracksData && !hasUserPatternData;
-      })();
-      
-      // Read latestCode dynamically
-      const currentLatestCode = typeof window !== 'undefined' && typeof localStorage !== 'undefined' 
-        ? localStorage.getItem('strudel-settingslatestCode') 
-        : null;
-      
+
       // Check if there's an active pattern and corresponding track
       const currentActivePattern = getActivePattern();
-      let trackCode = null;
-      
+
       console.log('[repl] Debug - currentActivePattern:', currentActivePattern);
-      
-      if (currentActivePattern && typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-        // First, try to find it in the FileManager tracks
-        const savedTracks = localStorage.getItem('strudel_tracks');
-        console.log('[repl] Debug - savedTracks found:', !!savedTracks);
-        
-        if (savedTracks) {
-          try {
-            const tracks = JSON.parse(savedTracks);
-            console.log('[repl] Debug - parsed tracks:', Object.keys(tracks));
-            const activeTrack = tracks[currentActivePattern];
-            console.log('[repl] Debug - activeTrack found in FileManager:', !!activeTrack, activeTrack?.name);
-            
-            if (activeTrack) {
-              trackCode = activeTrack.code;
-              console.log('[repl] Loading code from FileManager track:', activeTrack.name);
-              
-              // Notify FileManager to select this track
-              setTimeout(() => {
-                console.log('[repl] Dispatching strudel-select-track event for:', currentActivePattern);
-                window.dispatchEvent(new CustomEvent('strudel-select-track', {
-                  detail: { trackId: currentActivePattern }
-                }));
-              }, 100);
-            }
-          } catch (e) {
-            console.warn('[repl] Failed to parse tracks from localStorage:', e);
-          }
-        }
-        
-        // If not found in FileManager tracks, try the old user pattern system
-        if (!trackCode) {
-          try {
-            const userPatternsData = localStorage.getItem('strudel-settingsuserPatterns');
-            if (userPatternsData) {
-              const userPatterns = JSON.parse(userPatternsData);
-              const userPattern = userPatterns[currentActivePattern];
-              console.log('[repl] Debug - activePattern found in userPatterns:', !!userPattern);
-              
-              if (userPattern && userPattern.code) {
-                trackCode = userPattern.code;
-                console.log('[repl] Loading code from user pattern system');
-                
-                // Try to find a matching FileManager track by code content
-                if (savedTracks) {
-                  try {
-                    const tracks = JSON.parse(savedTracks);
-                    const matchingTrack = Object.values(tracks).find((track: any) => 
-                      track.code && track.code.trim() === userPattern.code.trim()
-                    );
-                    
-                    if (matchingTrack) {
-                      console.log('[repl] Found matching FileManager track by code content:', (matchingTrack as any).name);
-                      // Update active pattern to use the FileManager track ID
-                      setActivePattern((matchingTrack as any).id);
-                      
-                      // Notify FileManager to select this track
-                      setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent('strudel-select-track', {
-                          detail: { trackId: (matchingTrack as any).id }
-                        }));
-                      }, 100);
-                    } else {
-                      console.log('[repl] No matching FileManager track found');
-                    }
-                  } catch (e) {
-                    console.warn('[repl] Failed to parse tracks for matching:', e);
-                  }
-                }
-              }
-            }
-          } catch (e) {
-            console.warn('[repl] Failed to parse user patterns from localStorage:', e);
-          }
-        }
-      } else {
-        console.log('[repl] Debug - No active pattern or window/localStorage not available');
-      }
-      
+      console.log('[repl] Debug - NO localStorage access for authenticated users');
+
+      // For authenticated users, track loading will be handled by the FileManager
+      // For unauthenticated users, this will be handled by the regular ReplEditor
+
       if (decoded) {
         code = decoded;
         msg = `I have loaded the code from the URL.`;
-      } else if (trackCode) {
-        code = trackCode;
-        msg = `Your active track has been loaded!`;
-      } else if (currentLatestCode && !shouldShowWelcome) {
-        code = currentLatestCode;
-        msg = `Your last session has been loaded!`;
       } else {
-        /* const { code: randomTune, name } = await getRandomTune();
-        code = randomTune; */
-        code = DEFAULT_TRACK_CODE;
-        msg = `Default code has been loaded`;
+        // Check for pending code first
+        const pendingCode = getPendingCode();
+        if (pendingCode) {
+          code = pendingCode;
+          msg = `I have loaded the code from pending track.`;
+          console.log('[repl] Using pending code for initialization:', code.substring(0, 50) + '...');
+          clearPendingCode(); // Clear it
+        } else {
+          // Always start with default code - no localStorage fallback
+          code = DEFAULT_TRACK_CODE;
+          msg = `Default code has been loaded`;
+        }
       }
       editor.setCode(code);
       setDocumentTitle(code);
@@ -317,39 +239,35 @@ export function useReplContext(): ReplContext {
   const { started, isDirty, error, activeCode, pending } = replState;
   const editorRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  
+
   // Initialize TrackRouter
   const trackRouterRef = useRef<TrackRouter | null>(null);
-  
+
   // Initialize TrackRouter on first render
   useEffect(() => {
     if (!trackRouterRef.current) {
-      console.log('useReplContext - initializing TrackRouter');
       trackRouterRef.current = new TrackRouter({
         onTrackChange: (trackId, previousTrackId) => {
-          console.log('TrackRouter - track changed:', { trackId, previousTrackId });
           // Update activePattern to trigger FileManager synchronization
           if (trackId) {
             setActivePattern(trackId);
           }
         },
         onNavigationStart: (trackId) => {
-          console.log('TrackRouter - navigation started:', trackId);
         },
         onNavigationComplete: (trackId) => {
-          console.log('TrackRouter - navigation completed:', trackId);
         },
         onNavigationError: (error, trackId) => {
           console.error('TrackRouter - navigation error:', error, trackId);
         },
       });
-      
+
       // Initialize the router
       trackRouterRef.current.initialize().catch(error => {
         console.error('TrackRouter - initialization failed:', error);
       });
     }
-    
+
     return () => {
       if (trackRouterRef.current) {
         trackRouterRef.current.destroy();
@@ -362,7 +280,7 @@ export function useReplContext(): ReplContext {
   // this will be the case when the main repl is being replaced
   const _settings = useStore(settingsMap, { keys: Object.keys(defaultSettings) });
   const allSettings = useSettings(); // Get all settings including Prettier settings
-  
+
   useEffect(() => {
     let editorSettings: any = {};
     Object.keys(defaultSettings).forEach((key) => {
@@ -370,9 +288,8 @@ export function useReplContext(): ReplContext {
         editorSettings[key] = (_settings as any)[key];
       }
     });
-    console.log('[repl] updating editor settings:', editorSettings);
     editorRef.current?.updateSettings(editorSettings);
-    
+
     // Make all settings available globally for Prettier
     if (typeof window !== 'undefined') {
       (window as any).strudelSettings = allSettings;
@@ -399,36 +316,57 @@ export function useReplContext(): ReplContext {
     clearCanvas?.();
     clearHydra();
     resetLoadedSounds();
-    
+
     // Only reset CPS if editor is initialized
     if (editorRef.current && editorRef.current.repl && editorRef.current.repl.setCps) {
       editorRef.current.repl.setCps(0.5);
     }
-    
+
     await prebake(); // declare default samples
   };
 
-  const handleUpdate = async (patternData: Partial<PatternData> & { code: string }, reset = false): Promise<void> => {
+  const handleUpdate = useCallback(async (patternData: Partial<PatternData> & { code: string }, reset = false): Promise<void> => {
     const fullPatternData: PatternData = {
       id: patternData.id || '',
       code: patternData.code,
       ...patternData,
     };
     setViewingPatternData(fullPatternData);
-    
-    // Simple, direct approach - just set the code
-    if (editorRef.current && editorRef.current.setCode) {
-      editorRef.current.setCode(patternData.code);
+
+    console.log('[repl] handleUpdate called with code:', patternData.code.substring(0, 50) + '...');
+
+    // Store code in nano store as backup
+    setPendingCode(patternData.code);
+    setActiveCode(patternData.code);
+
+    // CRITICAL: Only update CodeMirror if the code is actually different
+    // This prevents unnecessary re-renders and editor destruction
+    const currentEditorCode = editorRef.current?.code || '';
+    if (currentEditorCode !== patternData.code) {
+      console.log('[repl] Setting code in editor via setCode');
+
+      // Method 1: Standard setCode
+      if (editorRef.current?.setCode) {
+        editorRef.current.setCode(patternData.code);
+      }
+
+      // Method 2: Use stored editor instance as backup
+      const storedEditor = getEditorInstance();
+      if (storedEditor?.setCode) {
+        console.log('[repl] Setting code via stored editor instance');
+        storedEditor.setCode(patternData.code);
+      }
+    } else {
+      console.log('[repl] Skipping setCode, code is the same');
     }
-    
+
     if (reset) {
-      // Only reset if editor is fully initialized
-      if (editorRef.current && editorRef.current.repl) {
+      if (editorRef.current?.repl) {
         await resetEditor();
         handleEvaluate();
       }
     }
-  };
+  }, []);
 
   const handleEvaluate = (): void => {
     if (editorRef.current && editorRef.current.evaluate) {
@@ -439,17 +377,17 @@ export function useReplContext(): ReplContext {
   const handleShuffle = async (): Promise<void> => {
     const patternData = await getRandomTune();
     if (!patternData || !patternData.id) return;
-    
+
     const code = patternData.code;
     logger(`[repl] ✨ loading random tune "${patternData.id}"`);
     setActivePattern(patternData.id);
     setViewingPatternData(patternData);
     await resetEditor();
-    
+
     // Only set code and evaluate if editor is initialized
     if (editorRef.current && editorRef.current.setCode) {
       editorRef.current.setCode(code);
-      
+
       if (editorRef.current.repl && editorRef.current.repl.evaluate) {
         editorRef.current.repl.evaluate(code);
       }

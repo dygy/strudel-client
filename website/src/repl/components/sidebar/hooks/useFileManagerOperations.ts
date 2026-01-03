@@ -347,8 +347,22 @@ export function useFileManagerOperations({
     setRenameValue('');
   }, [renamingFolder, renameValue, folders, setFolders, setRenamingFolder, setRenameValue, t]);
 
-  const handleMoveItem = useCallback((itemId: string, itemType: 'track' | 'folder', targetPath: string) => {
+  const handleMoveItem = useCallback(async (itemId: string, itemType: 'track' | 'folder', targetPath: string) => {
+    console.log('handleMoveItem called:', { 
+      itemId, 
+      itemType, 
+      targetPath, 
+      availableFolders: Object.keys(folders),
+      foldersData: Object.entries(folders).map(([key, folder]) => ({ 
+        key, 
+        id: folder.id, 
+        name: folder.name, 
+        path: typeof folder.path === 'string' ? folder.path : '[CORRUPTED]'
+      }))
+    });
+    
     if (itemType === 'track') {
+      // Update local state immediately for responsive UI
       setTracks(prev => ({
         ...prev,
         [itemId]: {
@@ -357,10 +371,76 @@ export function useFileManagerOperations({
           modified: new Date().toISOString(),
         }
       }));
-      toastActions.success(t('files:trackMoved'));
+      
+      // Update the database using the corrected legacy update endpoint
+      try {
+        // Convert targetPath to targetUuid for database storage
+        let targetUuid = null;
+        if (targetPath) {
+          // Find the target folder by path and get its UUID
+          const targetFolder = Object.values(folders).find(f => f.path === targetPath);
+          if (targetFolder) {
+            targetUuid = targetFolder.id;
+            console.log(`handleMoveItem - Found target folder "${targetPath}" with UUID: ${targetUuid}`);
+          } else {
+            console.warn(`handleMoveItem - Target folder not found for path: ${targetPath}`);
+            // If we can't find the folder, it might be a UUID already
+            targetUuid = targetPath;
+          }
+        }
+
+        // Use the corrected legacy update endpoint
+        const updateResponse = await fetch('/api/tracks/legacy-update', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            trackId: itemId,
+            folder: targetUuid, // Use UUID for folder reference
+            modified: new Date().toISOString()
+          }),
+        });
+
+        if (!updateResponse.ok) {
+          const errorData = await updateResponse.json();
+          console.error('handleMoveItem - Failed to update track in database:', errorData);
+          
+          // Revert local state on database error
+          setTracks(prev => ({
+            ...prev,
+            [itemId]: {
+              ...prev[itemId],
+              folder: prev[itemId].folder, // Revert to original folder
+            }
+          }));
+          
+          toastActions.error('Failed to move track. Please try again.');
+          return;
+        }
+
+        const result = await updateResponse.json();
+        console.log('handleMoveItem - Track updated successfully in database:', result);
+        toastActions.success(t('files:trackMoved'));
+      } catch (error) {
+        console.error('handleMoveItem - Error updating track in database:', error);
+        
+        // Revert local state on error
+        setTracks(prev => ({
+          ...prev,
+          [itemId]: {
+            ...prev[itemId],
+            folder: prev[itemId].folder, // Revert to original folder
+          }
+        }));
+        
+        toastActions.error('Failed to move track. Please try again.');
+        return;
+      }
     }
     // TODO: Implement folder moving
-  }, [setTracks, t]);
+  }, [setTracks, folders, t]);
 
   const convertToMultitrack = useCallback((track: Track) => {
     const updatedTrack: Track = {
@@ -791,6 +871,7 @@ export function useFileManagerOperations({
     createNewFolder,
     handleTrackSelect,
     duplicateTrack,
+    handleDeleteTrack: deleteTrack, // Alias for compatibility
     deleteTrack,
     confirmDelete,
     cancelCreate,

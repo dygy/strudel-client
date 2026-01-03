@@ -29,7 +29,6 @@ export { default as drawLine } from './drawLine.mjs';
 // below won't work with runtime.mjs (json import fails)
 /* import * as p from './package.json';
 export const version = p.version; */
-logger('🌀 @strudel/core loaded 🌀');
 if (globalThis._strudelLoaded) {
   console.warn(
     `@strudel/core was loaded more than once...

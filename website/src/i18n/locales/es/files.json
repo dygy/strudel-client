@@ -41,6 +41,7 @@
   
   "noCodeToSave": "No hay código para guardar",
   "trackSaved": "¡Pista guardada exitosamente!",
+  "trackCreatedAndSaved": "¡Pista '{{name}}' creada y guardada!",
   "trackDuplicated": "¡Pista duplicada exitosamente!",
   "trackDownloaded": "¡Pista descargada exitosamente!",
   "trackRenamed": "¡Pista renombrada exitosamente!",
@@ -59,7 +60,7 @@
   "newFolder": "Nueva Carpeta",
   "folderName": "Nombre de carpeta",
   "createFolder": "Crear Carpeta",
-  "openFolder": "Abrir Carpeta",
+  "ts": "Abrir Carpeta",
   "folderDeleted": "¡Carpeta eliminada con éxito!",
   "folderRenamed": "¡Carpeta renombrada con éxito!",
   "folderNotEmpty": "No se puede eliminar la carpeta: contiene archivos o subcarpetas",
@@ -104,5 +105,8 @@
   "allTracksDeleted": "¡Todas las pistas eliminadas exitosamente!",
   "allFoldersDeleted": "¡Todas las carpetas eliminadas exitosamente!",
   "allTracksAndFoldersDeleted": "¡Todas las pistas y carpetas eliminadas exitosamente!",
-  "noTracksToExport": "No hay pistas para exportar"
+  "noTracksToExport": "No hay pistas para exportar",
+  
+  "loadingTracks": "Cargando tus pistas...",
+  "loadingTracksDescription": "Por favor espera mientras obtenemos tus datos de la nube"
 }

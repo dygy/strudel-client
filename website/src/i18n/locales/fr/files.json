@@ -41,6 +41,7 @@
   
   "noCodeToSave": "Aucun code à enregistrer",
   "trackSaved": "Piste enregistrée avec succès !",
+  "trackCreatedAndSaved": "Piste '{{name}}' créée et enregistrée !",
   "trackDuplicated": "Piste dupliquée avec succès !",
   "trackDownloaded": "Piste téléchargée avec succès !",
   "trackRenamed": "Piste renommée avec succès !",
@@ -59,7 +60,7 @@
   "newFolder": "Nouveau Dossier",
   "folderName": "Nom du dossier",
   "createFolder": "Créer le Dossier",
-  "openFolder": "Ouvrir le Dossier",
+  "ts": "Ouvrir le Dossier",
   "folderDeleted": "Dossier supprimé avec succès !",
   "folderRenamed": "Dossier renommé avec succès !",
   "folderNotEmpty": "Impossible de supprimer le dossier : il contient des fichiers ou des sous-dossiers",
@@ -104,5 +105,8 @@
   "allTracksDeleted": "Toutes les pistes supprimées avec succès !",
   "allFoldersDeleted": "Tous les dossiers supprimés avec succès !",
   "allTracksAndFoldersDeleted": "Toutes les pistes et dossiers supprimés avec succès !",
-  "noTracksToExport": "Aucune piste à exporter"
+  "noTracksToExport": "Aucune piste à exporter",
+  
+  "loadingTracks": "Chargement de vos pistes...",
+  "loadingTracksDescription": "Veuillez patienter pendant que nous récupérons vos données depuis le cloud"
 }

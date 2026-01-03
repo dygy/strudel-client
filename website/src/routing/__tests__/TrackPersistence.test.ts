@@ -191,7 +191,7 @@ describe('TrackPersistence', () => {
           fc.record({
             trackId: fc.string({ minLength: 1, maxLength: 2000 }), // Very long track ID
             step: fc.option(fc.integer({ min: 0, max: 999999 })),
-            mode: fc.option(fc.constantFrom('edit', 'view', 'play')),
+            mode: fc.option(fc.constantFrom('edit' as const, 'view' as const, 'play' as const)),
           }),
           (state) => {
             const result = TrackPersistence.persistToURL(state);

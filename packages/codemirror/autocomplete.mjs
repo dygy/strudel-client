@@ -146,7 +146,7 @@ export const hydraFunctionDocs = {
   voronoi: 'Voronoi pattern source. Parameters: scale (default 5), speed (default 0.3), blending (default 0.3). Example: voronoi(5, 0.3, 0.3)',
   shape: 'Geometric shape source. Parameters: sides (default 3), radius (default 0.3), smoothing (default 0.01). Example: shape(4, 0.5, 0.01) for square',
   src: 'Use external source or output buffer. Parameters: source (o0, o1, o2, o3, or s0). Example: src(o0) for feedback',
-  
+
   // Transforms
   rotate: 'Rotate the visual. Parameters: angle (radians), speed (default 0). Example: rotate(0.5, 0.1)',
   scale: 'Scale the visual. Parameters: amount (default 1.5), xMult (default 1), yMult (default 1). Example: scale(2, 1, 1)',
@@ -158,7 +158,7 @@ export const hydraFunctionDocs = {
   scroll: 'Scroll the visual. Parameters: scrollX (default 0.5), scrollY (default 0.5), speedX (default 0), speedY (default 0). Example: scroll(0.5, 0.5)',
   scrollX: 'Scroll horizontally. Parameters: scrollX (default 0.5), speed (default 0). Example: scrollX(0.5, 0.1)',
   scrollY: 'Scroll vertically. Parameters: scrollY (default 0.5), speed (default 0). Example: scrollY(0.5, 0.1)',
-  
+
   // Color
   invert: 'Invert colors. Parameters: amount (default 1). Example: invert(1)',
   contrast: 'Adjust contrast. Parameters: amount (default 1.6). Example: contrast(2)',
@@ -171,7 +171,7 @@ export const hydraFunctionDocs = {
   colorama: 'Color shift effect - cycles through colors. Parameters: amount (default 0.005). Example: colorama(0.01)',
   posterize: 'Posterize colors - reduce color palette. Parameters: bins (default 3), gamma (default 0.6). Example: posterize(5, 0.6)',
   shift: 'Shift colors in RGB space. Parameters: r (default 0.5), g (default 0.5), b (default 0.5), a (default 0.5). Example: shift(0.1, 0.2, 0.3)',
-  
+
   // Modulation
   modulate: 'Modulate position with another source. Parameters: source, amount (default 0.1). Example: modulate(noise(3), 0.1)',
   modulateRotate: 'Modulate rotation with another source. Parameters: source, multiple (default 1), offset (default 0). Example: modulateRotate(osc(1), 0.5)',
@@ -183,7 +183,7 @@ export const hydraFunctionDocs = {
   modulateKaleid: 'Modulate kaleidoscope with another source. Parameters: source, nSides (default 4). Example: modulateKaleid(osc(1), 4)',
   modulateScrollX: 'Modulate horizontal scroll. Parameters: source, scrollX (default 0.5), speed (default 0). Example: modulateScrollX(osc(1), 0.5)',
   modulateScrollY: 'Modulate vertical scroll. Parameters: source, scrollY (default 0.5), speed (default 0). Example: modulateScrollY(osc(1), 0.5)',
-  
+
   // Blending
   add: 'Add/blend two sources together. Parameters: source, amount (default 0.5). Example: add(osc(10), 0.5)',
   sub: 'Subtract one source from another. Parameters: source, amount (default 1). Example: sub(osc(10), 0.5)',
@@ -192,13 +192,13 @@ export const hydraFunctionDocs = {
   diff: 'Difference between sources - creates interesting contrast effects. Parameters: source. Example: diff(osc(10))',
   layer: 'Layer sources on top of each other. Parameters: source. Example: layer(shape(4))',
   mask: 'Mask with another source - uses brightness as alpha. Parameters: source, reps (default 3), offset (default 0.5). Example: mask(shape(4))',
-  
+
   // Output
   out: 'Output to buffer. Parameters: buffer (o0, o1, o2, o3). Example: out(o0) or just out()',
   render: 'Render specific output buffer to screen. Parameters: buffer (o0, o1, o2, o3). Example: render(o0)',
   speed: 'Animation speed multiplier. Parameters: speed (default 1). Example: speed(0.5) for half speed',
   bpm: 'Set beats per minute for time-based animations. Parameters: bpm (default 30). Example: bpm(120)',
-  
+
   // Hydra-specific
   initHydra: 'Initialize Hydra video synth. Call with await at the top of your code. Options: {detectAudio: true} for audio reactivity, {feedStrudel: 1} to process Strudel visuals. Example: await initHydra({detectAudio: true})',
   H: 'Convert Strudel pattern to Hydra value. Use to drive Hydra parameters with patterns. Example: osc(H("10 20 30"), 0.1, 0)',
@@ -208,7 +208,7 @@ export const hydraFunctionDocs = {
 export const parseHydraDoc = (name, docString) => {
   const parts = docString.split('. ');
   const description = parts[0] + '.';
-  
+
   // Extract parameters
   const paramsMatch = docString.match(/Parameters?: ([^.]+)/);
   const params = [];
@@ -227,11 +227,11 @@ export const parseHydraDoc = (name, docString) => {
       }
     });
   }
-  
+
   // Extract example
   const exampleMatch = docString.match(/Example: (.+)$/);
   const examples = exampleMatch ? [exampleMatch[1]] : [];
-  
+
   return {
     name,
     description,
@@ -615,7 +615,7 @@ function methodHandler(context) {
         doc.memberof === 'Pattern' ||
         doc.tags?.some(t => t.originalTitle === 'patternMethod') ||
         // Common pattern methods
-        ['gain', 'speed', 'note', 'sound', 's', 'n', 'slow', 'fast', 'rev', 'jux', 
+        ['gain', 'speed', 'note', 'sound', 's', 'n', 'slow', 'fast', 'rev', 'jux',
          'every', 'off', 'layer', 'stack', 'cat', 'seq', 'add', 'sub', 'mul', 'div',
          'lpf', 'hpf', 'vowel', 'room', 'delay', 'delaytime', 'delayfeedback',
          'cutoff', 'resonance', 'crush', 'coarse', 'shape', 'pan', 'orbit',
@@ -634,10 +634,10 @@ function methodHandler(context) {
         ].includes(completion.label)
       );
     });
-    
+
     // Combine pattern methods with standard JavaScript methods
     const allMethods = [...patternMethods, ...allJsMethods];
-    
+
     return {
       from: afterDot.from + 1, // Start after the dot
       options: allMethods.filter(m => m.label.startsWith(word)),
@@ -686,16 +686,13 @@ export const strudelAutocomplete = (context) => {
 };
 
 export const isAutoCompletionEnabled = (enabled) => {
-  console.log('[autocomplete] isAutoCompletionEnabled called, enabled:', enabled);
   if (enabled) {
-    console.log('[autocomplete] registering autocomplete extension');
-    return [autocompletion({ 
-      override: [strudelAutocomplete], 
+    return [autocompletion({
+      override: [strudelAutocomplete],
       closeOnBlur: false,
       activateOnTyping: true,
       maxRenderedOptions: 100,
     })];
   }
-  console.log('[autocomplete] autocomplete disabled');
   return [];
 };

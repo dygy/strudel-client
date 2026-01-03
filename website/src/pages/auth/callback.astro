@@ -49,42 +49,74 @@
 
     <script type="module">
         async function handleCallback() {
-            console.log('OAuth callback page loaded');
-            
             try {
-                // Import Supabase client
                 const { supabase } = await import('/src/lib/supabase.ts');
                 
-                // Let Supabase automatically detect and process the session from URL
-                console.log('Waiting for Supabase to process OAuth callback...');
+                console.log('OAuth callback - Starting...');
                 
-                // Wait a moment for Supabase to process the URL automatically
+                // Wait a bit for Supabase to process the OAuth callback
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
-                // Check if session was created
-                const { data: { session }, error } = await supabase.auth.getSession();
+                // Check for session multiple times with retries
+                let session = null;
+                let attempts = 0;
+                const maxAttempts = 5;
                 
-                if (session) {
-                    console.log('Session created successfully:', session.user.email);
-                } else {
-                    console.log('No session found, Supabase may still be processing...');
+                while (!session && attempts < maxAttempts) {
+                    attempts++;
+                    console.log(`OAuth callback - Attempt ${attempts} to get session...`);
+                    
+                    const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+                    
+                    if (error) {
+                        console.error('OAuth callback - Session error:', error);
+                    }
+                    
+                    if (currentSession) {
+                        session = currentSession;
+                        console.log('OAuth callback - Session found:', {
+                            userId: session.user?.id,
+                            userEmail: session.user?.email,
+                            accessToken: session.access_token ? 'present' : 'missing',
+                            expiresAt: session.expires_at
+                        });
+                        break;
+                    }
+                    
+                    // Wait before retry
+                    if (attempts < maxAttempts) {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
                 }
                 
-                // Redirect regardless - AuthContext will handle session detection
-                const redirectUrl = sessionStorage.getItem('strudel_redirect_after_auth') || '/';
-                console.log('Redirecting to:', redirectUrl);
-                sessionStorage.removeItem('strudel_redirect_after_auth');
-                window.location.href = redirectUrl;
-                
+                if (session) {
+                    console.log('OAuth callback - Success! Setting cookies and redirecting to /repl');
+                    
+                    // Set cookies that the server can read
+                    document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=3600; secure; samesite=lax`;
+                    if (session.refresh_token) {
+                        document.cookie = `sb-refresh-token=${session.refresh_token}; path=/; max-age=86400; secure; samesite=lax`;
+                    }
+                    
+                    // Get the track parameter from URL if present
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const trackParam = urlParams.get('track');
+                    
+                    if (trackParam) {
+                        window.location.href = `/repl?track=${trackParam}`;
+                    } else {
+                        window.location.href = '/repl';
+                    }
+                } else {
+                    console.error('OAuth callback - No session found after all attempts');
+                    window.location.href = '/login?error=no_session';
+                }
             } catch (error) {
-                console.error('Error in callback:', error);
-                // Redirect anyway
-                const redirectUrl = sessionStorage.getItem('strudel_redirect_after_auth') || '/';
-                window.location.href = redirectUrl;
+                console.error('OAuth callback - Error:', error);
+                window.location.href = '/login?error=callback_error';
             }
         }
         
-        // Start callback handling
         handleCallback();
     </script>
 </body>

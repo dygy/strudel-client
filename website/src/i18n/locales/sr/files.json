@@ -40,6 +40,7 @@
   
   "noCodeToSave": "Нема кода за чување",
   "trackSaved": "Нумера је успешно сачувана!",
+  "trackCreatedAndSaved": "Нумера '{{name}}' је креирана и сачувана!",
   "trackDuplicated": "Нумера је успешно дуплирана!",
   "trackDownloaded": "Нумера је успешно преузета!",
   "trackRenamed": "Нумера је успешно преименована!",
@@ -58,7 +59,7 @@
   "newFolder": "Нова Фасцикла",
   "folderName": "Име фасцикле",
   "createFolder": "Креирај Фасциклу",
-  "openFolder": "Отвори Фасциклу",
+  "ts": "Отвори Фасциклу",
   "folderDeleted": "Фасцикла је успешно обрисана!",
   "folderRenamed": "Фасцикла је успешно преименована!",
   "folderNotEmpty": "Не може се обрисати фасцикла: садржи фајлове или подфасцикле",
@@ -104,5 +105,8 @@
   "allTracksDeleted": "Све нумере су успешно обрисане!",
   "allFoldersDeleted": "Све фасцикле су успешно обрисане!",
   "allTracksAndFoldersDeleted": "Све нумере и фасцикле су успешно обрисане!",
-  "noTracksToExport": "Нема нумера за извоз"
+  "noTracksToExport": "Нема нумера за извоз",
+  
+  "loadingTracks": "Учитавам ваше нумере...",
+  "loadingTracksDescription": "Молимо сачекајте док преузимамо ваше податке из облака"
 }

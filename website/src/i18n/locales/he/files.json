@@ -40,6 +40,7 @@
   
   "noCodeToSave": "אין קוד לשמירה",
   "trackSaved": "הרצועה נשמרה בהצלחה!",
+  "trackCreatedAndSaved": "רצועה '{{name}}' נוצרה ונשמרה!",
   "trackDuplicated": "הרצועה שוכפלה בהצלחה!",
   "trackDownloaded": "הרצועה הורדה בהצלחה!",
   "trackRenamed": "הרצועה שונתה בהצלחה!",
@@ -58,7 +59,7 @@
   "newFolder": "תיקייה חדשה",
   "folderName": "שם תיקייה",
   "createFolder": "צור תיקייה",
-  "openFolder": "פתח תיקייה",
+  "ts": "פתח תיקייה",
   "folderDeleted": "תיקייה נמחקה בהצלחה!",
   "folderRenamed": "תיקייה שונתה בהצלחה!",
   "folderNotEmpty": "לא ניתן למחוק תיקייה: היא מכילה קבצים או תת-תיקיות",
@@ -104,5 +105,8 @@
   "allTracksDeleted": "כל הרצועות נמחקו בהצלחה!",
   "allFoldersDeleted": "כל התיקיות נמחקו בהצלחה!",
   "allTracksAndFoldersDeleted": "כל הרצועות והתיקיות נמחקו בהצלחה!",
-  "noTracksToExport": "אין רצועות לייצוא"
+  "noTracksToExport": "אין רצועות לייצוא",
+  
+  "loadingTracks": "טוען את הרצועות שלך...",
+  "loadingTracksDescription": "אנא המתן בזמן שאנחנו מביאים את הנתונים שלך מהענן"
 }

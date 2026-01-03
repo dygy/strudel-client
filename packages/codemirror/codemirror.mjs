@@ -108,6 +108,8 @@ if (typeof window !== 'undefined') {
 
 // https://codemirror.net/docs/guide/
 export function initEditor({ initialCode = '', onChange, onEvaluate, onStop, root, mondo }) {
+  console.log('[initEditor] Called with root:', !!root, root);
+
   const settings = codemirrorSettings.get();
   const initialSettings = Object.keys(compartments).map((key) =>
     compartments[key].of(extensions[key](parseBooleans(settings[key]))),
@@ -179,14 +181,18 @@ export function initEditor({ initialCode = '', onChange, onEvaluate, onStop, roo
     ],
   });
 
-  return new EditorView({
+  const editorView = new EditorView({
     state,
     parent: root,
   });
+
+  console.log('[initEditor] EditorView created:', !!editorView, 'parent:', !!root);
+  return editorView;
 }
 
 export class StrudelMirror {
   constructor(options) {
+
     const {
       root,
       id,
@@ -278,7 +284,12 @@ export class StrudelMirror {
       onStop: () => this.stop(),
       mondo: replOptions.mondo,
     });
+
+    console.log('[StrudelMirror] Editor created:', !!this.editor, 'root:', !!root);
+
     const cmEditor = this.root.querySelector('.cm-editor');
+    console.log('[StrudelMirror] Looking for .cm-editor in root:', !!cmEditor);
+
     if (cmEditor) {
       this.root.style.display = 'block';
       if (bgFill) {

@@ -130,8 +130,9 @@ export function FileTree({
   onRenameStepCancel,
 }: FileTreeProps) {
   const { t } = useTranslation(['files', 'common']);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set([''])); // Root is expanded by default
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['root'])); // Root is expanded by default
   const [draggedItem, setDraggedItem] = useState<{ id: string; type: 'track' | 'folder' } | null>(null);
+  const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
 
   // Auto-expand parent directories when a track is selected
   React.useEffect(() => {
@@ -146,63 +147,109 @@ export function FileTree({
   // Function to expand all parent directories for a given folder path
   const expandParentDirectories = (folderPath: string) => {
     const pathsToExpand = new Set<string>();
-    
-    // Add the direct folder
-    pathsToExpand.add(folderPath);
-    
-    // Add all parent folders by walking up the hierarchy
-    let currentPath = folderPath;
-    while (currentPath) {
-      pathsToExpand.add(currentPath);
-      
-      // Find parent folder
-      const folder = folders[currentPath];
-      if (folder && folder.parent) {
-        currentPath = folder.parent;
-      } else {
-        break;
+
+    // Find folder by path and get its UUID chain
+    const findFolderByPath = (path: string) => {
+      return Object.values(folders).find(f => f.path === path);
+    };
+
+    const folder = findFolderByPath(folderPath);
+    if (folder) {
+      // Add this folder's UUID
+      pathsToExpand.add(folder.id);
+
+      // Walk up the parent chain using UUIDs
+      let currentFolder = folder;
+      while (currentFolder && currentFolder.parent) {
+        pathsToExpand.add(currentFolder.parent);
+        currentFolder = folders[currentFolder.parent];
       }
     }
-    
-    // Add root folder (empty string)
-    pathsToExpand.add('');
-    
+
+    // Add root folder
+    pathsToExpand.add('root');
+
     // Update expanded folders state
     setExpandedFolders(prev => {
       const newSet = new Set(prev);
-      pathsToExpand.forEach(path => newSet.add(path));
+      pathsToExpand.forEach(id => newSet.add(id));
       return newSet;
     });
   };
 
-  // Build tree structure
+  // Build proper tree structure
   const buildTree = (): TreeNode[] => {
     const tree: TreeNode[] = [];
-    const folderNodes: Record<string, TreeNode> = {};
+    const folderNodesById: Record<string, TreeNode> = {};
 
-    // Create folder nodes
+    // Step 1: Create all folder nodes and index them by UUID only
     Object.values(folders).forEach(folder => {
-      folderNodes[folder.path] = {
-        id: folder.path,
-        name: folder.name,
+      // CRITICAL: Validate folder data to prevent corruption
+      let folderPath: string;
+      if (typeof folder.path === 'string' && folder.path.trim()) {
+        folderPath = folder.path.trim();
+      } else if (typeof folder.name === 'string' && folder.name.trim()) {
+        folderPath = folder.name.trim();
+        console.warn('FileTree - buildTree: Using folder.name as path fallback for folder:', folder.id, folder.name);
+      } else {
+        folderPath = folder.id;
+        console.error('FileTree - buildTree: Both folder.path and folder.name are corrupted, using folder.id:', {
+          folderId: folder.id,
+          corruptedPath: folder.path,
+          pathType: typeof folder.path,
+          corruptedName: folder.name,
+          nameType: typeof folder.name
+        });
+      }
+
+      const node: TreeNode = {
+        id: folder.id,
+        name: folder.name || 'Unnamed Folder',
         type: 'folder',
-        path: folder.path,
+        path: folderPath,
         children: [],
-        data: folder,
+        data: {
+          ...folder,
+          path: folderPath // Ensure the data object has clean path
+        },
       };
+
+      folderNodesById[folder.id] = node;
     });
 
-    // Build folder hierarchy
+    // Step 2: Build folder hierarchy using UUIDs for parent-child relationships
     Object.values(folders).forEach(folder => {
-      const node = folderNodes[folder.path];
-      if (folder.parent && folderNodes[folder.parent]) {
-        folderNodes[folder.parent].children!.push(node);
+      const node = folderNodesById[folder.id];
+      
+      if (folder.parent) {
+        // Try to find parent by UUID first
+        let parentNode = folderNodesById[folder.parent];
+        
+        if (!parentNode) {
+          // Fallback: try to find parent by path (for backward compatibility)
+          parentNode = Object.values(folderNodesById).find(f => f.path === folder.parent);
+          
+          if (parentNode) {
+            console.log(`FileTree - buildTree: Found parent by path fallback: "${folder.parent}" -> UUID: ${parentNode.id}`);
+          } else {
+            console.warn(`FileTree - buildTree: Parent not found for folder "${folder.name}" (${folder.id}), parent reference: "${folder.parent}"`);
+          }
+        }
+        
+        if (parentNode) {
+          // This folder has a parent - add it to parent's children
+          parentNode.children!.push(node);
+        } else {
+          // Parent not found - add to tree root
+          tree.push(node);
+        }
       } else {
+        // This is a root folder - add to tree root
         tree.push(node);
       }
     });
 
-    // Add tracks to appropriate folders
+    // Step 3: Add tracks to their folders using UUIDs first, then paths as fallback
     Object.values(tracks).forEach(track => {
       const trackNode: TreeNode = {
         id: track.id,
@@ -211,39 +258,74 @@ export function FileTree({
         data: track,
       };
 
-      if (track.folder && folderNodes[track.folder]) {
-        folderNodes[track.folder].children!.push(trackNode);
+      // Try to find folder by UUID first (if track.folder is a UUID)
+      let targetFolder = folderNodesById[track.folder || ''];
+
+      if (!targetFolder && track.folder) {
+        // Fallback: find folder by path (for backward compatibility)
+        // CRITICAL FIX: Find the most specific path match, prioritizing root-level folders
+        const candidateFolders = Object.values(folderNodesById).filter(f => f.path === track.folder);
+        
+        if (candidateFolders.length === 1) {
+          // Only one match - use it
+          targetFolder = candidateFolders[0];
+        } else if (candidateFolders.length > 1) {
+          // Multiple matches - prioritize root-level folders (shorter paths)
+          targetFolder = candidateFolders.reduce((best, current) => {
+            const bestDepth = (best.path?.split('/') || []).length;
+            const currentDepth = (current.path?.split('/') || []).length;
+            return currentDepth < bestDepth ? current : best;
+          });
+          
+          console.warn(`FileTree - buildTree: Multiple folders found for path "${track.folder}", using root-level folder:`, targetFolder.id, targetFolder.path);
+        }
+        
+        if (targetFolder) {
+          console.log(`FileTree - buildTree: Found folder by path fallback: "${track.folder}" -> UUID: ${targetFolder.id}`);
+        }
+      }
+
+      if (targetFolder) {
+        // Track belongs to a folder
+        targetFolder.children!.push(trackNode);
       } else {
+        // Track is at root level
         tree.push(trackNode);
+        
+        if (track.folder) {
+          console.warn(`FileTree - buildTree: Folder not found for track "${track.name}", folder reference: "${track.folder}", placing in root`);
+        }
       }
     });
 
-    // Sort children (folders first, then tracks, both alphabetically)
-    const sortChildren = (nodes: TreeNode[]) => {
+    // Step 4: Sort everything (folders first, then alphabetically)
+    const sortTree = (nodes: TreeNode[]) => {
       nodes.sort((a, b) => {
         if (a.type !== b.type) {
           return a.type === 'folder' ? -1 : 1;
         }
         return a.name.localeCompare(b.name);
       });
+
       nodes.forEach(node => {
-        if (node.children) {
-          sortChildren(node.children);
+        if (node.children && node.children.length > 0) {
+          sortTree(node.children);
         }
       });
     };
 
-    sortChildren(tree);
+    sortTree(tree);
+    console.log({tree})
     return tree;
   };
 
-  const toggleFolder = (path: string) => {
+  const toggleFolder = (folderId: string) => {
     setExpandedFolders(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(path)) {
-        newSet.delete(path);
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId);
       } else {
-        newSet.add(path);
+        newSet.add(folderId);
       }
       return newSet;
     });
@@ -254,19 +336,67 @@ export function FileTree({
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent, targetNode?: TreeNode) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+
+    if (targetNode) {
+      // Only allow dropping on folders or tracks (which will use their parent folder)
+      if (targetNode.type === 'folder' || targetNode.type === 'track') {
+        setDragOverTarget(targetNode.id);
+      }
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear drag over if we're actually leaving the element
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setDragOverTarget(null);
+    }
   };
 
   const handleDrop = (e: React.DragEvent, targetNode: TreeNode) => {
     e.preventDefault();
-    if (!draggedItem || draggedItem.id === targetNode.id) return;
+    setDragOverTarget(null);
 
-    const targetPath = targetNode.type === 'folder' ? targetNode.path! : 
-                     (targetNode.data as Track).folder || '';
+    if (!draggedItem || draggedItem.id === targetNode.id) {
+      console.log('handleDrop: Invalid drop - same item or no dragged item');
+      return;
+    }
 
-    onMoveItem(draggedItem.id, draggedItem.type, targetPath);
+    // Determine the target based on the target node type
+    let targetId: string;
+
+    if (targetNode.type === 'folder') {
+      // Dropping onto a folder - use the folder's UUID
+      targetId = targetNode.id;
+      console.log('handleDrop: Dropping onto folder', { targetNodeId: targetNode.id, targetId });
+    } else {
+      // Dropping onto a track - use the track's parent folder (if any)
+      const track = targetNode.data as Track;
+      if (track.folder) {
+        // Try to find the folder by path (for backward compatibility) or UUID
+        const targetFolder = Object.values(folders).find(f => f.path === track.folder || f.id === track.folder);
+        targetId = targetFolder?.id || '';
+        console.log('handleDrop: Dropping onto track', { trackFolder: track.folder, targetFolder, targetId });
+      } else {
+        targetId = ''; // Root level
+        console.log('handleDrop: Dropping onto root level track');
+      }
+    }
+
+    console.log('handleDrop: Calling onMoveItem', {
+      draggedItemId: draggedItem.id,
+      draggedItemType: draggedItem.type,
+      targetId,
+      availableFolders: Object.keys(folders)
+    });
+
+    onMoveItem(draggedItem.id, draggedItem.type, targetId);
     setDraggedItem(null);
   };
 
@@ -334,34 +464,59 @@ export function FileTree({
     return baseItems;
   };
 
-  const getFolderContextItems = (folder: Folder) => [
+  const getFolderContextItems = (folder: Folder) => {
+    // CRITICAL: Validate folder.path to prevent corrupted data usage
+    let folderPath: string;
+    if (typeof folder.path === 'string' && folder.path.trim()) {
+      folderPath = folder.path.trim();
+    } else if (typeof folder.name === 'string' && folder.name.trim()) {
+      // Fallback to folder.name if path is corrupted
+      folderPath = folder.name.trim();
+      console.warn('FileTree - folder.path is corrupted, using folder.name as fallback:', {
+        folderId: folder.id,
+        folderName: folder.name,
+        corruptedPath: folder.path,
+        pathType: typeof folder.path
+      });
+    } else {
+      // Both path and name are corrupted - use folder ID as last resort
+      folderPath = folder.id;
+      console.error('FileTree - both folder.path and folder.name are corrupted, using folder.id:', {
+        folderId: folder.id,
+        corruptedPath: folder.path,
+        corruptedName: folder.name
+      });
+    }
+
+    return [
     {
       label: t('files:newTrack'),
       icon: <PlusIcon className="w-4 h-4" />,
-      onClick: () => onTrackCreate(folder.path),
+      onClick: () => onTrackCreate(folderPath),
     },
     {
       label: t('files:newFolder'),
       icon: <FolderIcon className="w-4 h-4" />,
-      onClick: () => onFolderCreate(folder.path),
+      onClick: () => onFolderCreate(folderPath),
     },
     { separator: true, label: '', onClick: () => {} },
     {
       label: t('files:downloadFolder'),
       icon: <ArrowDownTrayIcon className="w-4 h-4" />,
-      onClick: () => onFolderDownload(folder.path),
+      onClick: () => onFolderDownload(folderPath),
     },
     {
       label: t('files:rename'),
       icon: <PencilIcon className="w-4 h-4" />,
-      onClick: () => onFolderRename(folder.path),
+      onClick: () => onFolderRename(folderPath),
     },
     {
       label: t('files:delete'),
       icon: <TrashIcon className="w-4 h-4" />,
-      onClick: () => onFolderDelete(folder.path),
+      onClick: () => onFolderDelete(folderPath),
     },
   ];
+  };
 
   const getStepContextItems = (trackId: string, stepIndex: number, step: TrackStep) => [
     {
@@ -383,12 +538,12 @@ export function FileTree({
   ];
 
   const renderNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
-    const isExpanded = expandedFolders.has(node.path || node.id);
+    const isExpanded = expandedFolders.has(node.id); // Use node ID for expansion state
     const hasChildren = node.children && node.children.length > 0;
     const hasSteps = node.type === 'track' && (node.data as Track).isMultitrack && (node.data as Track).steps && (node.data as Track).steps!.length > 0;
     const isSelected = node.type === 'track' && selectedTrack === node.id; // Opened for editing
     const isPlaying = node.type === 'track' && activePattern === node.id; // Currently playing
-    
+
     const isRenaming = (node.type === 'track' && renamingTrack === node.id) ||
                       (node.type === 'folder' && renamingFolder === node.path);
 
@@ -427,7 +582,7 @@ export function FileTree({
     return (
       <div key={node.id}>
         <WorkingContextMenu
-          items={node.type === 'track' 
+          items={node.type === 'track'
             ? getTrackContextItems(node.data as Track)
             : getFolderContextItems(node.data as Folder)
           }
@@ -437,16 +592,19 @@ export function FileTree({
               isSelected ? 'bg-selection' : // Opened for editing (blue background)
               isPlaying ? 'bg-green-600/30 border-l-2 border-green-500' : // Currently playing (green accent)
               'hover:bg-gray-600' // Default hover
-            } ${draggedItem?.id === node.id ? 'opacity-50' : ''}`}
+            } ${draggedItem?.id === node.id ? 'opacity-50' : ''} ${
+              dragOverTarget === node.id ? 'bg-blue-600/30 border-2 border-blue-400 border-dashed' : ''
+            }`}
             style={{ paddingLeft: `${depth * 16 + 8}px` }}
             draggable={!isRenaming}
             onDragStart={(e) => handleDragStart(e, node)}
-            onDragOver={handleDragOver}
+            onDragOver={(e) => handleDragOver(e, node)}
+            onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, node)}
             {...getTooltipProps()}
             onClick={() => {
               if (node.type === 'folder') {
-                toggleFolder(node.path!);
+                toggleFolder(node.id); // Use node ID instead of path
               } else if (node.type === 'track' && !isRenaming) {
                 if ((node.data as Track).isMultitrack && hasSteps) {
                   toggleFolder(node.id); // Use track ID for multitrack expansion
@@ -523,7 +681,7 @@ export function FileTree({
                   {/* Burger menu button */}
                   <div className="ml-2">
                     <BurgerMenuButton
-                      items={node.type === 'track' 
+                      items={node.type === 'track'
                         ? getTrackContextItems(node.data as Track)
                         : getFolderContextItems(node.data as Folder)
                       }
@@ -541,7 +699,7 @@ export function FileTree({
           <div>
             {(node.data as Track).steps!.map((step, stepIndex) => {
               const isRenamingThisStep = renamingStep?.trackId === node.id && renamingStep?.stepIndex === stepIndex;
-              
+
               return (
                 <WorkingContextMenu
                   key={step.id}
@@ -557,7 +715,7 @@ export function FileTree({
                     <div className="w-4 h-4 mr-2 flex-shrink-0">
                       <div className="w-2 h-2 bg-purple-400 rounded-full mx-auto"></div>
                     </div>
-                    
+
                     {/* Step name or rename input */}
                     <div className="flex-1 min-w-0">
                       {isRenamingThisStep ? (
@@ -642,7 +800,34 @@ export function FileTree({
           </div>
           {/* Flexible empty space for context menu that fills remaining height */}
           <WorkingContextMenu items={emptySpaceContextItems}>
-            <div className="flex-1 h-full"></div>
+            <div
+              className={`flex-1 h-full ${
+                dragOverTarget === 'root' ? 'bg-blue-600/20 border-2 border-blue-400 border-dashed' : ''
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                setDragOverTarget('root');
+              }}
+              onDragLeave={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX;
+                const y = e.clientY;
+
+                if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                  setDragOverTarget(null);
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOverTarget(null);
+
+                if (draggedItem) {
+                  onMoveItem(draggedItem.id, draggedItem.type, ''); // Empty string for root
+                  setDraggedItem(null);
+                }
+              }}
+            ></div>
           </WorkingContextMenu>
         </div>
       )}
