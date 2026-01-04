@@ -1,72 +1,18 @@
 ---
-// Simple callback page - let Supabase handle OAuth automatically
+// React-based callback page
+import CallbackPage from '../../components/auth/CallbackPage.tsx';
 
 export const prerender = true;
-
-// Get environment variables for client-side use
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 ---
 
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Authenticating... | Strudel</title>
-    
-    <!-- Inject environment variables for client-side use -->
-    <script is:inline>
-        window.SUPABASE_URL = {JSON.stringify(supabaseUrl)};
-        window.SUPABASE_ANON_KEY = {JSON.stringify(supabaseAnonKey)};
-    </script>
-    <script is:inline>
-        // Load callback script after page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            var script = document.createElement('script');
-            script.type = 'module';
-            script.src = '/auth-callback.js';
-            document.head.appendChild(script);
-        });
-    </script>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            background: #f8fafc;
-        }
-        .container {
-            text-align: center;
-            padding: 2rem;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            max-width: 400px;
-        }
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #e5e7eb;
-            border-top: 4px solid #3b82f6;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
 </head>
 <body>
-    <div class="container">
-        <div class="spinner"></div>
-        <h2>Authenticating...</h2>
-        <p>Please wait while we complete your sign in.</p>
-    </div>
-
+    <CallbackPage client:load />
 </body>
 </html>
