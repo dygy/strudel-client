@@ -40,8 +40,11 @@ jobs:
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
       
+    - name: Generate JSDoc documentation
+      run: pnpm run jsdoc-json
+      
     - name: Build packages
-      run: pnpm run build:packages
+      run: pnpm -r --filter='!website' --filter='!hs2js' --filter='!embed' --filter='!sampler' --filter='!supradough' build
       
     - name: Build website for Netlify
       run: pnpm --filter website build:netlify

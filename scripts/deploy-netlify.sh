@@ -21,9 +21,13 @@ fi
 echo "📦 Installing dependencies..."
 pnpm install
 
-# Build packages (excluding hs2js which requires tree-sitter)
+# Generate JSDoc documentation (required for reference package)
+echo "📚 Generating JSDoc documentation..."
+pnpm run jsdoc-json
+
+# Build packages (excluding problematic ones)
 echo "🔨 Building packages..."
-pnpm -r --filter='!website' --filter='!hs2js' build
+pnpm -r --filter='!website' --filter='!hs2js' --filter='!embed' --filter='!sampler' --filter='!supradough' build
 
 # Build website for Netlify
 echo "🏗️ Building website for Netlify..."
