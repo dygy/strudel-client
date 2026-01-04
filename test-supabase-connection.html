@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Supabase Connection</title>
+</head>
+<body>
+    <h1>Testing Supabase Connection</h1>
+    <div id="status">Loading...</div>
+    <button onclick="testConnection()">Test Connection</button>
+    <button onclick="testAuth()">Test Auth</button>
+    
+    <script type="module">
+        // Test the Supabase configuration
+        const supabaseUrl = 'https://iarlunyimplczudavrcl.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlhcmx1bnlpbXBsY3p1ZGF2cmNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyODczMzksImV4cCI6MjA4Mjg2MzMzOX0.px2ShuMyEogGaoUrRKWupogB1D0Ra2gPF4wNMCGV63w';
+        
+        // Import Supabase
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+            auth: {
+                autoRefreshToken: true,
+                persistSession: true,
+                detectSessionInUrl: true,
+                flowType: 'pkce',
+            },
+        });
+        
+        window.testConnection = async function() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = 'Testing connection...';
+            
+            try {
+                // Test basic connection
+                const { data, error } = await supabase.from('profiles').select('count').limit(1);
+                
+                if (error) {
+                    statusDiv.innerHTML = `❌ Connection Error: ${error.message}`;
+                } else {
+                    statusDiv.innerHTML = '✅ Connection successful!';
+                }
+            } catch (err) {
+                statusDiv.innerHTML = `❌ Exception: ${err.message}`;
+            }
+        };
+        
+        window.testAuth = async function() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = 'Testing OAuth...';
+            
+            try {
+                const { data, error } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: window.location.origin + '/auth/callback'
+                    }
+                });
+                
+                if (error) {
+                    statusDiv.innerHTML = `❌ OAuth Error: ${error.message}`;
+                } else {
+                    statusDiv.innerHTML = '🔄 OAuth initiated...';
+                }
+            } catch (err) {
+                statusDiv.innerHTML = `❌ OAuth Exception: ${err.message}`;
+            }
+        };
+        
+        // Auto-test connection on load
+        window.testConnection();
+    </script>
+</body>
+</html>

@@ -57,24 +57,18 @@
   [headers.values]
     Cache-Control = "public, max-age=2592000" # 30 days
 
-# Redirects for OAuth callback
-[[redirects]]
-  from = "/auth/callback"
-  to = "/.netlify/functions/auth-callback"
-  status = 200
-
 # Redirect API routes to Netlify Functions
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
-# SPA fallback for client-side routing
+# SPA fallback for client-side routing (only for non-file requests)
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  conditions = {Role = ["admin"], Country = ["US"]}
+  force = false
 
 # Environment variables (you'll need to set these in Netlify dashboard)
 # PUBLIC_SUPABASE_URL
