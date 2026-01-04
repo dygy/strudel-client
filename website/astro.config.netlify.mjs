@@ -11,7 +11,7 @@ import tailwind from '@astrojs/tailwind';
 import AstroPWA from '@vite-pwa/astro';
 import netlifyAdapter from "@astrojs/netlify";
 
-const site = `https://strudel-client.netlify.app/`; // Update with your Netlify domain
+const site = `https://strudel.dygy.app/`; // Update with your Netlify domain
 const base = '/'; // base path of the strudel site
 const baseNoTrailing = base.endsWith('/') ? base.slice(0, -1) : base;
 

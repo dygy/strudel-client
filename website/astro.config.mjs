@@ -9,7 +9,6 @@ import bundleAudioWorkletPlugin from 'vite-plugin-bundle-audioworklet';
 
 import tailwind from '@astrojs/tailwind';
 import AstroPWA from '@vite-pwa/astro';
-import vercelAdapter from "@astrojs/vercel";
 
 const site = `https://strudel.dygy.app/`; // root url without a path
 const base = '/'; // base path of the strudel site
@@ -61,9 +60,6 @@ const options = {
 // https://astro.build/config
 export default defineConfig({
   output: 'server',
-  adapter: vercelAdapter({
-    webAnalytics: { enabled: true }
-  }),
   integrations: [
     react(),
     mdx(options),
