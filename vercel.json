@@ -1,7 +1,7 @@
 {
   "framework": "astro",
-  "buildCommand": "pnpm run jsdoc-json && cp doc.json website/ && cd website && pnpm run build",
-  "outputDirectory": "website/dist",
+  "buildCommand": "pnpm install && pnpm run jsdoc-json && cp doc.json website/ && cd website && pnpm run build",
+  "outputDirectory": "website/dist/client",
   "installCommand": "pnpm install",
   "devCommand": "cd website && npm run dev",
   "regions": ["iad1"],
