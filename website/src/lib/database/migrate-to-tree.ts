@@ -4,8 +4,6 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import fs from 'fs/promises';
-import path from 'path';
 
 interface LegacyTrack {
   id: string;
@@ -58,6 +56,8 @@ export class TreeMigration {
     console.log('Applying tree schema...');
     
     // Read and execute the schema file
+    const fs = await import('fs/promises');
+    const path = await import('path');
     
     const schemaPath = path.join(process.cwd(), 'website/src/lib/database/tree-schema.sql');
     const schema = await fs.readFile(schemaPath, 'utf-8');

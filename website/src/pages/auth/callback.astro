@@ -1,6 +1,5 @@
 ---
 // Simple callback page - let Supabase handle OAuth automatically
-import { supabase } from '../../lib/supabase.js';
 
 export const prerender = true;
 ---
@@ -53,6 +52,7 @@ export const prerender = true;
     <script type="module">
         async function handleCallback() {
             try {
+                const { supabase } = await import('/src/lib/supabase.ts');
                 
                 console.log('OAuth callback - Starting...');
                 
