@@ -15,9 +15,18 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
     <title>Authenticating... | Strudel</title>
     
     <!-- Inject environment variables for client-side use -->
-    <script>
+    <script is:inline>
         window.SUPABASE_URL = {JSON.stringify(supabaseUrl)};
         window.SUPABASE_ANON_KEY = {JSON.stringify(supabaseAnonKey)};
+    </script>
+    <script is:inline>
+        // Load callback script after page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            var script = document.createElement('script');
+            script.type = 'module';
+            script.src = '/auth-callback.js';
+            document.head.appendChild(script);
+        });
     </script>
     <style>
         body {
@@ -59,18 +68,5 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
         <p>Please wait while we complete your sign in.</p>
     </div>
 
-    <script is:inline>
-        // Simple script loader that runs after page load
-        window.addEventListener('load', function() {
-            // Create and load the callback script
-            const script = document.createElement('script');
-            script.type = 'module';
-            script.src = '/auth-callback.js';
-            script.onerror = function() {
-                console.error('Failed to load callback script');
-            };
-            document.head.appendChild(script);
-        });
-    </script>
 </body>
 </html>

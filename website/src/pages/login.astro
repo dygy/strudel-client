@@ -30,9 +30,18 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
     <link rel="icon" type="image/svg+xml" href="/logo.svg">
     
     <!-- Inject environment variables for client-side use -->
-    <script>
+    <script is:inline>
         window.SUPABASE_URL = {JSON.stringify(supabaseUrl)};
         window.SUPABASE_ANON_KEY = {JSON.stringify(supabaseAnonKey)};
+    </script>
+    <script is:inline>
+        // Load authentication script after page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            var script = document.createElement('script');
+            script.type = 'module';
+            script.src = '/auth-login.js';
+            document.head.appendChild(script);
+        });
     </script>
     <style>
         body {
@@ -217,18 +226,5 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
         </div>
     </div>
     
-    <script is:inline>
-        // Simple script loader that runs after page load
-        window.addEventListener('load', function() {
-            // Create and load the authentication script
-            const script = document.createElement('script');
-            script.type = 'module';
-            script.src = '/auth-login.js';
-            script.onerror = function() {
-                console.error('Failed to load authentication script');
-            };
-            document.head.appendChild(script);
-        });
-    </script>
 </body>
 </html>
