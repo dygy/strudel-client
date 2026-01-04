@@ -153,3 +153,4 @@ samples/*
 .env.development
 /website/.vercel/
 .vercel
+/website/.netlify/

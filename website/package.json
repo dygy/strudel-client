@@ -7,6 +7,7 @@
     "dev": "astro dev --host 0.0.0.0",
     "start": "astro dev",
     "build": "astro build",
+    "build:netlify": "astro build --config ./astro.config.netlify.mjs",
     "preview": "astro preview --port 3009 --host 0.0.0.0",
     "astro": "astro"
   },
@@ -14,6 +15,7 @@
     "@algolia/client-search": "^5.20.0",
     "@astro-community/astro-embed-youtube": "^0.5.6",
     "@astrojs/mdx": "^4.0.7",
+    "@astrojs/netlify": "^6.6.3",
     "@astrojs/react": "^4.1.6",
     "@astrojs/rss": "^4.0.11",
     "@astrojs/tailwind": "^5.1.5",

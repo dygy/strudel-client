@@ -1,0 +1,82 @@
+[build]
+  # Build command for the monorepo (excluding problematic packages)
+  command = "pnpm install && pnpm -r --filter='!website' --filter='!hs2js' --filter='!embed' --filter='!sampler' --filter='!supradough' build && pnpm --filter website build:netlify"
+  # Output directory (Astro builds to dist by default)
+  publish = "website/dist"
+  # Base directory for the build
+  base = "."
+
+[build.environment]
+  # Use Node.js 20
+  NODE_VERSION = "20"
+  # Use pnpm
+  NPM_FLAGS = "--version" # This tells Netlify to use pnpm
+  PNPM_VERSION = "9"
+
+# Netlify Functions configuration (for API routes)
+[functions]
+  # Directory where Netlify Functions are built
+  directory = "website/dist/functions"
+
+# Headers for security and performance
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Security headers
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    
+    # Audio/MIDI permissions for Web Audio API
+    Permissions-Policy = "microphone=(), camera=(), geolocation=(), midi=(self)"
+    
+    # CORS headers for audio samples and external resources
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+# Cache static assets
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Cache audio samples
+[[headers]]
+  for = "*.wav"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000" # 30 days
+
+[[headers]]
+  for = "*.mp3"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000" # 30 days
+
+[[headers]]
+  for = "*.ogg"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000" # 30 days
+
+# Redirects for OAuth callback
+[[redirects]]
+  from = "/auth/callback"
+  to = "/.netlify/functions/auth-callback"
+  status = 200
+
+# Redirect API routes to Netlify Functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA fallback for client-side routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  conditions = {Role = ["admin"], Country = ["US"]}
+
+# Environment variables (you'll need to set these in Netlify dashboard)
+# PUBLIC_SUPABASE_URL
+# PUBLIC_SUPABASE_ANON_KEY
+# SUPABASE_SERVICE_ROLE_KEY

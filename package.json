@@ -31,6 +31,8 @@
     "deploy": "node deploy.js",
     "deploy:vercel": "./scripts/deploy-vercel.sh",
     "deploy:vercel:prod": "./scripts/deploy-vercel.sh --production",
+    "deploy:netlify": "pnpm -r --filter='!website' --filter='!hs2js' --filter='!embed' --filter='!sampler' --filter='!supradough' build && pnpm --filter website build:netlify",
+    "deploy:netlify:prod": "pnpm -r --filter='!website' --filter='!hs2js' --filter='!embed' --filter='!sampler' --filter='!supradough' build && pnpm --filter website build:netlify",
     "setup:workspace": "./scripts/setup-workspace.sh",
     "sync:packages": "./scripts/sync-packages.sh",
     "build:packages": "pnpm -r --filter='!website' build",
