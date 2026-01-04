@@ -18,10 +18,11 @@ Successfully configured Strudel for deployment to Netlify with the following set
 ### 🔧 Key Configurations
 
 #### Build Settings
-- **Build Command**: `pnpm install && pnpm -r --filter='!website' --filter='!hs2js' --filter='!embed' --filter='!sampler' --filter='!supradough' build && pnpm --filter website build:netlify`
+- **Build Command**: `pnpm install && pnpm run jsdoc-json && pnpm -r --filter='!website' --filter='!hs2js' --filter='!embed' --filter='!sampler' --filter='!supradough' build && pnpm --filter website build:netlify`
 - **Publish Directory**: `website/dist`
 - **Node Version**: 20
 - **Package Manager**: pnpm 9
+- **JSDoc Generation**: Required for reference package build
 
 #### Excluded Packages
 We excluded problematic packages that aren't essential for the core functionality:

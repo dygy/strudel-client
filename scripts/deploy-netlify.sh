@@ -25,6 +25,10 @@ pnpm install
 echo "📚 Generating JSDoc documentation..."
 pnpm run jsdoc-json
 
+# Copy JSDoc to website directory
+echo "📋 Copying JSDoc to website directory..."
+cp doc.json website/
+
 # Build packages (excluding problematic ones)
 echo "🔨 Building packages..."
 pnpm -r --filter='!website' --filter='!hs2js' --filter='!embed' --filter='!sampler' --filter='!supradough' build

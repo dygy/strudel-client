@@ -1,6 +1,6 @@
 [build]
   # Build command for the monorepo (excluding problematic packages)
-  command = "pnpm install && pnpm run jsdoc-json && pnpm -r --filter='!website' --filter='!hs2js' --filter='!embed' --filter='!sampler' --filter='!supradough' build && pnpm --filter website build:netlify"
+  command = "pnpm install && pnpm run jsdoc-json && cp doc.json website/ && pnpm -r --filter='!website' --filter='!hs2js' --filter='!embed' --filter='!sampler' --filter='!supradough' build && pnpm --filter website build:netlify"
   # Output directory (Astro builds to dist by default)
   publish = "website/dist"
   # Base directory for the build

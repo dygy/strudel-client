@@ -43,6 +43,9 @@ jobs:
     - name: Generate JSDoc documentation
       run: pnpm run jsdoc-json
       
+    - name: Copy JSDoc to website directory
+      run: cp doc.json website/
+      
     - name: Build packages
       run: pnpm -r --filter='!website' --filter='!hs2js' --filter='!embed' --filter='!sampler' --filter='!supradough' build
       
