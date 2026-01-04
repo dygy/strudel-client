@@ -1,5 +1,6 @@
 ---
 // Debug page to test OAuth flow
+import { supabase } from '../lib/supabase.js';
 ---
 
 <html lang="en">
@@ -108,7 +109,6 @@ All cookies: ${cookies || 'None'}
         window.testGoogleAuth = async () => {
             try {
                 log('Starting Google OAuth test...');
-                const { supabase } = await import('/src/lib/supabase.ts');
                 
                 log('Supabase client loaded');
                 log('Redirect URL will be: ' + window.location.origin + '/auth/callback');
