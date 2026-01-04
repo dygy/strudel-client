@@ -27,5 +27,3 @@ const edited = records.map((entry) => ({
   ...entry,
   code: withCps(entry.code, 1),
 }));
-
-console.log(stringify(edited));
