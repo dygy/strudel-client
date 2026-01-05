@@ -1,5 +1,9 @@
 FROM node:24-alpine
 
+# Accept build arguments from Heroku
+ARG PUBLIC_SUPABASE_URL
+ARG PUBLIC_SUPABASE_ANON_KEY
+
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
@@ -22,6 +26,10 @@ COPY website/public/ ./website/public/
 COPY website/astro.config.heroku.mjs ./website/
 COPY website/tailwind.config.cjs ./website/
 COPY website/tsconfig.json ./website/
+
+# Set environment variables for build
+ENV PUBLIC_SUPABASE_URL=$PUBLIC_SUPABASE_URL
+ENV PUBLIC_SUPABASE_ANON_KEY=$PUBLIC_SUPABASE_ANON_KEY
 
 # Build the application
 RUN npm run build:heroku
