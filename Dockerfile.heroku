@@ -33,19 +33,21 @@ RUN rm -rf packages/*/src packages/*/test node_modules/.pnpm website/src website
 
 # Create startup script to replace environment variables at runtime
 RUN echo '#!/bin/sh\n\
+echo "Starting Strudel application..."\n\
 # Replace placeholder values with real environment variables\n\
 if [ -n "$PUBLIC_SUPABASE_URL" ] && [ -n "$PUBLIC_SUPABASE_ANON_KEY" ]; then\n\
   echo "Replacing Supabase configuration..."\n\
-  find /app/website/dist -name "*.js" -type f -exec sed -i "s|https://placeholder.supabase.co|${PUBLIC_SUPABASE_URL}|g" {} \\;\n\
-  find /app/website/dist -name "*.mjs" -type f -exec sed -i "s|https://placeholder.supabase.co|${PUBLIC_SUPABASE_URL}|g" {} \\;\n\
-  find /app/website/dist -name "*.js" -type f -exec sed -i "s|placeholder-key|${PUBLIC_SUPABASE_ANON_KEY}|g" {} \\;\n\
-  find /app/website/dist -name "*.mjs" -type f -exec sed -i "s|placeholder-key|${PUBLIC_SUPABASE_ANON_KEY}|g" {} \\;\n\
+  # Replace in the main supabase files\n\
+  sed -i "s|https://placeholder.supabase.co|${PUBLIC_SUPABASE_URL}|g" /app/website/dist/client/_astro/supabase.*.js 2>/dev/null || true\n\
+  sed -i "s|placeholder-key|${PUBLIC_SUPABASE_ANON_KEY}|g" /app/website/dist/client/_astro/supabase.*.js 2>/dev/null || true\n\
+  sed -i "s|https://placeholder.supabase.co|${PUBLIC_SUPABASE_URL}|g" /app/website/dist/server/chunks/supabase*.mjs 2>/dev/null || true\n\
+  sed -i "s|placeholder-key|${PUBLIC_SUPABASE_ANON_KEY}|g" /app/website/dist/server/chunks/supabase*.mjs 2>/dev/null || true\n\
   echo "Supabase configuration updated"\n\
 else\n\
   echo "Warning: Supabase environment variables not found"\n\
 fi\n\
 # Start the application\n\
-echo "Starting application..."\n\
+echo "Starting Node.js server..."\n\
 cd website && PORT=${PORT:-3000} HOST=0.0.0.0 node ./dist/server/entry.mjs' > /app/start.sh && chmod +x /app/start.sh
 
 # Expose port
