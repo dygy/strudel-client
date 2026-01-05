@@ -1,0 +1,40 @@
+# Exclude development files from Heroku slug
+test/
+docs/
+examples/
+tools/
+samples/
+my-patterns/
+scripts/
+src-tauri/
+bench/
+jsdoc/
+origin/
+.git/
+.github/
+.forgejo/
+.idea/
+.vscode/
+.kiro/
+
+# Exclude source files after build
+packages/*/src/
+packages/*/test/
+packages/*/node_modules/
+website/src/
+website/node_modules/
+
+# Exclude development dependencies
+node_modules/.pnpm/
+*.test.*
+*.spec.*
+*.md
+README*
+CHANGELOG*
+LICENSE*
+
+# Keep only essential files
+!website/dist/
+!package.json
+!Procfile
+!doc.json
