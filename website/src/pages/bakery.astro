@@ -1,4 +1,6 @@
 ---
+export const prerender = true;
+
 import HeadCommon from '../components/HeadCommon.astro';
 import Header from '../components/Header/Header.astro';
 import LeftSidebar from '../components/LeftSidebar/LeftSidebar.astro';
@@ -8,7 +10,8 @@ import { compareDesc } from 'date-fns';
 import { Oven as CommunityOven } from '../components/Oven/Oven.jsx';
 import RightSidebar from '../components/RightSidebar/RightSidebar.astro';
 
-const currentPage = Astro.url.pathname;
+// For static builds, we'll pass the pathname from client-side
+const currentPage = '/bakery';
 
 const posts = (await getCollection('blog')).sort((a, b) => compareDesc(a.data.date, b.data.date));
 ---

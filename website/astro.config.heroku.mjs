@@ -69,78 +69,6 @@ export default defineConfig({
     mdx(options),
     tailwind(),
     // Disable PWA for Heroku to reduce build complexity and memory usage
-    // AstroPWA({
-    //   experimental: { directoryAndTrailingSlashHandler: true },
-    //   registerType: 'autoUpdate',
-    //   injectRegister: 'auto',
-    //   workbox: {
-    //     maximumFileSizeToCacheInBytes: 10485760, // 10MB instead of 4MB
-    //     globPatterns: ['**/*.{js,css,html,ico,png,svg,json,wav,mp3,ogg,ttf,woff2,TTF,otf}'],
-    //     // Exclude large audio files from precaching to avoid warnings
-    //     globIgnores: [
-    //       '**/samples/vcsl/**/*.wav', // Exclude VCSL samples that are too large
-    //     ],
-    //     runtimeCaching: [
-    //       {
-    //         urlPattern: ({ url }) =>
-    //           [
-    //             /^https:\/\/raw\.githubusercontent\.com\/.*/i,
-    //             /^https:\/\/freesound\.org\/.*/i,
-    //             /^https:\/\/cdn\.freesound\.org\/.*/i,
-    //             /^https:\/\/shabda\.ndre\.gr\/.*/i,
-    //           ].some((regex) => regex.test(url)),
-    //         handler: 'CacheFirst',
-    //         options: {
-    //           cacheName: 'external-samples',
-    //           expiration: {
-    //             maxEntries: 5000,
-    //             maxAgeSeconds: 60 * 60 * 24 * 30, // <== 14 days
-    //           },
-    //           cacheableResponse: {
-    //             statuses: [0, 200],
-    //           },
-    //         },
-    //       },
-    //     ],
-    //   },
-    //   devOptions: {
-    //     enabled: false,
-    //   },
-    //   manifest: {
-    //     includeAssets: ['favicon.ico', 'icons/apple-icon-180.png'],
-    //     name: 'Strudel REPL',
-    //     short_name: 'Strudel',
-    //     description:
-    //       'Strudel is a music live coding environment for the browser, porting the TidalCycles pattern language to JavaScript.',
-    //     theme_color: '#222222',
-    //     icons: [
-    //       {
-    //         src: 'icons/manifest-icon-192.maskable.png',
-    //         sizes: '192x192',
-    //         type: 'image/png',
-    //         purpose: 'any',
-    //       },
-    //       {
-    //         src: 'icons/manifest-icon-192.maskable.png',
-    //         sizes: '192x192',
-    //         type: 'image/png',
-    //         purpose: 'maskable',
-    //       },
-    //       {
-    //         src: 'icons/manifest-icon-512.maskable.png',
-    //         sizes: '512x512',
-    //         type: 'image/png',
-    //         purpose: 'any',
-    //       },
-    //       {
-    //         src: 'icons/manifest-icon-512.maskable.png',
-    //         sizes: '512x512',
-    //         type: 'image/png',
-    //         purpose: 'maskable',
-    //       },
-    //     ],
-    //   },
-    // }),
   ],
   site,
   base,
@@ -148,14 +76,17 @@ export default defineConfig({
     plugins: [bundleAudioWorkletPlugin()],
     build: {
       // Optimize for Heroku build constraints
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 2000, // Increase threshold to reduce warnings
+      minify: 'terser', // Use terser for better compression
       rollupOptions: {
         output: {
           manualChunks: {
-            // Split large dependencies into separate chunks
+            // Split large dependencies into separate chunks to reduce memory usage
             'vendor-react': ['react', 'react-dom'],
             'vendor-codemirror': ['@codemirror/state', '@codemirror/view', '@codemirror/lang-javascript'],
-            'vendor-audio': ['@strudel/webaudio', '@strudel/superdough'],
+            'vendor-audio': ['@strudel/webaudio'],
+            'vendor-core': ['@strudel/core'],
+            'vendor-csound': ['@strudel/csound'],
           }
         }
       }
