@@ -4,7 +4,7 @@
   "private": true,
   "description": "Port of tidalcycles to javascript",
   "engines": {
-    "node": ">=18.0.0",
+    "node": "24.x",
     "pnpm": ">=8.0.0"
   },
   "scripts": {
