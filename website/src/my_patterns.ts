@@ -11,7 +11,7 @@ interface PatternCollection {
  * @returns Object mapping pattern names to their code content
  */
 export function getMyPatterns(): PatternCollection {
-  const my = import.meta.glob('../../my-patterns/**', { as: 'raw', eager: true });
+  const my = import.meta.glob('../../my-patterns/**', { query: '?raw', import: 'default', eager: true });
   return Object.fromEntries(
     Object.entries(my)
       .filter(([name]) => name.endsWith('.txt'))
