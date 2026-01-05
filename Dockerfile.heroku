@@ -11,6 +11,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/ ./packages/
 COPY website/package.json ./website/
 COPY jsdoc/ ./jsdoc/
+COPY my-patterns/ ./my-patterns/
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
