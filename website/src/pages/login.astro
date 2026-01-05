@@ -350,7 +350,7 @@ import HeadCommon from '../components/HeadCommon.astro';
                     sessionStorage.setItem('strudel_redirect_after_auth', '/repl');
                 }
                 
-                const { supabase } = await import('/src/lib/supabase.ts');
+                const { supabase } = await import('../lib/supabase.ts');
                 
                 console.log('=== SIGN IN WITH GOOGLE DEBUG ===');
                 const currentOrigin = window.location.origin;
