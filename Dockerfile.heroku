@@ -24,8 +24,6 @@ COPY website/tailwind.config.cjs ./website/
 COPY website/tsconfig.json ./website/
 
 # Build the application
-ENV PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
-ENV PUBLIC_SUPABASE_ANON_KEY=placeholder-key
 RUN npm run build:heroku
 
 # Remove unnecessary files after build
