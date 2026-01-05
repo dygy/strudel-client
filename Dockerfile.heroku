@@ -1,9 +1,5 @@
 FROM node:24-alpine
 
-# Accept build arguments from Heroku
-ARG PUBLIC_SUPABASE_URL
-ARG PUBLIC_SUPABASE_ANON_KEY
-
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
@@ -27,18 +23,28 @@ COPY website/astro.config.heroku.mjs ./website/
 COPY website/tailwind.config.cjs ./website/
 COPY website/tsconfig.json ./website/
 
-# Set environment variables for build
-ENV PUBLIC_SUPABASE_URL=$PUBLIC_SUPABASE_URL
-ENV PUBLIC_SUPABASE_ANON_KEY=$PUBLIC_SUPABASE_ANON_KEY
-
-# Build the application
+# Build the application with placeholder values (will be replaced at runtime)
+ENV PUBLIC_SUPABASE_URL=RUNTIME_REPLACE_SUPABASE_URL
+ENV PUBLIC_SUPABASE_ANON_KEY=RUNTIME_REPLACE_SUPABASE_ANON_KEY
 RUN npm run build:heroku
 
 # Remove unnecessary files after build
 RUN rm -rf packages/*/src packages/*/test node_modules/.pnpm website/src website/public jsdoc/
 
+# Create startup script to replace environment variables at runtime
+RUN echo '#!/bin/sh\n\
+# Replace placeholder values with real environment variables\n\
+if [ -n "$PUBLIC_SUPABASE_URL" ] && [ -n "$PUBLIC_SUPABASE_ANON_KEY" ]; then\n\
+  echo "Replacing Supabase configuration..."\n\
+  find /app/website/dist -name "*.js" -type f -exec sed -i "s|RUNTIME_REPLACE_SUPABASE_URL|$PUBLIC_SUPABASE_URL|g" {} +\n\
+  find /app/website/dist -name "*.js" -type f -exec sed -i "s|RUNTIME_REPLACE_SUPABASE_ANON_KEY|$PUBLIC_SUPABASE_ANON_KEY|g" {} +\n\
+  echo "Supabase configuration updated"\n\
+fi\n\
+# Start the application\n\
+cd website && PORT=$PORT HOST=0.0.0.0 node ./dist/server/entry.mjs' > /app/start.sh && chmod +x /app/start.sh
+
 # Expose port
 EXPOSE $PORT
 
-# Start the application
-CMD ["sh", "-c", "cd website && PORT=$PORT HOST=0.0.0.0 node ./dist/server/entry.mjs"]
+# Start the application using our script
+CMD ["/app/start.sh"]

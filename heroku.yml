@@ -1,9 +1,5 @@
 build:
   docker:
-    web: 
-      dockerfile: Dockerfile.heroku
-      buildargs:
-        PUBLIC_SUPABASE_URL: $PUBLIC_SUPABASE_URL
-        PUBLIC_SUPABASE_ANON_KEY: $PUBLIC_SUPABASE_ANON_KEY
+    web: Dockerfile.heroku
 run:
   web: cd website && PORT=$PORT HOST=0.0.0.0 node ./dist/server/entry.mjs
