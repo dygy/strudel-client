@@ -1,0 +1,35 @@
+FROM node:24-alpine
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/ ./packages/
+COPY website/package.json ./website/
+COPY jsdoc/ ./jsdoc/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source files needed for build
+COPY website/src/ ./website/src/
+COPY website/public/ ./website/public/
+COPY website/astro.config.heroku.mjs ./website/
+COPY website/tailwind.config.cjs ./website/
+COPY website/tsconfig.json ./website/
+
+# Build the application
+RUN npm run build:heroku
+
+# Remove unnecessary files after build
+RUN rm -rf packages/*/src packages/*/test node_modules/.pnpm website/src website/public jsdoc/
+
+# Expose port
+EXPOSE $PORT
+
+# Start the application
+CMD ["sh", "-c", "cd website && PORT=$PORT HOST=0.0.0.0 node ./dist/server/entry.mjs"]
