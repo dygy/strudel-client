@@ -77,14 +77,16 @@ export default defineConfig({
         enabled: false,
       },
       workbox: {
-        // Minimal workbox config to reduce memory usage
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        maximumFileSizeToCacheInBytes: 2097152, // 2MB limit
+        // Very minimal workbox config to reduce memory usage
+        globPatterns: ['**/*.{js,css,html,ico,png}'], // Exclude large files
+        maximumFileSizeToCacheInBytes: 1048576, // 1MB limit (very restrictive)
+        skipWaiting: true,
+        clientsClaim: true,
       },
       manifest: {
-        name: 'Strudel REPL',
+        name: 'Strudel',
         short_name: 'Strudel',
-        description: 'Strudel is a music live coding environment for the browser.',
+        description: 'Live coding environment',
         theme_color: '#222222',
         icons: [
           {
@@ -108,12 +110,18 @@ export default defineConfig({
       rollupOptions: {
         output: {
           manualChunks: {
-            // Split large dependencies into separate chunks to reduce memory usage
+            // Split large dependencies into smaller, more granular chunks to reduce memory usage
             'vendor-react': ['react', 'react-dom'],
-            'vendor-codemirror': ['@codemirror/state', '@codemirror/view', '@codemirror/lang-javascript'],
-            'vendor-audio': ['@strudel/webaudio'],
+            'vendor-codemirror-core': ['@codemirror/state', '@codemirror/view'],
+            'vendor-codemirror-lang': ['@codemirror/lang-javascript'],
+            'vendor-audio-core': ['@strudel/webaudio'],
+            'vendor-audio-engine': ['@strudel/superdough'],
             'vendor-core': ['@strudel/core'],
+            'vendor-mini': ['@strudel/mini'],
             'vendor-csound': ['@strudel/csound'],
+            'vendor-tonal': ['@strudel/tonal'],
+            // Split large third-party libraries
+            'vendor-jszip': ['jszip'],
           }
         }
       }
