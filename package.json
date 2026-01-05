@@ -5,9 +5,9 @@
   "description": "Port of tidalcycles to javascript",
   "scripts": {
     "setup": "pnpm i",
-    "pretest": "npm run jsdoc-json",
-    "prebuild": "npm run jsdoc-json",
-    "prestart": "npm run jsdoc-json",
+    "pretest": "npm run jsdoc-json && cp doc.json website/",
+    "prebuild": "npm run jsdoc-json && cp doc.json website/",
+    "prestart": "npm run jsdoc-json && cp doc.json website/",
     "test": "npm run pretest && vitest run --version",
     "test-ui": "npm run pretest && vitest --ui",
     "test-coverage": "npm run pretest && vitest --coverage",

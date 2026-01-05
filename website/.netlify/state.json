@@ -1,0 +1,20 @@
+{
+	"geolocation": {
+		"data": {
+			"city": "Belgrade",
+			"country": {
+				"code": "RS",
+				"name": "Serbia"
+			},
+			"subdivision": {
+				"code": "00",
+				"name": "Belgrade"
+			},
+			"timezone": "Europe/Belgrade",
+			"latitude": 44.8046,
+			"longitude": 20.4637
+		},
+		"timestamp": 1767539330041
+	},
+	"siteId": "aa83b89d-5428-40a9-acd1-2afd0ad359b7"
+}
