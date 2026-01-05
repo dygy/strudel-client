@@ -63,21 +63,38 @@ export default defineConfig({
     react(),
     mdx(options),
     tailwind(),
+    // PWA disabled for Heroku builds to reduce complexity
   ],
   site,
   base,
   vite: {
     plugins: [bundleAudioWorkletPlugin()],
+    define: {
+      'import.meta.env.MODE': JSON.stringify('heroku')
+    },
     build: {
       // Optimize for Heroku build constraints
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 2000,
+      minify: 'esbuild',
+      target: 'es2020',
+      sourcemap: false, // Disable source maps to save memory
       rollupOptions: {
         output: {
-          manualChunks: {
-            // Split large dependencies into separate chunks
-            'vendor-react': ['react', 'react-dom'],
-            'vendor-codemirror': ['@codemirror/state', '@codemirror/view', '@codemirror/lang-javascript'],
-            'vendor-audio': ['@strudel/webaudio', '@strudel/superdough'],
+          // Simplified chunking for static build
+          manualChunks: (id) => {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('react-dom')) {
+                return 'vendor-react';
+              }
+              if (id.includes('@codemirror')) {
+                return 'vendor-codemirror';
+              }
+              // Group other vendor code
+              return 'vendor';
+            }
+            if (id.includes('@strudel/')) {
+              return 'strudel';
+            }
           }
         }
       }

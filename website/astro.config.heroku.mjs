@@ -7,10 +7,7 @@ import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import rehypeUrls from 'rehype-urls';
 import bundleAudioWorkletPlugin from 'vite-plugin-bundle-audioworklet';
 import node from '@astrojs/node';
-
 import tailwind from '@astrojs/tailwind';
-import AstroPWA from '@vite-pwa/astro';
-import AstroPWA from '@vite-pwa/astro';
 
 const site = `https://strudel.cc/`; // root url without a path
 const base = '/'; // base path of the strudel site
@@ -69,66 +66,37 @@ export default defineConfig({
     react(),
     mdx(options),
     tailwind(),
-    // Minimal PWA config for Heroku to avoid build errors
-    AstroPWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
-      devOptions: {
-        enabled: false,
-      },
-      workbox: {
-        // Very minimal workbox config to reduce memory usage
-        globPatterns: ['**/*.{js,css,html,ico,png}'], // Exclude large files
-        maximumFileSizeToCacheInBytes: 1048576, // 1MB limit (very restrictive)
-        skipWaiting: true,
-        clientsClaim: true,
-      },
-      manifest: {
-        name: 'Strudel',
-        short_name: 'Strudel',
-        description: 'Live coding environment',
-        theme_color: '#222222',
-        icons: [
-          {
-            src: 'icons/manifest-icon-192.maskable.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any',
-          },
-        ],
-      },
-    }),
+    // PWA completely disabled for Heroku
   ],
   site,
   base,
   vite: {
     plugins: [bundleAudioWorkletPlugin()],
+    define: {
+      'import.meta.env.MODE': JSON.stringify('heroku')
+    },
     build: {
-      // Optimize for Heroku build constraints
-      chunkSizeWarningLimit: 2000, // Increase threshold to reduce warnings
-      minify: 'terser', // Use terser for better compression
+      // Ultra-simplified build config for Heroku
+      chunkSizeWarningLimit: 10000, // Increase warning limit to reduce warnings
+      minify: false, // Disable minification to speed up build
+      target: 'es2020',
+      sourcemap: false, // Disable source maps to save memory
       rollupOptions: {
-        output: {
-          manualChunks: {
-            // Split large dependencies into smaller, more granular chunks to reduce memory usage
-            'vendor-react': ['react', 'react-dom'],
-            'vendor-codemirror-core': ['@codemirror/state', '@codemirror/view'],
-            'vendor-codemirror-lang': ['@codemirror/lang-javascript'],
-            'vendor-audio-core': ['@strudel/webaudio'],
-            'vendor-audio-engine': ['@strudel/superdough'],
-            'vendor-core': ['@strudel/core'],
-            'vendor-mini': ['@strudel/mini'],
-            'vendor-csound': ['@strudel/csound'],
-            'vendor-tonal': ['@strudel/tonal'],
-            // Split large third-party libraries
-            'vendor-jszip': ['jszip'],
-          }
-        }
+        // Disable manual chunking to avoid complexity
+        output: {}
       }
     },
     ssr: {
-      // Example: Force a broken package to skip SSR processing, if needed
-      // external: ['fraction.js'], // https://github.com/infusion/Fraction.js/issues/51
+      // Force problematic packages to be external to reduce build complexity
+      external: [
+        'jszip',
+        '@strudel/csound',
+        '@strudel/soundfonts',
+        '@strudel/hydra',
+        '@strudel/motion',
+        '@strudel/gamepad',
+        '@strudel/desktopbridge'
+      ],
     },
   },
 });

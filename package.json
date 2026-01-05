@@ -21,7 +21,7 @@
     "start": "npm run prestart && cd website && npm run dev",
     "dev": "npm run prestart && cd website && npm run dev",
     "build": "npm run prebuild && cd website && npm run build",
-    "build:heroku": "NODE_OPTIONS='--max-old-space-size=6144 --max-semi-space-size=128' npm run prebuild && cd website && NODE_OPTIONS='--max-old-space-size=6144 --max-semi-space-size=128' npx astro build --config astro.config.heroku.mjs",
+    "build:heroku": "NODE_OPTIONS='--max-old-space-size=2048' npm run prebuild && cd website && NODE_OPTIONS='--max-old-space-size=2048' MODE=heroku npx astro build --config astro.config.heroku.mjs",
     "build:heroku:static": "NODE_OPTIONS='--max-old-space-size=2048' npm run prebuild && cd website && NODE_OPTIONS='--max-old-space-size=2048' npx astro build --config astro.config.static.mjs",
     "heroku-postbuild": "npm run build:heroku",
     "preview": "cd website && npm run preview",
@@ -68,7 +68,8 @@
     "@strudel/webaudio": "workspace:*",
     "@strudel/xen": "workspace:*",
     "express": "^4.18.2",
-    "nanoid": "^5.0.9"
+    "nanoid": "^5.0.9",
+    "serve": "^14.2.1"
   },
   "devDependencies": {
     "@eslint/compat": "^1.2.5",
