@@ -8,7 +8,6 @@ my-patterns/
 scripts/
 src-tauri/
 bench/
-jsdoc/
 origin/
 .git/
 .github/
@@ -17,24 +16,17 @@ origin/
 .vscode/
 .kiro/
 
-# Exclude source files after build
-packages/*/src/
-packages/*/test/
-packages/*/node_modules/
+# Exclude source files after build (but keep packages for runtime)
 website/src/
 website/node_modules/
 
 # Exclude development dependencies
-node_modules/.pnpm/
 *.test.*
 *.spec.*
-*.md
-README*
-CHANGELOG*
-LICENSE*
 
-# Keep only essential files
+# Keep essential build files
 !website/dist/
 !package.json
 !Procfile
 !doc.json
+!jsdoc/
