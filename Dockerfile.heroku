@@ -36,14 +36,17 @@ RUN echo '#!/bin/sh\n\
 # Replace placeholder values with real environment variables\n\
 if [ -n "$PUBLIC_SUPABASE_URL" ] && [ -n "$PUBLIC_SUPABASE_ANON_KEY" ]; then\n\
   echo "Replacing Supabase configuration..."\n\
-  find /app/website/dist -name "*.js" -type f -exec sed -i "s|https://placeholder.supabase.co|$PUBLIC_SUPABASE_URL|g" {} +\n\
-  find /app/website/dist -name "*.mjs" -type f -exec sed -i "s|https://placeholder.supabase.co|$PUBLIC_SUPABASE_URL|g" {} +\n\
-  find /app/website/dist -name "*.js" -type f -exec sed -i "s|placeholder-key|$PUBLIC_SUPABASE_ANON_KEY|g" {} +\n\
-  find /app/website/dist -name "*.mjs" -type f -exec sed -i "s|placeholder-key|$PUBLIC_SUPABASE_ANON_KEY|g" {} +\n\
+  find /app/website/dist -name "*.js" -type f -exec sed -i "s|https://placeholder.supabase.co|${PUBLIC_SUPABASE_URL}|g" {} \\;\n\
+  find /app/website/dist -name "*.mjs" -type f -exec sed -i "s|https://placeholder.supabase.co|${PUBLIC_SUPABASE_URL}|g" {} \\;\n\
+  find /app/website/dist -name "*.js" -type f -exec sed -i "s|placeholder-key|${PUBLIC_SUPABASE_ANON_KEY}|g" {} \\;\n\
+  find /app/website/dist -name "*.mjs" -type f -exec sed -i "s|placeholder-key|${PUBLIC_SUPABASE_ANON_KEY}|g" {} \\;\n\
   echo "Supabase configuration updated"\n\
+else\n\
+  echo "Warning: Supabase environment variables not found"\n\
 fi\n\
 # Start the application\n\
-cd website && PORT=$PORT HOST=0.0.0.0 node ./dist/server/entry.mjs' > /app/start.sh && chmod +x /app/start.sh
+echo "Starting application..."\n\
+cd website && PORT=${PORT:-3000} HOST=0.0.0.0 node ./dist/server/entry.mjs' > /app/start.sh && chmod +x /app/start.sh
 
 # Expose port
 EXPOSE $PORT
