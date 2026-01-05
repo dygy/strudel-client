@@ -24,8 +24,8 @@ COPY website/tailwind.config.cjs ./website/
 COPY website/tsconfig.json ./website/
 
 # Build the application with placeholder values (will be replaced at runtime)
-ENV PUBLIC_SUPABASE_URL=RUNTIME_REPLACE_SUPABASE_URL
-ENV PUBLIC_SUPABASE_ANON_KEY=RUNTIME_REPLACE_SUPABASE_ANON_KEY
+ENV PUBLIC_SUPABASE_URL=https://runtime-replace-supabase-url.supabase.co
+ENV PUBLIC_SUPABASE_ANON_KEY=runtime_replace_supabase_anon_key
 RUN npm run build:heroku
 
 # Remove unnecessary files after build
@@ -36,8 +36,8 @@ RUN echo '#!/bin/sh\n\
 # Replace placeholder values with real environment variables\n\
 if [ -n "$PUBLIC_SUPABASE_URL" ] && [ -n "$PUBLIC_SUPABASE_ANON_KEY" ]; then\n\
   echo "Replacing Supabase configuration..."\n\
-  find /app/website/dist -name "*.js" -type f -exec sed -i "s|RUNTIME_REPLACE_SUPABASE_URL|$PUBLIC_SUPABASE_URL|g" {} +\n\
-  find /app/website/dist -name "*.js" -type f -exec sed -i "s|RUNTIME_REPLACE_SUPABASE_ANON_KEY|$PUBLIC_SUPABASE_ANON_KEY|g" {} +\n\
+  find /app/website/dist -name "*.js" -type f -exec sed -i "s|https://runtime-replace-supabase-url.supabase.co|$PUBLIC_SUPABASE_URL|g" {} +\n\
+  find /app/website/dist -name "*.js" -type f -exec sed -i "s|runtime_replace_supabase_anon_key|$PUBLIC_SUPABASE_ANON_KEY|g" {} +\n\
   echo "Supabase configuration updated"\n\
 fi\n\
 # Start the application\n\
