@@ -55,6 +55,7 @@ export const prerender = true;
         
         <div>
             <h2>Actions</h2>
+            <button onclick="checkConfig()">Check Supabase Config</button>
             <button onclick="testGoogleAuth()">Test Google OAuth</button>
             <button onclick="checkCookies()">Check Cookies</button>
             <button onclick="testAPI()">Test API</button>
@@ -106,12 +107,46 @@ All cookies: ${cookies || 'None'}
             document.getElementById('current-state').textContent = state;
         }
         
+        window.checkConfig = async () => {
+            try {
+                log('Checking Supabase configuration...');
+                const { supabase } = await import('/src/lib/supabase.ts');
+                
+                // Try to access the internal configuration
+                const url = supabase.supabaseUrl;
+                const key = supabase.supabaseKey;
+                
+                log('Supabase URL: ' + (url || 'Not accessible'));
+                log('Supabase Key: ' + (key ? key.substring(0, 20) + '...' : 'Not accessible'));
+                
+                // Alternative: check the module source
+                const moduleText = await fetch('/src/lib/supabase.ts').then(r => r.text()).catch(() => 'Could not fetch module');
+                if (moduleText.includes('placeholder.supabase.co')) {
+                    log('WARNING: Module still contains placeholder URL!');
+                } else if (moduleText.includes('iarlunyimplczudavrcl.supabase.co')) {
+                    log('SUCCESS: Module contains real Supabase URL');
+                } else {
+                    log('Module check inconclusive');
+                }
+                
+            } catch (error) {
+                log('Config check error: ' + error.message);
+            }
+        };
+        
         window.testGoogleAuth = async () => {
             try {
                 log('Starting Google OAuth test...');
                 const { supabase } = await import('/src/lib/supabase.ts');
                 
                 log('Supabase client loaded');
+                
+                // Log the current Supabase configuration
+                const supabaseUrl = supabase.supabaseUrl;
+                const supabaseKey = supabase.supabaseKey;
+                log('Supabase URL: ' + (supabaseUrl || 'undefined'));
+                log('Supabase Key: ' + (supabaseKey ? supabaseKey.substring(0, 20) + '...' : 'undefined'));
+                
                 log('Redirect URL will be: ' + window.location.origin + '/auth/callback');
                 
                 const { error } = await supabase.auth.signInWithOAuth({
