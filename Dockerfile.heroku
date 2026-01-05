@@ -23,6 +23,14 @@ COPY website/astro.config.heroku.mjs ./website/
 COPY website/tailwind.config.cjs ./website/
 COPY website/tsconfig.json ./website/
 
+# Build arguments for environment variables
+ARG PUBLIC_SUPABASE_URL
+ARG PUBLIC_SUPABASE_ANON_KEY
+
+# Set environment variables from build args
+ENV PUBLIC_SUPABASE_URL=$PUBLIC_SUPABASE_URL
+ENV PUBLIC_SUPABASE_ANON_KEY=$PUBLIC_SUPABASE_ANON_KEY
+
 # Build the application with real environment variables from Heroku
 RUN npm run build:heroku
 
