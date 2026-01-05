@@ -3,6 +3,10 @@
   "version": "0.5.0",
   "private": true,
   "description": "Port of tidalcycles to javascript",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
   "scripts": {
     "setup": "pnpm i",
     "pretest": "npm run jsdoc-json && cp doc.json website/",
@@ -17,6 +21,8 @@
     "start": "npm run prestart && cd website && npm run dev",
     "dev": "npm run prestart && cd website && npm run dev",
     "build": "npm run prebuild && cd website && npm run build",
+    "build:heroku": "npm run prebuild && cd website && npx astro build --config astro.config.heroku.mjs",
+    "heroku-postbuild": "npm run build:heroku",
     "preview": "cd website && npm run preview",
     "osc": "cd packages/osc && npm run server",
     "jsdoc": "jsdoc packages/ -c jsdoc/jsdoc.config.json",

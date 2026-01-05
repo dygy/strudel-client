@@ -1,0 +1,1 @@
+web: cd website && PORT=$PORT HOST=0.0.0.0 node ./dist/server/entry.mjs
