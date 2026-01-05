@@ -10,6 +10,7 @@ import node from '@astrojs/node';
 
 import tailwind from '@astrojs/tailwind';
 import AstroPWA from '@vite-pwa/astro';
+import AstroPWA from '@vite-pwa/astro';
 
 const site = `https://strudel.cc/`; // root url without a path
 const base = '/'; // base path of the strudel site
@@ -68,7 +69,33 @@ export default defineConfig({
     react(),
     mdx(options),
     tailwind(),
-    // Disable PWA for Heroku to reduce build complexity and memory usage
+    // Minimal PWA config for Heroku to avoid build errors
+    AstroPWA({
+      registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      devOptions: {
+        enabled: false,
+      },
+      workbox: {
+        // Minimal workbox config to reduce memory usage
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        maximumFileSizeToCacheInBytes: 2097152, // 2MB limit
+      },
+      manifest: {
+        name: 'Strudel REPL',
+        short_name: 'Strudel',
+        description: 'Strudel is a music live coding environment for the browser.',
+        theme_color: '#222222',
+        icons: [
+          {
+            src: 'icons/manifest-icon-192.maskable.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any',
+          },
+        ],
+      },
+    }),
   ],
   site,
   base,
