@@ -8,6 +8,12 @@ const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const GET: APIRoute = async ({ request }) => {
   try {
+    // Debug environment variables
+    console.log('Environment check:', {
+      supabaseUrl: supabaseUrl ? 'SET' : 'MISSING',
+      supabaseServiceKey: supabaseServiceKey ? 'SET' : 'MISSING',
+      supabaseServiceKeyLength: supabaseServiceKey?.length || 0
+    });
     // Get user from auth API
     const baseUrl = new URL(request.url).origin;
     const authResponse = await fetch(`${baseUrl}/api/auth/user`, {
@@ -30,6 +36,14 @@ export const GET: APIRoute = async ({ request }) => {
     }
 
     // Create Supabase client with service role key
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing Supabase configuration:', { supabaseUrl: !!supabaseUrl, supabaseServiceKey: !!supabaseServiceKey });
+      return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Check if user has any tracks (indicates migration has happened)
