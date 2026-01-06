@@ -106,7 +106,13 @@ export const prerender = true;
                 }
                 
                 if (session) {
-                    console.log('OAuth callback - Success! Redirecting to /repl');
+                    console.log('OAuth callback - Success! Setting cookies and redirecting to /repl');
+                    
+                    // Set cookies that the server can read
+                    document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=3600; secure; samesite=lax`;
+                    if (session.refresh_token) {
+                        document.cookie = `sb-refresh-token=${session.refresh_token}; path=/; max-age=86400; secure; samesite=lax`;
+                    }
                     
                     // Check if there's a redirect URL stored in sessionStorage
                     const redirectUrl = sessionStorage.getItem('strudel_redirect_after_auth') || '/repl';
