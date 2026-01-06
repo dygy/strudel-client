@@ -8,7 +8,7 @@ const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || 'placeholder
 // Only create client if we have real values (not placeholders)
 const hasRealConfig = supabaseUrl !== 'https://placeholder.supabase.co' && 
                      supabaseAnonKey !== 'placeholder-key' && 
-                     supabaseUrl.includes('iarlunyimplczudavrcl.supabase.co');
+                     supabaseUrl.includes('.supabase.co');
 
 console.log('Supabase config check:', {
   supabaseUrl: supabaseUrl.substring(0, 30) + '...',
