@@ -400,14 +400,13 @@ export function EnhancedReference() {
 
   // Copy to clipboard function
   const copyToClipboard = (text: string, exampleId: string) => {
-    const toastActions = useToastContext();
     navigator.clipboard.writeText(text).then(() => {
-      toastActions.success('Copied to clipboard');
+      toast.success('Copied to clipboard');
       setCopiedExample(exampleId);
       // Reset the checkmark after 2 seconds
       setTimeout(() => setCopiedExample(null), 2000);
     }).catch(() => {
-      toastActions.error('Failed to copy to clipboard');
+      toast.error('Failed to copy to clipboard');
     });
   };
 
