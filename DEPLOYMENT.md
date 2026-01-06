@@ -4,11 +4,7 @@ This document describes the automated deployment process for the Strudel applica
 
 ## Available Deployment Targets
 
-### Vercel (Primary)
-- **Production**: `npm run deploy:vercel:prod`
-- **Staging**: `npm run deploy:vercel`
-
-### Heroku (Secondary)
+### Heroku (Primary)
 - **Production**: `npm run deploy:heroku:prod`
 - **Staging**: `npm run deploy:heroku`
 - **Force Deploy**: `npm run deploy:heroku:force`

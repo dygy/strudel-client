@@ -58,7 +58,8 @@ pnpm --filter @strudel/core build  # Build specific package
 
 ### Deployment
 ```bash
-npm run deploy:vercel:prod  # Deploy to Vercel production
+npm run deploy:heroku:prod  # Deploy to Heroku production
+npm run deploy:heroku       # Deploy to Heroku staging
 ```
 
 ## Package Development

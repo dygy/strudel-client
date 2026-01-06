@@ -37,8 +37,6 @@
     "sampler": "cd samples && node ../packages/sampler/sample-server.mjs",
     "iclc": "cd paper && pandoc --template=pandoc/iclc.html --citeproc  --number-sections iclc2023.md -o iclc2023.html && pandoc --template=pandoc/iclc.latex --citeproc --number-sections iclc2023.md -o iclc2023.pdf",
     "deploy": "node deploy.js",
-    "deploy:vercel": "./scripts/deploy-vercel.sh",
-    "deploy:vercel:prod": "./scripts/deploy-vercel.sh --production",
     "deploy:heroku": "./scripts/deploy-heroku.sh",
     "deploy:heroku:prod": "./scripts/deploy-heroku.sh --production",
     "deploy:heroku:force": "./scripts/deploy-heroku.sh --force",
