@@ -83,8 +83,8 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       return;
     }
 
-    // Prevent duplicate loads
-    if (hasLoadedData) {
+    // Prevent duplicate loads, but allow retry if authentication state changed
+    if (hasLoadedData && isInitialized) {
       return;
     }
 
@@ -101,8 +101,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
         return acc;
       }, {});
 
-      console.log('SupabaseFileManager - Converted to objects:', Object.keys(tracksObj).length, 'tracks,', Object.keys(foldersObj).length, 'folders');
-      console.log('SupabaseFileManager - Sample folder objects:', Object.values(foldersObj).slice(0, 3).map((f: any) => ({ id: f.id, name: f.name, path: f.path, parent: f.parent })));
+      console.log('SupabaseFileManager - Using SSR data:', Object.keys(tracksObj).length, 'tracks,', Object.keys(foldersObj).length, 'folders');
 
       // Update local state for the file manager
       setTracks(tracksObj);
@@ -111,7 +110,6 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setHasLoadedData(true);
 
       // CRITICAL: Also update the global tracksStore so ReplEditor can see the data
-      // Since we already have flat data, we can set it directly
       tracksStore.set({
         tracks: tracksObj,
         folders: foldersObj,

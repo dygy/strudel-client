@@ -54,10 +54,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     let mounted = true;
+    let retryCount = 0;
+    const maxRetries = 3;
 
-    // Get initial session using secure API
+    // Get initial session using secure API with retry logic
     const getInitialSession = async () => {
       try {
+        // First, try to restore session from Supabase storage
+        console.log('AuthContext - Attempting to restore session...');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (session && !sessionError) {
+          console.log('AuthContext - Session restored from storage');
+        } else if (sessionError) {
+          console.log('AuthContext - Session restoration error:', sessionError);
+        } else {
+          console.log('AuthContext - No session found in storage');
+        }
+
+        // Then check authentication via secure API
         const isAuthenticated = await checkAuth();
 
         if (!mounted) return;
@@ -66,12 +81,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
           console.log('AuthContext - User authenticated');
         } else {
           console.log('AuthContext - No authenticated user');
+          
+          // If no user found and we haven't exceeded retries, try again after a short delay
+          if (retryCount < maxRetries) {
+            retryCount++;
+            console.log(`AuthContext - Retrying authentication check (${retryCount}/${maxRetries})...`);
+            setTimeout(() => {
+              if (mounted) {
+                getInitialSession();
+              }
+            }, 1000 * retryCount); // Exponential backoff
+            return;
+          }
         }
 
         setLoading(false);
       } catch (error) {
         console.error('AuthContext - Error getting initial session:', error);
         if (mounted) {
+          // Retry on error if we haven't exceeded max retries
+          if (retryCount < maxRetries) {
+            retryCount++;
+            console.log(`AuthContext - Retrying after error (${retryCount}/${maxRetries})...`);
+            setTimeout(() => {
+              if (mounted) {
+                getInitialSession();
+              }
+            }, 1000 * retryCount);
+            return;
+          }
           setLoading(false);
         }
       }

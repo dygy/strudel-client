@@ -62,14 +62,25 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
 
   // CRITICAL: Only initialize state once and prevent re-renders
   const [codeComponentKey] = useState(() => Math.random().toString(36));
+  const [showWelcomeDelayed, setShowWelcomeDelayed] = useState(false);
 
-  // Simple welcome screen logic using tracks store
-  const shouldShowWelcome = tracks.isInitialized && !tracks.hasTracks() && !tracks.isLoading;
+  // Delay showing welcome screen to give time for authentication and track loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowWelcomeDelayed(true);
+    }, 2000); // Wait 2 seconds before showing welcome screen
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Welcome screen logic - only show after delay and when we're sure there are no tracks
+  const shouldShowWelcome = showWelcomeDelayed && tracks.isInitialized && !tracks.hasTracks() && !tracks.isLoading;
 
   console.log('🔥 ReplEditor: State check:', {
     isInitialized: tracks.isInitialized,
     hasTracks: tracks.hasTracks(),
     isLoading: tracks.isLoading,
+    showWelcomeDelayed,
     shouldShowWelcome,
     tracksCount: tracks.getTracksCount(),
     foldersCount: tracks.getFoldersCount(),

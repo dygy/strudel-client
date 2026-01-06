@@ -6,15 +6,23 @@ const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || 'https://placeholder.
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 
 // Only create client if we have real values (not placeholders)
-const hasRealConfig = supabaseUrl !== 'https://placeholder.supabase.co' && supabaseAnonKey !== 'placeholder-key';
+const hasRealConfig = supabaseUrl !== 'https://placeholder.supabase.co' && 
+                     supabaseAnonKey !== 'placeholder-key' && 
+                     supabaseUrl.includes('iarlunyimplczudavrcl.supabase.co');
+
+console.log('Supabase config check:', {
+  supabaseUrl: supabaseUrl.substring(0, 30) + '...',
+  hasRealConfig,
+  persistSession: hasRealConfig
+});
 
 // Create Supabase client with proper OAuth configuration
-// Use placeholder values during build if environment variables are not available
+// Always enable session persistence in production
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    autoRefreshToken: hasRealConfig,
-    persistSession: hasRealConfig, // Only persist sessions if we have real config
-    detectSessionInUrl: hasRealConfig, // Only detect sessions if we have real config
+    autoRefreshToken: true,
+    persistSession: true, // Always enable session persistence
+    detectSessionInUrl: true, // Always enable session detection
     flowType: 'pkce', // Use PKCE flow for security
   },
 });
