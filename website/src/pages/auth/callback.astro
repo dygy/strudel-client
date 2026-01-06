@@ -49,9 +49,24 @@ export const prerender = true;
     </div>
 
     <script type="module">
+        // Import Supabase client from CDN for the callback page
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
         async function handleCallback() {
             try {
-                const { supabase } = await import('/src/lib/supabase.ts');
+                // Create Supabase client with the same config as the app
+                const supabase = createClient(
+                    'https://iarlunyimplczudavrcl.supabase.co',
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlhcmx1bnlpbXBsY3p1ZGF2cmNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyODczMzksImV4cCI6MjA4Mjg2MzMzOX0.px2ShuMyEogGaoUrRKWupogB1D0Ra2gPF4wNMCGV63w',
+                    {
+                        auth: {
+                            autoRefreshToken: true,
+                            persistSession: true,
+                            detectSessionInUrl: true,
+                            flowType: 'pkce'
+                        }
+                    }
+                );
                 
                 console.log('OAuth callback - Starting...');
                 
@@ -91,23 +106,13 @@ export const prerender = true;
                 }
                 
                 if (session) {
-                    console.log('OAuth callback - Success! Setting cookies and redirecting to /repl');
+                    console.log('OAuth callback - Success! Redirecting to /repl');
                     
-                    // Set cookies that the server can read
-                    document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=3600; secure; samesite=lax`;
-                    if (session.refresh_token) {
-                        document.cookie = `sb-refresh-token=${session.refresh_token}; path=/; max-age=86400; secure; samesite=lax`;
-                    }
+                    // Check if there's a redirect URL stored in sessionStorage
+                    const redirectUrl = sessionStorage.getItem('strudel_redirect_after_auth') || '/repl';
+                    sessionStorage.removeItem('strudel_redirect_after_auth');
                     
-                    // Get the track parameter from URL if present
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const trackParam = urlParams.get('track');
-                    
-                    if (trackParam) {
-                        window.location.href = `/repl?track=${trackParam}`;
-                    } else {
-                        window.location.href = '/repl';
-                    }
+                    window.location.href = redirectUrl;
                 } else {
                     console.error('OAuth callback - No session found after all attempts');
                     window.location.href = '/login?error=no_session';
