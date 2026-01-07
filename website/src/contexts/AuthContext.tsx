@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { secureApi, type User } from '../lib/secureApi';
+import type { Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
@@ -225,17 +226,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // First, try to restore session from Supabase storage
         console.log('AuthContext - Attempting to restore session...');
         
-        let session = null;
-        let sessionError = null;
+        let session: Session | null = null;
+        let sessionError: Error | null = null;
         
         try {
           const sessionResult = await Promise.race([
             supabase.auth.getSession(),
             timeoutPromise
           ]);
-          ({ data: { session }, error: sessionError } = sessionResult);
+          
+          // Type guard to check if we got a valid session result
+          if (sessionResult && typeof sessionResult === 'object' && 'data' in sessionResult) {
+            const typedResult = sessionResult as { data: { session: Session | null }, error: Error | null };
+            session = typedResult.data.session;
+            sessionError = typedResult.error;
+          } else {
+            console.log('AuthContext - Invalid session result type');
+            sessionError = new Error('Invalid session result');
+          }
         } catch (error) {
-          if (error.message === 'Initial session timeout') {
+          if (error instanceof Error && error.message === 'Initial session timeout') {
             console.log('AuthContext - Session restoration timed out');
             sessionError = error;
           } else {
@@ -255,12 +265,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
         let isAuthenticated = false;
         
         try {
-          isAuthenticated = await Promise.race([
+          const authResult = await Promise.race([
             checkAuth(),
             timeoutPromise
           ]);
+          
+          // Type guard to check if we got a boolean result
+          if (typeof authResult === 'boolean') {
+            isAuthenticated = authResult;
+          } else {
+            console.log('AuthContext - Invalid auth result type:', typeof authResult);
+            isAuthenticated = false;
+          }
         } catch (error) {
-          if (error.message === 'Initial session timeout') {
+          if (error instanceof Error && error.message === 'Initial session timeout') {
             console.log('AuthContext - Authentication check timed out');
             isAuthenticated = false;
           } else {
@@ -296,7 +314,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.error('AuthContext - Error getting initial session:', error);
         if (mounted) {
           // If it's a timeout error, just set loading to false and let user try to sign in
-          if (error.message === 'Initial session timeout') {
+          if (error instanceof Error && error.message === 'Initial session timeout') {
             console.log('AuthContext - Session restoration timed out, setting loading to false');
             setLoading(false);
             return;

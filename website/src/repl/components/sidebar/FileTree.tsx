@@ -796,7 +796,7 @@ export function FileTree({
             </div>
             {/* Flexible empty space for drag & drop that fills remaining height */}
             <div
-              className={`flex-1 min-h-[100px] ${
+              className={`flex-1 ${
                 dragOverTarget === 'root' ? 'bg-blue-600/20 border-2 border-blue-400 border-dashed' : ''
               }`}
               onDragOver={(e) => {
