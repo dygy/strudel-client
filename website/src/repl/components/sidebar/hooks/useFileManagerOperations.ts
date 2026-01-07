@@ -43,6 +43,8 @@ interface UseFileManagerOperationsProps {
   isDeletingFolderRef: React.MutableRefObject<Set<string>>;
   context: any;
   t: (key: string) => string;
+  // API functions
+  deleteTrack?: (trackId: string) => Promise<boolean>;
 }
 
 export function useFileManagerOperations({
@@ -84,6 +86,7 @@ export function useFileManagerOperations({
   isDeletingFolderRef,
   context,
   t,
+  deleteTrack: deleteTrackAPI,
 }: UseFileManagerOperationsProps) {
 
   const createNewTrack = useCallback((parentPath?: string) => {
@@ -173,7 +176,7 @@ export function useFileManagerOperations({
     setShowDeleteModal(true);
   }, [setTrackToDelete, setShowDeleteModal]);
 
-  const confirmDelete = useCallback(() => {
+  const confirmDelete = useCallback(async () => {
     if (!tracks || !setTracks || !selectedTrack) return;
     
     const trackToDelete = tracks[selectedTrack];
@@ -189,13 +192,33 @@ export function useFileManagerOperations({
     
     console.log('FileManager - STARTING deletion process for track:', trackName, 'ID:', trackToDelete.id);
     
-    const performDeletion = () => {
+    const performDeletion = async () => {
       console.log('FileManager - PERFORMING actual deletion of track:', trackToDelete.id);
       
+      // Call the API to delete from database if available
+      if (deleteTrackAPI) {
+        try {
+          const success = await deleteTrackAPI(trackToDelete.id);
+          if (!success) {
+            console.error('FileManager - API deletion failed');
+            toastActions.error(t('files:errors.deleteFailed'));
+            isDeletingTrackRef.current = false;
+            return;
+          }
+          console.log('FileManager - API deletion successful');
+        } catch (error) {
+          console.error('FileManager - API deletion error:', error);
+          toastActions.error(t('files:errors.deleteFailed'));
+          isDeletingTrackRef.current = false;
+          return;
+        }
+      }
+      
+      // Update local state
       setTracks(prev => {
         const newTracks = { ...prev };
         const wasDeleted = delete newTracks[trackToDelete.id];
-        console.log('FileManager - deletion successful:', wasDeleted);
+        console.log('FileManager - local state deletion successful:', wasDeleted);
         return newTracks;
       });
       
@@ -222,7 +245,7 @@ export function useFileManagerOperations({
           context.editorRef.current.setCode('');
         }
         
-        performDeletion();
+        await performDeletion();
         
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('strudel-all-tracks-deleted'));
@@ -230,9 +253,9 @@ export function useFileManagerOperations({
       }
     } else {
       console.log('FileManager - deleting non-selected track immediately');
-      performDeletion();
+      await performDeletion();
     }
-  }, [tracks, setTracks, selectedTrack, isDeletingTrackRef, setTrackToDelete, loadTrack, setSelectedTrack, context, t]);
+  }, [tracks, setTracks, selectedTrack, isDeletingTrackRef, setTrackToDelete, loadTrack, setSelectedTrack, context, t, deleteTrackAPI]);
 
   const cancelCreate = useCallback(() => {
     setIsCreating(false);

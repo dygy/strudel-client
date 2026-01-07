@@ -6,7 +6,7 @@ import {useTranslation} from '@src/i18n';
 import {useAuth} from '../../../../contexts/AuthContext';
 import {db, type Folder, migration, type Track} from '../../../../lib/secureApi';
 import {getEditorInstance, setPendingCode} from '../../../../stores/editorStore';
-import {tracksStore} from '../../../../stores/tracksStore';
+import {tracksStore, tracksActions} from '../../../../stores/tracksStore';
 import {nanoid} from 'nanoid';
 
 interface ReplContext {
@@ -110,12 +110,18 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setHasLoadedData(true);
 
       // CRITICAL: Also update the global tracksStore so ReplEditor can see the data
+      // Update the store using actions for proper reactivity
+      tracksActions.clear(); // Clear first
+      
+      // Add tracks and folders
+      Object.values(tracksObj).forEach(track => tracksActions.addTrack(track));
+      Object.values(foldersObj).forEach(folder => tracksActions.addFolder(folder));
+      
+      // Mark as initialized
       tracksStore.set({
-        tracks: tracksObj,
-        folders: foldersObj,
+        ...tracksStore.get(),
         isInitialized: true,
         isLoading: false,
-        selectedTrack: null,
         error: null
       });
 
@@ -132,7 +138,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     // Fallback to client-side loading if no SSR data
     console.log('SupabaseFileManager - No SSR data, loading from Supabase client-side');
     loadDataFromSupabase();
-  }, [isAuthenticated, user, ssrData, hasLoadedData]);
+  }, [isAuthenticated, user, ssrData]); // Remove hasLoadedData from dependencies to prevent loops
 
   // Check for migration when user signs in
   useEffect(() => {
@@ -272,6 +278,30 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
       setIsInitialized(true);
       setHasLoadedData(true); // Mark data as loaded to prevent duplicate calls
+
+      // CRITICAL: Also update the global tracksStore so ReplEditor can see the data
+      // Update the store using actions for proper reactivity
+      tracksActions.clear(); // Clear first
+      
+      // Add tracks and folders
+      Object.values(tracksObj).forEach(track => tracksActions.addTrack(track));
+      Object.values(foldersObj).forEach(folder => tracksActions.addFolder(folder));
+      
+      // Mark as initialized
+      tracksStore.set({
+        ...tracksStore.get(),
+        isInitialized: true,
+        isLoading: false,
+        error: null
+      });
+
+      console.log('SupabaseFileManager - Updated both local state and global tracksStore from loadDataFromSupabase');
+      console.log('SupabaseFileManager - TracksStore state:', {
+        tracksCount: Object.keys(tracksObj).length,
+        foldersCount: Object.keys(foldersObj).length,
+        isInitialized: true,
+        hasTracks: Object.keys(tracksObj).length > 0
+      });
 
       // DEBUG: Log sample data structure
       const sampleTracks = Object.values(tracksObj).slice(0, 2);

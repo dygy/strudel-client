@@ -7,9 +7,13 @@ const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const GET: APIRoute = async ({ url, cookies, redirect }) => {
+  console.log('🔥 AUTH CALLBACK API STARTED 🔥');
+  console.log('🔥 AUTH CALLBACK API STARTED 🔥');
+  console.log('🔥 AUTH CALLBACK API STARTED 🔥');
+  
   try {
     // Debug environment variables
-    console.log('Auth callback API - Environment check:', {
+    console.log('🔧 Environment check:', {
       supabaseUrl: supabaseUrl?.substring(0, 30) + '...',
       hasServiceKey: !!supabaseServiceKey,
       serviceKeyLength: supabaseServiceKey?.length
@@ -18,6 +22,29 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
     const code = url.searchParams.get('code');
     const error = url.searchParams.get('error');
     const allParams = Object.fromEntries(url.searchParams.entries());
+    
+    console.log('📥 Callback params:', { 
+      hasCode: !!code, 
+      codeLength: code?.length,
+      hasError: !!error,
+      errorMessage: error,
+      allParamsCount: Object.keys(allParams).length
+    });
+    
+    // TEMPORARY: Return debug info as JSON response to see what's happening
+    if (url.searchParams.get('debug') === 'true') {
+      return new Response(JSON.stringify({
+        debug: 'Auth callback debug info',
+        supabaseUrl: supabaseUrl?.substring(0, 30) + '...',
+        hasServiceKey: !!supabaseServiceKey,
+        hasCode: !!code,
+        codeLength: code?.length,
+        allParams
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
     
     console.log('Auth callback API - received params:', { 
       code: !!code, 
@@ -41,21 +68,24 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
       return redirect('/login?error=invalid_callback_access');
     }
 
+    console.log('🔧 Creating Supabase client...');
     // Create Supabase client with service role key
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log('Auth callback API - attempting to exchange code for session...');
-    console.log('Auth callback API - using Supabase URL:', supabaseUrl);
-    console.log('Auth callback API - code length:', code?.length);
+    console.log('🔄 Attempting to exchange code for session...');
+    console.log('🔄 Using Supabase URL:', supabaseUrl);
+    console.log('🔄 Code length:', code?.length);
 
     // Exchange the code for a session
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
-    console.log('Auth callback API - exchange result:', {
+    console.log('📊 Exchange result:', {
       hasData: !!data,
       hasSession: !!data?.session,
       hasUser: !!data?.session?.user,
-      error: exchangeError?.message
+      errorMessage: exchangeError?.message,
+      errorStatus: exchangeError?.status,
+      fullError: exchangeError
     });
 
     if (exchangeError) {

@@ -48,16 +48,31 @@ export const prerender = true;
         <p>Please wait while we complete your sign in.</p>
     </div>
 
-    <script type="module">
+    <script type="module" define:vars={{ supabaseUrl: import.meta.env.PUBLIC_SUPABASE_URL, supabaseAnonKey: import.meta.env.PUBLIC_SUPABASE_ANON_KEY }}>
         // Import Supabase client from CDN for the callback page
         import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
         
         async function handleCallback() {
             try {
-                // Create Supabase client with the same config as the app
+                console.log('🔥 OAuth callback - Using environment variables:', {
+                    supabaseUrl: supabaseUrl?.substring(0, 30) + '...',
+                    hasAnonKey: !!supabaseAnonKey
+                });
+                
+                // Validate environment variables
+                if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder')) {
+                    console.error('🔥 OAuth callback - Invalid environment variables:', {
+                        supabaseUrl: supabaseUrl?.substring(0, 30) + '...',
+                        hasAnonKey: !!supabaseAnonKey
+                    });
+                    window.location.href = '/login?error=config_error';
+                    return;
+                }
+                
+                // Create Supabase client with environment variables
                 const supabase = createClient(
-                    'https://iarlunyimplczudavrcl.supabase.co',
-                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlhcmx1bnlpbXBsY3p1ZGF2cmNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyODczMzksImV4cCI6MjA4Mjg2MzMzOX0.px2ShuMyEogGaoUrRKWupogB1D0Ra2gPF4wNMCGV63w',
+                    supabaseUrl,
+                    supabaseAnonKey,
                     {
                         auth: {
                             autoRefreshToken: true,

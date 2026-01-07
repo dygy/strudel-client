@@ -45,6 +45,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
     ...fileManagerState,
     context,
     t,
+    deleteTrack: fileManagerState.deleteTrack,
   } : {
     // Provide safe defaults when fileManagerState is null
     tracks: {},
