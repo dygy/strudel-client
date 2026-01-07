@@ -225,11 +225,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // First, try to restore session from Supabase storage
         console.log('AuthContext - Attempting to restore session...');
         
-        const sessionPromise = supabase.auth.getSession();
-        const { data: { session }, error: sessionError } = await Promise.race([
-          sessionPromise,
-          timeoutPromise
-        ]);
+        let session = null;
+        let sessionError = null;
+        
+        try {
+          const sessionResult = await Promise.race([
+            supabase.auth.getSession(),
+            timeoutPromise
+          ]);
+          ({ data: { session }, error: sessionError } = sessionResult);
+        } catch (error) {
+          if (error.message === 'Initial session timeout') {
+            console.log('AuthContext - Session restoration timed out');
+            sessionError = error;
+          } else {
+            throw error;
+          }
+        }
         
         if (session && !sessionError) {
           console.log('AuthContext - Session restored from storage');
@@ -240,11 +252,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         // Then check authentication via secure API with timeout
-        const authPromise = checkAuth();
-        const isAuthenticated = await Promise.race([
-          authPromise,
-          timeoutPromise
-        ]);
+        let isAuthenticated = false;
+        
+        try {
+          isAuthenticated = await Promise.race([
+            checkAuth(),
+            timeoutPromise
+          ]);
+        } catch (error) {
+          if (error.message === 'Initial session timeout') {
+            console.log('AuthContext - Authentication check timed out');
+            isAuthenticated = false;
+          } else {
+            throw error;
+          }
+        }
 
         if (!mounted) return;
 
