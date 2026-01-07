@@ -7,6 +7,7 @@ import { useTranslation } from '@src/i18n';
 import { toastActions } from '@src/stores/toastStore';
 import { batch } from '@src/lib/secureApi';
 import { nanoid } from 'nanoid';
+import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 
 // Import our new components and hooks
 import { useFileManager } from './hooks/useFileManager';
@@ -831,8 +832,46 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
         setNewTrackName={fileManagerState.setNewTrackName}
         setNewFolderName={fileManagerState.setNewFolderName}
         setNewStepName={fileManagerState.setNewStepName}
-        onCreateTrack={operations.createNewTrack}
-        onCreateFolder={operations.createNewFolder}
+        onCreateTrack={async () => {
+          if (fileManagerState.createTrack) {
+            // Use Supabase file manager's createTrack function
+            const newTrack = await fileManagerState.createTrack(
+              fileManagerState.newTrackName.trim(),
+              DEFAULT_TRACK_CODE,
+              fileManagerState.newItemParentPath || undefined
+            );
+            if (newTrack) {
+              fileManagerState.setNewTrackName('');
+              fileManagerState.setNewItemParentPath('');
+              fileManagerState.setIsCreating(false);
+              // Load the newly created track
+              if (fileManagerState.loadTrack) {
+                fileManagerState.loadTrack(newTrack);
+              }
+            }
+          } else {
+            // Fallback to operations if Supabase not available
+            operations.createNewTrack();
+          }
+        }}
+        onCreateFolder={async () => {
+          if (fileManagerState.createFolder) {
+            // Use Supabase file manager's createFolder function
+            const folderName = fileManagerState.newFolderName.trim();
+            const parentPath = fileManagerState.newItemParentPath;
+            const folderPath = parentPath ? `${parentPath}/${folderName}` : folderName;
+            
+            const newFolder = await fileManagerState.createFolder(folderName, folderPath, parentPath);
+            if (newFolder) {
+              fileManagerState.setNewFolderName('');
+              fileManagerState.setNewItemParentPath('');
+              fileManagerState.setIsCreating(false);
+            }
+          } else {
+            // Fallback to operations if Supabase not available
+            operations.createNewFolder();
+          }
+        }}
         onAddStep={operations.addStep}
         onCancelCreate={operations.cancelCreate}
         onCancelCreateStep={operations.cancelCreateStep}

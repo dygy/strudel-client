@@ -1,31 +1,81 @@
 import type { APIRoute } from 'astro';
-import { db } from '../../../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
 
 export const prerender = false;
 
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+
 async function getAuthenticatedUser(request: Request) {
-  // Try to get user from cookie-based auth
-  const baseUrl = new URL(request.url).origin;
-  const authResponse = await fetch(`${baseUrl}/api/auth/user`, {
-    headers: { 'Cookie': request.headers.get('cookie') || '' }
-  });
+  try {
+    const cookies = request.headers.get('cookie') || '';
+    
+    console.log('CREATE API - cookies received:', cookies.substring(0, 100) + '...');
+    
+    if (!cookies) {
+      console.log('CREATE API - No cookies found');
+      throw new Error('No cookies found');
+    }
 
-  if (!authResponse.ok) {
-    throw new Error('Authentication failed');
-  }
+    // Parse cookies to get Supabase session tokens
+    const cookieMap = new Map();
+    cookies.split(';').forEach(cookie => {
+      const [key, value] = cookie.trim().split('=');
+      if (key && value) {
+        cookieMap.set(key, decodeURIComponent(value));
+      }
+    });
 
-  const { user } = await authResponse.json();
-  if (!user) {
-    throw new Error('User not authenticated');
+    console.log('CREATE API - Parsed cookie keys:', Array.from(cookieMap.keys()));
+
+    // Look for Supabase auth cookies
+    let accessToken = null;
+
+    // Try different cookie patterns that Supabase might use
+    cookieMap.forEach((value, key) => {
+      // Access token should be a JWT (starts with eyJ and has dots)
+      if ((key.includes('access') || key.includes('auth-token') || key.startsWith('sb-access')) && value.includes('.')) {
+        accessToken = value;
+        console.log('CREATE API - Found access token in:', key);
+      }
+    });
+
+    if (!accessToken) {
+      console.log('CREATE API - No access token found in cookies');
+      throw new Error('No access token found');
+    }
+
+    console.log('CREATE API - Attempting to verify access token...');
+
+    // Create Supabase client with anon key and verify the access token
+    const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
+    
+    const { data: { user }, error } = await supabaseAnon.auth.getUser(accessToken);
+
+    console.log('CREATE API - getUser result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      error: error?.message
+    });
+
+    if (error || !user) {
+      console.log('CREATE API - Authentication failed:', error?.message || 'No user returned');
+      throw new Error('Authentication failed: ' + (error?.message || 'No user returned'));
+    }
+
+    return { user, accessToken };
+  } catch (error) {
+    console.error('CREATE API - getAuthenticatedUser error:', error);
+    throw error;
   }
-  
-  return user;
 }
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const user = await getAuthenticatedUser(request);
+    const { user, accessToken } = await getAuthenticatedUser(request);
 
     // Parse request body
     const body = await request.json();
@@ -38,22 +88,30 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    console.log('API /tracks/create - creating track:', { name, folder, isMultitrack });
+    console.log('API /tracks/create - creating track for user:', user.id, { name, folder, isMultitrack });
 
-    // Create the track using the direct database approach
+    // Create the track directly using Supabase service role client
+    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Create the track with service role (bypasses RLS)
     const trackData = {
       id: nanoid(),
+      user_id: user.id,
       name: name.trim(),
       code: code || '',
       folder: folder || null,
-      isMultitrack: isMultitrack || false,
+      is_multitrack: isMultitrack || false,
       steps: steps || [],
-      activeStep: activeStep || 0,
+      active_step: activeStep || 0,
       created: new Date().toISOString(),
       modified: new Date().toISOString(),
     };
 
-    const { data: newTrack, error } = await db.tracks.create(trackData);
+    const { data: newTrack, error } = await supabaseService
+      .from('tracks')
+      .insert(trackData)
+      .select()
+      .single();
 
     if (error) {
       console.error('API /tracks/create - database error:', error);
