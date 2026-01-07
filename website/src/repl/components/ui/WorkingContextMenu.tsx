@@ -30,8 +30,36 @@ export function WorkingContextMenu({ items, children }: WorkingContextMenuProps)
     openMenus.forEach(closeMenu => closeMenu());
     openMenus.clear();
     
-    setX(event.pageX);
-    setY(event.pageY);
+    // Calculate smart positioning based on viewport
+    const menuWidth = 200; // Estimated menu width
+    const menuHeight = items.length * 40; // Estimated menu height (40px per item)
+    const padding = 10; // Padding from viewport edges
+    
+    let menuX = event.pageX;
+    let menuY = event.pageY;
+    
+    // Check if menu would overflow right edge
+    if (menuX + menuWidth > window.innerWidth - padding) {
+      menuX = event.pageX - menuWidth; // Show to the left of cursor
+    }
+    
+    // Check if menu would overflow bottom edge
+    if (menuY + menuHeight > window.innerHeight - padding) {
+      menuY = event.pageY - menuHeight; // Show above cursor
+    }
+    
+    // Ensure menu doesn't go off left edge
+    if (menuX < padding) {
+      menuX = padding;
+    }
+    
+    // Ensure menu doesn't go off top edge
+    if (menuY < padding) {
+      menuY = padding;
+    }
+    
+    setX(menuX);
+    setY(menuY);
     setVisible(true);
     
     // Add this menu to the open menus set

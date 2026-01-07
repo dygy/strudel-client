@@ -780,25 +780,23 @@ export function FileTree({
   const tree = buildTree();
 
   return (
-    <div className="flex-1 overflow-auto min-h-0 h-full">
-      {tree.length === 0 ? (
-        <WorkingContextMenu items={emptySpaceContextItems}>
+    <WorkingContextMenu items={emptySpaceContextItems}>
+      <div className="flex-1 overflow-auto min-h-0 h-full">
+        {tree.length === 0 ? (
           <div className="p-4 text-center text-gray-400 text-sm h-full flex flex-col justify-center">
             {t('files:noTracksYet')}
             <div className="mt-2 text-xs">
               {t('files:rightClickToCreate')}
             </div>
           </div>
-        </WorkingContextMenu>
-      ) : (
-        <div className="py-2 min-h-full flex flex-col">
-          <div>
-            {tree.map(node => renderNode(node))}
-          </div>
-          {/* Flexible empty space for context menu that fills remaining height */}
-          <WorkingContextMenu items={emptySpaceContextItems}>
+        ) : (
+          <div className="py-2 min-h-full flex flex-col">
+            <div>
+              {tree.map(node => renderNode(node))}
+            </div>
+            {/* Flexible empty space for drag & drop that fills remaining height */}
             <div
-              className={`flex-1 h-full ${
+              className={`flex-1 min-h-[100px] ${
                 dragOverTarget === 'root' ? 'bg-blue-600/20 border-2 border-blue-400 border-dashed' : ''
               }`}
               onDragOver={(e) => {
@@ -825,9 +823,9 @@ export function FileTree({
                 }
               }}
             ></div>
-          </WorkingContextMenu>
-        </div>
-      )}
-    </div>
+          </div>
+        )}
+      </div>
+    </WorkingContextMenu>
   );
 }

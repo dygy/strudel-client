@@ -171,26 +171,22 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
         aria-haspopup="true"
       >
         {/* Avatar */}
-        {userInfo.avatarUrl ? (
-          <img
-            src={userInfo.avatarUrl}
-            alt={userInfo.displayName}
-            className="w-8 h-8 rounded-full object-cover border border-gray-200"
-            onError={(e) => {
-              // Fallback to initials if image fails to load
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              const fallback = target.nextElementSibling as HTMLElement;
-              if (fallback) fallback.style.display = 'flex';
-            }}
-          />
-        ) : null}
-        
-        {/* Fallback avatar with initials */}
-        <div 
-          className={`w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm ${userInfo.avatarUrl ? 'hidden' : 'flex'}`}
-        >
-          {userInfo.initials}
+        <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-200 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-semibold shadow-sm">
+          {userInfo.avatarUrl ? (
+            <img
+              src={userInfo.avatarUrl}
+              alt={userInfo.displayName}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // Hide image on error and show initials fallback
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
+            />
+          ) : null}
+          <span className={userInfo.avatarUrl ? 'hidden' : 'block'}>
+            {userInfo.initials}
+          </span>
         </div>
 
         {/* User info - hidden on small screens */}
@@ -224,17 +220,23 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
           {/* User info header */}
           <div className="p-4 border-b border-gray-600 bg-lineHighlight">
             <div className="flex items-center gap-3">
-              {userInfo.avatarUrl ? (
-                <img
-                  src={userInfo.avatarUrl}
-                  alt={userInfo.displayName}
-                  className="w-10 h-10 rounded-full object-cover border border-gray-500"
-                />
-              ) : (
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+              <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-500 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-semibold">
+                {userInfo.avatarUrl ? (
+                  <img
+                    src={userInfo.avatarUrl}
+                    alt={userInfo.displayName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Hide image on error and show initials fallback
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                ) : null}
+                <span className={userInfo.avatarUrl ? 'hidden' : 'block'}>
                   {userInfo.initials}
-                </div>
-              )}
+                </span>
+              </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-foreground truncate">
                   {userInfo.displayName}

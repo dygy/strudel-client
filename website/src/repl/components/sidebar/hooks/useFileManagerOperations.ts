@@ -135,6 +135,9 @@ export function useFileManagerOperations({
   const handleTrackSelect = useCallback(async (track: Track) => {
     console.log('FileManager - handleTrackSelect called for:', track.name);
     
+    // Clear step selection when selecting a regular track
+    setSelectedStepTrack(null);
+    
     // Save current track before switching if autosave is enabled
     if (selectedTrack && selectedTrack !== track.id) {
       console.log('FileManager - force saving current track before switching:', tracks[selectedTrack]?.name);
@@ -152,7 +155,7 @@ export function useFileManagerOperations({
     }
     
     loadTrack(track);
-  }, [selectedTrack, tracks, saveCurrentTrack, context, loadTrack]);
+  }, [selectedTrack, tracks, saveCurrentTrack, context, loadTrack, setSelectedStepTrack]);
 
   const duplicateTrack = useCallback((track: Track) => {
     const trackId = nanoid();
@@ -616,6 +619,9 @@ export function useFileManagerOperations({
 
     console.log('FileManager - switchToStep called for track:', track.name, 'step:', stepIndex);
 
+    // Set step selection state when switching to a step
+    setSelectedStepTrack(trackId);
+
     // Save current code to active step if this track is currently selected
     if (selectedTrack === trackId && track.activeStep !== undefined) {
       const currentCode = context.editorRef?.current?.code || context.activeCode || '';
@@ -667,7 +673,7 @@ export function useFileManagerOperations({
         console.error('FileManager - Failed to update URL for step:', error);
       }
     }
-  }, [tracks, selectedTrack, context, setTracks, loadTrack]);
+  }, [tracks, selectedTrack, context, setTracks, loadTrack, setSelectedStepTrack]);
 
   const startRenameStep = useCallback((trackId: string, stepIndex: number) => {
     const track = tracks[trackId];

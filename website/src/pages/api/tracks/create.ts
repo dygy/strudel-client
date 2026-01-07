@@ -124,9 +124,23 @@ export const POST: APIRoute = async ({ request }) => {
 
     console.log('API /tracks/create - track created successfully:', newTrack.id);
 
+    // Transform database response to match TypeScript interface
+    const responseTrack = {
+      id: newTrack.id,
+      name: newTrack.name,
+      code: newTrack.code,
+      created: newTrack.created,
+      modified: newTrack.modified,
+      folder: newTrack.folder,
+      isMultitrack: newTrack.is_multitrack || false,
+      steps: newTrack.steps || [],
+      activeStep: newTrack.active_step || 0,
+      user_id: newTrack.user_id,
+    };
+
     return new Response(JSON.stringify({ 
       success: true,
-      track: newTrack 
+      track: responseTrack 
     }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' }

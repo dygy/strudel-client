@@ -3,10 +3,10 @@ import {useSettings} from '@src/settings';
 import {getActivePattern, setActivePattern, useActivePattern} from '@src/user_pattern_utils';
 import {toastActions} from '@src/stores/toastStore';
 import {useTranslation} from '@src/i18n';
-import {useAuth} from '../../../../contexts/AuthContext';
-import {db, type Folder, migration, type Track} from '../../../../lib/secureApi';
-import {getEditorInstance, setPendingCode} from '../../../../stores/editorStore';
-import {tracksStore, tracksActions} from '../../../../stores/tracksStore';
+import {useAuth} from '@src/contexts/AuthContext.tsx';
+import {db, type Folder, migration, type Track} from '@src/lib/secureApi.ts';
+import {getEditorInstance, setPendingCode} from '@src/stores/editorStore.ts';
+import {tracksStore, tracksActions} from '@src/stores/tracksStore.ts';
 import {nanoid} from 'nanoid';
 
 interface ReplContext {
@@ -112,11 +112,11 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       // CRITICAL: Also update the global tracksStore so ReplEditor can see the data
       // Update the store using actions for proper reactivity
       tracksActions.clear(); // Clear first
-      
+
       // Add tracks and folders
-      Object.values(tracksObj).forEach(track => tracksActions.addTrack(track));
-      Object.values(foldersObj).forEach(folder => tracksActions.addFolder(folder));
-      
+      Object.values<Track>(tracksObj).forEach(track => tracksActions.addTrack(track));
+      Object.values<Folder>(foldersObj).forEach(folder => tracksActions.addFolder(folder));
+
       // Mark as initialized
       tracksStore.set({
         ...tracksStore.get(),
@@ -282,11 +282,11 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       // CRITICAL: Also update the global tracksStore so ReplEditor can see the data
       // Update the store using actions for proper reactivity
       tracksActions.clear(); // Clear first
-      
+
       // Add tracks and folders
       Object.values(tracksObj).forEach(track => tracksActions.addTrack(track));
       Object.values(foldersObj).forEach(folder => tracksActions.addFolder(folder));
-      
+
       // Mark as initialized
       tracksStore.set({
         ...tracksStore.get(),
@@ -391,12 +391,18 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
   useEffect(() => {
     if (!isInitialized || !activePattern || !isAuthenticated) return;
 
+    // Don't auto-load tracks if we're currently in step selection mode
+    if (selectedStepTrack) {
+      console.log('SupabaseFileManager - skipping activePattern load due to step selection:', selectedStepTrack);
+      return;
+    }
+
     // If the activePattern exists in tracks and is different from selected track, load it
     if (tracks[activePattern] && selectedTrack !== activePattern) {
       setSelectedTrack(activePattern);
       loadTrack(tracks[activePattern]);
     }
-  }, [activePattern, isInitialized, selectedTrack, loadTrack, tracks, isAuthenticated]);
+  }, [activePattern, isInitialized, selectedTrack, loadTrack, tracks, isAuthenticated, selectedStepTrack]);
 
   const saveSpecificTrack = useCallback(async (trackId: string, showToast: boolean = true) => {
     if (!trackId || !isAuthenticated) {
@@ -525,62 +531,36 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
       console.log('SupabaseFileManager - creating track directly in Supabase:', trackData);
 
-      const { data, error } = await db.tracks.create(trackData);
+      // Call the API endpoint directly instead of using db.tracks.create
+      const response = await fetch('/api/tracks/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(trackData),
+      });
 
-      if (error) {
-        console.error('SupabaseFileManager - Supabase error:', error);
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('SupabaseFileManager - API error:', errorData);
 
-        // If it's a table not found error, run automatic migration
-        if (error.code === 'PGRST205') {
-          console.log('🔧 Tables not found during track creation, checking migration status...');
-
-          try {
-            const migrationResponse = await fetch('/api/database/migrate', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              credentials: 'include',
-            });
-
-            const migrationResult = await migrationResponse.json();
-
-            if (migrationResult.success) {
-              console.log('✅ Database tables exist, retrying track creation...');
-
-              // Retry track creation
-              const { data: retryData, error: retryError } = await db.tracks.create(trackData);
-
-              if (retryError) {
-                throw retryError;
-              }
-
-              if (retryData) {
-                console.log('✅ Track created successfully:', retryData.id, retryData.name);
-                setTracks(prev => ({ ...prev, [retryData.id]: retryData }));
-                toastActions.success(t('files:trackCreated'));
-                return retryData;
-              }
-            } else {
-              console.error('❌ Database migration failed:', migrationResult.message);
-              toastActions.error(t('auth:errors.databaseSetupRequired'));
-              return null;
-            }
-          } catch (migrationError) {
-            console.error('❌ Migration error:', migrationError);
-            toastActions.error(t('auth:errors.databaseSetupInstructions'));
-            return null;
-          }
+        // Handle specific error cases
+        if (response.status === 401) {
+          toastActions.error('Authentication failed. Please try refreshing the page.');
+          return null;
         }
 
-        throw error;
+        throw new Error(errorData.error || errorData.message || 'Failed to create track');
       }
 
-      if (data) {
-        console.log('✅ Track created successfully:', data.id, data.name);
-        setTracks(prev => ({ ...prev, [data.id]: data }));
+      const result = await response.json();
+
+      if (result.success && result.track) {
+        console.log('✅ Track created successfully:', result.track.id, result.track.name);
+        setTracks(prev => ({ ...prev, [result.track.id]: result.track }));
         toastActions.success(t('files:trackCreated'));
-        return data;
+        return result.track;
       }
 
       return null;

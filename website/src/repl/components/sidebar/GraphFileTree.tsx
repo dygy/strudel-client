@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { ArrowDownTrayIcon, InformationCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
 import type {TreeNode, Track} from '@src/lib/FileSystemGraph.ts';
 
 interface GraphFileTreeProps {
@@ -129,7 +130,7 @@ export function GraphFileTree({
           },
           {
             label: 'Download',
-            icon: <span>💾</span>,
+            icon: <ArrowDownTrayIcon className="w-4 h-4" />,
             onClick: () => {
               onTrackDownload(node.id);
               setContextMenu(null);
@@ -137,7 +138,7 @@ export function GraphFileTree({
           },
           {
             label: 'Info',
-            icon: <span>ℹ️</span>,
+            icon: <InformationCircleIcon className="w-4 h-4" />,
             onClick: () => {
               onTrackInfo(track);
               setContextMenu(null);
@@ -165,7 +166,7 @@ export function GraphFileTree({
           ] : []),
           {
             label: 'Delete',
-            icon: <span>🗑️</span>,
+            icon: <TrashIcon className="w-4 h-4" />,
             onClick: () => {
               onTrackDelete(node.id);
               setContextMenu(null);
@@ -201,7 +202,7 @@ export function GraphFileTree({
           },
           {
             label: 'Download',
-            icon: <span>💾</span>,
+            icon: <ArrowDownTrayIcon className="w-4 h-4" />,
             onClick: () => {
               onFolderDownload(node.id);
               setContextMenu(null);
@@ -209,7 +210,7 @@ export function GraphFileTree({
           },
           {
             label: 'Delete',
-            icon: <span>🗑️</span>,
+            icon: <TrashIcon className="w-4 h-4" />,
             onClick: () => {
               onFolderDelete(node.id);
               setContextMenu(null);

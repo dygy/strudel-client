@@ -193,7 +193,6 @@ export const tracksActions = {
         [track.id]: track,
       },
     });
-    console.log(`TracksStore - Added track: ${track.name}`);
   },
 
   /**

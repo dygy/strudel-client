@@ -9,16 +9,18 @@ export interface Track {
   code: string;
   created: string;
   modified: string;
-  folder?: string;
-  isMultitrack?: boolean;
-  steps?: any[];
-  activeStep?: number;
+  folder: string | null;
+  isMultitrack: boolean;
+  steps: any[];
+  activeStep: number;
+  user_id: string;
 }
 
 export interface Folder {
   id: string;
   name: string;
   path: string;
+  parent: string | null;
   created: string;
   user_id: string;
 }
@@ -114,7 +116,7 @@ class SecureApiClient {
   async createTrack(data: {
     name: string;
     code?: string;
-    folder?: string;
+    folder?: string | null;
     isMultitrack?: boolean;
     steps?: any[];
     activeStep?: number;
@@ -304,7 +306,7 @@ export const db = {
       // Return both tracks and folders since /tracks/list provides both
       return { data: { tracks: result.tracks, folders: result.folders }, error: null };
     },
-    create: async (track: Omit<Track, 'id' | 'created' | 'modified'>) => {
+    create: async (track: Omit<Track, 'id' | 'created' | 'modified' | 'user_id'>) => {
       try {
         const result = await secureApi.createTrack(track);
         return { data: result.track, error: null };
