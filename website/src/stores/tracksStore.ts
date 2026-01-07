@@ -245,7 +245,6 @@ export const tracksActions = {
         [folder.id]: folder,
       },
     });
-    console.log(`TracksStore - Added folder: ${folder.name}`);
   },
 
   /**
@@ -278,7 +277,6 @@ export const tracksActions = {
    */
   clear() {
     tracksStore.set(initialState);
-    console.log('TracksStore - Cleared all data');
   },
 
   /**

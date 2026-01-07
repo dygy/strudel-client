@@ -9,6 +9,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
   ensureValidSession: () => Promise<boolean>;
+  sessionExpiresAt: Date | null;
+  sessionWarning: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,16 +22,37 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<Date | null>(null);
+  const [sessionWarning, setSessionWarning] = useState(false);
 
   // Function to check authentication using secure API
   const checkAuth = async () => {
     try {
       const { user: authUser } = await secureApi.getUser();
       setUser(authUser);
+      
+      // Update session expiry info
+      if (authUser) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.expires_at) {
+          const expiresAt = new Date(session.expires_at * 1000);
+          setSessionExpiresAt(expiresAt);
+          
+          // Check if session expires within 5 minutes
+          const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+          setSessionWarning(expiresAt < fiveMinutesFromNow);
+        }
+      } else {
+        setSessionExpiresAt(null);
+        setSessionWarning(false);
+      }
+      
       return !!authUser;
     } catch (error) {
       console.error('Auth check failed:', error);
       setUser(null);
+      setSessionExpiresAt(null);
+      setSessionWarning(false);
       return false;
     }
   };
@@ -37,20 +60,154 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Function to refresh session if needed
   const ensureValidSession = async (): Promise<boolean> => {
     try {
+      // First try to refresh the session with Supabase
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError) {
+        console.log('AuthContext - Session refresh failed:', refreshError.message);
+        // If refresh fails, try to get current session
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (!currentSession) {
+          console.log('AuthContext - No valid session found');
+          setUser(null);
+          setSessionExpiresAt(null);
+          setSessionWarning(false);
+          return false;
+        }
+      } else if (session) {
+        console.log('AuthContext - Session refreshed successfully');
+      }
+
+      // Then validate with our secure API
       const { user: authUser } = await secureApi.getUser();
       if (authUser) {
         setUser(authUser);
+        
+        // Update session expiry info
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (currentSession?.expires_at) {
+          const expiresAt = new Date(currentSession.expires_at * 1000);
+          setSessionExpiresAt(expiresAt);
+          
+          // Check if session expires within 5 minutes
+          const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+          setSessionWarning(expiresAt < fiveMinutesFromNow);
+          
+          console.log('AuthContext - Session expires at:', expiresAt.toLocaleString());
+        }
+        
         return true;
       } else {
         setUser(null);
+        setSessionExpiresAt(null);
+        setSessionWarning(false);
         return false;
       }
     } catch (error) {
       console.error('Session validation failed:', error);
       setUser(null);
+      setSessionExpiresAt(null);
+      setSessionWarning(false);
       return false;
     }
   };
+
+  // Periodic session health check
+  useEffect(() => {
+    let sessionCheckInterval: NodeJS.Timeout | null = null;
+
+    const startSessionHealthCheck = () => {
+      // Only start health check if user is authenticated and not loading
+      if (!user || loading) {
+        console.log('AuthContext - Not starting session health check:', { hasUser: !!user, loading });
+        return;
+      }
+
+      console.log('AuthContext - Starting periodic session health check (every 10 seconds)');
+      
+      sessionCheckInterval = setInterval(async () => {
+        try {
+          console.log('AuthContext - 🔄 Performing periodic session check...');
+          
+          // Always make explicit network call to validate session
+          const response = await fetch('/api/auth/user', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache',
+            },
+          });
+          
+          if (response.ok) {
+            const userData = await response.json();
+            if (userData.user) {
+              console.log('AuthContext - ✅ Periodic session validation successful');
+              setUser(userData.user);
+              
+              // Check session expiry
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session?.expires_at) {
+                const expiresAt = new Date(session.expires_at * 1000);
+                const tenMinutesFromNow = new Date(Date.now() + 10 * 60 * 1000);
+                
+                if (expiresAt < tenMinutesFromNow) {
+                  console.log('AuthContext - ⚠️ Session expires soon, will refresh on next check');
+                  setSessionWarning(true);
+                } else {
+                  setSessionWarning(false);
+                }
+                
+                setSessionExpiresAt(expiresAt);
+              }
+            } else {
+              console.warn('AuthContext - ❌ No user in periodic validation response');
+              setUser(null);
+              setSessionExpiresAt(null);
+              setSessionWarning(false);
+            }
+          } else {
+            console.warn('AuthContext - ❌ Periodic session validation failed:', response.status);
+            if (response.status === 401) {
+              console.log('AuthContext - Session expired, signing out user');
+              setUser(null);
+              setSessionExpiresAt(null);
+              setSessionWarning(false);
+            }
+          }
+        } catch (error) {
+          console.error('AuthContext - ❌ Session health check failed:', error);
+        }
+      }, 10000); // Check every 10 seconds
+    };
+
+    const stopSessionHealthCheck = () => {
+      if (sessionCheckInterval) {
+        console.log('AuthContext - Stopping periodic session health check');
+        clearInterval(sessionCheckInterval);
+        sessionCheckInterval = null;
+      }
+    };
+
+    // Debug current state
+    console.log('AuthContext - Session health check effect triggered:', { 
+      hasUser: !!user, 
+      loading, 
+      isAuthenticated: !!user && !loading 
+    });
+
+    // Start health check when user is authenticated and not loading
+    if (user && !loading) {
+      startSessionHealthCheck();
+    } else {
+      stopSessionHealthCheck();
+    }
+
+    // Cleanup on unmount or user change
+    return () => {
+      stopSessionHealthCheck();
+    };
+  }, [user, loading]); // Restart health check when user or loading state changes
 
   useEffect(() => {
     let mounted = true;
@@ -60,9 +217,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Get initial session using secure API with retry logic
     const getInitialSession = async () => {
       try {
+        // Add timeout to prevent infinite loading
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Initial session timeout')), 15000);
+        });
+
         // First, try to restore session from Supabase storage
         console.log('AuthContext - Attempting to restore session...');
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        const sessionPromise = supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ]);
         
         if (session && !sessionError) {
           console.log('AuthContext - Session restored from storage');
@@ -72,8 +239,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           console.log('AuthContext - No session found in storage');
         }
 
-        // Then check authentication via secure API
-        const isAuthenticated = await checkAuth();
+        // Then check authentication via secure API with timeout
+        const authPromise = checkAuth();
+        const isAuthenticated = await Promise.race([
+          authPromise,
+          timeoutPromise
+        ]);
 
         if (!mounted) return;
 
@@ -102,7 +273,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } catch (error) {
         console.error('AuthContext - Error getting initial session:', error);
         if (mounted) {
-          // Retry on error if we haven't exceeded max retries
+          // If it's a timeout error, just set loading to false and let user try to sign in
+          if (error.message === 'Initial session timeout') {
+            console.log('AuthContext - Session restoration timed out, setting loading to false');
+            setLoading(false);
+            return;
+          }
+          
+          // Retry on other errors if we haven't exceeded max retries
           if (retryCount < maxRetries) {
             retryCount++;
             console.log(`AuthContext - Retrying after error (${retryCount}/${maxRetries})...`);
@@ -199,6 +377,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signOut,
     isAuthenticated: !!user,
     ensureValidSession,
+    sessionExpiresAt,
+    sessionWarning,
   };
 
   return (

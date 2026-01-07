@@ -88,6 +88,16 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       return;
     }
 
+    // Add a timeout to prevent infinite loading
+    const loadTimeout = setTimeout(() => {
+      if (!hasLoadedData && !isInitialized) {
+        console.warn('SupabaseFileManager - Load timeout reached, setting initialized to prevent infinite loading');
+        setIsInitialized(true);
+        setIsLoading(false);
+        setSyncError('Load timeout - please refresh the page');
+      }
+    }, 30000); // 30 second timeout
+
     // If we have SSR data, use it immediately
     if (ssrData) {
       // SSR data is already in flat format, convert directly to objects
@@ -132,12 +142,21 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
         isInitialized: true,
         hasTracks: Object.keys(tracksObj).length > 0
       });
+      
+      clearTimeout(loadTimeout);
       return;
     }
 
     // Fallback to client-side loading if no SSR data
     console.log('SupabaseFileManager - No SSR data, loading from Supabase client-side');
-    loadDataFromSupabase();
+    loadDataFromSupabase().finally(() => {
+      clearTimeout(loadTimeout);
+    });
+
+    // Cleanup timeout on unmount
+    return () => {
+      clearTimeout(loadTimeout);
+    };
   }, [isAuthenticated, user, ssrData]); // Remove hasLoadedData from dependencies to prevent loops
 
   // Check for migration when user signs in
@@ -183,11 +202,22 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     try {
       console.log('SupabaseFileManager - loading tracks directly from Supabase');
 
-      // Ensure we have a valid session before making database calls
-      const validSession = await ensureValidSession();
+      // Add timeout to prevent infinite waiting
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Session validation timeout')), 10000);
+      });
+
+      // Ensure we have a valid session before making database calls with timeout
+      const validSession = await Promise.race([
+        ensureValidSession(),
+        timeoutPromise
+      ]);
+      
       if (!validSession) {
         throw new Error('Unable to establish valid session');
       }
+
+      console.log('SupabaseFileManager - Session validated, loading data...');
 
       // Load tracks and folders from Supabase in one call
       const { data, error } = await db.tracks.getAll();
@@ -315,6 +345,57 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       await new Promise(resolve => setTimeout(resolve, 50));
     } catch (error) {
       console.error('SupabaseFileManager - Error loading data:', error);
+      
+      // If it's a session timeout, try to load data anyway (might work if cookies are still valid)
+      if (error.message === 'Session validation timeout') {
+        console.log('SupabaseFileManager - Session timeout, attempting direct data load...');
+        
+        try {
+          const { data, error: directError } = await db.tracks.getAll();
+          
+          if (!directError && data) {
+            console.log('SupabaseFileManager - Direct data load successful');
+            
+            // Process the data normally
+            const tracks = data?.tracks || [];
+            const folders = data?.folders || [];
+
+            const tracksObj = tracks.reduce((acc: Record<string, Track>, track: Track) => {
+              acc[track.id] = track;
+              return acc;
+            }, {});
+
+            const foldersObj = folders.reduce((acc: Record<string, Folder>, folder: Folder) => {
+              acc[folder.id] = folder;
+              return acc;
+            }, {});
+
+            setTracks(prev => ({ ...tracksObj }));
+            setFolders(prev => ({ ...foldersObj }));
+            setIsInitialized(true);
+            setHasLoadedData(true);
+
+            // Update global store
+            tracksActions.clear();
+            Object.values(tracksObj).forEach(track => tracksActions.addTrack(track));
+            Object.values(foldersObj).forEach(folder => tracksActions.addFolder(folder));
+            
+            tracksStore.set({
+              ...tracksStore.get(),
+              isInitialized: true,
+              isLoading: false,
+              error: null
+            });
+
+            console.log('SupabaseFileManager - Direct load completed successfully');
+            setIsLoading(false);
+            return;
+          }
+        } catch (directError) {
+          console.error('SupabaseFileManager - Direct load also failed:', directError);
+        }
+      }
+      
       setSyncError(error instanceof Error ? error.message : 'Failed to load data');
       toastActions.error(t('files:errors.loadFailed'));
     } finally {
