@@ -867,6 +867,10 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
         return newTracks;
       });
 
+      // CRITICAL: Also update the global tracks store so ReplEditor can see the change
+      tracksActions.removeTrack(trackId);
+      console.log('SupabaseFileManager - global store updated, track removed:', trackId);
+
       if (selectedTrack === trackId) {
         setSelectedTrack(null);
       }

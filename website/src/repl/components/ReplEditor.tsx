@@ -12,6 +12,7 @@ import { useTracks } from '@src/hooks/useTracks';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 import { GlobalToastContainer } from '@src/components/GlobalToastContainer';
 import { useTranslation } from '@src/i18n';
+import { nanoid } from 'nanoid';
 import React, { useState, useEffect } from 'react';
 import { getPendingCode, clearPendingCode, getEditorInstance } from '../../stores/editorStore';
 
@@ -74,11 +75,11 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
   }, []);
 
   // Welcome screen logic - only show after delay and when we're sure there are no tracks
-  const shouldShowWelcome = showWelcomeDelayed && tracks.isInitialized && !tracks.hasTracks() && !tracks.isLoading;
+  const shouldShowWelcome = showWelcomeDelayed && tracks.isInitialized && !tracks.hasTracks && !tracks.isLoading;
 
   console.log('🔥 ReplEditor: State check:', {
     isInitialized: tracks.isInitialized,
-    hasTracks: tracks.hasTracks(),
+    hasTracks: tracks.hasTracks,
     isLoading: tracks.isLoading,
     showWelcomeDelayed,
     shouldShowWelcome,
@@ -163,7 +164,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
 
       try {
         const newTrack = await fileManagerHook.createTrack(
-          `Track ${Date.now()}`,
+          `Track ${nanoid().substring(0, 8)}`,
           DEFAULT_TRACK_CODE,
           undefined, // folder
           false, // isMultitrack
@@ -192,13 +193,13 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
     console.log('handleCreateTrack - track created but not persisted for unauthenticated users');
 
     // Also create in user pattern system for consistency
-    const newTrackId = Date.now().toString();
+    const newTrackId = nanoid();
     const newPattern = userPattern.update(newTrackId, { code: DEFAULT_TRACK_CODE });
 
     // Add to store
     tracks.addTrack({
       id: newTrackId,
-      name: `Track ${Date.now()}`,
+      name: `Track ${nanoid().substring(0, 8)}`,
       code: DEFAULT_TRACK_CODE,
       created: new Date().toISOString(),
       modified: new Date().toISOString(),

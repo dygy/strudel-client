@@ -11,6 +11,7 @@ import { WelcomeScreen } from './WelcomeScreen';
 import { useActivePattern, userPattern } from '@src/user_pattern_utils';
 import { useTracks } from '@src/hooks/useTracks';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
+import { nanoid } from 'nanoid';
 
 interface ReplContext {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -75,7 +76,7 @@ function ReplEditorClean({ context, fileManagerHook, ssrData, ...editorProps }: 
   const [codeComponentKey] = useState(() => Math.random().toString(36));
 
   // Simple welcome screen logic using tracks store
-  const shouldShowWelcome = tracks.isInitialized && !tracks.hasTracks() && !tracks.isLoading;
+  const shouldShowWelcome = tracks.isInitialized && !tracks.hasTracks && !tracks.isLoading;
 
   const handleCreateTrack = useCallback(async (trackName?: string) => {
     const name = trackName || 'New Track';
@@ -89,7 +90,7 @@ function ReplEditorClean({ context, fileManagerHook, ssrData, ...editorProps }: 
     } else {
       // Fallback for unauthenticated users
       console.log('ReplEditor - creating track locally:', name);
-      const newTrackId = Date.now().toString();
+      const newTrackId = nanoid();
       const newPattern = userPattern.update(newTrackId, { code: DEFAULT_TRACK_CODE });
 
       // Add to store

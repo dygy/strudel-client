@@ -37,8 +37,8 @@ export function useTracks() {
     getFoldersCount: tracksSelectors.getFoldersCount,
     
     // Reactive computed values based on current state
-    hasTracks: () => Object.keys(state.tracks).length > 0,
-    hasData: () => Object.keys(state.tracks).length > 0 || Object.keys(state.folders).length > 0,
+    hasTracks: Object.keys(state.tracks).length > 0,
+    hasData: Object.keys(state.tracks).length > 0 || Object.keys(state.folders).length > 0,
 
     // Computed values
     tracksArray: Object.values(state.tracks),

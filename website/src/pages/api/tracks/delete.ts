@@ -1,30 +1,81 @@
 import type { APIRoute } from 'astro';
-import { db } from '../../../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 export const prerender = false;
 
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+
 async function getAuthenticatedUser(request: Request) {
-  // Try to get user from cookie-based auth
-  const baseUrl = new URL(request.url).origin;
-  const authResponse = await fetch(`${baseUrl}/api/auth/user`, {
-    headers: { 'Cookie': request.headers.get('cookie') || '' }
-  });
+  try {
+    const cookies = request.headers.get('cookie') || '';
+    
+    console.log('DELETE API - cookies received:', cookies.substring(0, 100) + '...');
+    
+    if (!cookies) {
+      console.log('DELETE API - No cookies found');
+      throw new Error('No cookies found');
+    }
 
-  if (!authResponse.ok) {
-    throw new Error('Authentication failed');
-  }
+    // Parse cookies to get Supabase session tokens
+    const cookieMap = new Map();
+    cookies.split(';').forEach(cookie => {
+      const [key, value] = cookie.trim().split('=');
+      if (key && value) {
+        cookieMap.set(key, decodeURIComponent(value));
+      }
+    });
 
-  const { user } = await authResponse.json();
-  if (!user) {
-    throw new Error('User not authenticated');
+    console.log('DELETE API - Parsed cookie keys:', Array.from(cookieMap.keys()));
+
+    // Look for Supabase auth cookies
+    let accessToken = null;
+
+    // Try different cookie patterns that Supabase might use
+    for (const [key, value] of cookieMap) {
+      // Access token should be a JWT (starts with eyJ and has dots)
+      if ((key.includes('access') || key.includes('auth-token') || key.startsWith('sb-access')) && value.includes('.')) {
+        accessToken = value;
+        console.log('DELETE API - Found access token in:', key);
+        break;
+      }
+    }
+
+    if (!accessToken) {
+      console.log('DELETE API - No access token found in cookies');
+      throw new Error('No access token found');
+    }
+
+    console.log('DELETE API - Attempting to verify access token...');
+
+    // Create Supabase client with anon key and verify the access token
+    const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
+    
+    const { data: { user }, error } = await supabaseAnon.auth.getUser(accessToken);
+
+    console.log('DELETE API - getUser result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      error: error?.message
+    });
+
+    if (error || !user) {
+      console.log('DELETE API - Authentication failed:', error?.message || 'No user returned');
+      throw new Error('Authentication failed: ' + (error?.message || 'No user returned'));
+    }
+
+    return { user, accessToken };
+  } catch (error) {
+    console.error('DELETE API - getAuthenticatedUser error:', error);
+    throw error;
   }
-  
-  return user;
 }
 
 export const DELETE: APIRoute = async ({ request }) => {
   try {
-    const user = await getAuthenticatedUser(request);
+    const { user, accessToken } = await getAuthenticatedUser(request);
 
     // Parse request body
     const body = await request.json();
@@ -39,8 +90,15 @@ export const DELETE: APIRoute = async ({ request }) => {
 
     console.log('API /tracks/delete - deleting track:', trackId, 'for user:', user.id);
 
-    // Delete the track using the legacy tracks table
-    const { data: deletedTrack, error } = await db.tracks.delete(trackId);
+    // Delete the track directly using Supabase service role client
+    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Delete the track with service role (bypasses RLS)
+    const { data: deletedTrack, error } = await supabaseService
+      .from('tracks')
+      .delete()
+      .eq('id', trackId)
+      .eq('user_id', user.id); // Still check user_id for security
 
     if (error) {
       console.error('API /tracks/delete - database error:', error);

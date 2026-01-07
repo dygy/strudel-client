@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
 import { toastActions } from '@src/stores/toastStore';
+import { tracksActions } from '@src/stores/tracksStore';
+import { nanoid } from 'nanoid';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 import { setActivePattern } from '@src/user_pattern_utils';
 import type { Track, TrackStep, Folder } from './useFileManager';
@@ -92,7 +94,7 @@ export function useFileManagerOperations({
   const createNewTrack = useCallback((parentPath?: string) => {
     if (!newTrackName.trim()) return;
 
-    const trackId = Date.now().toString();
+    const trackId = nanoid();
     const newTrack: Track = {
       id: trackId,
       name: newTrackName.trim(),
@@ -112,7 +114,7 @@ export function useFileManagerOperations({
   const createNewFolder = useCallback((parentPath?: string) => {
     if (!newFolderName.trim()) return;
 
-    const folderId = Date.now().toString();
+    const folderId = nanoid();
     const targetParent = parentPath || newItemParentPath;
     const folderPath = targetParent ? `${targetParent}/${newFolderName.trim()}` : newFolderName.trim();
 
@@ -153,7 +155,7 @@ export function useFileManagerOperations({
   }, [selectedTrack, tracks, saveCurrentTrack, context, loadTrack]);
 
   const duplicateTrack = useCallback((track: Track) => {
-    const trackId = Date.now().toString();
+    const trackId = nanoid();
     const duplicatedTrack: Track = {
       ...track,
       id: trackId,
@@ -221,6 +223,10 @@ export function useFileManagerOperations({
         console.log('FileManager - local state deletion successful:', wasDeleted);
         return newTracks;
       });
+      
+      // CRITICAL: Also update the global tracks store so ReplEditor can see the change
+      tracksActions.removeTrack(trackToDelete.id);
+      console.log('FileManager - global store updated, track removed:', trackToDelete.id);
       
       setTrackToDelete(null);
       isDeletingTrackRef.current = false;
