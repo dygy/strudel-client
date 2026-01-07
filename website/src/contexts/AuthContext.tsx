@@ -79,6 +79,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (isAuthenticated) {
           console.log('AuthContext - User authenticated');
+          setLoading(false);
         } else {
           console.log('AuthContext - No authenticated user');
           
@@ -90,12 +91,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
               if (mounted) {
                 getInitialSession();
               }
-            }, 1000 * retryCount); // Exponential backoff
+            }, 2000 * retryCount); // Longer delay for better session restoration
             return;
           }
+          
+          // Only set loading to false after all retries are exhausted
+          console.log('AuthContext - All retries exhausted, no user found');
+          setLoading(false);
         }
-
-        setLoading(false);
       } catch (error) {
         console.error('AuthContext - Error getting initial session:', error);
         if (mounted) {

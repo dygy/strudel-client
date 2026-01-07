@@ -8,6 +8,12 @@ const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const GET: APIRoute = async ({ request }) => {
   try {
+    // Debug: Log the environment variables being used
+    console.log('API /auth/user - Environment check:', {
+      supabaseUrl: supabaseUrl?.substring(0, 30) + '...',
+      hasServiceKey: !!supabaseServiceKey,
+      anonKey: import.meta.env.PUBLIC_SUPABASE_ANON_KEY?.substring(0, 30) + '...'
+    });
     const cookies = request.headers.get('cookie') || '';
     
     console.log('API /auth/user - All cookies:', cookies);

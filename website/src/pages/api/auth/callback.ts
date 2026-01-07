@@ -8,6 +8,13 @@ const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const GET: APIRoute = async ({ url, cookies, redirect }) => {
   try {
+    // Debug environment variables
+    console.log('Auth callback API - Environment check:', {
+      supabaseUrl: supabaseUrl?.substring(0, 30) + '...',
+      hasServiceKey: !!supabaseServiceKey,
+      serviceKeyLength: supabaseServiceKey?.length
+    });
+
     const code = url.searchParams.get('code');
     const error = url.searchParams.get('error');
     const allParams = Object.fromEntries(url.searchParams.entries());
@@ -38,12 +45,25 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     console.log('Auth callback API - attempting to exchange code for session...');
+    console.log('Auth callback API - using Supabase URL:', supabaseUrl);
+    console.log('Auth callback API - code length:', code?.length);
 
     // Exchange the code for a session
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
+    console.log('Auth callback API - exchange result:', {
+      hasData: !!data,
+      hasSession: !!data?.session,
+      hasUser: !!data?.session?.user,
+      error: exchangeError?.message
+    });
+
     if (exchangeError) {
-      console.error('Error exchanging code for session:', exchangeError);
+      console.error('Error exchanging code for session:', {
+        message: exchangeError.message,
+        status: exchangeError.status,
+        details: exchangeError
+      });
       return redirect(`/login?error=${encodeURIComponent(exchangeError.message)}`);
     }
 
