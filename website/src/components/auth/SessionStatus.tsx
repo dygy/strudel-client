@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { CheckCircleIcon, ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 interface SessionStatusProps {
@@ -46,8 +46,8 @@ export function SessionStatus({ className = '', showOnlyWhenIssues = false }: Se
     // Initial check
     checkSessionStatus();
 
-    // Periodic checks every 30 seconds (less frequent than the main auth check)
-    statusInterval = setInterval(checkSessionStatus, 30000);
+    // Periodic checks - DISABLED to stop spam
+    // statusInterval = setInterval(checkSessionStatus, 120000);
 
     return () => {
       if (statusInterval) {

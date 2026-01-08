@@ -1,5 +1,6 @@
 import React from 'react';
-import { AuthProvider, useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
+import { AuthInitializer } from '../../components/auth/AuthInitializer';
 import { MigrationModal } from '@components/auth/MigrationModal';
 import ReplEditor from './ReplEditor';
 import { useSupabaseFileManager } from './sidebar/hooks/useSupabaseFileManager';
@@ -105,8 +106,9 @@ function AuthenticatedReplContent({ context: externalContext, ssrData, ...editor
 
 export default function AuthenticatedReplEditor(props: AuthenticatedReplEditorProps) {
   return (
-    <AuthProvider>
+    <>
+      <AuthInitializer />
       <AuthenticatedReplContent {...props} />
-    </AuthProvider>
+    </>
   );
 }

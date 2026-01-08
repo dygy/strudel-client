@@ -3,7 +3,7 @@ import {useSettings} from '@src/settings';
 import {getActivePattern, setActivePattern, useActivePattern} from '@src/user_pattern_utils';
 import {toastActions} from '@src/stores/toastStore';
 import {useTranslation} from '@src/i18n';
-import {useAuth} from '@src/contexts/AuthContext.tsx';
+import {useAuth} from '@src/hooks/useAuth';
 import {db, type Folder, migration, type Track} from '@src/lib/secureApi.ts';
 import {getEditorInstance, setPendingCode} from '@src/stores/editorStore.ts';
 import {tracksStore, tracksActions} from '@src/stores/tracksStore.ts';
@@ -17,7 +17,7 @@ interface ReplContext {
 }
 
 export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks: any[]; folders: any[]; } | null) {
-  const { user, isAuthenticated, ensureValidSession, loading } = useAuth();
+  const { user, isAuthenticated, loading, checkAuth } = useAuth();
 
   // Always call all hooks at the top level - never conditionally!
   const [tracks, setTracks] = useState<Record<string, Track>>({});
@@ -148,14 +148,6 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
         isLoading: false,
         error: null
       });
-
-      console.log('SupabaseFileManager - Updated both local state and global tracksStore');
-      console.log('SupabaseFileManager - TracksStore state:', {
-        tracksCount: Object.keys(tracksObj).length,
-        foldersCount: Object.keys(foldersObj).length,
-        isInitialized: true,
-        hasTracks: Object.keys(tracksObj).length > 0
-      });
       
       clearTimeout(loadTimeout);
       return;
@@ -273,7 +265,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
       // Ensure we have a valid session before making database calls with timeout
       const validSession = await Promise.race([
-        ensureValidSession(),
+        checkAuth(),
         timeoutPromise
       ]);
       
@@ -655,7 +647,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     }
 
     // Ensure valid session before creating track
-    const isValidSession = await ensureValidSession();
+    const isValidSession = await checkAuth();
     if (!isValidSession) {
       console.error('SupabaseFileManager - createTrack: unable to establish valid session');
       toastActions.error('Unable to verify authentication. Please try again.');
@@ -715,7 +707,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setSyncError(error instanceof Error ? error.message : 'Create failed');
       return null;
     }
-  }, [user, ensureValidSession, t]);
+  }, [user, checkAuth, t]);
 
   // Listen for new user pattern creation and automatically save to Supabase
   useEffect(() => {
@@ -773,14 +765,14 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
     try {
       // Ensure valid session before creating folder
-      const isValidSession = await ensureValidSession();
+      const isValidSession = await checkAuth();
       if (!isValidSession) {
         console.error('SupabaseFileManager - createFolder: unable to establish valid session');
         toastActions.error('Unable to verify authentication. Please try again.');
         return null;
       }
 
-      // Get the current user from the auth context (ensureValidSession already set it)
+      // Get the current user from the auth context (checkAuth already set it)
       if (!user?.id) {
         console.error('SupabaseFileManager - createFolder: no user available after session validation');
         toastActions.error('Authentication error: No user found. Please try refreshing the page.');
@@ -871,7 +863,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setSyncError(error instanceof Error ? error.message : 'Create failed');
       return null;
     }
-  }, [user, t, ensureValidSession, setFolders]);
+  }, [user, t, checkAuth, setFolders]);
 
   const updateFolder = useCallback(async (folderId: string, updates: { parent?: string | null; name?: string; path?: string }) => {
     console.log('SupabaseFileManager - updateFolder called:', { folderId, updates });
@@ -884,7 +876,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
     try {
       // Ensure valid session before updating folder
-      const isValidSession = await ensureValidSession();
+      const isValidSession = await checkAuth();
       if (!isValidSession) {
         console.error('SupabaseFileManager - updateFolder: unable to establish valid session');
         toastActions.error('Unable to verify authentication. Please try again.');
@@ -958,7 +950,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setSyncError(error instanceof Error ? error.message : 'Update failed');
       return null;
     }
-  }, [user, t, ensureValidSession, setFolders]);
+  }, [user, t, checkAuth, setFolders]);
 
   const deleteTrack = useCallback(async (trackId: string) => {
     if (!user) {
@@ -968,7 +960,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
     try {
       // Ensure valid session before deleting
-      const validSession = await ensureValidSession();
+      const validSession = await checkAuth();
       if (!validSession) {
         console.error('SupabaseFileManager - deleteTrack: unable to establish valid session');
         toastActions.error(t('auth:errors.sessionExpired'));
@@ -1008,7 +1000,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setSyncError(error instanceof Error ? error.message : 'Delete failed');
       return false;
     }
-  }, [user, selectedTrack, t, ensureValidSession]);
+  }, [user, selectedTrack, t, checkAuth]);
 
   const handleMigrationComplete = () => {
     setShowMigrationModal(false);
@@ -1029,7 +1021,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
     try {
       // Ensure valid session before deleting
-      const validSession = await ensureValidSession();
+      const validSession = await checkAuth();
       if (!validSession) {
         console.error('SupabaseFileManager - deleteAllTracks: unable to establish valid session');
         toastActions.error(t('auth:errors.sessionExpired'));
@@ -1089,7 +1081,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setSyncError(error instanceof Error ? error.message : 'Delete all failed');
       return false;
     }
-  }, [user, tracks, folders, setTracks, setFolders, setSelectedTrack, context, t, ensureValidSession]);
+  }, [user, tracks, folders, setTracks, setFolders, setSelectedTrack, context, t, checkAuth]);
 
   // Refresh data from Supabase - useful after operations that modify data
   const refreshFromSupabase = useCallback(async () => {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from '@src/i18n';
+import { Checkbox } from './SettingsTab';
 
 // Import cache functions from @strudel/webaudio (which re-exports superdough)
 let cacheAPI: any = null;
@@ -215,31 +216,19 @@ export function SampleCacheSettings() {
         <h4 className="font-medium text-foreground">{t('sampleCache.configuration')}</h4>
         
         {/* Enable Cache */}
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-foreground">
-            {t('sampleCache.enabled')}
-          </label>
-          <input
-            type="checkbox"
-            checked={config.enabled}
-            onChange={(e) => handleConfigChange('enabled', e.target.checked)}
-            className="rounded border-border bg-background text-blue-500 focus:ring-blue-500"
-          />
-        </div>
+        <Checkbox
+          label={t('sampleCache.enabled')}
+          value={config.enabled}
+          onChange={(e) => handleConfigChange('enabled', e.target.checked)}
+        />
 
         {/* Enable Preloading */}
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-foreground">
-            {t('sampleCache.preloadEnabled')}
-          </label>
-          <input
-            type="checkbox"
-            checked={config.preloadEnabled}
-            disabled={!config.enabled}
-            onChange={(e) => handleConfigChange('preloadEnabled', e.target.checked)}
-            className="rounded border-border bg-background text-blue-500 focus:ring-blue-500 disabled:opacity-50"
-          />
-        </div>
+        <Checkbox
+          label={t('sampleCache.preloadEnabled')}
+          value={config.preloadEnabled}
+          disabled={!config.enabled}
+          onChange={(e) => handleConfigChange('preloadEnabled', e.target.checked)}
+        />
 
         {/* Max Cache Size */}
         <div>

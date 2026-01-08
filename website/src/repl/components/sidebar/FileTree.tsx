@@ -230,7 +230,7 @@ export function FileTree({
           parentNode = Object.values(folderNodesById).find(f => f.path === folder.parent);
 
           if (parentNode) {
-            console.log(`FileTree - buildTree: Found parent by path fallback: "${folder.parent}" -> UUID: ${parentNode.id}`);
+            // Found parent by path fallback
           } else {
             console.warn(`FileTree - buildTree: Parent not found for folder "${folder.name}" (${folder.id}), parent reference: "${folder.parent}"`);
           }
@@ -311,7 +311,6 @@ export function FileTree({
     };
 
     sortTree(tree);
-    console.log({tree})
     return tree;
   };
 

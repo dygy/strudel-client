@@ -17,7 +17,7 @@ interface CheckboxProps {
   disabled?: boolean;
 }
 
-function Checkbox({ label, value, onChange, disabled = false }: CheckboxProps) {
+export function Checkbox({ label, value, onChange, disabled = false }: CheckboxProps) {
   return (
     <label className="flex items-center gap-3 cursor-pointer group">
       <div className="relative">

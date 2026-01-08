@@ -77,16 +77,6 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
   // Welcome screen logic - only show after delay and when we're sure there are no tracks
   const shouldShowWelcome = showWelcomeDelayed && tracks.isInitialized && !tracks.hasTracks && !tracks.isLoading;
 
-  console.log('🔥 ReplEditor: State check:', {
-    isInitialized: tracks.isInitialized,
-    hasTracks: tracks.hasTracks,
-    isLoading: tracks.isLoading,
-    showWelcomeDelayed,
-    shouldShowWelcome,
-    tracksCount: tracks.getTracksCount(),
-    foldersCount: tracks.getFoldersCount(),
-  });
-
   useEffect(() => {
     // Listen for when tracks are imported
     const handleTracksImported = async () => {
@@ -254,7 +244,6 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
           </div>
         ) : (
           <>
-            {console.log('ReplEditor - rendering Code component, shouldShowWelcome:', shouldShowWelcome, 'isLoading:', tracks.isLoading)}
             <Code key={codeComponentKey} containerRef={containerRef} editorRef={editorRef} init={init} />
           </>
         )}
