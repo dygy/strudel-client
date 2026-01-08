@@ -71,6 +71,17 @@ export const authActions = {
           }
           
           return true;
+        } else {
+          // API returned 200 but no user - user is not authenticated
+          this.setUser(null);
+          this.setSessionInfo(null, false);
+          
+          // Redirect to login if not already on login page
+          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+            window.location.href = '/login';
+          }
+          
+          return false;
         }
       }
       
@@ -102,6 +113,8 @@ export const authActions = {
         return true;
       }
       
+      // If no current user and network error, stop loading but don't redirect
+      this.setLoading(false);
       return false;
     }
   },
