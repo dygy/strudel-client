@@ -17,7 +17,7 @@ interface ReplContext {
 }
 
 export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks: any[]; folders: any[]; } | null) {
-  const { user, isAuthenticated, ensureValidSession } = useAuth();
+  const { user, isAuthenticated, ensureValidSession, loading } = useAuth();
 
   // Always call all hooks at the top level - never conditionally!
   const [tracks, setTracks] = useState<Record<string, Track>>({});
@@ -74,12 +74,26 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
   // Load data from Supabase when user is authenticated
   useEffect(() => {
-    if (!isAuthenticated || !user) {
-      // Clear data when not authenticated
+    if (!user) {
+      // Clear data when no user
       setTracks({});
       setFolders({});
       setIsInitialized(false);
       setHasLoadedData(false);
+      return;
+    }
+
+    // Don't load data if authentication is still loading (prevents race conditions)
+    if (loading) {
+      console.log('SupabaseFileManager - Authentication still loading, waiting...');
+      return;
+    }
+
+    // Don't try to load data if we don't have an authenticated user
+    if (!isAuthenticated) {
+      console.log('SupabaseFileManager - User not authenticated, skipping data load');
+      setIsInitialized(true); // Set as initialized to prevent loading loops
+      setIsLoading(false);
       return;
     }
 
@@ -88,7 +102,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       return;
     }
 
-    // Add a timeout to prevent infinite loading
+    // Add a timeout to prevent infinite loading - reduced timeout
     const loadTimeout = setTimeout(() => {
       if (!hasLoadedData && !isInitialized) {
         console.warn('SupabaseFileManager - Load timeout reached, setting initialized to prevent infinite loading');
@@ -96,7 +110,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
         setIsLoading(false);
         setSyncError('Load timeout - please refresh the page');
       }
-    }, 30000); // 30 second timeout
+    }, 15000); // Reduced to 15 seconds
 
     // If we have SSR data, use it immediately
     if (ssrData) {
@@ -157,14 +171,14 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     return () => {
       clearTimeout(loadTimeout);
     };
-  }, [isAuthenticated, user, ssrData]); // Remove hasLoadedData from dependencies to prevent loops
+  }, [user, loading, isAuthenticated, ssrData]); // Add isAuthenticated to dependencies
 
   // Check for migration when user signs in
   useEffect(() => {
-    if (isAuthenticated && user && !hasMigrated) {
+    if (user && !hasMigrated) {
       checkMigrationStatus();
     }
-  }, [isAuthenticated, user, hasMigrated]);
+  }, [user, hasMigrated]);
 
   const checkMigrationStatus = async () => {
     try {
@@ -194,7 +208,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
   };
 
   const loadDataFromSupabase = async () => {
-    if (!isAuthenticated) return;
+    if (!user) return;
 
     setIsLoading(true);
     setSyncError(null);
@@ -202,9 +216,59 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     try {
       console.log('SupabaseFileManager - loading tracks directly from Supabase');
 
-      // Add timeout to prevent infinite waiting
+      // If we have a user, try direct load first (faster)
+      if (user) {
+        console.log('SupabaseFileManager - User exists, attempting direct data load...');
+        
+        try {
+          const { data, error } = await db.tracks.getAll();
+          
+          if (!error && data) {
+            console.log('SupabaseFileManager - Direct data load successful');
+            
+            // Process the data normally
+            const tracks = data.tracks || [];
+            const folders = data.folders || [];
+
+            const tracksObj = tracks.reduce((acc: Record<string, Track>, track: Track) => {
+              acc[track.id] = track;
+              return acc;
+            }, {});
+
+            const foldersObj = folders.reduce((acc: Record<string, Folder>, folder: Folder) => {
+              acc[folder.id] = folder;
+              return acc;
+            }, {});
+
+            setTracks(prev => ({ ...tracksObj }));
+            setFolders(prev => ({ ...foldersObj }));
+            setIsInitialized(true);
+            setHasLoadedData(true);
+
+            // Update global store
+            tracksActions.clear();
+            Object.values(tracksObj).forEach(track => tracksActions.addTrack(track));
+            Object.values(foldersObj).forEach(folder => tracksActions.addFolder(folder));
+            
+            tracksStore.set({
+              ...tracksStore.get(),
+              isInitialized: true,
+              isLoading: false,
+              error: null
+            });
+
+            console.log('SupabaseFileManager - Direct load completed successfully');
+            setIsLoading(false);
+            return;
+          }
+        } catch (directError) {
+          console.log('SupabaseFileManager - Direct load failed, trying with session validation:', directError);
+        }
+      }
+
+      // Fallback: Add timeout to prevent infinite waiting - reduced timeout
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Session validation timeout')), 10000);
+        setTimeout(() => reject(new Error('Session validation timeout')), 5000); // Reduced to 5 seconds
       });
 
       // Ensure we have a valid session before making database calls with timeout
@@ -470,7 +534,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
   // Handle activePattern changes (URL routing)
   useEffect(() => {
-    if (!isInitialized || !activePattern || !isAuthenticated) return;
+    if (!isInitialized || !activePattern || !user) return;
 
     // Don't auto-load tracks if we're currently in step selection mode
     if (selectedStepTrack) {
@@ -483,10 +547,10 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setSelectedTrack(activePattern);
       loadTrack(tracks[activePattern]);
     }
-  }, [activePattern, isInitialized, selectedTrack, loadTrack, tracks, isAuthenticated, selectedStepTrack]);
+  }, [activePattern, isInitialized, selectedTrack, loadTrack, tracks, user, selectedStepTrack]);
 
   const saveSpecificTrack = useCallback(async (trackId: string, showToast: boolean = true) => {
-    if (!trackId || !isAuthenticated) {
+    if (!trackId || !user) {
       console.warn('SupabaseFileManager - saveSpecificTrack: not authenticated or invalid track ID:', trackId);
       return false;
     }
@@ -557,16 +621,16 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setSyncError(error instanceof Error ? error.message : 'Save failed');
       return false;
     }
-  }, [context, t, selectedTrack, tracks, isAuthenticated]);
+  }, [context, t, selectedTrack, tracks, user]);
 
   const saveCurrentTrack = useCallback(async (showToast: boolean = true) => {
-    if (!selectedTrack || !isAuthenticated) return false;
+    if (!selectedTrack || !user) return false;
     return await saveSpecificTrack(selectedTrack, showToast);
-  }, [selectedTrack, isAuthenticated, saveSpecificTrack]);
+  }, [selectedTrack, user, saveSpecificTrack]);
 
   // Set up save event listener for Cmd+S functionality
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!user) return;
 
     const handleSave = (event: CustomEvent) => {
       console.log('SupabaseFileManager - received save event:', event.detail);
@@ -578,13 +642,13 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     return () => {
       document.removeEventListener('strudel-save', handleSave as EventListener);
     };
-  }, [isAuthenticated, saveCurrentTrack]);
+  }, [user, saveCurrentTrack]);
 
   const createTrack = useCallback(async (name: string, code: string = '', folderOrEvent?: string | React.SyntheticEvent, isMultitrack?: boolean, steps?: any[], activeStep?: number) => {
     // Handle case where folder parameter might be a SyntheticEvent (from React event handlers)
     const folder = typeof folderOrEvent === 'string' ? folderOrEvent : undefined;
 
-    if (!isAuthenticated) {
+    if (!user) {
       console.error('SupabaseFileManager - createTrack: not authenticated');
       toastActions.error(t('auth:errors.notAuthenticated'));
       return null;
@@ -651,11 +715,11 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setSyncError(error instanceof Error ? error.message : 'Create failed');
       return null;
     }
-  }, [isAuthenticated, ensureValidSession, t]);
+  }, [user, ensureValidSession, t]);
 
   // Listen for new user pattern creation and automatically save to Supabase
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!user) return;
 
     const handleUserPatternCreated = async (event: CustomEvent) => {
       const { patternId, patternData } = event.detail;
@@ -696,12 +760,12 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     return () => {
       document.removeEventListener('strudel-user-pattern-created', handleUserPatternCreated as EventListener);
     };
-  }, [isAuthenticated, tracks, createTrack]);
+  }, [user, tracks, createTrack]);
 
   const createFolder = useCallback(async (name: string, path: string, parent?: string) => {
     console.log('SupabaseFileManager - createFolder called:', { name, path, parent });
 
-    if (!isAuthenticated) {
+    if (!user) {
       console.error('SupabaseFileManager - createFolder: not authenticated');
       toastActions.error(t('auth:errors.notAuthenticated'));
       return null;
@@ -807,12 +871,12 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setSyncError(error instanceof Error ? error.message : 'Create failed');
       return null;
     }
-  }, [isAuthenticated, t, ensureValidSession, setFolders]);
+  }, [user, t, ensureValidSession, setFolders]);
 
   const updateFolder = useCallback(async (folderId: string, updates: { parent?: string | null; name?: string; path?: string }) => {
     console.log('SupabaseFileManager - updateFolder called:', { folderId, updates });
 
-    if (!isAuthenticated) {
+    if (!user) {
       console.error('SupabaseFileManager - updateFolder: not authenticated');
       toastActions.error('Not authenticated. Please refresh the page.');
       return null;
@@ -894,10 +958,10 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setSyncError(error instanceof Error ? error.message : 'Update failed');
       return null;
     }
-  }, [isAuthenticated, t, ensureValidSession, setFolders]);
+  }, [user, t, ensureValidSession, setFolders]);
 
   const deleteTrack = useCallback(async (trackId: string) => {
-    if (!isAuthenticated) {
+    if (!user) {
       toastActions.error(t('auth:errors.notAuthenticated'));
       return false;
     }
@@ -944,7 +1008,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setSyncError(error instanceof Error ? error.message : 'Delete failed');
       return false;
     }
-  }, [isAuthenticated, selectedTrack, t, ensureValidSession]);
+  }, [user, selectedTrack, t, ensureValidSession]);
 
   const handleMigrationComplete = () => {
     setShowMigrationModal(false);
@@ -953,7 +1017,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
   };
 
   const deleteAllTracks = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!user) {
       toastActions.error(t('auth:errors.notAuthenticated'));
       return false;
     }
@@ -1025,19 +1089,19 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       setSyncError(error instanceof Error ? error.message : 'Delete all failed');
       return false;
     }
-  }, [isAuthenticated, tracks, folders, setTracks, setFolders, setSelectedTrack, context, t, ensureValidSession]);
+  }, [user, tracks, folders, setTracks, setFolders, setSelectedTrack, context, t, ensureValidSession]);
 
   // Refresh data from Supabase - useful after operations that modify data
   const refreshFromSupabase = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!user) return;
 
     console.log('SupabaseFileManager - Manual refresh from Supabase requested');
     setHasLoadedData(false); // Reset flag to allow reload
     await loadDataFromSupabase();
-  }, [isAuthenticated, loadDataFromSupabase]);
+  }, [user, loadDataFromSupabase]);
 
   // If not authenticated, return minimal state but still with all the same structure
-  if (!isAuthenticated || !user) {
+  if (!user) {
     return {
       // State
       tracks: {},

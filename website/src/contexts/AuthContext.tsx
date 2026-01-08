@@ -118,15 +118,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     let sessionCheckInterval: NodeJS.Timeout | null = null;
 
     const startSessionHealthCheck = () => {
-      // Only start health check if user is authenticated and not loading
-      if (!user || loading) {
-        console.log('AuthContext - Not starting session health check:', { hasUser: !!user, loading });
+      // Only start health check if user exists (don't wait for loading to be false)
+      if (!user) {
+        console.log('AuthContext - Not starting session health check: no user');
         return;
       }
 
       console.log('AuthContext - Starting periodic session health check (every 10 seconds)');
       
-      sessionCheckInterval = setInterval(async () => {
+      // Start immediately, then repeat every 10 seconds
+      const performCheck = async () => {
         try {
           console.log('AuthContext - 🔄 Performing periodic session check...');
           
@@ -137,6 +138,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             headers: {
               'Cache-Control': 'no-cache',
               'Pragma': 'no-cache',
+              'X-Timestamp': Date.now().toString(), // Force cache bust
             },
           });
           
@@ -179,7 +181,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         } catch (error) {
           console.error('AuthContext - ❌ Session health check failed:', error);
         }
-      }, 10000); // Check every 10 seconds
+      };
+
+      // Perform initial check immediately
+      performCheck();
+      
+      // Then set up interval for subsequent checks
+      sessionCheckInterval = setInterval(performCheck, 10000); // Check every 10 seconds
     };
 
     const stopSessionHealthCheck = () => {
@@ -193,12 +201,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Debug current state
     console.log('AuthContext - Session health check effect triggered:', { 
       hasUser: !!user, 
-      loading, 
-      isAuthenticated: !!user && !loading 
+      loading
     });
 
-    // Start health check when user is authenticated and not loading
-    if (user && !loading) {
+    // Start health check when user exists (regardless of loading state)
+    if (user) {
       startSessionHealthCheck();
     } else {
       stopSessionHealthCheck();
@@ -208,19 +215,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       stopSessionHealthCheck();
     };
-  }, [user, loading]); // Restart health check when user or loading state changes
+  }, [user]); // Only depend on user, not loading state
 
   useEffect(() => {
     let mounted = true;
     let retryCount = 0;
-    const maxRetries = 3;
+    const maxRetries = 1; // Reduced to 1 retry only
 
     // Get initial session using secure API with retry logic
     const getInitialSession = async () => {
       try {
-        // Add timeout to prevent infinite loading
+        // Add timeout to prevent infinite loading - reduced to 8 seconds
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Initial session timeout')), 15000);
+          setTimeout(() => reject(new Error('Initial session timeout')), 8000);
         });
 
         // First, try to restore session from Supabase storage
@@ -241,8 +248,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             session = typedResult.data.session;
             sessionError = typedResult.error;
           } else {
-            console.log('AuthContext - Invalid session result type');
-            sessionError = new Error('Invalid session result');
+            console.log('AuthContext - Session restoration timed out');
+            sessionError = new Error('Session restoration timeout');
           }
         } catch (error) {
           if (error instanceof Error && error.message === 'Initial session timeout') {
@@ -261,24 +268,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
           console.log('AuthContext - No session found in storage');
         }
 
-        // Then check authentication via secure API with timeout
+        // Then check authentication via secure API with shorter timeout
         let isAuthenticated = false;
         
         try {
+          const authTimeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Auth check timeout')), 3000); // Reduced to 3 seconds
+          });
+          
           const authResult = await Promise.race([
             checkAuth(),
-            timeoutPromise
+            authTimeoutPromise
           ]);
           
           // Type guard to check if we got a boolean result
           if (typeof authResult === 'boolean') {
             isAuthenticated = authResult;
           } else {
-            console.log('AuthContext - Invalid auth result type:', typeof authResult);
+            console.log('AuthContext - Authentication check timed out');
             isAuthenticated = false;
           }
         } catch (error) {
-          if (error instanceof Error && error.message === 'Initial session timeout') {
+          if (error instanceof Error && (error.message === 'Initial session timeout' || error.message === 'Auth check timeout')) {
             console.log('AuthContext - Authentication check timed out');
             isAuthenticated = false;
           } else {
@@ -292,6 +303,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
           console.log('AuthContext - User authenticated');
           setLoading(false);
         } else {
+          // Check if we have a user from session but auth check failed
+          if (session && session.user) {
+            console.log('AuthContext - Have session user but auth check failed, treating as authenticated');
+            setUser({
+              id: session.user.id,
+              email: session.user.email || '',
+              name: session.user.user_metadata?.full_name || session.user.email || '',
+              avatar: session.user.user_metadata?.avatar_url || null
+            });
+            setLoading(false);
+            return;
+          }
+          
           console.log('AuthContext - No authenticated user');
           
           // If no user found and we haven't exceeded retries, try again after a short delay
@@ -302,21 +326,53 @@ export function AuthProvider({ children }: AuthProviderProps) {
               if (mounted) {
                 getInitialSession();
               }
-            }, 2000 * retryCount); // Longer delay for better session restoration
+            }, 1000 * retryCount); // Shorter delay
             return;
           }
           
           // Only set loading to false after all retries are exhausted
-          console.log('AuthContext - All retries exhausted, no user found');
+          console.log('AuthContext - All retries exhausted, no user found - should redirect to login');
           setLoading(false);
+          
+          // If we're not on the login page and have no user, redirect to login
+          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+            console.log('AuthContext - Redirecting to login page');
+            window.location.href = '/login';
+            return;
+          }
         }
       } catch (error) {
         console.error('AuthContext - Error getting initial session:', error);
         if (mounted) {
-          // If it's a timeout error, just set loading to false and let user try to sign in
-          if (error instanceof Error && error.message === 'Initial session timeout') {
-            console.log('AuthContext - Session restoration timed out, setting loading to false');
+          // If it's a timeout error, check if we have a session user as fallback
+          if (error instanceof Error && (error.message === 'Initial session timeout' || error.message === 'Auth check timeout')) {
+            console.log('AuthContext - Session/auth check timed out, checking for session user');
+            
+            // Try to get session one more time as fallback
+            try {
+              const { data: { session: fallbackSession } } = await supabase.auth.getSession();
+              if (fallbackSession && fallbackSession.user) {
+                console.log('AuthContext - Found session user as fallback, using it');
+                setUser({
+                  id: fallbackSession.user.id,
+                  email: fallbackSession.user.email || '',
+                  name: fallbackSession.user.user_metadata?.full_name || fallbackSession.user.email || '',
+                  avatar: fallbackSession.user.user_metadata?.avatar_url || null
+                });
+                setLoading(false);
+                return;
+              }
+            } catch (fallbackError) {
+              console.log('AuthContext - Fallback session check also failed');
+            }
+            
             setLoading(false);
+            
+            // If we're not on the login page, redirect to login
+            if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+              console.log('AuthContext - Redirecting to login page due to timeout');
+              window.location.href = '/login';
+            }
             return;
           }
           
@@ -415,7 +471,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loading,
     signInWithGoogle,
     signOut,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && !loading, // Fix: Only consider authenticated when we have user AND not loading
     ensureValidSession,
     sessionExpiresAt,
     sessionWarning,
