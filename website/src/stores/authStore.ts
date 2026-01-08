@@ -74,21 +74,40 @@ export const authActions = {
         }
       }
       
-      this.setUser(null);
-      this.setSessionInfo(null, false);
+      // Only clear user on explicit 401/403, not on network errors
+      if (response.status === 401 || response.status === 403) {
+        this.setUser(null);
+        this.setSessionInfo(null, false);
+        
+        // Redirect to login on 401
+        if (response.status === 401 && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          window.location.href = '/login';
+        }
+        
+        return false;
+      }
       
-      // Redirect to login on 401
-      if (response.status === 401 && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
+      // For other status codes, don't clear user - might be temporary server issue
+      console.warn('Auth check returned non-OK status:', response.status, 'keeping current auth state');
+      return !!this.getUser();
+      
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      
+      // Don't clear user on network errors - keep current state
+      // Only log the error and return current auth status
+      const currentUser = this.getUser();
+      if (currentUser) {
+        console.log('Network error during auth check, keeping user logged in');
+        return true;
       }
       
       return false;
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      this.setUser(null);
-      this.setSessionInfo(null, false);
-      return false;
     }
+  },
+
+  getUser(): User | null {
+    return authStore.get().user;
   },
 
   async signInWithGoogle() {
@@ -156,7 +175,12 @@ export const authActions = {
     sessionCheckInterval = setInterval(async () => {
       const currentState = authStore.get();
       if (currentState.user) {
-        await this.checkAuth();
+        try {
+          await this.checkAuth();
+        } catch (error) {
+          console.error('Periodic auth check failed, but continuing:', error);
+          // Don't stop the interval on errors - keep checking
+        }
       } else {
         // Stop checking if no user
         this.stopPeriodicCheck();
