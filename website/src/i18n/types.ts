@@ -192,6 +192,7 @@ export interface TabsTranslations {
   patterns: string;
   sounds: string;
   reference: string;
+  shortcuts: string;
   console: string;
   settings: string;
 }
@@ -283,6 +284,32 @@ export interface AuthTranslations {
   };
 }
 
+export interface ShortcutsTranslations {
+  title: string;
+  description: string;
+  sections: {
+    essential: string;
+    file: string;
+    editor: string;
+  };
+  evaluate: string;
+  update: string;
+  playPause: string;
+  save: string;
+  comment: string;
+  tip: {
+    title: string;
+    description: string;
+  };
+  keybindings: {
+    title: string;
+    description: string;
+  };
+  platform: {
+    mac: string;
+  };
+}
+
 export interface Resources {
   common: CommonTranslations;
   files: FilesTranslations;
@@ -291,6 +318,7 @@ export interface Resources {
   messages: MessagesTranslations;
   welcome: WelcomeTranslations;
   auth: AuthTranslations;
+  shortcuts: ShortcutsTranslations;
 }
 
 // Namespace type

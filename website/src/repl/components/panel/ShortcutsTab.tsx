@@ -51,7 +51,11 @@ export function ShortcutsTab() {
   const { t } = useTranslation(['shortcuts', 'common']);
   
   // Detect platform for showing correct modifier key
-  const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const isMac = typeof navigator !== 'undefined' && (
+    navigator.userAgent.includes('Mac') || 
+    navigator.userAgent.includes('iPhone') || 
+    navigator.userAgent.includes('iPad')
+  );
   const modKey = isMac ? 'Cmd' : 'Ctrl';
 
   return (
