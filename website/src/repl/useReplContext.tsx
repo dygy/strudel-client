@@ -407,44 +407,6 @@ export function useReplContext(): ReplContext {
     };
   }, []);
 
-  // Global keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Check if we're in an input field or textarea to avoid interfering with typing
-      const target = event.target as HTMLElement;
-      const isInputField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true';
-      
-      // Only handle shortcuts when Ctrl (or Cmd on Mac) is pressed
-      const isCtrlOrCmd = event.ctrlKey || event.metaKey;
-      
-      if (!isCtrlOrCmd) return;
-
-      switch (event.key.toLowerCase()) {
-        case 'u':
-          // Ctrl+U for update/evaluate
-          event.preventDefault();
-          handleEvaluate();
-          break;
-        case 'p':
-          // Ctrl+P for play/pause
-          event.preventDefault();
-          handleTogglePlay();
-          break;
-        default:
-          // Don't prevent default for other shortcuts
-          break;
-      }
-    };
-
-    // Add the event listener
-    document.addEventListener('keydown', handleKeyDown);
-
-    // Cleanup
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [handleEvaluate, handleTogglePlay]); // Dependencies for the handlers
-
   //
   // UI Actions
   //
@@ -576,6 +538,44 @@ export function useReplContext(): ReplContext {
   };
 
   const handleShare = async (): Promise<void> => shareCode();
+
+  // Global keyboard shortcuts - placed after function declarations
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Check if we're in an input field or textarea to avoid interfering with typing
+      const target = event.target as HTMLElement;
+      const isInputField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true';
+      
+      // Only handle shortcuts when Ctrl (or Cmd on Mac) is pressed
+      const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+      
+      if (!isCtrlOrCmd) return;
+
+      switch (event.key.toLowerCase()) {
+        case 'u':
+          // Ctrl+U for update/evaluate
+          event.preventDefault();
+          handleEvaluate();
+          break;
+        case 'p':
+          // Ctrl+P for play/pause
+          event.preventDefault();
+          handleTogglePlay();
+          break;
+        default:
+          // Don't prevent default for other shortcuts
+          break;
+      }
+    };
+
+    // Add the event listener
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleEvaluate, handleTogglePlay]); // Dependencies for the handlers
 
   const context: ReplContext = {
     started,
