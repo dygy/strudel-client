@@ -1,0 +1,25 @@
+{
+  "title": "Raccourcis Clavier",
+  "description": "Accélérez votre flux de travail de live coding avec ces raccourcis clavier",
+  "sections": {
+    "essential": "Essentiels",
+    "file": "Gestion des Fichiers", 
+    "editor": "Éditeur de Code"
+  },
+  "evaluate": "Évaluer/exécuter le motif",
+  "update": "Mettre à jour le motif (alternative)",
+  "playPause": "Basculer lecture/pause",
+  "save": "Sauvegarder la piste actuelle",
+  "comment": "Basculer le commentaire de ligne",
+  "tip": {
+    "title": "Conseil Pro",
+    "description": "Utilisez Ctrl+Entrée ou Ctrl+U fréquemment pendant le live coding pour entendre vos changements instantanément. Ctrl+P vous permet d'arrêter tout rapidement si nécessaire."
+  },
+  "keybindings": {
+    "title": "Raccourcis de l'Éditeur",
+    "description": "Vous pouvez changer les raccourcis de l'éditeur dans les Paramètres :"
+  },
+  "platform": {
+    "mac": "Sur Mac, utilisez Cmd au lieu de Ctrl pour tous les raccourcis"
+  }
+}

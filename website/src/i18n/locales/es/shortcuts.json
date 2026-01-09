@@ -1,0 +1,25 @@
+{
+  "title": "Atajos de Teclado",
+  "description": "Acelera tu flujo de trabajo de live coding con estos atajos de teclado",
+  "sections": {
+    "essential": "Esenciales",
+    "file": "Gestión de Archivos", 
+    "editor": "Editor de Código"
+  },
+  "evaluate": "Evaluar/ejecutar patrón",
+  "update": "Actualizar patrón (alternativa)",
+  "playPause": "Alternar reproducir/pausar",
+  "save": "Guardar pista actual",
+  "comment": "Alternar comentario de línea",
+  "tip": {
+    "title": "Consejo Pro",
+    "description": "Usa Ctrl+Enter o Ctrl+U frecuentemente durante el live coding para escuchar tus cambios al instante. Ctrl+P te permite detener todo rápidamente cuando sea necesario."
+  },
+  "keybindings": {
+    "title": "Atajos del Editor",
+    "description": "Puedes cambiar los atajos del editor en Configuración:"
+  },
+  "platform": {
+    "mac": "En Mac, usa Cmd en lugar de Ctrl para todos los atajos"
+  }
+}
