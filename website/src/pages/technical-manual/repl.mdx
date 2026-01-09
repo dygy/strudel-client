@@ -193,4 +193,30 @@ function onTrigger(hap, deadline, duration) {
 
 The above example will create an `OscillatorNode` for each event, where the frequency is controlled by the `note` param. In essence, this is how the WebAudio API output of Strudel works, only with many more parameters to control synths, samples and effects.
 
+## Keyboard Shortcuts
+
+The Strudel REPL includes several keyboard shortcuts to enhance the live coding experience:
+
+### Code Evaluation
+- **Ctrl+Enter** (or **Cmd+Enter** on Mac): Evaluate/update the current pattern
+- **Ctrl+U** (or **Cmd+U** on Mac): Update the current pattern (alternative to Ctrl+Enter)
+
+### Playback Control
+- **Ctrl+P** (or **Cmd+P** on Mac): Toggle play/pause
+
+### File Management
+- **Ctrl+S** (or **Cmd+S** on Mac): Save the current track (when authenticated)
+
+### Editor Features
+The editor also supports different keybinding modes that can be configured in Settings:
+- **CodeMirror** (default): Standard text editor shortcuts
+- **Vim**: Vim-style modal editing
+- **Emacs**: Emacs-style shortcuts
+- **VSCode**: Visual Studio Code shortcuts
+
+### Comments
+- **Cmd+/** (or **Ctrl+/** on Windows/Linux): Toggle line comments
+
+These shortcuts are designed to minimize interruption to the creative flow during live coding sessions, allowing quick pattern updates and playback control without reaching for the mouse.
+
 I want to help, how do I contribute to the [Docs](/technical-manual/docs)?
