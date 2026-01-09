@@ -6,6 +6,7 @@ import { Reference } from './Reference';
 import { EnhancedReference } from './EnhancedReference';
 import { SettingsTab } from './SettingsTab';
 import { SoundsTab } from './SoundsTab';
+import { ShortcutsTab } from './ShortcutsTab';
 import { useLogger } from '../useLogger';
 import { WelcomeTab } from './WelcomeTab';
 import { PatternsTab } from './PatternsTab';
@@ -202,6 +203,7 @@ const getTabNames = (t: (key: string) => string) => {
     patterns: t('patterns'),
     sounds: t('sounds'),
     reference: t('reference'),
+    shortcuts: t('shortcuts'),
     console: t('console'),
     settings: t('settings'),
   };
@@ -287,6 +289,8 @@ function PanelContent({ context, tab }: PanelContentProps) {
         return <SoundsTab />;
       case 'reference':
         return <EnhancedReference />;
+      case 'shortcuts':
+        return <ShortcutsTab />;
       case 'files':
         return <FilesTab />;
       case 'settings':

@@ -1,0 +1,25 @@
+{
+  "title": "Keyboard Shortcuts",
+  "description": "Speed up your live coding workflow with these keyboard shortcuts",
+  "sections": {
+    "essential": "Essential",
+    "file": "File Management", 
+    "editor": "Code Editor"
+  },
+  "evaluate": "Evaluate/run pattern",
+  "update": "Update pattern (alternative)",
+  "playPause": "Toggle play/pause",
+  "save": "Save current track",
+  "comment": "Toggle line comment",
+  "tip": {
+    "title": "Pro Tip",
+    "description": "Use Ctrl+Enter or Ctrl+U frequently during live coding to hear your changes instantly. Ctrl+P lets you quickly stop everything when needed."
+  },
+  "keybindings": {
+    "title": "Editor Keybindings",
+    "description": "You can change editor keybindings in Settings:"
+  },
+  "platform": {
+    "mac": "On Mac, use Cmd instead of Ctrl for all shortcuts"
+  }
+}
