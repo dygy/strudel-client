@@ -1,0 +1,31 @@
+{
+  "title": "欢迎",
+  "description": "您发现了 strudel，一个在浏览器中编写动态音乐作品的新实时编程平台！它是免费开源的，适合初学者和专家。开始使用：",
+  "steps": "1. 点击播放\n2. 修改一些内容\n3. 点击更新",
+  "getStarted": "要开始使用，请查看",
+  "interactiveTutorial": "交互式教程",
+  "joinDiscord": "也欢迎加入",
+  "discordChannel": "discord 频道",
+  "discordText": "提问、反馈或打个招呼。",
+  "aboutTitle": "关于",
+  "aboutDescription": "strudel 是",
+  "tidalcycles": "tidalcycles",
+  "tidalDescription": "的 JavaScript 版本，这是一个用 Haskell 编写的流行音乐实时编程语言。Strudel 是自由/开源软件：您可以在",
+  "license": "GNU Affero 通用公共许可证",
+  "sourceCode": "的条款下重新分发和/或修改它。您可以在",
+  "codeberg": "codeberg",
+  "licensingInfo": "找到源代码。您也可以在那里找到默认音色库的许可信息",
+  "defaultSounds": "。",
+  "fileManager": {
+    "welcomeTitle": "欢迎来到 Strudel",
+    "subtitle": "网络上的实时编程模式",
+    "getStartedTitle": "开始使用",
+    "getStartedDescription": "创建您的第一个音轨开始实时编程音乐模式，或导入现有音轨继续您的工作。",
+    "createNewTrack": "创建新音轨",
+    "importTracks": "导入音轨",
+    "quickTipsTitle": "快速提示",
+    "tip1": "按 {{key}} 执行代码",
+    "tip2": "使用文件管理器组织您的模式",
+    "tip3": "查看侧边栏中的示例获取灵感"
+  }
+}

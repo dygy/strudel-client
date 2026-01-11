@@ -1,0 +1,25 @@
+{
+  "title": "키보드 단축키",
+  "description": "이 키보드 단축키로 라이브 코딩 워크플로우를 가속화하세요",
+  "sections": {
+    "essential": "필수",
+    "file": "파일 관리", 
+    "editor": "코드 에디터"
+  },
+  "evaluate": "평가/패턴 실행",
+  "update": "패턴 업데이트 (대안)",
+  "playPause": "재생/일시정지 토글",
+  "save": "현재 트랙 저장",
+  "comment": "줄 주석 토글",
+  "tip": {
+    "title": "프로 팁",
+    "description": "라이브 코딩 중에 Ctrl+Enter 또는 Ctrl+U를 자주 사용하여 변경사항을 즉시 들어보세요. 필요할 때 Ctrl+P로 모든 것을 빠르게 중지할 수 있습니다."
+  },
+  "keybindings": {
+    "title": "에디터 키 바인딩",
+    "description": "설정에서 에디터 키 바인딩을 변경할 수 있습니다:"
+  },
+  "platform": {
+    "mac": "Mac에서는 모든 단축키에 Ctrl 대신 Cmd를 사용하세요"
+  }
+}

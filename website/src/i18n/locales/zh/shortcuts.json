@@ -1,0 +1,25 @@
+{
+  "title": "键盘快捷键",
+  "description": "使用这些键盘快捷键加速您的实时编程工作流程",
+  "sections": {
+    "essential": "基本操作",
+    "file": "文件管理", 
+    "editor": "代码编辑器"
+  },
+  "evaluate": "执行/运行模式",
+  "update": "更新模式（替代方式）",
+  "playPause": "切换播放/暂停",
+  "save": "保存当前音轨",
+  "comment": "切换行注释",
+  "tip": {
+    "title": "专业提示",
+    "description": "在实时编程时经常使用 Ctrl+Enter 或 Ctrl+U 来立即听到您的更改。需要时使用 Ctrl+P 快速停止所有内容。"
+  },
+  "keybindings": {
+    "title": "编辑器键盘绑定",
+    "description": "您可以在设置中更改编辑器键盘绑定："
+  },
+  "platform": {
+    "mac": "在 Mac 上，所有快捷键使用 Cmd 而不是 Ctrl"
+  }
+}

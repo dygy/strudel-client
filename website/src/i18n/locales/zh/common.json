@@ -1,0 +1,24 @@
+{
+  "close": "关闭",
+  "cancel": "取消", 
+  "confirm": "确认",
+  "save": "保存",
+  "delete": "删除",
+  "edit": "编辑",
+  "loading": "加载中...",
+  "error": "错误",
+  "success": "成功",
+  "selectOption": "选择一个选项",
+  "play": "播放",
+  "stop": "停止", 
+  "update": "更新",
+  "shuffle": "随机播放",
+  "files": "文件",
+  "docs": "文档",
+  "toggleFileManager": "切换文件管理器",
+  "clickAuthButtonToSignIn": "点击右上角的登录按钮开始使用",
+  "reference": {
+    "search": "搜索函数...",
+    "noResults": "未找到结果"
+  }
+}

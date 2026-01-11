@@ -1,0 +1,24 @@
+{
+  "close": "닫기",
+  "cancel": "취소", 
+  "confirm": "확인",
+  "save": "저장",
+  "delete": "삭제",
+  "edit": "편집",
+  "loading": "로딩 중...",
+  "error": "오류",
+  "success": "성공",
+  "selectOption": "옵션 선택",
+  "play": "재생",
+  "stop": "정지", 
+  "update": "업데이트",
+  "shuffle": "셔플",
+  "files": "파일",
+  "docs": "문서",
+  "toggleFileManager": "파일 관리자 토글",
+  "clickAuthButtonToSignIn": "시작하려면 우측 상단의 로그인 버튼을 클릭하세요",
+  "reference": {
+    "search": "함수 검색...",
+    "noResults": "결과를 찾을 수 없습니다"
+  }
+}

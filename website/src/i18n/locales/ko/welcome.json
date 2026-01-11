@@ -1,0 +1,31 @@
+{
+  "title": "환영",
+  "description": "브라우저에서 동적 음악 작품을 작성하는 새로운 라이브 코딩 플랫폼인 strudel을 발견하셨습니다! 무료 오픈소스이며 초보자와 전문가 모두를 위해 만들어졌습니다. 시작하려면:",
+  "steps": "1. 재생을 누르세요\n2. 무언가를 변경하세요\n3. 업데이트를 누르세요",
+  "getStarted": "시작하려면",
+  "interactiveTutorial": "인터랙티브 튜토리얼",
+  "joinDiscord": "을 확인하세요. 또한 자유롭게",
+  "discordChannel": "디스코드 채널",
+  "discordText": "에 참여하여 질문하고, 피드백을 주거나 인사하세요.",
+  "aboutTitle": "소개",
+  "aboutDescription": "strudel은",
+  "tidalcycles": "tidalcycles",
+  "tidalDescription": "의 JavaScript 버전입니다. 이는 Haskell로 작성된 인기 있는 음악 라이브 코딩 언어입니다. Strudel은 자유/오픈소스 소프트웨어입니다:",
+  "license": "GNU Affero 일반 공중 사용 허가서",
+  "sourceCode": "조건 하에 재배포 및/또는 수정할 수 있습니다. 소스 코드는",
+  "codeberg": "codeberg",
+  "licensingInfo": "에서 찾을 수 있습니다. 기본 사운드 뱅크에 대한 라이선스 정보도",
+  "defaultSounds": "거기에서 찾을 수 있습니다.",
+  "fileManager": {
+    "welcomeTitle": "Strudel에 오신 것을 환영합니다",
+    "subtitle": "웹에서의 라이브 코딩 패턴",
+    "getStartedTitle": "시작하기",
+    "getStartedDescription": "첫 번째 트랙을 만들어 음악 패턴 라이브 코딩을 시작하거나, 기존 트랙을 가져와서 작업을 계속하세요.",
+    "createNewTrack": "새 트랙 만들기",
+    "importTracks": "트랙 가져오기",
+    "quickTipsTitle": "빠른 팁",
+    "tip1": "{{key}}를 눌러 코드를 실행하세요",
+    "tip2": "파일 관리자를 사용하여 패턴을 정리하세요",
+    "tip3": "영감을 얻으려면 사이드바의 예제를 확인하세요"
+  }
+}

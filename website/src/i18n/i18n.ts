@@ -2,6 +2,7 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import resourcesToBackend from 'i18next-resources-to-backend';
+import { languages, supportedLanguages, isRTL } from './languageConfig';
 
 // Only use LanguageDetector in browser environment
 if (typeof window !== 'undefined') {
@@ -21,6 +22,9 @@ i18n
     ns: ['common', 'files', 'settings', 'tabs', 'messages', 'welcome', 'auth', 'shortcuts'],
     debug: false,
     
+    // Automatically configure supported languages
+    supportedLngs: supportedLanguages,
+    
     interpolation: {
       escapeValue: false,
     },
@@ -35,26 +39,15 @@ i18n
     }),
   });
 
-// Language configuration for RTL support
-const languages = {
-  en: { name: 'English', nativeName: 'English', rtl: false },
-  fr: { name: 'French', nativeName: 'Français', rtl: false },
-  es: { name: 'Spanish', nativeName: 'Español', rtl: false },
-  ru: { name: 'Russian', nativeName: 'Русский', rtl: false },
-  he: { name: 'Hebrew', nativeName: 'עברית', rtl: true },
-  ar: { name: 'Arabic', nativeName: 'العربية', rtl: true },
-  sr: { name: 'Serbian', nativeName: 'Српски', rtl: false },
-};
-
 // Set document direction based on language
 i18n.on('languageChanged', (lng) => {
-  const config = languages[lng as keyof typeof languages];
   if (typeof document !== 'undefined') {
-    document.documentElement.dir = config?.rtl ? 'rtl' : 'ltr';
+    const rtl = isRTL(lng);
+    document.documentElement.dir = rtl ? 'rtl' : 'ltr';
     document.documentElement.lang = lng;
     
     // Add/remove RTL class for easier CSS targeting
-    if (config?.rtl) {
+    if (rtl) {
       document.documentElement.classList.add('rtl');
     } else {
       document.documentElement.classList.remove('rtl');
