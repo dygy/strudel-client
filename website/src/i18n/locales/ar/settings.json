@@ -39,6 +39,7 @@
   "signatureHelp": "تلميحات المعاملات",
   "errorHighlighting": "تمييز الأخطاء",
   "codeFormatting": "تنسيق الكود",
+  "experimental": "تجريبي",
   "prettierEnabled": "تفعيل تنسيق Prettier",
   "prettierDescription": "تنسيق الكود تلقائياً باستخدام Prettier عند الحفظ أو الحفظ التلقائي. هذا يضمن نمط كود متسق وقابلية قراءة.",
   "prettierTabWidth": "عرض التبويب",

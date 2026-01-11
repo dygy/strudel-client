@@ -5,7 +5,6 @@
  */
 
 import { atom } from 'nanostores';
-import { TreeDataTransformer } from '../lib/TreeDataTransformer';
 import { secureApi } from '../lib/secureApi';
 
 // Types
@@ -38,6 +37,10 @@ export interface TracksState {
   isInitialized: boolean;
   selectedTrack: string | null;
   error: string | null;
+  // New coordination fields
+  initializationPromise: Promise<void> | null;
+  randomTrackSelected: boolean;
+  loadingPhase: 'initial' | 'loading' | 'complete' | 'error';
 }
 
 // Initial state
@@ -48,6 +51,10 @@ const initialState: TracksState = {
   isInitialized: false,
   selectedTrack: null,
   error: null,
+  // New coordination fields
+  initializationPromise: null,
+  randomTrackSelected: false,
+  loadingPhase: 'initial',
 };
 
 // Store
@@ -136,6 +143,9 @@ export const tracksActions = {
       isInitialized: true,
       selectedTrack: null,
       error: null,
+      initializationPromise: null,
+      randomTrackSelected: false,
+      loadingPhase: 'complete',
     });
   },
 
@@ -170,12 +180,16 @@ export const tracksActions = {
         isInitialized: true,
         selectedTrack: currentState.selectedTrack,
         error: null,
+        initializationPromise: currentState.initializationPromise,
+        randomTrackSelected: currentState.randomTrackSelected,
+        loadingPhase: 'complete',
       });
     } catch (error) {
       console.error('TracksStore - Error loading from API:', error);
       tracksStore.set({
         ...currentState,
         isLoading: false,
+        loadingPhase: 'error',
         error: error instanceof Error ? error.message : 'Failed to load tracks',
       });
     }
@@ -276,7 +290,12 @@ export const tracksActions = {
    * Clear all data
    */
   clear() {
-    tracksStore.set(initialState);
+    tracksStore.set({
+      ...initialState,
+      initializationPromise: null,
+      randomTrackSelected: false,
+      loadingPhase: 'initial',
+    });
   },
 
   /**
@@ -300,6 +319,143 @@ export const tracksActions = {
   hasData(): boolean {
     const state = tracksStore.get();
     return Object.keys(state.tracks).length > 0 || Object.keys(state.folders).length > 0;
+  },
+
+  /**
+   * Select a random track with smart criteria
+   */
+  selectRandomTrack(): Track | null {
+    const state = tracksStore.get();
+    const tracks = Object.values(state.tracks);
+
+    if (tracks.length === 0) {
+      return null;
+    }
+
+    // Smart criteria: prefer recently modified tracks, exclude empty tracks
+    const validTracks = tracks.filter(track =>
+      track.code && track.code.trim().length > 0
+    );
+
+    if (validTracks.length === 0) {
+      // If no valid tracks, return any track
+      return tracks[Math.floor(Math.random() * tracks.length)];
+    }
+
+    // Weight by modification date (more recent = higher weight)
+    const now = Date.now();
+    const tracksWithWeights = validTracks.map(track => {
+      const modifiedTime = new Date(track.modified).getTime();
+      const daysSinceModified = (now - modifiedTime) / (1000 * 60 * 60 * 24);
+      // Higher weight for more recently modified tracks
+      const weight = Math.max(1, 30 - daysSinceModified);
+      return { track, weight };
+    });
+
+    // Weighted random selection
+    const totalWeight = tracksWithWeights.reduce((sum, item) => sum + item.weight, 0);
+    let randomWeight = Math.random() * totalWeight;
+
+    for (const item of tracksWithWeights) {
+      randomWeight -= item.weight;
+      if (randomWeight <= 0) {
+        return item.track;
+      }
+    }
+
+    // Fallback to first track
+    return validTracks[0];
+  },
+
+  /**
+   * Initialize with coordination and callbacks
+   */
+  initializeWithCoordination(ssrData: any, onComplete: (randomTrack: Track | null) => void): void {
+    const currentState = tracksStore.get();
+
+    // Prevent multiple initializations
+    if (currentState.initializationPromise) {
+      currentState.initializationPromise.then(() => {
+        const state = tracksStore.get();
+        const randomTrack = state.randomTrackSelected ? tracksActions.selectRandomTrack() : null;
+        onComplete(randomTrack);
+      });
+      return;
+    }
+
+    const initPromise = new Promise<void>((resolve) => {
+      tracksStore.set({
+        ...currentState,
+        loadingPhase: 'loading',
+        initializationPromise: null, // Will be set after this
+      });
+
+      // Initialize with SSR data
+      tracksActions.initializeWithSSR(ssrData);
+
+      // Select random track if tracks are available
+      const updatedState = tracksStore.get();
+      const randomTrack = tracksActions.selectRandomTrack();
+
+      tracksStore.set({
+        ...updatedState,
+        randomTrackSelected: randomTrack !== null,
+        loadingPhase: 'complete',
+        selectedTrack: randomTrack?.id || null,
+      });
+
+      onComplete(randomTrack);
+      resolve();
+    });
+
+    tracksStore.set({
+      ...currentState,
+      initializationPromise: initPromise,
+    });
+  },
+
+  /**
+   * Wait for initialization to complete
+   */
+  async waitForInitialization(): Promise<{ hasData: boolean; randomTrack: Track | null }> {
+    const state = tracksStore.get();
+
+    if (state.initializationPromise) {
+      await state.initializationPromise;
+    }
+
+    const finalState = tracksStore.get();
+    const randomTrack = finalState.randomTrackSelected ? tracksActions.selectRandomTrack() : null;
+
+    return {
+      hasData: tracksActions.hasData(),
+      randomTrack,
+    };
+  },
+
+  /**
+   * Set loading phase with timeout handling
+   */
+  setLoadingPhase(phase: 'initial' | 'loading' | 'complete' | 'error', timeout?: number): void {
+    const currentState = tracksStore.get();
+    tracksStore.set({
+      ...currentState,
+      loadingPhase: phase,
+    });
+
+    // Handle timeout if specified
+    if (timeout && phase === 'loading') {
+      setTimeout(() => {
+        const state = tracksStore.get();
+        if (state.loadingPhase === 'loading') {
+          tracksStore.set({
+            ...state,
+            loadingPhase: 'error',
+            error: 'Loading timeout exceeded',
+          });
+        }
+      }, timeout);
+    }
   },
 };
 

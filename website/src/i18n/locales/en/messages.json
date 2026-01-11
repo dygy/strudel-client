@@ -1,5 +1,9 @@
 {
   "zenModeHint": "Press Ctrl+. to toggle zen mode",
   "reloadRequired": "This change requires a page reload. Continue?",
-  "confirmReset": "Are you sure you want to reset all settings to defaults?"
+  "confirmReset": "Are you sure you want to reset all settings to defaults?",
+  "prettierFormatSuccess": "Code formatted successfully",
+  "prettierFormatError": "Format failed: {error}",
+  "prettierAutoFormatFailed": "Auto-format failed: {error}",
+  "prettierAutoFormatFailedSavingOriginal": "Auto-format failed, saving original code"
 }

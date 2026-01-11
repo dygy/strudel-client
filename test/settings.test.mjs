@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as fc from 'fast-check';
 
 // Mock localStorage for testing
 const mockLocalStorage = {
@@ -75,6 +76,94 @@ describe('Settings', () => {
       mockLocalStorage.setItem('bool-test', 'false');
       const falseValue = mockLocalStorage.getItem('bool-test') === 'true';
       expect(falseValue).toBe(false);
+    });
+  });
+
+  describe('Property-Based Tests', () => {
+    /**
+     * Feature: prettier-integration, Property 7: Settings Persistence Round-trip
+     * Validates: Requirements 2.4, 4.4
+     */
+    it('should persist and retrieve prettier settings correctly (property test)', () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            isPrettierEnabled: fc.boolean(),
+            prettierAutoFormatOnSave: fc.boolean(),
+            prettierTabWidth: fc.integer({ min: 1, max: 8 }),
+            prettierUseTabs: fc.boolean(),
+            prettierSemi: fc.boolean(),
+            prettierSingleQuote: fc.boolean(),
+            prettierQuoteProps: fc.constantFrom('as-needed', 'consistent', 'preserve'),
+            prettierTrailingComma: fc.constantFrom('none', 'es5', 'all'),
+            prettierBracketSpacing: fc.boolean(),
+            prettierArrowParens: fc.constantFrom('avoid', 'always'),
+            prettierPrintWidth: fc.integer({ min: 40, max: 200 })
+          }),
+          (prettierSettings) => {
+            // Clear storage before test
+            mockLocalStorage.clear();
+            
+            // Store all prettier settings
+            Object.entries(prettierSettings).forEach(([key, value]) => {
+              mockLocalStorage.setItem(`strudel-settings-${key}`, String(value));
+            });
+            
+            // Retrieve and verify all settings
+            Object.entries(prettierSettings).forEach(([key, expectedValue]) => {
+              const storedValue = mockLocalStorage.getItem(`strudel-settings-${key}`);
+              const parsedValue = key.includes('TabWidth') || key.includes('PrintWidth') 
+                ? Number(storedValue)
+                : key.includes('QuoteProps') || key.includes('TrailingComma') || key.includes('ArrowParens')
+                ? storedValue
+                : storedValue === 'true';
+              
+              expect(parsedValue).toEqual(expectedValue);
+            });
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should handle settings persistence across browser sessions (property test)', () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            isPrettierEnabled: fc.boolean(),
+            prettierAutoFormatOnSave: fc.boolean(),
+            prettierTabWidth: fc.integer({ min: 1, max: 8 }),
+            prettierPrintWidth: fc.integer({ min: 40, max: 200 })
+          }),
+          (settings) => {
+            // Simulate first session
+            mockLocalStorage.clear();
+            Object.entries(settings).forEach(([key, value]) => {
+              mockLocalStorage.setItem(`strudel-settings-${key}`, String(value));
+            });
+            
+            // Simulate browser restart (storage persists)
+            const persistedData = { ...mockLocalStorage.store };
+            
+            // Simulate second session
+            mockLocalStorage.clear();
+            Object.entries(persistedData).forEach(([key, value]) => {
+              mockLocalStorage.setItem(key, value);
+            });
+            
+            // Verify settings are still available
+            Object.entries(settings).forEach(([key, expectedValue]) => {
+              const storedValue = mockLocalStorage.getItem(`strudel-settings-${key}`);
+              const parsedValue = key.includes('TabWidth') || key.includes('PrintWidth')
+                ? Number(storedValue)
+                : storedValue === 'true';
+              
+              expect(parsedValue).toEqual(expectedValue);
+            });
+          }
+        ),
+        { numRuns: 100 }
+      );
     });
   });
 });

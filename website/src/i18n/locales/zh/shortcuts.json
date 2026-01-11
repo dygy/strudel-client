@@ -11,6 +11,7 @@
   "playPause": "切换播放/暂停",
   "save": "保存当前音轨",
   "comment": "切换行注释",
+  "format": "使用 Prettier 格式化代码",
   "tip": {
     "title": "专业提示",
     "description": "在实时编程时经常使用 Ctrl+Enter 或 Ctrl+U 来立即听到您的更改。需要时使用 Ctrl+P 快速停止所有内容。"

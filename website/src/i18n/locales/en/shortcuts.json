@@ -11,6 +11,7 @@
   "playPause": "Toggle play/pause",
   "save": "Save current track",
   "comment": "Toggle line comment",
+  "format": "Format code with Prettier",
   "tip": {
     "title": "Pro Tip",
     "description": "Use Ctrl+Enter or Ctrl+U frequently during live coding to hear your changes instantly. Ctrl+P lets you quickly stop everything when needed."

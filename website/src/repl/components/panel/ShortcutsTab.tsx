@@ -102,6 +102,11 @@ export function ShortcutsTab() {
             description={t('shortcuts:comment', 'Toggle line comment')}
             icon={<CommandLineIcon className="w-4 h-4" />}
           />
+          <ShortcutItem
+            keys={[modKey, 'Q']}
+            description={t('shortcuts:format', 'Format code with Prettier')}
+            icon={<CommandLineIcon className="w-4 h-4" />}
+          />
         </ShortcutSection>
 
         <div className="mt-8 p-4 bg-gray-800/30 rounded-lg">

@@ -17,9 +17,13 @@ export function useTracks() {
     isInitialized: state.isInitialized,
     selectedTrack: state.selectedTrack,
     error: state.error,
+    initializationPromise: state.initializationPromise,
+    randomTrackSelected: state.randomTrackSelected,
+    loadingPhase: state.loadingPhase,
 
     // Actions
     initializeWithSSR: tracksActions.initializeWithSSR,
+    initializeWithCoordination: tracksActions.initializeWithCoordination,
     loadFromAPI: tracksActions.loadFromAPI,
     addTrack: tracksActions.addTrack,
     updateTrack: tracksActions.updateTrack,
@@ -28,6 +32,9 @@ export function useTracks() {
     removeFolder: tracksActions.removeFolder,
     setSelectedTrack: tracksActions.setSelectedTrack,
     clear: tracksActions.clear,
+    selectRandomTrack: tracksActions.selectRandomTrack,
+    waitForInitialization: tracksActions.waitForInitialization,
+    setLoadingPhase: tracksActions.setLoadingPhase,
 
     // Selectors
     getTrack: tracksSelectors.getTrack,

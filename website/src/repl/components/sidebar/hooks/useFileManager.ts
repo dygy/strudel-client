@@ -437,18 +437,57 @@ export function useFileManager(context: ReplContext, options: { disabled?: boole
       return false;
     }
 
+    // Auto-format on save if enabled
+    let codeToSave = currentCode;
+    try {
+      // Get current settings from the proper settings store
+      const { settingsMap } = await import('@src/settings');
+      const settings = settingsMap.get();
+      
+      if (settings?.isPrettierEnabled && settings?.prettierAutoFormatOnSave) {
+        console.log('FileManager - auto-formatting code before save');
+        
+        // Dynamically import the auto-format function
+        const { autoFormatOnSave } = await import('@strudel/codemirror');
+        const formatResult = await autoFormatOnSave(currentCode, settings);
+        
+        if (formatResult.success && formatResult.formattedCode) {
+          codeToSave = formatResult.formattedCode;
+          
+          // Update the editor with formatted code if it's different
+          if (codeToSave !== currentCode && context.editorRef?.current?.setCode) {
+            context.editorRef.current.setCode(codeToSave);
+          }
+          
+          console.log('FileManager - code auto-formatted successfully');
+        } else if (formatResult.error) {
+          console.warn('FileManager - auto-format failed:', formatResult.error);
+          // Continue with original code if formatting fails
+          if (showToast) {
+            toastActions.warning(`Auto-format failed: ${formatResult.error}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('FileManager - auto-format error:', error);
+      // Continue with original code if formatting fails
+      if (showToast) {
+        toastActions.warning('Auto-format failed, saving original code');
+      }
+    }
+
     console.log('FileManager - saving to track:', currentTracks[trackId]?.name, 'ID:', trackId);
 
     setTracks(prev => ({
       ...prev,
       [trackId]: {
         ...prev[trackId],
-        code: currentCode,
+        code: codeToSave,
         modified: new Date().toISOString()
       }
     }));
 
-    lastSavedCodeRef.current = currentCode;
+    lastSavedCodeRef.current = codeToSave;
 
     if (showToast) {
       toastActions.success(t('files:trackSaved'));

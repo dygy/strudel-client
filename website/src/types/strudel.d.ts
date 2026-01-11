@@ -112,6 +112,31 @@ declare module '@strudel/codemirror' {
   export const defaultSettings: any;
   export const themes: any;
   export function formatCode(code: string): Promise<string>;
+  
+  // Prettier extension exports
+  export interface FormatResult {
+    success: boolean;
+    formattedCode?: string;
+    error?: string;
+  }
+  
+  export interface PrettierSettings {
+    isPrettierEnabled?: boolean;
+    prettierAutoFormatOnSave?: boolean;
+    prettierTabWidth?: number;
+    prettierUseTabs?: boolean;
+    prettierSemi?: boolean;
+    prettierSingleQuote?: boolean;
+    prettierQuoteProps?: 'as-needed' | 'consistent' | 'preserve';
+    prettierTrailingComma?: 'none' | 'es5' | 'all';
+    prettierBracketSpacing?: boolean;
+    prettierArrowParens?: 'avoid' | 'always';
+    prettierPrintWidth?: number;
+  }
+  
+  export function autoFormatOnSave(code: string, settings: PrettierSettings): Promise<FormatResult>;
+  export function prettierExtension(): any;
+  
   // Add other exports as needed
 }
 

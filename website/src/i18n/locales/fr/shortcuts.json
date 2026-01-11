@@ -11,6 +11,7 @@
   "playPause": "Basculer lecture/pause",
   "save": "Sauvegarder la piste actuelle",
   "comment": "Basculer le commentaire de ligne",
+  "format": "Formater le code avec Prettier",
   "tip": {
     "title": "Conseil Pro",
     "description": "Utilisez Ctrl+Entrée ou Ctrl+U fréquemment pendant le live coding pour entendre vos changements instantanément. Ctrl+P vous permet d'arrêter tout rapidement si nécessaire."

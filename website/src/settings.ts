@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/react';
 import { register } from '@strudel/core';
 import { isUdels } from './repl/util';
 import type { Language } from './i18n';
+import i18n from './i18n/i18n';
 
 // Type definitions for settings
 export type AudioEngineTarget = 'webaudio' | 'osc';
@@ -11,6 +12,11 @@ export type PanelPosition = 'right' | 'bottom';
 export type TogglePanelTrigger = 'click' | 'hover';
 export type Keybindings = 'codemirror' | 'vim' | 'emacs' | 'vscode';
 export type Theme = string; // Could be more specific if we know all theme names
+
+// Prettier configuration types
+export type PrettierQuoteProps = 'as-needed' | 'consistent' | 'preserve';
+export type PrettierTrailingComma = 'none' | 'es5' | 'all';
+export type PrettierArrowParens = 'avoid' | 'always';
 
 // User pattern interface
 export interface UserPattern {
@@ -73,6 +79,18 @@ export interface Settings {
   language: Language;
   isAutosaveEnabled: boolean;
   autosaveInterval: number; // in milliseconds
+  // Prettier settings
+  isPrettierEnabled: boolean;
+  prettierAutoFormatOnSave: boolean;
+  prettierTabWidth: number;
+  prettierUseTabs: boolean;
+  prettierSemi: boolean;
+  prettierSingleQuote: boolean;
+  prettierQuoteProps: PrettierQuoteProps;
+  prettierTrailingComma: PrettierTrailingComma;
+  prettierBracketSpacing: boolean;
+  prettierArrowParens: PrettierArrowParens;
+  prettierPrintWidth: number;
 }
 
 // Raw settings interface (as stored, with string values for booleans)
@@ -115,6 +133,18 @@ export interface RawSettings {
   language: Language;
   isAutosaveEnabled: boolean | string;
   autosaveInterval: number;
+  // Prettier settings
+  isPrettierEnabled: boolean | string;
+  prettierAutoFormatOnSave: boolean | string;
+  prettierTabWidth: number | string;
+  prettierUseTabs: boolean | string;
+  prettierSemi: boolean | string;
+  prettierSingleQuote: boolean | string;
+  prettierQuoteProps: PrettierQuoteProps;
+  prettierTrailingComma: PrettierTrailingComma;
+  prettierBracketSpacing: boolean | string;
+  prettierArrowParens: PrettierArrowParens;
+  prettierPrintWidth: number | string;
 }
 
 export const audioEngineTargets = {
@@ -172,6 +202,18 @@ export const defaultSettings: RawSettings = {
   language: 'en',
   isAutosaveEnabled: false,
   autosaveInterval: 30000, // 30 seconds default
+  // Prettier settings
+  isPrettierEnabled: false,
+  prettierAutoFormatOnSave: false,
+  prettierTabWidth: 2,
+  prettierUseTabs: false,
+  prettierSemi: true,
+  prettierSingleQuote: false,
+  prettierQuoteProps: 'as-needed',
+  prettierTrailingComma: 'es5',
+  prettierBracketSpacing: true,
+  prettierArrowParens: 'always',
+  prettierPrintWidth: 80,
 };
 
 let search: URLSearchParams | null = null;
@@ -200,6 +242,7 @@ export const settingsMap = typeof window !== 'undefined'
 // One-time migration: add new IDE feature settings for existing users
 if (typeof window !== 'undefined') {
   const MIGRATION_KEY = 'strudel-settings-ide-features-v1';
+  const PRETTIER_MIGRATION_KEY = 'strudel-settings-prettier-v1';
 
   // Only run migration in browser environment
   const runMigration = () => {
@@ -225,10 +268,73 @@ if (typeof window !== 'undefined') {
         localStorage.setItem(MIGRATION_KEY, 'true');
       }
     }
+
+    // Prettier settings migration
+    if (typeof localStorage !== 'undefined' && !localStorage.getItem(PRETTIER_MIGRATION_KEY)) {
+      console.log('[settings] migrating to add Prettier features');
+
+      const currentSettings = settingsMap.get();
+      const updated = {
+        ...currentSettings,
+        isPrettierEnabled: currentSettings.isPrettierEnabled === undefined ? false : parseBoolean(currentSettings.isPrettierEnabled),
+        prettierAutoFormatOnSave: currentSettings.prettierAutoFormatOnSave === undefined ? false : parseBoolean(currentSettings.prettierAutoFormatOnSave),
+        prettierTabWidth: currentSettings.prettierTabWidth === undefined ? 2 : Number(currentSettings.prettierTabWidth),
+        prettierUseTabs: currentSettings.prettierUseTabs === undefined ? false : parseBoolean(currentSettings.prettierUseTabs),
+        prettierSemi: currentSettings.prettierSemi === undefined ? true : parseBoolean(currentSettings.prettierSemi),
+        prettierSingleQuote: currentSettings.prettierSingleQuote === undefined ? false : parseBoolean(currentSettings.prettierSingleQuote),
+        prettierQuoteProps: currentSettings.prettierQuoteProps || 'as-needed',
+        prettierTrailingComma: currentSettings.prettierTrailingComma || 'es5',
+        prettierBracketSpacing: currentSettings.prettierBracketSpacing === undefined ? true : parseBoolean(currentSettings.prettierBracketSpacing),
+        prettierArrowParens: currentSettings.prettierArrowParens || 'always',
+        prettierPrintWidth: currentSettings.prettierPrintWidth === undefined ? 80 : Number(currentSettings.prettierPrintWidth),
+      };
+
+      settingsMap.set(updated);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(PRETTIER_MIGRATION_KEY, 'true');
+      }
+    }
   };
 
   // Run migration after a short delay to ensure everything is initialized
   setTimeout(runMigration, 0);
+
+  // Sync language from i18next localStorage to settings store
+  const syncLanguageFromI18n = () => {
+    const i18nLanguage = localStorage.getItem('strudel-language');
+    const currentSettings = settingsMap.get();
+    
+    if (i18nLanguage && i18nLanguage !== currentSettings.language) {
+      console.log('[settings] syncing language from i18next:', i18nLanguage);
+      settingsMap.setKey('language', i18nLanguage);
+    }
+  };
+
+  // Run language sync after migrations
+  setTimeout(syncLanguageFromI18n, 10);
+
+  // Listen for localStorage changes to keep settings in sync
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'strudel-language' && e.newValue) {
+      const currentSettings = settingsMap.get();
+      if (e.newValue !== currentSettings.language) {
+        console.log('[settings] syncing language from storage event:', e.newValue);
+        settingsMap.setKey('language', e.newValue);
+      }
+    }
+  });
+
+  // Listen for settings store changes to sync back to i18next
+  settingsMap.subscribe((settings) => {
+    const i18nLanguage = localStorage.getItem('strudel-language');
+    if (settings.language && settings.language !== i18nLanguage) {
+      console.log('[settings] syncing language to i18next:', settings.language);
+      localStorage.setItem('strudel-language', settings.language);
+      
+      // Also update i18next
+      i18n.changeLanguage(settings.language);
+    }
+  });
 }
 
 
@@ -274,6 +380,18 @@ export function useSettings(): Settings {
     multiChannelOrbits: parseBoolean(state.multiChannelOrbits),
     isFileManagerOpen: parseBoolean(state.isFileManagerOpen),
     language: (state.language || 'en') as Language,
+    // Prettier settings parsing
+    isPrettierEnabled: parseBoolean(state.isPrettierEnabled),
+    prettierAutoFormatOnSave: parseBoolean(state.prettierAutoFormatOnSave),
+    prettierTabWidth: Number(state.prettierTabWidth),
+    prettierUseTabs: parseBoolean(state.prettierUseTabs),
+    prettierSemi: parseBoolean(state.prettierSemi),
+    prettierSingleQuote: parseBoolean(state.prettierSingleQuote),
+    prettierQuoteProps: (state.prettierQuoteProps || 'as-needed') as PrettierQuoteProps,
+    prettierTrailingComma: (state.prettierTrailingComma || 'es5') as PrettierTrailingComma,
+    prettierBracketSpacing: parseBoolean(state.prettierBracketSpacing),
+    prettierArrowParens: (state.prettierArrowParens || 'always') as PrettierArrowParens,
+    prettierPrintWidth: Number(state.prettierPrintWidth),
   };
 }
 

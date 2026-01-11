@@ -39,6 +39,7 @@
   "signatureHelp": "Савети за параметре",
   "errorHighlighting": "Истицање грешака",
   "codeFormatting": "Форматирање кода",
+  "experimental": "Експериментално",
   "prettierEnabled": "Омогући Prettier форматирање",
   "prettierDescription": "Аутоматски форматирај свој код помоћу Prettier-а при чувању или аутоматском чувању. Ово обезбеђује доследан стил кода и читљивост.",
   "prettierTabWidth": "Ширина таба",

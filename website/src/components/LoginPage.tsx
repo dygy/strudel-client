@@ -21,7 +21,7 @@ export default function LoginPage({ error, hasTrack }: LoginPageProps) {
     const savedLanguage = localStorage.getItem('strudel-language') || 'en';
     console.log('Loading saved language:', savedLanguage);
     console.log('Available languages:', Object.keys(languages));
-    
+
     if (languages[savedLanguage]) {
       setCurrentLanguage(savedLanguage);
       i18n.changeLanguage(savedLanguage).then(() => {
@@ -52,7 +52,7 @@ export default function LoginPage({ error, hasTrack }: LoginPageProps) {
     setCurrentLanguage(code);
     setShowLanguageDropdown(false);
     localStorage.setItem('strudel-language', code);
-    
+
     i18n.changeLanguage(code).then(() => {
       console.log('Successfully changed language to:', code);
     }).catch(err => {
@@ -113,14 +113,6 @@ export default function LoginPage({ error, hasTrack }: LoginPageProps) {
 
   return (
     <div key={currentLanguage} className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 flex flex-col">
-      {/* Debug info */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="bg-black text-white p-2 text-xs">
-          Debug: Current language: {currentLanguage}, i18n language: {i18n.language}, 
-          Available languages: {Object.keys(languages).join(', ')}
-        </div>
-      )}
-      
       {/* Header */}
       <div className="flex justify-between items-center p-4 bg-white bg-opacity-10 backdrop-blur-md">
         <div className="flex items-center gap-2 text-white text-xl font-bold">
@@ -147,7 +139,7 @@ export default function LoginPage({ error, hasTrack }: LoginPageProps) {
                   className="px-4 py-3 cursor-pointer text-gray-700 border-b border-gray-100 last:border-b-0 hover:bg-gray-50"
                   onClick={() => setLanguage(code)}
                 >
-                  {lang.nativeName} ({lang.name})
+                  {lang.nativeName}
                 </div>
               ))}
             </div>

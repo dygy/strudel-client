@@ -27,6 +27,7 @@ import { radioPlugin, updateRadioWidgets } from './radio.mjs';
 import { widgetPlugin, updateWidgets } from './widget.mjs';
 import { isSignatureHelpEnabled } from './signature.mjs';
 import { isLinterEnabled } from './diagnostics.mjs';
+import { prettierExtension } from './prettierExtension.mjs';
 import { persistentAtom } from '@nanostores/persistent';
 import { basicSetup } from './basicSetup.mjs';
 
@@ -52,6 +53,7 @@ const extensions = {
           EditorView.clickAddsSelectionRange.of((ev) => ev.metaKey || ev.ctrlKey),
         ]
       : [],
+  isPrettierEnabled: (on) => (on ? prettierExtension(true) : []),
 };
 const compartments = Object.fromEntries(Object.keys(extensions).map((key) => [key, new Compartment()]));
 
@@ -70,6 +72,7 @@ export const defaultSettings = {
   isLineWrappingEnabled: false,
   isTabIndentationEnabled: true, // Enable tab indentation for better coding experience
   isMultiCursorEnabled: true, // Enable multi-cursor for advanced editing
+  isPrettierEnabled: false, // Prettier disabled by default
   theme: 'strudelTheme',
   fontFamily: 'monospace',
   fontSize: 18,
@@ -84,6 +87,7 @@ export const codemirrorSettings = persistentAtom('codemirror-settings', defaultS
 // This runs once and sets a migration flag - deferred to avoid SSR issues
 if (typeof window !== 'undefined') {
   const MIGRATION_KEY = 'codemirror-settings-migrated-v1';
+  const PRETTIER_MIGRATION_KEY = 'codemirror-prettier-migrated-v1';
 
   // Defer migration to avoid SSR issues
   setTimeout(() => {
@@ -102,6 +106,17 @@ if (typeof window !== 'undefined') {
       };
       codemirrorSettings.set(updated);
       localStorage.setItem(MIGRATION_KEY, 'true');
+    }
+
+    // Prettier migration
+    if (typeof localStorage !== 'undefined' && !localStorage.getItem(PRETTIER_MIGRATION_KEY)) {
+      const savedSettings = codemirrorSettings.get();
+      const updated = {
+        ...savedSettings,
+        isPrettierEnabled: false, // Default to disabled
+      };
+      codemirrorSettings.set(updated);
+      localStorage.setItem(PRETTIER_MIGRATION_KEY, 'true');
     }
   }, 0);
 }

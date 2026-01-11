@@ -11,6 +11,7 @@
   "playPause": "Alternar reproducir/pausar",
   "save": "Guardar pista actual",
   "comment": "Alternar comentario de línea",
+  "format": "Formatear código con Prettier",
   "tip": {
     "title": "Consejo Pro",
     "description": "Usa Ctrl+Enter o Ctrl+U frecuentemente durante el live coding para escuchar tus cambios al instante. Ctrl+P te permite detener todo rápidamente cuando sea necesario."

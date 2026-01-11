@@ -144,6 +144,23 @@ export function FileTree({
     }
   }, [selectedTrack, tracks, folders]);
 
+  // Listen for manual folder expansion events
+  React.useEffect(() => {
+    const handleExpandFolder = (event: CustomEvent) => {
+      const { folderPath, trackName } = event.detail;
+      console.log('🔥 FileTree: Received folder expansion event for:', trackName, 'in folder:', folderPath);
+      if (folderPath) {
+        expandParentDirectories(folderPath);
+      }
+    };
+
+    window.addEventListener('strudel-expand-folder', handleExpandFolder as EventListener);
+    
+    return () => {
+      window.removeEventListener('strudel-expand-folder', handleExpandFolder as EventListener);
+    };
+  }, []);
+
   // Function to expand all parent directories for a given folder path
   const expandParentDirectories = (folderPath: string) => {
     const pathsToExpand = new Set<string>();

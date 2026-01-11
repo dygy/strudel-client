@@ -573,12 +573,51 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       return false;
     }
 
+    // Auto-format on save if enabled
+    let codeToSave = currentCode;
+    try {
+      // Get current settings from the proper settings store
+      const { settingsMap } = await import('@src/settings');
+      const settings = settingsMap.get();
+      
+      if (settings?.isPrettierEnabled && settings?.prettierAutoFormatOnSave) {
+        console.log('SupabaseFileManager - auto-formatting code before save');
+        
+        // Dynamically import the auto-format function
+        const { autoFormatOnSave } = await import('@strudel/codemirror');
+        const formatResult = await autoFormatOnSave(currentCode, settings);
+        
+        if (formatResult.success && formatResult.formattedCode) {
+          codeToSave = formatResult.formattedCode;
+          
+          // Update the editor with formatted code if it's different
+          if (codeToSave !== currentCode && context.editorRef?.current?.setCode) {
+            context.editorRef.current.setCode(codeToSave);
+          }
+          
+          console.log('SupabaseFileManager - code auto-formatted successfully');
+        } else if (formatResult.error) {
+          console.warn('SupabaseFileManager - auto-format failed:', formatResult.error);
+          // Continue with original code if formatting fails
+          if (showToast) {
+            toastActions.warning(`Auto-format failed: ${formatResult.error}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('SupabaseFileManager - auto-format error:', error);
+      // Continue with original code if formatting fails
+      if (showToast) {
+        toastActions.warning('Auto-format failed, saving original code');
+      }
+    }
+
     console.log('SupabaseFileManager - saving to Supabase:', tracks[trackId]?.name, 'ID:', trackId);
 
     try {
       // Update in Supabase directly
       const { data, error } = await db.tracks.update(trackId, {
-        code: currentCode,
+        code: codeToSave,
         modified: new Date().toISOString()
       });
 
@@ -591,12 +630,12 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
         ...prev,
         [trackId]: {
           ...prev[trackId],
-          code: currentCode,
+          code: codeToSave,
           modified: new Date().toISOString()
         }
       }));
 
-      lastSavedCodeRef.current = currentCode;
+      lastSavedCodeRef.current = codeToSave;
 
       if (showToast) {
         toastActions.success(t('files:trackSaved'));

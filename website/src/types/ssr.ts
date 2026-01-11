@@ -35,6 +35,8 @@ export interface SSRFolder {
 export interface SSRData {
   tracks: SSRTrack[];
   folders: SSRFolder[];
+  // Optional hierarchical format for tracksStore compatibility
+  hierarchical?: TreeResponse;
 }
 
 // Hierarchical tree structure returned by /api/tracks/list

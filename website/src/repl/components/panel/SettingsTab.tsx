@@ -197,6 +197,18 @@ export function SettingsTab({ started }: SettingsTabProps) {
     language,
     isAutosaveEnabled,
     autosaveInterval,
+    // Prettier settings
+    isPrettierEnabled,
+    prettierAutoFormatOnSave,
+    prettierTabWidth,
+    prettierUseTabs,
+    prettierSemi,
+    prettierSingleQuote,
+    prettierQuoteProps,
+    prettierTrailingComma,
+    prettierBracketSpacing,
+    prettierArrowParens,
+    prettierPrintWidth,
   } = useSettings();
   const shouldAlwaysSync = isUdels();
   const canChangeAudioDevice = 'setSinkId' in AudioContext.prototype;
@@ -308,6 +320,163 @@ export function SettingsTab({ started }: SettingsTabProps) {
                   />
                 </div>
                 <p className="text-xs text-foreground opacity-60">{t('autosaveDescription')}</p>
+              </div>
+            )}
+          </div>
+        </FormItem>
+
+        <FormItem label={
+          <div className="flex items-center gap-2">
+            <span>{t('codeFormatting')}</span>
+            <span className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 rounded-md border border-yellow-500/30">
+              {t('experimental')}
+            </span>
+          </div>
+        }>
+          <div className="space-y-4">
+            <Checkbox
+              label={t('prettierEnabled')}
+              onChange={(cbEvent) => {
+                settingsMap.setKey('isPrettierEnabled', cbEvent.target.checked);
+              }}
+              value={isPrettierEnabled}
+            />
+            <p className="text-xs text-foreground opacity-60">{t('prettierDescription')}</p>
+            
+            {isPrettierEnabled && (
+              <div className="space-y-4 p-4 bg-opacity-20 rounded-lg border border-lineHighlight border-opacity-20">
+                <Checkbox
+                  label={t('prettierAutoFormatOnSave')}
+                  onChange={(cbEvent) => {
+                    settingsMap.setKey('prettierAutoFormatOnSave', cbEvent.target.checked);
+                  }}
+                  value={prettierAutoFormatOnSave}
+                />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {t('prettierTabWidth')}
+                    </label>
+                    <NumberSlider
+                      value={prettierTabWidth}
+                      onChange={(value) => settingsMap.setKey('prettierTabWidth', value)}
+                      min={1}
+                      max={8}
+                      step={1}
+                    />
+                    <p className="text-xs text-foreground opacity-60 mt-1">{t('prettierTabWidthDescription')}</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {t('prettierPrintWidth')}
+                    </label>
+                    <NumberSlider
+                      value={prettierPrintWidth}
+                      onChange={(value) => settingsMap.setKey('prettierPrintWidth', value)}
+                      min={40}
+                      max={200}
+                      step={10}
+                    />
+                    <p className="text-xs text-foreground opacity-60 mt-1">{t('prettierPrintWidthDescription')}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Checkbox
+                    label={t('prettierUseTabs')}
+                    onChange={(cbEvent) => {
+                      settingsMap.setKey('prettierUseTabs', cbEvent.target.checked);
+                    }}
+                    value={prettierUseTabs}
+                  />
+                  
+                  <Checkbox
+                    label={t('prettierSemi')}
+                    onChange={(cbEvent) => {
+                      settingsMap.setKey('prettierSemi', cbEvent.target.checked);
+                    }}
+                    value={prettierSemi}
+                  />
+                  
+                  <Checkbox
+                    label={t('prettierSingleQuote')}
+                    onChange={(cbEvent) => {
+                      settingsMap.setKey('prettierSingleQuote', cbEvent.target.checked);
+                    }}
+                    value={prettierSingleQuote}
+                  />
+                  
+                  <Checkbox
+                    label={t('prettierBracketSpacing')}
+                    onChange={(cbEvent) => {
+                      settingsMap.setKey('prettierBracketSpacing', cbEvent.target.checked);
+                    }}
+                    value={prettierBracketSpacing}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {t('prettierQuoteProps')}
+                    </label>
+                    <SelectInput
+                      options={{
+                        'as-needed': t('prettierQuotePropsAsNeeded'),
+                        'consistent': t('prettierQuotePropsConsistent'),
+                        'preserve': t('prettierQuotePropsPreserve')
+                      }}
+                      value={prettierQuoteProps}
+                      onChange={(value) => settingsMap.setKey('prettierQuoteProps', value)}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {t('prettierTrailingComma')}
+                    </label>
+                    <SelectInput
+                      options={{
+                        'none': t('prettierTrailingCommaNone'),
+                        'es5': t('prettierTrailingCommaEs5'),
+                        'all': t('prettierTrailingCommaAll')
+                      }}
+                      value={prettierTrailingComma}
+                      onChange={(value) => settingsMap.setKey('prettierTrailingComma', value)}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {t('prettierArrowParens')}
+                    </label>
+                    <SelectInput
+                      options={{
+                        'avoid': t('prettierArrowParensAvoid'),
+                        'always': t('prettierArrowParensAlways')
+                      }}
+                      value={prettierArrowParens}
+                      onChange={(value) => settingsMap.setKey('prettierArrowParens', value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 p-3 bg-gray-800/20 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-300 mb-2">
+                    {t('prettierPreview')}
+                  </h4>
+                  <pre className="text-xs text-gray-400 bg-gray-900/40 p-2 rounded overflow-x-auto">
+{`const example = {
+  name: "test",
+  value: 42
+};`}
+                  </pre>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {t('prettierPreviewDescription')}
+                  </p>
+                </div>
               </div>
             )}
           </div>

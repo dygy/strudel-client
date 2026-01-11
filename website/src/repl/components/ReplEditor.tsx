@@ -50,11 +50,83 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
   // Use the tracks store instead of complex state management
   const tracks = useTracks();
 
-  // Initialize tracks store with SSR data
+  // Initialize tracks store with SSR data and coordination
   useEffect(() => {
     if (ssrData && !tracks.isInitialized) {
-      console.log('🔥 ReplEditor: Initializing tracks store with SSR data');
-      tracks.initializeWithSSR(ssrData);
+      console.log('🔥 ReplEditor: Initializing tracks store with SSR data and coordination');
+      
+      // Use the hierarchical format for tracksStore coordination
+      const hierarchicalData = (ssrData as any).hierarchical || ssrData;
+      
+      // Use the new coordination method that includes random track selection
+      tracks.initializeWithCoordination(hierarchicalData, (randomTrack) => {
+        if (randomTrack) {
+          console.log('🔥 ReplEditor: Random track selected:', randomTrack.name);
+          
+          // Update the file manager's selected track state
+          if (fileManagerHook && typeof fileManagerHook === 'object' && fileManagerHook.setSelectedTrack) {
+            console.log('🔥 ReplEditor: Updating file manager selected track');
+            console.log('🔥 ReplEditor: Random track folder:', randomTrack.folder);
+            console.log('🔥 ReplEditor: FileManager tracks count:', Object.keys(fileManagerHook.tracks || {}).length);
+            
+            fileManagerHook.setSelectedTrack(randomTrack.id);
+            
+            // Force folder expansion by dispatching a custom event
+            // This will trigger any listeners that need to expand folders
+            if (randomTrack.folder) {
+              setTimeout(() => {
+                const expandEvent = new CustomEvent('strudel-expand-folder', {
+                  detail: { 
+                    trackId: randomTrack.id,
+                    folderPath: randomTrack.folder,
+                    trackName: randomTrack.name
+                  }
+                });
+                window.dispatchEvent(expandEvent);
+                console.log('🔥 ReplEditor: Dispatched folder expansion event for:', randomTrack.folder);
+              }, 100);
+            }
+            
+            // Small delay to ensure the FileTree component processes the selectedTrack change
+            // and expands the necessary folders
+            setTimeout(() => {
+              console.log('🔥 ReplEditor: FileTree should have expanded folders for track:', randomTrack.name);
+              if (randomTrack.folder) {
+                console.log('🔥 ReplEditor: Track is in folder:', randomTrack.folder);
+              } else {
+                console.log('🔥 ReplEditor: Track is in root folder');
+              }
+            }, 200);
+          }
+          
+          // Load the random track code into the editor
+          if (randomTrack.code) {
+            // Method 1: Use context.editorRef
+            if (context.editorRef?.current?.setCode) {
+              context.editorRef.current.setCode(randomTrack.code);
+            }
+
+            // Method 2: Use stored editor instance
+            if (getEditorInstance()?.setCode) {
+              getEditorInstance().setCode(randomTrack.code);
+            }
+
+            // Method 3: Direct CodeMirror manipulation as fallback
+            setTimeout(() => {
+              const cmEditor = document.querySelector('.cm-editor');
+              if (cmEditor) {
+                const cmView = (cmEditor as any).cmView || getEditorInstance()?.editor;
+                if (cmView && cmView.dispatch) {
+                  const changes = { from: 0, to: cmView.state.doc.length, insert: randomTrack.code };
+                  cmView.dispatch({ changes });
+                }
+              }
+            }, 100);
+          }
+        } else {
+          console.log('🔥 ReplEditor: No random track selected (no tracks available)');
+        }
+      });
     } else if (!ssrData && !tracks.isInitialized) {
       console.log('🔥 ReplEditor: No SSR data, initializing empty store');
       tracks.initializeWithSSR(null);
