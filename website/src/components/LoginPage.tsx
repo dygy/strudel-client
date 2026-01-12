@@ -103,7 +103,6 @@ export default function LoginPage({ error, hasTrack }: LoginPageProps) {
   const getTranslation = (key: string, fallback: string) => {
     try {
       const translation = t(key);
-      console.log(`Translation for ${key}:`, translation);
       return translation !== key ? translation : fallback;
     } catch (error) {
       console.error(`Translation error for ${key}:`, error);
