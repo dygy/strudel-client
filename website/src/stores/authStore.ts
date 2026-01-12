@@ -66,8 +66,9 @@ export const authActions = {
           
           if (data.sessionExpiresAt) {
             const expiresAt = new Date(data.sessionExpiresAt);
-            const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
-            this.setSessionInfo(expiresAt, expiresAt < fiveMinutesFromNow);
+            // Show warning if expiring within 15 minutes (more buffer)
+            const fifteenMinutesFromNow = new Date(Date.now() + 15 * 60 * 1000);
+            this.setSessionInfo(expiresAt, expiresAt < fifteenMinutesFromNow);
           }
           
           return true;
@@ -183,7 +184,7 @@ export const authActions = {
       return;
     }
 
-    console.log('AuthStore - Starting periodic session check (every 30 seconds)');
+    console.log('AuthStore - Starting periodic session check (every 60 seconds)');
     
     sessionCheckInterval = setInterval(async () => {
       const currentState = authStore.get();
@@ -198,7 +199,7 @@ export const authActions = {
         // Stop checking if no user
         this.stopPeriodicCheck();
       }
-    }, 30 * 1000); // Check every 30 seconds
+    }, 60 * 1000); // Check every 60 seconds (less frequent to reduce race conditions)
   },
 
   stopPeriodicCheck() {
@@ -213,6 +214,10 @@ export const authActions = {
     console.log('AuthStore - Initializing authentication...');
     
     try {
+      // Initialize Supabase auth listener first
+      const { initializeAuthListener, cleanupAuthListener } = await import('../lib/authListener');
+      initializeAuthListener();
+      
       const isAuthenticated = await this.checkAuth();
       
       if (isAuthenticated) {
@@ -233,6 +238,7 @@ export const authActions = {
         return () => {
           window.removeEventListener('storage', handleStorageChange);
           this.stopPeriodicCheck();
+          cleanupAuthListener();
         };
       }
     } catch (error) {

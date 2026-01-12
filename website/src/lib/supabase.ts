@@ -24,6 +24,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true, // Always enable session persistence
     detectSessionInUrl: true, // Always enable session detection
     flowType: 'pkce', // Use PKCE flow for security
+    // Increase refresh buffer to prevent race conditions
+    refreshTokenRotationEnabled: true,
   },
 });
 
@@ -115,12 +117,32 @@ export const db = {
       // First check session and refresh if needed
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (session?.expires_at && Date.now() / 1000 > session.expires_at) {
-        console.log('db.tracks.getAll - Session expired, attempting refresh...');
-        const { error: refreshError } = await supabase.auth.refreshSession();
+      if (sessionError) {
+        console.error('db.tracks.getAll - Session error:', sessionError);
+        throw new Error('Session error: ' + sessionError.message);
+      }
+      
+      if (!session) {
+        console.error('db.tracks.getAll - No session found');
+        throw new Error('Not authenticated');
+      }
+      
+      // Check if session is expired or expiring soon (within 10 minutes)
+      const now = Math.floor(Date.now() / 1000);
+      const expiresAt = session.expires_at || 0;
+      const timeUntilExpiry = expiresAt - now;
+      
+      if (timeUntilExpiry < 600) { // Less than 10 minutes
+        console.log('db.tracks.getAll - Session expiring soon, attempting refresh...');
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError) {
           console.error('db.tracks.getAll - Failed to refresh session:', refreshError);
+          throw new Error('Session refresh failed: ' + refreshError.message);
         }
+        if (!refreshData.session) {
+          throw new Error('No session after refresh');
+        }
+        console.log('db.tracks.getAll - Session refreshed successfully');
       }
       
       const { data: { user }, error: userError } = await supabase.auth.getUser();

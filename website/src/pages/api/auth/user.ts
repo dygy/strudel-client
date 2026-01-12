@@ -88,6 +88,20 @@ export const GET: APIRoute = async ({ request }) => {
       });
     }
 
+    // Decode the JWT to get the actual expiry time
+    let sessionExpiresAt = null;
+    try {
+      const tokenParts = accessToken.split('.');
+      if (tokenParts.length === 3) {
+        const payload = JSON.parse(atob(tokenParts[1]));
+        if (payload.exp) {
+          sessionExpiresAt = new Date(payload.exp * 1000).toISOString();
+        }
+      }
+    } catch (e) {
+      console.warn('API /auth/user - Could not decode JWT expiry:', e.message);
+    }
+
     // Return user information (without sensitive data)
     return new Response(JSON.stringify({
       user: {
@@ -96,10 +110,7 @@ export const GET: APIRoute = async ({ request }) => {
         name: (user as any).user_metadata?.full_name || user.email,
         avatar: (user as any).user_metadata?.avatar_url
       },
-      session: {
-        access_token: accessToken, // Only return for server-side use
-        expires_at: user.last_sign_in_at
-      }
+      sessionExpiresAt
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
