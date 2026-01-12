@@ -38,6 +38,7 @@ async function getAuthenticatedUser(request: Request) {
       if ((key.includes('access') || key.includes('auth-token') || key.startsWith('sb-access')) && value.includes('.')) {
         accessToken = value;
         console.log('DELETE API - Found access token in:', key);
+        console.log('DELETE API - Token preview:', value.substring(0, 50) + '...');
         break;
       }
     }
@@ -52,17 +53,62 @@ async function getAuthenticatedUser(request: Request) {
     // Create Supabase client with anon key and verify the access token
     const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
     
-    const { data: { user }, error } = await supabaseAnon.auth.getUser(accessToken);
+    // First try to get the user with the access token
+    let { data: { user }, error } = await supabaseAnon.auth.getUser(accessToken);
+
+    // If the token is invalid, try to refresh the session
+    if (error && error.message?.includes('JWT')) {
+      console.log('DELETE API - JWT error, attempting session refresh...');
+      
+      // Look for refresh token in cookies
+      let refreshToken = null;
+      for (const [key, value] of cookieMap) {
+        if (key.includes('refresh') && value.length > 10) {
+          refreshToken = value;
+          console.log('DELETE API - Found refresh token in:', key);
+          break;
+        }
+      }
+      
+      if (refreshToken) {
+        try {
+          const { data: sessionData, error: refreshError } = await supabaseAnon.auth.refreshSession({
+            refresh_token: refreshToken
+          });
+          
+          if (!refreshError && sessionData.session) {
+            console.log('DELETE API - Session refreshed successfully');
+            // Try again with the new access token
+            const { data: { user: refreshedUser }, error: newError } = await supabaseAnon.auth.getUser(sessionData.session.access_token);
+            if (!newError && refreshedUser) {
+              user = refreshedUser;
+              error = null;
+              accessToken = sessionData.session.access_token;
+            }
+          }
+        } catch (refreshErr) {
+          console.log('DELETE API - Session refresh failed:', refreshErr);
+        }
+      }
+    }
 
     console.log('DELETE API - getUser result:', {
       hasUser: !!user,
       userId: user?.id,
       userEmail: user?.email,
-      error: error?.message
+      error: error?.message,
+      errorCode: error?.code,
+      errorStatus: error?.status
     });
 
     if (error || !user) {
       console.log('DELETE API - Authentication failed:', error?.message || 'No user returned');
+      
+      // Provide more specific error information
+      if (error?.message?.includes('JWT') || error?.message?.includes('token')) {
+        throw new Error(`Authentication failed: invalid JWT: ${error.message}`);
+      }
+      
       throw new Error('Authentication failed: ' + (error?.message || 'No user returned'));
     }
 
@@ -75,7 +121,64 @@ async function getAuthenticatedUser(request: Request) {
 
 export const DELETE: APIRoute = async ({ request }) => {
   try {
-    const { user, accessToken } = await getAuthenticatedUser(request);
+    // Try the cookie-based authentication first
+    let user, accessToken;
+    
+    try {
+      const authResult = await getAuthenticatedUser(request);
+      user = authResult.user;
+      accessToken = authResult.accessToken;
+    } catch (authError) {
+      console.log('DELETE API - Cookie auth failed, trying alternative method:', authError.message);
+      
+      // Alternative: Try to get session from Supabase directly
+      const cookies = request.headers.get('cookie') || '';
+      const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
+      
+      // Parse cookies for Supabase session
+      const cookieMap = new Map();
+      cookies.split(';').forEach(cookie => {
+        const [key, value] = cookie.trim().split('=');
+        if (key && value) {
+          cookieMap.set(key, decodeURIComponent(value));
+        }
+      });
+      
+      // Look for session cookies
+      let sessionToken = null;
+      let refreshToken = null;
+      
+      for (const [key, value] of cookieMap) {
+        if (key.includes('access') || key.includes('session')) {
+          sessionToken = value;
+        }
+        if (key.includes('refresh')) {
+          refreshToken = value;
+        }
+      }
+      
+      if (sessionToken && refreshToken) {
+        try {
+          // Set the session manually
+          const { data: sessionData, error: sessionError } = await supabaseAnon.auth.setSession({
+            access_token: sessionToken,
+            refresh_token: refreshToken
+          });
+          
+          if (!sessionError && sessionData.user) {
+            user = sessionData.user;
+            accessToken = sessionToken;
+            console.log('DELETE API - Alternative auth successful');
+          } else {
+            throw new Error('Session validation failed: ' + (sessionError?.message || 'No user'));
+          }
+        } catch (sessionErr) {
+          throw new Error('Authentication failed: ' + authError.message);
+        }
+      } else {
+        throw new Error('Authentication failed: ' + authError.message);
+      }
+    }
 
     // Parse request body
     const body = await request.json();

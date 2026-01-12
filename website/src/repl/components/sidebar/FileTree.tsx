@@ -615,7 +615,10 @@ export function FileTree({
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, node)}
             {...getTooltipProps()}
-            onClick={() => {
+            onClick={(e) => {
+              // Don't handle click if it's a right-click (context menu)
+              if (e.button === 2) return;
+              
               if (node.type === 'folder') {
                 toggleFolder(node.id); // Use node ID instead of path
               } else if (node.type === 'track' && !isRenaming) {
@@ -623,6 +626,12 @@ export function FileTree({
                   toggleFolder(node.id); // Use track ID for multitrack expansion
                 }
                 onTrackSelect(node.data as Track);
+              }
+            }}
+            onMouseDown={(e) => {
+              // Prevent drag start on right-click
+              if (e.button === 2) {
+                e.preventDefault();
               }
             }}
           >

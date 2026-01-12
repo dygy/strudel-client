@@ -115,7 +115,7 @@ function NumberSlider({ value, onChange, step = 1, ...rest }: NumberSliderProps)
 }
 
 interface FormItemProps {
-  label?: string;
+  label?: React.ReactNode;
   children: React.ReactNode;
   sublabel?: string;
 }

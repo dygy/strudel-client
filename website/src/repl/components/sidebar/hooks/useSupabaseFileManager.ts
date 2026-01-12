@@ -9,6 +9,116 @@ import {getEditorInstance, setPendingCode} from '@src/stores/editorStore.ts';
 import {tracksStore, tracksActions} from '@src/stores/tracksStore.ts';
 import {nanoid} from 'nanoid';
 
+// Helper: Convert array to record keyed by id
+const arrayToRecord = <T extends { id: string }>(items: T[]): Record<string, T> =>
+  Object.fromEntries(items.map(item => [item.id, item]));
+
+// Helper: Sync local state to global tracksStore
+const syncToGlobalStore = (tracksObj: Record<string, Track>, foldersObj: Record<string, Folder>) => {
+  tracksActions.clear();
+  Object.values(tracksObj).forEach(track => tracksActions.addTrack(track));
+  Object.values(foldersObj).forEach(folder => tracksActions.addFolder(folder));
+  tracksStore.set({
+    ...tracksStore.get(),
+    isInitialized: true,
+    isLoading: false,
+    error: null
+  });
+};
+
+// Helper: Centralized error handling
+const handleApiError = (
+  error: unknown,
+  context: string,
+  setSyncError: (err: string | null) => void,
+  toastMessage?: string
+) => {
+  console.error(`SupabaseFileManager - ${context}:`, error);
+  const message = error instanceof Error ? error.message : 'Unknown error';
+  setSyncError(message);
+  if (toastMessage) {
+    toastActions.error(toastMessage);
+  }
+  return message;
+};
+
+// No-op function for unauthenticated state
+const noop = () => {};
+const asyncNoopFalse = async () => false;
+const asyncNoopNull = async () => null;
+const asyncNoopVoid = async () => {};
+
+// Static unauthenticated state (values that don't depend on hooks)
+const UNAUTHENTICATED_STATIC_STATE = {
+  tracks: {} as Record<string, Track>,
+  folders: {} as Record<string, Folder>,
+  selectedTrack: null,
+  isInitialized: false,
+  isLoading: false,
+  syncError: null,
+  isAuthenticated: false,
+  showMigrationModal: false,
+  setShowMigrationModal: noop,
+  handleMigrationComplete: noop,
+  isCreating: false,
+  isCreatingFolder: false,
+  newTrackName: '',
+  newFolderName: '',
+  newItemParentPath: '',
+  saveStatus: '',
+  renamingTrack: null,
+  renamingFolder: null,
+  renamingStep: null,
+  renameValue: '',
+  showDeleteModal: false,
+  trackToDelete: null,
+  showDeleteFolderModal: false,
+  folderToDelete: null,
+  folderContents: { subfolders: [] as string[], tracks: [] as string[] },
+  showDeleteAllModal: false,
+  isCreatingStep: false,
+  newStepName: '',
+  selectedStepTrack: null,
+  isDragOver: false,
+  setTracks: noop,
+  setFolders: noop,
+  setSelectedTrack: noop,
+  setIsCreating: noop,
+  setIsCreatingFolder: noop,
+  setNewTrackName: noop,
+  setNewFolderName: noop,
+  setNewItemParentPath: noop,
+  setSaveStatus: noop,
+  setRenamingTrack: noop,
+  setRenamingFolder: noop,
+  setRenamingStep: noop,
+  setRenameValue: noop,
+  setShowDeleteModal: noop,
+  setTrackToDelete: noop,
+  setShowDeleteFolderModal: noop,
+  setFolderToDelete: noop,
+  setFolderContents: noop,
+  setShowDeleteAllModal: noop,
+  setIsCreatingStep: noop,
+  setNewStepName: noop,
+  setSelectedStepTrack: noop,
+  setIsDragOver: noop,
+  loadTrack: noop,
+  saveCurrentTrack: asyncNoopFalse,
+  saveSpecificTrack: asyncNoopFalse,
+  createTrack: asyncNoopNull,
+  createFolder: asyncNoopNull,
+  deleteTrack: asyncNoopFalse,
+  deleteAllTracks: asyncNoopFalse,
+  loadDataFromSupabase: asyncNoopVoid,
+  refreshFromSupabase: asyncNoopVoid,
+  autosaveTimerRef: { current: null },
+  autosaveTrackIdRef: { current: null },
+  lastSavedCodeRef: { current: '' },
+  isDeletingTrackRef: { current: false },
+  isDeletingFolderRef: { current: new Set<string>() },
+};
+
 interface ReplContext {
   activeCode?: string;
   editorRef?: React.RefObject<{ code: string; setCode?: (code: string) => void }>;
@@ -114,41 +224,17 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
     // If we have SSR data, use it immediately
     if (ssrData) {
-      // SSR data is already in flat format, convert directly to objects
-      const tracksObj = (ssrData.tracks || []).reduce((acc: Record<string, any>, track: any) => {
-        acc[track.id] = track;
-        return acc;
-      }, {});
-
-      const foldersObj = (ssrData.folders || []).reduce((acc: Record<string, any>, folder: any) => {
-        acc[folder.id] = folder;
-        return acc;
-      }, {});
+      const tracksObj = arrayToRecord(ssrData.tracks || []);
+      const foldersObj = arrayToRecord(ssrData.folders || []);
 
       console.log('SupabaseFileManager - Using SSR data:', Object.keys(tracksObj).length, 'tracks,', Object.keys(foldersObj).length, 'folders');
 
-      // Update local state for the file manager
       setTracks(tracksObj);
       setFolders(foldersObj);
       setIsInitialized(true);
       setHasLoadedData(true);
+      syncToGlobalStore(tracksObj, foldersObj);
 
-      // CRITICAL: Also update the global tracksStore so ReplEditor can see the data
-      // Update the store using actions for proper reactivity
-      tracksActions.clear(); // Clear first
-
-      // Add tracks and folders
-      Object.values<Track>(tracksObj).forEach(track => tracksActions.addTrack(track));
-      Object.values<Folder>(foldersObj).forEach(folder => tracksActions.addFolder(folder));
-
-      // Mark as initialized
-      tracksStore.set({
-        ...tracksStore.get(),
-        isInitialized: true,
-        isLoading: false,
-        error: null
-      });
-      
       clearTimeout(loadTimeout);
       return;
     }
@@ -214,40 +300,18 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
         
         try {
           const { data, error } = await db.tracks.getAll();
-          
+
           if (!error && data) {
             console.log('SupabaseFileManager - Direct data load successful');
-            
-            // Process the data normally
-            const tracks = data.tracks || [];
-            const folders = data.folders || [];
 
-            const tracksObj = tracks.reduce((acc: Record<string, Track>, track: Track) => {
-              acc[track.id] = track;
-              return acc;
-            }, {});
+            const tracksObj = arrayToRecord(data.tracks || []);
+            const foldersObj = arrayToRecord(data.folders || []);
 
-            const foldersObj = folders.reduce((acc: Record<string, Folder>, folder: Folder) => {
-              acc[folder.id] = folder;
-              return acc;
-            }, {});
-
-            setTracks(prev => ({ ...tracksObj }));
-            setFolders(prev => ({ ...foldersObj }));
+            setTracks(tracksObj);
+            setFolders(foldersObj);
             setIsInitialized(true);
             setHasLoadedData(true);
-
-            // Update global store
-            tracksActions.clear();
-            Object.values(tracksObj).forEach(track => tracksActions.addTrack(track));
-            Object.values(foldersObj).forEach(folder => tracksActions.addFolder(folder));
-            
-            tracksStore.set({
-              ...tracksStore.get(),
-              isInitialized: true,
-              isLoading: false,
-              error: null
-            });
+            syncToGlobalStore(tracksObj, foldersObj);
 
             console.log('SupabaseFileManager - Direct load completed successfully');
             setIsLoading(false);
@@ -339,109 +403,35 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       }
 
       // The tracks endpoint now returns both tracks and folders
-      const tracks = data?.tracks || [];
-      const folders = data?.folders || [];
+      const tracksObj = arrayToRecord(data?.tracks || []);
+      const foldersObj = arrayToRecord(data?.folders || []);
 
-      // Convert arrays to objects with id as key
-      const tracksObj = tracks.reduce((acc: Record<string, Track>, track: Track) => {
-        acc[track.id] = track;
-        return acc;
-      }, {});
-
-      const foldersObj = folders.reduce((acc: Record<string, Folder>, folder: Folder) => {
-        acc[folder.id] = folder;
-        return acc;
-      }, {});
-
-      // Force new object references to ensure React re-renders
-      setTracks(prev => {
-        return {...tracksObj};
-      });
-
-      setFolders(prev => {
-        return {...foldersObj};
-      });
-
+      setTracks(tracksObj);
+      setFolders(foldersObj);
       setIsInitialized(true);
-      setHasLoadedData(true); // Mark data as loaded to prevent duplicate calls
-
-      // CRITICAL: Also update the global tracksStore so ReplEditor can see the data
-      // Update the store using actions for proper reactivity
-      tracksActions.clear(); // Clear first
-
-      // Add tracks and folders
-      Object.values(tracksObj).forEach(track => tracksActions.addTrack(track));
-      Object.values(foldersObj).forEach(folder => tracksActions.addFolder(folder));
-
-      // Mark as initialized
-      tracksStore.set({
-        ...tracksStore.get(),
-        isInitialized: true,
-        isLoading: false,
-        error: null
-      });
+      setHasLoadedData(true);
+      syncToGlobalStore(tracksObj, foldersObj);
 
       console.log('SupabaseFileManager - Updated both local state and global tracksStore from loadDataFromSupabase');
-      console.log('SupabaseFileManager - TracksStore state:', {
-        tracksCount: Object.keys(tracksObj).length,
-        foldersCount: Object.keys(foldersObj).length,
-        isInitialized: true,
-        hasTracks: Object.keys(tracksObj).length > 0
-      });
-
-      // DEBUG: Log sample data structure
-      const sampleTracks = Object.values(tracksObj).slice(0, 2);
-      const sampleFolders = Object.values(foldersObj).slice(0, 2);
-      console.log('🔍 DEBUG - Loaded data structure:', {
-        sampleTracks: sampleTracks.map(t => ({ name: t.name, folder: t.folder })),
-        sampleFolders: sampleFolders.map(f => ({ name: f.name, path: f.path }))
-      });
-
-      // Force a small delay to ensure state updates are processed
-      await new Promise(resolve => setTimeout(resolve, 50));
     } catch (error) {
       console.error('SupabaseFileManager - Error loading data:', error);
-      
-      // If it's a session timeout, try to load data anyway (might work if cookies are still valid)
-      if (error.message === 'Session validation timeout') {
+
+      // If it's a session timeout, try direct load (cookies might still be valid)
+      if (error instanceof Error && error.message === 'Session validation timeout') {
         console.log('SupabaseFileManager - Session timeout, attempting direct data load...');
-        
+
         try {
           const { data, error: directError } = await db.tracks.getAll();
-          
+
           if (!directError && data) {
-            console.log('SupabaseFileManager - Direct data load successful');
-            
-            // Process the data normally
-            const tracks = data?.tracks || [];
-            const folders = data?.folders || [];
+            const tracksObj = arrayToRecord(data.tracks || []);
+            const foldersObj = arrayToRecord(data.folders || []);
 
-            const tracksObj = tracks.reduce((acc: Record<string, Track>, track: Track) => {
-              acc[track.id] = track;
-              return acc;
-            }, {});
-
-            const foldersObj = folders.reduce((acc: Record<string, Folder>, folder: Folder) => {
-              acc[folder.id] = folder;
-              return acc;
-            }, {});
-
-            setTracks(prev => ({ ...tracksObj }));
-            setFolders(prev => ({ ...foldersObj }));
+            setTracks(tracksObj);
+            setFolders(foldersObj);
             setIsInitialized(true);
             setHasLoadedData(true);
-
-            // Update global store
-            tracksActions.clear();
-            Object.values(tracksObj).forEach(track => tracksActions.addTrack(track));
-            Object.values(foldersObj).forEach(folder => tracksActions.addFolder(folder));
-            
-            tracksStore.set({
-              ...tracksStore.get(),
-              isInitialized: true,
-              isLoading: false,
-              error: null
-            });
+            syncToGlobalStore(tracksObj, foldersObj);
 
             console.log('SupabaseFileManager - Direct load completed successfully');
             setIsLoading(false);
@@ -451,7 +441,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
           console.error('SupabaseFileManager - Direct load also failed:', directError);
         }
       }
-      
+
       setSyncError(error instanceof Error ? error.message : 'Failed to load data');
       toastActions.error(t('files:errors.loadFailed'));
     } finally {
@@ -877,29 +867,9 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
       return null;
     } catch (error) {
-      console.error('SupabaseFileManager - Error creating folder:', error);
-      console.error('SupabaseFileManager - Error type:', typeof error);
-      console.error('SupabaseFileManager - Error stringified:', JSON.stringify(error, null, 2));
-
-      // Handle network errors or other issues
-      if (error instanceof Error) {
-        console.error('SupabaseFileManager - Error is instance of Error, message:', error.message);
-        if (error.message.includes('fetch')) {
-          toastActions.error('Network error. Please check your connection and try again.');
-        } else {
-          toastActions.error(error.message);
-        }
-      } else {
-        console.error('SupabaseFileManager - Error is not instance of Error');
-        const errorMessage = typeof error === 'string' ? error :
-                           error?.message ||
-                           error?.error ||
-                           'Failed to create folder';
-        console.error('SupabaseFileManager - Using error message:', errorMessage);
-        toastActions.error(errorMessage);
-      }
-
-      setSyncError(error instanceof Error ? error.message : 'Create failed');
+      const isNetworkError = error instanceof Error && error.message.includes('fetch');
+      const toastMsg = isNetworkError ? 'Network error. Please check your connection.' : (error instanceof Error ? error.message : 'Failed to create folder');
+      handleApiError(error, 'Error creating folder', setSyncError, toastMsg);
       return null;
     }
   }, [user, t, checkAuth, setFolders]);
@@ -973,20 +943,9 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
       return null;
     } catch (error) {
-      console.error('SupabaseFileManager - Error updating folder:', error);
-
-      // Handle network errors or other issues
-      if (error instanceof Error) {
-        if (error.message.includes('fetch')) {
-          toastActions.error('Network error. Please check your connection and try again.');
-        } else {
-          toastActions.error(error.message);
-        }
-      } else {
-        toastActions.error('Failed to update folder. Please try again.');
-      }
-
-      setSyncError(error instanceof Error ? error.message : 'Update failed');
+      const isNetworkError = error instanceof Error && error.message.includes('fetch');
+      const toastMsg = isNetworkError ? 'Network error. Please check your connection.' : (error instanceof Error ? error.message : 'Failed to update folder');
+      handleApiError(error, 'Error updating folder', setSyncError, toastMsg);
       return null;
     }
   }, [user, t, checkAuth, setFolders]);
@@ -1034,9 +993,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       toastActions.success(t('files:trackDeleted'));
       return true;
     } catch (error) {
-      console.error('SupabaseFileManager - Error deleting track:', error);
-      toastActions.error(t('files:errors.deleteFailed'));
-      setSyncError(error instanceof Error ? error.message : 'Delete failed');
+      handleApiError(error, 'Error deleting track', setSyncError, t('files:errors.deleteFailed'));
       return false;
     }
   }, [user, selectedTrack, t, checkAuth]);
@@ -1115,9 +1072,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
       return true;
     } catch (error) {
-      console.error('SupabaseFileManager - Error deleting all tracks and folders:', error);
-      toastActions.error(t('files:errors.deleteFailed'));
-      setSyncError(error instanceof Error ? error.message : 'Delete all failed');
+      handleApiError(error, 'Error deleting all tracks and folders', setSyncError, t('files:errors.deleteFailed'));
       return false;
     }
   }, [user, tracks, folders, setTracks, setFolders, setSelectedTrack, context, t, checkAuth]);
@@ -1131,94 +1086,13 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     await loadDataFromSupabase();
   }, [user, loadDataFromSupabase]);
 
-  // If not authenticated, return minimal state but still with all the same structure
+  // If not authenticated, return minimal state with no-op functions
   if (!user) {
     return {
-      // State
-      tracks: {},
-      folders: {},
-      selectedTrack: null,
+      ...UNAUTHENTICATED_STATIC_STATE,
       activePattern,
-      isInitialized: false,
-      isLoading: false,
-      syncError: null,
-      isAuthenticated: false,
-
-      // Migration
-      showMigrationModal: false,
-      setShowMigrationModal: () => {},
-      handleMigrationComplete: () => {},
-
-      // UI State
-      isCreating: false,
-      isCreatingFolder: false,
-      newTrackName: '',
-      newFolderName: '',
-      newItemParentPath: '',
-      saveStatus: '',
-      renamingTrack: null,
-      renamingFolder: null,
-      renamingStep: null,
-      renameValue: '',
-      showDeleteModal: false,
-      trackToDelete: null,
-      showDeleteFolderModal: false,
-      folderToDelete: null,
-      folderContents: {subfolders: [], tracks: []},
-      showDeleteAllModal: false,
-      isCreatingStep: false,
-      newStepName: '',
-      selectedStepTrack: null,
-      isDragOver: false,
-
-      // Setters (no-ops)
-      setTracks: () => {},
-      setFolders: () => {},
-      setSelectedTrack: () => {},
-      setIsCreating: () => {},
-      setIsCreatingFolder: () => {},
-      setNewTrackName: () => {},
-      setNewFolderName: () => {},
-      setNewItemParentPath: () => {},
-      setSaveStatus: () => {},
-      setRenamingTrack: () => {},
-      setRenamingFolder: () => {},
-      setRenamingStep: () => {},
-      setRenameValue: () => {},
-      setShowDeleteModal: () => {},
-      setTrackToDelete: () => {},
-      setShowDeleteFolderModal: () => {},
-      setFolderToDelete: () => {},
-      setFolderContents: () => {},
-      setShowDeleteAllModal: () => {},
-      setIsCreatingStep: () => {},
-      setNewStepName: () => {},
-      setSelectedStepTrack: () => {},
-      setIsDragOver: () => {},
-
-      // Functions
-      loadTrack: () => {},
-      saveCurrentTrack: async () => false,
-      saveSpecificTrack: async () => false,
-      createTrack: async () => null,
-      createFolder: async () => null,
-      deleteTrack: async () => false,
-      deleteAllTracks: async () => false,
-      loadDataFromSupabase: async () => {},
-      refreshFromSupabase: async () => {},
-
-      // Refs (empty)
-      autosaveTimerRef: { current: null },
-      autosaveTrackIdRef: { current: null },
-      lastSavedCodeRef: { current: '' },
-      isDeletingTrackRef: { current: false },
-      isDeletingFolderRef: { current: new Set() },
-
-      // Settings
       isAutosaveEnabled,
       autosaveInterval,
-
-      // Translation
       t,
     };
   }

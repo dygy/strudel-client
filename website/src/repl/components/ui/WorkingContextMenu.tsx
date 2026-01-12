@@ -23,45 +23,52 @@ export function WorkingContextMenu({ items, children }: WorkingContextMenuProps)
   const [y, setY] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Debug: Add a test button to manually show the menu
+  const [debugMode, setDebugMode] = useState(false);
+
   const showMenu = (event: React.MouseEvent) => {
+    console.log('WorkingContextMenu - showMenu called', { items: items.length });
     event.preventDefault();
-    
+    event.stopPropagation();
+
     // Close all other open menus
     openMenus.forEach(closeMenu => closeMenu());
     openMenus.clear();
-    
+
     // Calculate smart positioning based on viewport
     const menuWidth = 200; // Estimated menu width
     const menuHeight = items.length * 40; // Estimated menu height (40px per item)
     const padding = 10; // Padding from viewport edges
-    
+
     let menuX = event.pageX;
     let menuY = event.pageY;
-    
+
     // Check if menu would overflow right edge
     if (menuX + menuWidth > window.innerWidth - padding) {
       menuX = event.pageX - menuWidth; // Show to the left of cursor
     }
-    
+
     // Check if menu would overflow bottom edge
     if (menuY + menuHeight > window.innerHeight - padding) {
       menuY = event.pageY - menuHeight; // Show above cursor
     }
-    
+
     // Ensure menu doesn't go off left edge
     if (menuX < padding) {
       menuX = padding;
     }
-    
+
     // Ensure menu doesn't go off top edge
     if (menuY < padding) {
       menuY = padding;
     }
-    
+
     setX(menuX);
     setY(menuY);
     setVisible(true);
-    
+
+    console.log('WorkingContextMenu - menu should be visible now', { x: menuX, y: menuY, visible: true });
+
     // Add this menu to the open menus set
     openMenus.add(() => setVisible(false));
   };
@@ -81,13 +88,13 @@ export function WorkingContextMenu({ items, children }: WorkingContextMenuProps)
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') hideMenu();
     };
-    
+
     if (visible) {
       document.addEventListener('click', handleClick);
       document.addEventListener('scroll', handleScroll);
       document.addEventListener('keydown', handleEscape);
     }
-    
+
     return () => {
       document.removeEventListener('click', handleClick);
       document.removeEventListener('scroll', handleScroll);
@@ -97,15 +104,25 @@ export function WorkingContextMenu({ items, children }: WorkingContextMenuProps)
 
   return (
     <>
-      <div className="h-full" onContextMenu={showMenu}>
+      <div
+        className="h-full"
+        onContextMenu={showMenu}
+        style={{ position: 'relative' }}
+      >
         {children}
       </div>
-      
+
       {visible && (
         <div
           ref={menuRef}
-          className="fixed bg-background border border-lineHighlight rounded shadow-lg py-1 z-[10000]"
-          style={{ left: x, top: y, minWidth: '150px' }}
+          className="fixed bg-background border border-lineHighlight rounded shadow-lg py-1"
+          style={{
+            left: x,
+            top: y,
+            minWidth: '150px',
+            pointerEvents: 'auto',
+            zIndex: 10000
+          }}
         >
           {items.map((item, index) => (
             <React.Fragment key={index}>
@@ -119,6 +136,7 @@ export function WorkingContextMenu({ items, children }: WorkingContextMenuProps)
                       : 'text-foreground hover:bg-lineHighlight cursor-pointer'
                   } ${item.className || ''}`}
                   onClick={() => {
+                    console.log('WorkingContextMenu - item clicked:', item.label);
                     if (!item.disabled) {
                       item.onClick();
                       hideMenu();

@@ -3,6 +3,8 @@
  * This ensures API keys are never exposed to the frontend
  */
 
+import { ensureValidSession } from './authUtils';
+
 export interface Track {
   id: string;
   name: string;
@@ -49,6 +51,12 @@ class SecureApiClient {
   }
 
   private async request(endpoint: string, options: RequestInit = {}) {
+    // Ensure we have a valid session before making the request
+    const sessionResult = await ensureValidSession();
+    if (!sessionResult.success) {
+      throw new Error(`Authentication failed: ${sessionResult.error}`);
+    }
+    
     const url = `${this.baseUrl}/api${endpoint}`;
     
     const response = await fetch(url, {
@@ -62,6 +70,24 @@ class SecureApiClient {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      
+      // If it's an auth error, try to refresh session and retry once
+      if (response.status === 401 && !options.headers?.['X-Retry-After-Refresh']) {
+        console.log('Got 401, attempting session refresh and retry...');
+        
+        const retrySessionResult = await ensureValidSession();
+        if (retrySessionResult.success) {
+          // Retry the request once with a flag to prevent infinite loops
+          return this.request(endpoint, {
+            ...options,
+            headers: {
+              ...options.headers,
+              'X-Retry-After-Refresh': 'true'
+            }
+          });
+        }
+      }
+      
       throw new Error(errorData.error || `HTTP ${response.status}`);
     }
 
