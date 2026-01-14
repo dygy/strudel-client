@@ -18,6 +18,7 @@ import { DragDropOverlay } from './components/DragDropOverlay';
 import { ImportConflictModal } from '../ui/ImportConflictModal';
 import type { ImportConflict } from '../ui/ImportConflictModal.types';
 import type { Track } from './types/fileManager';
+import { nanoid } from 'nanoid';
 
 interface ReplContext {
   activeCode?: string;
@@ -217,21 +218,22 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
 
     // Check if we have items (supports folders) or just files
     const items = e.dataTransfer.items;
-    
+
     if (items) {
       // Use DataTransferItemList API for folder support
       const entries: FileSystemEntry[] = [];
-      
+
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (item.kind === 'file') {
-          const entry = item.webkitGetAsEntry?.() || item.getAsEntry?.();
+          // TypeScript doesn't have types for webkitGetAsEntry, so we cast
+          const entry = (item as any).webkitGetAsEntry?.();
           if (entry) {
             entries.push(entry);
           }
         }
       }
-      
+
       try {
         for (const entry of entries) {
           if (entry.isDirectory) {
@@ -273,14 +275,14 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
   // Handle folder drop (check if it's a multitrack)
   const handleFolderDrop = async (dirEntry: FileSystemDirectoryEntry) => {
     console.log('Folder dropped:', dirEntry.name);
-    
+
     try {
       // Read folder contents
       const entries = await readDirectory(dirEntry);
-      
+
       // Check if this is a multitrack folder (has metadata.json)
       const hasMetadata = entries.some(e => e.isFile && e.name === 'metadata.json');
-      
+
       if (hasMetadata) {
         console.log('Detected multitrack folder:', dirEntry.name);
         await handleMultitrackFolderImport(dirEntry, entries);
@@ -299,7 +301,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
     return new Promise((resolve, reject) => {
       const reader = dirEntry.createReader();
       const entries: FileSystemEntry[] = [];
-      
+
       const readEntries = () => {
         reader.readEntries((results) => {
           if (results.length === 0) {
@@ -310,7 +312,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
           }
         }, reject);
       };
-      
+
       readEntries();
     });
   };
@@ -370,7 +372,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
 
       // Check for conflicts
       const existingTrack = checkTrackExists(trackName);
-      
+
       if (existingTrack) {
         // Show conflict modal
         setImportConflicts([{
@@ -409,10 +411,10 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
           steps,
           metadata.activeStep || 0
         );
-        
+
         if (createdTrack) {
           toastActions.success(t('files:multitrackImported', { name: trackName }));
-          
+
           await new Promise(resolve => setTimeout(resolve, 100));
           fileManagerHook.loadTrack(createdTrack);
 
@@ -444,7 +446,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
   // Helper to check if track name exists
   const checkTrackExists = (name: string, folder?: string): Track | null => {
     const tracksArray = Object.values(fileManagerState.tracks);
-    return tracksArray.find(track => 
+    return tracksArray.find(track =>
       track.name === name && (track.folder || null) === (folder || null)
     ) || null;
   };
@@ -467,7 +469,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
       if (resolution === 'overwrite' && currentImport) {
         await importTrackWithOverwrite(currentImport);
       }
-      
+
       // Move to next conflict or finish
       if (currentConflictIndex < importConflicts.length - 1) {
         setCurrentConflictIndex(currentConflictIndex + 1);
@@ -487,7 +489,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
     try {
       // Find existing track
       const existing = checkTrackExists(importData.name, importData.folder);
-      
+
       if (existing) {
         // Update existing track
         const { data, error } = await db.tracks.update(existing.id, {
@@ -496,7 +498,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
           steps: importData.steps,
           activeStep: importData.activeStep,
         });
-        
+
         if (!error && data) {
           toastActions.success(t('files:trackImported', { name: importData.name }));
         }
@@ -522,7 +524,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
     for (let i = 0; i < pendingImports.length; i++) {
       const importData = pendingImports[i];
       const conflict = importConflicts[i];
-      
+
       if (conflict && defaultResolution === 'overwrite') {
         await importTrackWithOverwrite(importData);
       } else if (!conflict) {
@@ -531,13 +533,13 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
       }
       // If skip, do nothing
     }
-    
+
     // Cleanup
     setImportConflicts([]);
     setPendingImports([]);
     setCurrentConflictIndex(0);
     setConflictResolution(null);
-    
+
     // Refresh data
     if (fileManagerHook.loadDataFromSupabase) {
       await fileManagerHook.loadDataFromSupabase();
@@ -555,7 +557,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
 
           // Check if track already exists
           const existingTrack = checkTrackExists(trackName);
-          
+
           if (existingTrack) {
             // Show conflict modal
             setImportConflicts([{
@@ -589,15 +591,15 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
             if (createdTrack) {
               console.log('FileManager - Track created in database:', createdTrack.id, 'code length:', createdTrack.code?.length);
               toastActions.success(t('files:trackImported', { name: trackName }));
-              
+
               await new Promise(resolve => setTimeout(resolve, 300));
-              
+
               const trackUrl = generateTrackUrlPath(createdTrack.name, createdTrack.folder, fileManagerState.folders);
               window.history.pushState({}, '', trackUrl);
-              
+
               const trackPath = trackUrl.replace('/repl/', '');
               setActivePattern(trackPath);
-              
+
               fileManagerHook.loadTrack(createdTrack);
 
               setTimeout(() => {
@@ -1140,7 +1142,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
             const folderName = fileManagerState.newFolderName.trim();
             const parentPath = fileManagerState.newItemParentPath;
             const folderPath = parentPath ? `${parentPath}/${folderName}` : folderName;
-            
+
             const newFolder = await fileManagerState.createFolder(folderName, folderPath, parentPath);
             if (newFolder) {
               fileManagerState.setNewFolderName('');
