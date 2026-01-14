@@ -214,15 +214,219 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
     e.stopPropagation();
     fileManagerState.setIsDragOver(false);
 
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length === 0) return;
+    // Check if we have items (supports folders) or just files
+    const items = e.dataTransfer.items;
+    
+    if (items) {
+      // Use DataTransferItemList API for folder support
+      const entries: FileSystemEntry[] = [];
+      
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === 'file') {
+          const entry = item.webkitGetAsEntry?.() || item.getAsEntry?.();
+          if (entry) {
+            entries.push(entry);
+          }
+        }
+      }
+      
+      try {
+        for (const entry of entries) {
+          if (entry.isDirectory) {
+            await handleFolderDrop(entry as FileSystemDirectoryEntry);
+          } else if (entry.isFile) {
+            const file = await getFileFromEntry(entry as FileSystemFileEntry);
+            if (file) {
+              await handleFileImport(file);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error handling dropped items:', error);
+        toastActions.error(t('files:errors.importFailed'));
+      }
+    } else {
+      // Fallback to files API
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length === 0) return;
 
+      try {
+        for (const file of files) {
+          await handleFileImport(file);
+        }
+      } catch (error) {
+        console.error('Error handling dropped files:', error);
+        toastActions.error(t('files:errors.importFailed'));
+      }
+    }
+  };
+
+  // Helper to get File from FileSystemFileEntry
+  const getFileFromEntry = (entry: FileSystemFileEntry): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      entry.file(resolve, reject);
+    });
+  };
+
+  // Handle folder drop (check if it's a multitrack)
+  const handleFolderDrop = async (dirEntry: FileSystemDirectoryEntry) => {
+    console.log('Folder dropped:', dirEntry.name);
+    
     try {
-      for (const file of files) {
-        await handleFileImport(file);
+      // Read folder contents
+      const entries = await readDirectory(dirEntry);
+      
+      // Check if this is a multitrack folder (has metadata.json)
+      const hasMetadata = entries.some(e => e.isFile && e.name === 'metadata.json');
+      
+      if (hasMetadata) {
+        console.log('Detected multitrack folder:', dirEntry.name);
+        await handleMultitrackFolderImport(dirEntry, entries);
+      } else {
+        // Regular folder - show info
+        toastActions.info(t('files:folderImportNotSupported'));
       }
     } catch (error) {
-      console.error('Error handling dropped files:', error);
+      console.error('Error handling folder drop:', error);
+      toastActions.error(t('files:errors.importFailed'));
+    }
+  };
+
+  // Read directory entries
+  const readDirectory = (dirEntry: FileSystemDirectoryEntry): Promise<FileSystemEntry[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = dirEntry.createReader();
+      const entries: FileSystemEntry[] = [];
+      
+      const readEntries = () => {
+        reader.readEntries((results) => {
+          if (results.length === 0) {
+            resolve(entries);
+          } else {
+            entries.push(...results);
+            readEntries(); // Continue reading if there are more entries
+          }
+        }, reject);
+      };
+      
+      readEntries();
+    });
+  };
+
+  // Import multitrack from folder
+  const handleMultitrackFolderImport = async (
+    dirEntry: FileSystemDirectoryEntry,
+    entries: FileSystemEntry[]
+  ) => {
+    try {
+      // Read metadata.json
+      const metadataEntry = entries.find(e => e.isFile && e.name === 'metadata.json') as FileSystemFileEntry;
+      if (!metadataEntry) {
+        toastActions.error(t('files:invalidMultitrackFile'));
+        return;
+      }
+
+      const metadataFile = await getFileFromEntry(metadataEntry);
+      const metadataText = await metadataFile.text();
+      const metadata = JSON.parse(metadataText);
+
+      // Validate metadata
+      if (metadata.tracks || metadata.folders || metadata.exportDate) {
+        toastActions.error(t('files:invalidMultitrackFile'));
+        return;
+      }
+
+      const trackName = metadata.name || metadata.trackName || dirEntry.name;
+
+      // Find step files
+      const stepFiles = entries
+        .filter(e => e.isFile && e.name.match(/\.(js|txt)$/i))
+        .filter(e => e.name !== 'metadata.json')
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      if (stepFiles.length === 0) {
+        toastActions.error(t('files:noValidStepsFound'));
+        return;
+      }
+
+      // Read all step files
+      const steps: any[] = [];
+      for (let i = 0; i < stepFiles.length; i++) {
+        const stepEntry = stepFiles[i] as FileSystemFileEntry;
+        const stepFile = await getFileFromEntry(stepEntry);
+        const stepContent = await stepFile.text();
+        const stepName = metadata.steps?.[i]?.name || `Step ${i + 1}`;
+
+        steps.push({
+          id: `step_${i}`,
+          name: stepName,
+          code: stepContent,
+          created: metadata.steps?.[i]?.created || new Date().toISOString(),
+          modified: metadata.steps?.[i]?.modified || new Date().toISOString(),
+        });
+      }
+
+      // Check for conflicts
+      const existingTrack = checkTrackExists(trackName);
+      
+      if (existingTrack) {
+        // Show conflict modal
+        setImportConflicts([{
+          type: 'multitrack',
+          name: trackName,
+          path: existingTrack.folder || '',
+          existingItem: {
+            created: existingTrack.created,
+            modified: existingTrack.modified,
+          },
+          newItem: {
+            stepsCount: steps.length,
+          }
+        }]);
+        setPendingImports([{
+          type: 'multitrack',
+          name: trackName,
+          code: steps[0]?.code || '',
+          folder: existingTrack.folder,
+          isMultitrack: true,
+          steps,
+          activeStep: metadata.activeStep || 0,
+        }]);
+        setCurrentConflictIndex(0);
+        setShowConflictModal(true);
+        return;
+      }
+
+      // No conflict, import directly
+      if (fileManagerHook && fileManagerHook.isAuthenticated && fileManagerHook.createTrack) {
+        const createdTrack = await fileManagerHook.createTrack(
+          trackName,
+          steps[0]?.code || '',
+          undefined,
+          true,
+          steps,
+          metadata.activeStep || 0
+        );
+        
+        if (createdTrack) {
+          toastActions.success(t('files:multitrackImported', { name: trackName }));
+          
+          await new Promise(resolve => setTimeout(resolve, 100));
+          fileManagerHook.loadTrack(createdTrack);
+
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('strudel-tracks-imported'));
+          }, 150);
+        }
+      } else {
+        toastActions.error(t('auth:signInRequired'));
+      }
+    } catch (error) {
+      console.error('Error importing multitrack folder:', error);
+      toastActions.error(t('files:multitrackImportFailed'));
+    }
+  };
       toastActions.error(t('files:errors.importFailed'));
     }
   };
