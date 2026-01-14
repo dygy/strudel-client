@@ -112,6 +112,23 @@
   "allFoldersDeleted": "All folders deleted successfully!",
   "allTracksAndFoldersDeleted": "All tracks and folders deleted successfully!",
   
+  "importConflict": {
+    "title": "Import Conflict",
+    "message": "A {{type}} named '{{name}}' already exists",
+    "multipleConflicts": "Conflict {{current}} of {{total}}",
+    "existing": "Existing Item",
+    "new": "New Item",
+    "fromImport": "From import file",
+    "overwrite": "Overwrite",
+    "skip": "Skip",
+    "overwriteAll": "Overwrite All",
+    "skipAll": "Skip All"
+  },
+  
+  "track": "Track",
+  "multitrack": "Multitrack",
+  "steps": "Steps",
+  
   "loadingTracks": "Loading your tracks...",
   "loadingTracksDescription": "Please wait while we fetch your data from the cloud",
   

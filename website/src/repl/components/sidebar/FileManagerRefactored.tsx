@@ -5,7 +5,7 @@ import { ConfirmModal } from '../ui/ConfirmModal';
 import { formatDateTimeIntl } from '@src/i18n/dateFormat';
 import { useTranslation } from '@src/i18n';
 import { toastActions } from '@src/stores/toastStore';
-import { batch } from '@src/lib/secureApi';
+import { batch, db } from '@src/lib/secureApi';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 import { generateTrackUrlPath } from '@src/lib/slugUtils';
 import { setActivePattern } from '@src/user_pattern_utils';
@@ -15,6 +15,8 @@ import { useFileManagerOperations } from './hooks/useFileManagerOperations';
 import { FileManagerHeader } from './components/FileManagerHeader';
 import { FileManagerFooter } from './components/FileManagerFooter';
 import { DragDropOverlay } from './components/DragDropOverlay';
+import { ImportConflictModal, ImportConflict } from '../ui/ImportConflictModal';
+import type { Track } from './types/fileManager';
 
 interface ReplContext {
   activeCode?: string;
@@ -40,6 +42,21 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
     title: string;
     items: Array<{ label: string; value: string }>
   }>({ title: '', items: [] });
+
+  // Import conflict state
+  const [importConflicts, setImportConflicts] = React.useState<ImportConflict[]>([]);
+  const [currentConflictIndex, setCurrentConflictIndex] = React.useState(0);
+  const [showConflictModal, setShowConflictModal] = React.useState(false);
+  const [conflictResolution, setConflictResolution] = React.useState<'overwrite' | 'skip' | null>(null);
+  const [pendingImports, setPendingImports] = React.useState<Array<{
+    type: 'track' | 'multitrack';
+    name: string;
+    code: string;
+    folder?: string;
+    isMultitrack?: boolean;
+    steps?: any[];
+    activeStep?: number;
+  }>>([]);
 
   // Always call the operations hook, but with safe defaults when no fileManagerState
   const operations = useFileManagerOperations(fileManagerState ? {
@@ -222,6 +239,109 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
     }
   };
 
+  // Helper to check if track name exists
+  const checkTrackExists = (name: string, folder?: string): Track | null => {
+    const tracksArray = Object.values(fileManagerState.tracks);
+    return tracksArray.find(track => 
+      track.name === name && (track.folder || null) === (folder || null)
+    ) || null;
+  };
+
+  // Handle conflict resolution
+  const handleConflictResolution = async (resolution: 'overwrite' | 'skip' | 'overwriteAll' | 'skipAll') => {
+    if (resolution === 'overwriteAll') {
+      setConflictResolution('overwrite');
+      setShowConflictModal(false);
+      // Process all pending imports with overwrite
+      await processPendingImports('overwrite');
+    } else if (resolution === 'skipAll') {
+      setConflictResolution('skip');
+      setShowConflictModal(false);
+      // Process all pending imports with skip
+      await processPendingImports('skip');
+    } else {
+      // Handle single conflict
+      const currentImport = pendingImports[currentConflictIndex];
+      if (resolution === 'overwrite' && currentImport) {
+        await importTrackWithOverwrite(currentImport);
+      }
+      
+      // Move to next conflict or finish
+      if (currentConflictIndex < importConflicts.length - 1) {
+        setCurrentConflictIndex(currentConflictIndex + 1);
+      } else {
+        setShowConflictModal(false);
+        setImportConflicts([]);
+        setPendingImports([]);
+        setCurrentConflictIndex(0);
+        setConflictResolution(null);
+      }
+    }
+  };
+
+  const importTrackWithOverwrite = async (importData: typeof pendingImports[0]) => {
+    if (!fileManagerHook || !fileManagerHook.isAuthenticated) return;
+
+    try {
+      // Find existing track
+      const existing = checkTrackExists(importData.name, importData.folder);
+      
+      if (existing) {
+        // Update existing track
+        const { data, error } = await db.tracks.update(existing.id, {
+          code: importData.code,
+          isMultitrack: importData.isMultitrack,
+          steps: importData.steps,
+          activeStep: importData.activeStep,
+        });
+        
+        if (!error && data) {
+          toastActions.success(t('files:trackImported', { name: importData.name }));
+        }
+      } else {
+        // Create new track
+        await fileManagerHook.createTrack(
+          importData.name,
+          importData.code,
+          importData.folder,
+          importData.isMultitrack,
+          importData.steps,
+          importData.activeStep
+        );
+        toastActions.success(t('files:trackImported', { name: importData.name }));
+      }
+    } catch (error) {
+      console.error('Error importing track:', error);
+      toastActions.error(t('files:errors.importFailed'));
+    }
+  };
+
+  const processPendingImports = async (defaultResolution: 'overwrite' | 'skip') => {
+    for (let i = 0; i < pendingImports.length; i++) {
+      const importData = pendingImports[i];
+      const conflict = importConflicts[i];
+      
+      if (conflict && defaultResolution === 'overwrite') {
+        await importTrackWithOverwrite(importData);
+      } else if (!conflict) {
+        // No conflict, just import
+        await importTrackWithOverwrite(importData);
+      }
+      // If skip, do nothing
+    }
+    
+    // Cleanup
+    setImportConflicts([]);
+    setPendingImports([]);
+    setCurrentConflictIndex(0);
+    setConflictResolution(null);
+    
+    // Refresh data
+    if (fileManagerHook.loadDataFromSupabase) {
+      await fileManagerHook.loadDataFromSupabase();
+    }
+  };
+
   const handleTrackImport = async (file: File) => {
     return new Promise<void>((resolve, reject) => {
       const reader = new FileReader();
@@ -231,30 +351,53 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
           const content = event.target?.result as string;
           const trackName = file.name.replace(/\.(js|txt|md)$/, '');
 
-          // Import to appropriate storage based on file manager type
+          // Check if track already exists
+          const existingTrack = checkTrackExists(trackName);
+          
+          if (existingTrack) {
+            // Show conflict modal
+            setImportConflicts([{
+              type: 'track',
+              name: trackName,
+              path: existingTrack.folder || '',
+              existingItem: {
+                created: existingTrack.created,
+                modified: existingTrack.modified,
+              },
+              newItem: {
+                size: new Blob([content]).size,
+              }
+            }]);
+            setPendingImports([{
+              type: 'track',
+              name: trackName,
+              code: content,
+              folder: existingTrack.folder,
+            }]);
+            setCurrentConflictIndex(0);
+            setShowConflictModal(true);
+            resolve();
+            return;
+          }
+
+          // No conflict, proceed with import
           if (fileManagerHook && fileManagerHook.isAuthenticated && fileManagerHook.createTrack) {
-            // Import to Supabase
             console.log('FileManager - Importing track to Supabase:', trackName, 'code length:', content.length);
             const createdTrack = await fileManagerHook.createTrack(trackName, content);
             if (createdTrack) {
               console.log('FileManager - Track created in database:', createdTrack.id, 'code length:', createdTrack.code?.length);
               toastActions.success(t('files:trackImported', { name: trackName }));
               
-              // Wait a bit longer to ensure database write is complete
               await new Promise(resolve => setTimeout(resolve, 300));
               
-              // Navigate to the imported track URL using slug-based format
               const trackUrl = generateTrackUrlPath(createdTrack.name, createdTrack.folder, fileManagerState.folders);
               window.history.pushState({}, '', trackUrl);
               
-              // Update activePattern (strip /repl/ prefix)
               const trackPath = trackUrl.replace('/repl/', '');
               setActivePattern(trackPath);
               
-              // Load the imported track
               fileManagerHook.loadTrack(createdTrack);
 
-              // Dispatch event to notify other components that tracks were imported
               setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('strudel-tracks-imported'));
               }, 150);
@@ -266,7 +409,6 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
             toastActions.error(t('auth:signInRequired'));
           }
 
-          // Dispatch event to notify other components that tracks were imported
           setTimeout(() => {
             window.dispatchEvent(new CustomEvent('strudel-tracks-imported'));
           }, 150);
@@ -869,6 +1011,19 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
         onClose={() => setShowInfoModal(false)}
         title={infoModalData.title}
         items={infoModalData.items}
+      />
+
+      <ImportConflictModal
+        isOpen={showConflictModal}
+        onClose={() => {
+          setShowConflictModal(false);
+          setImportConflicts([]);
+          setPendingImports([]);
+          setCurrentConflictIndex(0);
+        }}
+        conflicts={importConflicts}
+        currentIndex={currentConflictIndex}
+        onResolve={handleConflictResolution}
       />
 
       <ConfirmModal
