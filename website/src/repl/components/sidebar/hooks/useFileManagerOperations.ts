@@ -5,12 +5,14 @@ import { nanoid } from 'nanoid';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 import { setActivePattern } from '@src/user_pattern_utils';
 import { generateTrackUrlPath, trackNameToSlug } from '@src/lib/slugUtils';
-import type { Track, TrackStep, Folder } from './useFileManager';
+import { validateTrackName, generateUniqueTrackName } from '@src/lib/trackValidation';
+import type { Track, TrackStep, Folder } from '../types/fileManager';
 
 interface UseFileManagerOperationsProps {
   tracks: Record<string, Track>;
   folders: Record<string, Folder>;
   selectedTrack: string | null;
+  trackToDelete: string | null;
   newTrackName: string;
   newFolderName: string;
   newItemParentPath: string;
@@ -54,6 +56,7 @@ export function useFileManagerOperations({
   tracks,
   folders,
   selectedTrack,
+  trackToDelete: trackToDeleteId,
   newTrackName,
   newFolderName,
   newItemParentPath,
@@ -95,6 +98,15 @@ export function useFileManagerOperations({
   const createNewTrack = useCallback((parentPath?: string) => {
     if (!newTrackName.trim()) return;
 
+    const targetFolder = parentPath || newItemParentPath || undefined;
+    
+    // Validate track name
+    const validationError = validateTrackName(newTrackName, targetFolder, tracks);
+    if (validationError) {
+      toastActions.error(validationError);
+      return;
+    }
+
     const trackId = nanoid();
     const newTrack: Track = {
       id: trackId,
@@ -102,7 +114,7 @@ export function useFileManagerOperations({
       code: DEFAULT_TRACK_CODE,
       created: new Date().toISOString(),
       modified: new Date().toISOString(),
-      folder: parentPath || newItemParentPath || undefined,
+      folder: targetFolder,
     };
 
     setTracks(prev => ({ ...prev, [trackId]: newTrack }));
@@ -110,7 +122,7 @@ export function useFileManagerOperations({
     setNewItemParentPath('');
     setIsCreating(false);
     loadTrack(newTrack);
-  }, [newTrackName, newItemParentPath, setTracks, setNewTrackName, setNewItemParentPath, setIsCreating, loadTrack]);
+  }, [newTrackName, newItemParentPath, tracks, setTracks, setNewTrackName, setNewItemParentPath, setIsCreating, loadTrack]);
 
   const createNewFolder = useCallback((parentPath?: string) => {
     if (!newFolderName.trim()) return;
@@ -207,10 +219,15 @@ export function useFileManagerOperations({
 
   const duplicateTrack = useCallback((track: Track) => {
     const trackId = nanoid();
+    
+    // Generate a unique name for the duplicate
+    const baseName = `${track.name} (copy)`;
+    const uniqueName = generateUniqueTrackName(baseName, track.folder, tracks);
+    
     const duplicatedTrack: Track = {
       ...track,
       id: trackId,
-      name: `${track.name} (copy)`,
+      name: uniqueName,
       created: new Date().toISOString(),
       modified: new Date().toISOString(),
       folder: track.folder,
@@ -222,7 +239,7 @@ export function useFileManagerOperations({
 
     setTracks(prev => ({ ...prev, [trackId]: duplicatedTrack }));
     toastActions.success(t('files:trackDuplicated'));
-  }, [setTracks, t]);
+  }, [tracks, setTracks, t]);
 
   const deleteTrack = useCallback((trackId: string) => {
     setTrackToDelete(trackId);
@@ -230,9 +247,9 @@ export function useFileManagerOperations({
   }, [setTrackToDelete, setShowDeleteModal]);
 
   const confirmDelete = useCallback(async () => {
-    if (!tracks || !setTracks || !selectedTrack) return;
+    if (!tracks || !setTracks || !trackToDeleteId) return;
     
-    const trackToDelete = tracks[selectedTrack];
+    const trackToDelete = tracks[trackToDeleteId];
     if (!trackToDelete || isDeletingTrackRef.current) {
       console.log('FileManager - confirmDelete called but already deleting or no track to delete');
       return;
@@ -243,12 +260,15 @@ export function useFileManagerOperations({
     const trackName = trackToDelete.name;
     
     // Check if we're deleting the currently viewed track (from URL)
-    const currentUrlTrackId = window.location.pathname.match(/^\/repl\/([^\/]+)$/)?.[1];
-    const isDeletingCurrentUrlTrack = currentUrlTrackId === trackToDelete.id;
-    const isSelectedTrack = selectedTrack === trackToDelete.id;
+    const currentPath = window.location.pathname;
+    const trackUrl = generateTrackUrlPath(trackToDelete.name, trackToDelete.folder, folders);
+    const isDeletingCurrentUrlTrack = currentPath === trackUrl;
     
     console.log('FileManager - STARTING deletion process for track:', trackName, 'ID:', trackToDelete.id);
-    console.log('FileManager - Current URL track:', currentUrlTrackId, 'Deleting current URL track:', isDeletingCurrentUrlTrack);
+    console.log('FileManager - Current URL:', currentPath);
+    console.log('FileManager - Track being deleted URL:', trackUrl);
+    console.log('FileManager - URLs match (deleting current track):', isDeletingCurrentUrlTrack);
+    console.log('FileManager - Track folder:', trackToDelete.folder);
     
     const performDeletion = async () => {
       console.log('FileManager - PERFORMING actual deletion of track:', trackToDelete.id);
@@ -348,7 +368,7 @@ export function useFileManagerOperations({
       console.log('FileManager - deleting non-current track, no navigation needed');
       await performDeletion();
     }
-  }, [tracks, setTracks, selectedTrack, isDeletingTrackRef, setTrackToDelete, loadTrack, setSelectedTrack, context, t, deleteTrackAPI]);
+  }, [tracks, setTracks, trackToDeleteId, isDeletingTrackRef, setTrackToDelete, loadTrack, setSelectedTrack, context, t, deleteTrackAPI, folders]);
 
   const cancelCreate = useCallback(() => {
     setIsCreating(false);
@@ -426,6 +446,13 @@ export function useFileManagerOperations({
       const newName = renameValue.trim();
 
       if (track && oldName && oldName !== newName) {
+        // Validate the new track name
+        const validationError = validateTrackName(newName, track.folder, tracks, renamingTrack);
+        if (validationError) {
+          toastActions.error(validationError);
+          return;
+        }
+
         setTracks(prev => ({
           ...prev,
           [renamingTrack]: {

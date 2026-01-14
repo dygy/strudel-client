@@ -77,7 +77,10 @@ export function BurgerMenuButton({ items, className = '', size = 'sm' }: BurgerM
     <>
       <button
         ref={buttonRef}
-        onClick={showMenu}
+        onClick={(e) => {
+          e.stopPropagation(); // Prevent parent row click
+          showMenu(e);
+        }}
         className={`p-1 rounded hover:bg-lineHighlight transition-colors ${className}`}
         title="More options"
       >

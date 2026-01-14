@@ -88,7 +88,9 @@ CREATE TABLE IF NOT EXISTS public.tracks (
     steps JSONB,
     active_step INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    -- Ensure unique track names within the same folder for the same user
+    CONSTRAINT unique_track_name_per_folder UNIQUE (user_id, name, folder)
 );
 
 CREATE TABLE IF NOT EXISTS public.folders (

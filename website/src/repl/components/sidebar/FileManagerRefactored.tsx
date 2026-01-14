@@ -6,8 +6,9 @@ import { formatDateTimeIntl } from '@src/i18n/dateFormat';
 import { useTranslation } from '@src/i18n';
 import { toastActions } from '@src/stores/toastStore';
 import { batch } from '@src/lib/secureApi';
-import { nanoid } from 'nanoid';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
+import { generateTrackUrlPath } from '@src/lib/slugUtils';
+import { setActivePattern } from '@src/user_pattern_utils';
 
 // Import our new components and hooks
 import { useFileManagerOperations } from './hooks/useFileManagerOperations';
@@ -51,6 +52,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
     tracks: {},
     folders: {},
     selectedTrack: null,
+    trackToDelete: null,
     newTrackName: '',
     newFolderName: '',
     newItemParentPath: '',
@@ -241,8 +243,13 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
               // Wait a bit longer to ensure database write is complete
               await new Promise(resolve => setTimeout(resolve, 300));
               
-              // Navigate to the imported track URL
-              window.history.pushState({}, '', `/repl/${createdTrack.id}`);
+              // Navigate to the imported track URL using slug-based format
+              const trackUrl = generateTrackUrlPath(createdTrack.name, createdTrack.folder, fileManagerState.folders);
+              window.history.pushState({}, '', trackUrl);
+              
+              // Update activePattern (strip /repl/ prefix)
+              const trackPath = trackUrl.replace('/repl/', '');
+              setActivePattern(trackPath);
               
               // Load the imported track
               fileManagerHook.loadTrack(createdTrack);
@@ -255,30 +262,8 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
               console.error('FileManager - Failed to create track in database');
             }
           } else {
-            // Import to localStorage
-            const newTrack = {
-              id: nanoid(), // Use proper UUID
-              name: trackName,
-              code: content,
-              created: new Date().toISOString(),
-              modified: new Date().toISOString(),
-            };
-
-            const savedTracks = localStorage.getItem('strudel_tracks');
-            const tracks = savedTracks ? JSON.parse(savedTracks) : {};
-            tracks[newTrack.id] = newTrack;
-            localStorage.setItem('strudel_tracks', JSON.stringify(tracks));
-
-            // Update FileManager state
-            fileManagerState.setTracks(prev => ({ ...prev, [newTrack.id]: newTrack }));
-            toastActions.success(t('files:trackImported', { name: trackName }));
-
-            // Navigate to the imported track URL
-            window.history.pushState({}, '', `/repl/${newTrack.id}`);
-
-            // Load the imported track with a small delay
-            await new Promise(resolve => setTimeout(resolve, 100));
-            fileManagerState.loadTrack(newTrack);
+            console.error('FileManager - User not authenticated, cannot import track');
+            toastActions.error(t('auth:signInRequired'));
           }
 
           // Dispatch event to notify other components that tracks were imported
@@ -471,18 +456,8 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
           }, 150);
         }
       } else {
-        // Import to localStorage
-        const savedTracks = localStorage.getItem('strudel_tracks');
-        const tracks = savedTracks ? JSON.parse(savedTracks) : {};
-        tracks[multitrackData.id] = multitrackData;
-        localStorage.setItem('strudel_tracks', JSON.stringify(tracks));
-
-        fileManagerState.setTracks(prev => ({ ...prev, [multitrackData.id]: multitrackData }));
-        toastActions.success(t('files:multitrackImported', { name: multitrackData.name }));
-
-        // Load the imported track
-        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
-        fileManagerState.loadTrack(multitrackData);
+        console.error('FileManager - User not authenticated, cannot import multitrack');
+        toastActions.error(t('auth:signInRequired'));
       }
 
       // Dispatch event to notify other components that tracks were imported
@@ -695,125 +670,74 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
         folders: foldersToImport.length
       });
 
-      // Now perform the batch import
-      if (fileManagerHook && fileManagerHook.isAuthenticated) {
-        // Use batch import for Supabase
-        console.log('Library Import - Sending batch import to Supabase...');
-        const { data: result, error } = await batch.importLibrary({
-          tracks: tracksToImport,
-          folders: foldersToImport
+      // Perform batch import to Supabase (authentication required)
+      if (!fileManagerHook || !fileManagerHook.isAuthenticated) {
+        console.error('Library Import - User not authenticated');
+        toastActions.error(t('auth:signInRequired'));
+        return;
+      }
+
+      // Use batch import for Supabase
+      console.log('Library Import - Sending batch import to Supabase...');
+      const { data: result, error } = await batch.importLibrary({
+        tracks: tracksToImport,
+        folders: foldersToImport
+      });
+
+      if (error) {
+        console.error('Library Import - Batch import failed:', error);
+        toastActions.error(t('files:errors.importFailed'));
+        return;
+      }
+
+      if (result && result.success) {
+        const { tracksCreated, foldersCreated, totalCreated, errors } = result.results;
+
+        console.log('Library Import - Batch import completed:', result.results);
+
+        // DEBUG: Log the data structure before refresh
+        console.log('🔍 DEBUG - Data before refresh:', {
+          tracksToImport: tracksToImport.length,
+          foldersToImport: foldersToImport.length,
+          sampleTracks: tracksToImport.slice(0, 2).map(t => ({ name: t.name, folder: t.folder })),
+          sampleFolders: foldersToImport.slice(0, 2).map(f => ({ name: f.name, path: f.path }))
         });
 
-        if (error) {
-          console.error('Library Import - Batch import failed:', error);
-          toastActions.error(t('files:errors.importFailed'));
-          return;
-        }
-
-        if (result && result.success) {
-          const { tracksCreated, foldersCreated, totalCreated, errors } = result.results;
-
-          console.log('Library Import - Batch import completed:', result.results);
-
-          // DEBUG: Log the data structure before refresh
-          console.log('🔍 DEBUG - Data before refresh:', {
-            tracksToImport: tracksToImport.length,
-            foldersToImport: foldersToImport.length,
-            sampleTracks: tracksToImport.slice(0, 2).map(t => ({ name: t.name, folder: t.folder })),
-            sampleFolders: foldersToImport.slice(0, 2).map(f => ({ name: f.name, path: f.path }))
-          });
-
-          // Show success message
-          let message = '';
-          if (tracksCreated > 0 && foldersCreated > 0) {
-            message = `${tracksCreated} tracks and ${foldersCreated} folders imported!`;
-          } else if (tracksCreated > 0) {
-            message = `${tracksCreated} tracks imported!`;
-          } else if (foldersCreated > 0) {
-            message = `${foldersCreated} folders imported!`;
-          } else {
-            message = `${totalCreated} items imported!`;
-          }
-
-          if (errors && errors.length > 0) {
-            console.warn('Library Import - Some errors occurred:', errors);
-            message += ` (${errors.length} errors)`;
-          }
-
-          toastActions.success(message);
-
-          // Refresh data from Supabase
-          console.log('Library Import - Refreshing data from Supabase...');
-          if (fileManagerHook.loadDataFromSupabase) {
-            await fileManagerHook.loadDataFromSupabase();
-
-            // Give React more time to process state updates and re-render
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            console.log('Library Import - Data refresh completed, UI should now show updated structure');
-          }
-
-          // Dispatch event to notify other components
-          setTimeout(() => {
-            console.log('Library Import - Dispatching strudel-tracks-imported event');
-            window.dispatchEvent(new CustomEvent('strudel-tracks-imported'));
-          }, 300);
-        }
-      } else {
-        // Fallback to localStorage for unauthenticated users
-        console.log('Library Import - Falling back to localStorage import...');
-
-        // Create folders in localStorage
-        for (const folderData of foldersToImport) {
-          const newFolder = {
-            id: nanoid(), // Use proper UUID
-            name: folderData.name,
-            path: folderData.path,
-            parent: folderData.parent,
-            created: new Date().toISOString(),
-          };
-
-          const savedFolders = localStorage.getItem('strudel_folders');
-          const folders = savedFolders ? JSON.parse(savedFolders) : {};
-          folders[newFolder.id] = newFolder;
-          localStorage.setItem('strudel_folders', JSON.stringify(folders));
-
-          fileManagerState.setFolders(prev => ({ ...prev, [newFolder.id]: newFolder }));
-        }
-
-        // Create tracks in localStorage
-        for (const trackData of tracksToImport) {
-          const newTrack = {
-            id: nanoid(), // Use proper UUID
-            name: trackData.name,
-            code: trackData.code,
-            created: new Date().toISOString(),
-            modified: new Date().toISOString(),
-            folder: trackData.folder,
-            isMultitrack: trackData.isMultitrack,
-            steps: trackData.steps,
-            activeStep: trackData.activeStep,
-          };
-
-          const savedTracks = localStorage.getItem('strudel_tracks');
-          const tracks = savedTracks ? JSON.parse(savedTracks) : {};
-          tracks[newTrack.id] = newTrack;
-          localStorage.setItem('strudel_tracks', JSON.stringify(tracks));
-
-          fileManagerState.setTracks(prev => ({ ...prev, [newTrack.id]: newTrack }));
-        }
-
-        const totalImported = tracksToImport.length + foldersToImport.length;
-        if (totalImported > 0) {
-          toastActions.success(`${totalImported} items imported!`);
-
-          // Dispatch event to notify other components
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('strudel-tracks-imported'));
-          }, 100);
+        // Show success message
+        let message = '';
+        if (tracksCreated > 0 && foldersCreated > 0) {
+          message = `${tracksCreated} tracks and ${foldersCreated} folders imported!`;
+        } else if (tracksCreated > 0) {
+          message = `${tracksCreated} tracks imported!`;
+        } else if (foldersCreated > 0) {
+          message = `${foldersCreated} folders imported!`;
         } else {
-          toastActions.warning('No valid track files found in ZIP');
+          message = `${totalCreated} items imported!`;
         }
+
+        if (errors && errors.length > 0) {
+          console.warn('Library Import - Some errors occurred:', errors);
+          message += ` (${errors.length} errors)`;
+        }
+
+        toastActions.success(message);
+
+        // Refresh data from Supabase
+        console.log('Library Import - Refreshing data from Supabase...');
+        if (fileManagerHook.loadDataFromSupabase) {
+          await fileManagerHook.loadDataFromSupabase();
+
+          // Give React more time to process state updates and re-render
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          console.log('Library Import - Data refresh completed, UI should now show updated structure');
+        }
+
+        // Dispatch event to notify other components
+        setTimeout(() => {
+          console.log('Library Import - Dispatching strudel-tracks-imported event');
+          window.dispatchEvent(new CustomEvent('strudel-tracks-imported'));
+        }, 300);
       }
     } catch (error) {
       console.error('Library Import - Error:', error);
@@ -1000,11 +924,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
         onClose={() => fileManagerState.setShowDeleteAllModal(false)}
         onConfirm={() => {
           if (fileManagerHook && fileManagerHook.deleteAllTracks) {
-            // Supabase version
             fileManagerHook.deleteAllTracks();
-          } else {
-            // localStorage version
-            operations.deleteAllTracks();
           }
           fileManagerState.setShowDeleteAllModal(false);
         }}

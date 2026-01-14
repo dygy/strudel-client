@@ -196,8 +196,26 @@ export const DELETE: APIRoute = async ({ request }) => {
     // Delete the track directly using Supabase service role client
     const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
 
+    // First, fetch the track to get its name for logging
+    const { data: trackToDelete, error: fetchError } = await supabaseService
+      .from('tracks')
+      .select('name')
+      .eq('id', trackId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (fetchError || !trackToDelete) {
+      console.error('API /tracks/delete - track not found:', trackId);
+      return new Response(JSON.stringify({ error: 'Track not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log('API /tracks/delete - deleting track:', trackToDelete.name, 'ID:', trackId);
+
     // Delete the track with service role (bypasses RLS)
-    const { data: deletedTrack, error } = await supabaseService
+    const { error } = await supabaseService
       .from('tracks')
       .delete()
       .eq('id', trackId)
@@ -216,7 +234,7 @@ export const DELETE: APIRoute = async ({ request }) => {
       throw error;
     }
 
-    console.log('API /tracks/delete - track deleted successfully:', trackId);
+    console.log('API /tracks/delete - track deleted successfully:', trackToDelete.name, 'ID:', trackId);
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,

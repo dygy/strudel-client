@@ -478,3 +478,95 @@ This implementation provides a robust, user-friendly routing system that:
 - Synchronizes state across components
 
 The system is production-ready and handles edge cases gracefully. All navigation flows work correctly, and the URL always reflects the current state accurately.
+
+
+---
+
+## 9. Unique Track Names Validation (January 14, 2026)
+
+### Problem
+Users could create multiple tracks with the same name in the same folder, causing:
+- Confusion when selecting tracks
+- Data integrity issues
+- Unclear which track is which
+- Problems with URL generation and routing
+
+### Solution
+Implemented comprehensive validation to ensure track names are unique within each folder at multiple levels:
+
+#### Database Level
+- Existing constraint: `CONSTRAINT unique_track_name_per_folder UNIQUE (user_id, name, folder)`
+- Prevents duplicates at the database level
+- Final safety net for data integrity
+
+#### Backend API Level
+**Track Creation API** (`/api/tracks/create`):
+- Validates track name is not empty
+- Checks for existing tracks with same name in same folder
+- Returns 409 Conflict if duplicate exists
+- Handles database constraint violations gracefully
+
+**Track Update API** (`/api/tracks/update`):
+- Validates new name when renaming
+- Excludes current track from duplicate check
+- Checks target folder when moving tracks
+- Returns 409 Conflict if duplicate exists
+
+**Batch Import API** (`/api/library/batch-import`):
+- Automatically generates unique names for duplicates
+- Appends numbers to conflicting names (e.g., "Track 2", "Track 3")
+- Ensures all tracks are imported successfully
+- Logs renamed tracks for debugging
+
+#### Frontend Level
+**Validation Utilities** (`website/src/lib/trackValidation.ts`):
+- `isTrackNameAvailable()` - Checks if name is available
+- `generateUniqueTrackName()` - Generates unique names with numbers
+- `validateTrackName()` - Complete validation with error messages
+
+**File Manager Operations**:
+- Validates before creating tracks
+- Validates before renaming tracks
+- Auto-generates unique names when duplicating
+- Shows user-friendly error messages via toasts
+
+### Key Features
+1. **Case Insensitive**: Prevents "Track" and "track" in same folder
+2. **Folder Aware**: Same name allowed in different folders
+3. **Automatic Resolution**: Duplicates handled gracefully in batch imports
+4. **Defense in Depth**: Validation at frontend, backend, and database
+5. **User Friendly**: Clear error messages guide users
+
+### Error Messages
+- "Track name cannot be empty"
+- "Track name is too long (max 100 characters)"
+- "Track name contains invalid characters"
+- "A track named 'X' already exists in Y folder"
+
+### Files Modified
+- `website/src/lib/trackValidation.ts` (created)
+- `website/src/pages/api/tracks/create.ts`
+- `website/src/pages/api/tracks/update.ts`
+- `website/src/pages/api/library/batch-import.ts`
+- `website/src/repl/components/sidebar/hooks/useFileManagerOperations.ts`
+
+### Documentation
+See `UNIQUE_TRACK_NAMES_IMPLEMENTATION.md` for complete details.
+
+---
+
+## Summary of All Changes
+
+This document covers the complete evolution of the Strudel REPL routing and file management system:
+
+1. **Autosave System** - Strict track-specific autosave with validation
+2. **Path-Based Routing** - Clean URLs with `/repl/folder/track` format
+3. **Save-Before-Unload** - Emergency save on page close/refresh
+4. **URL-Based State** - URL as single source of truth
+5. **Folder-Based Routing** - Hierarchical folder paths in URLs
+6. **UUID to Path Conversion** - Tracks store folder paths, not UUIDs
+7. **Step Name URLs** - Multitrack steps use names instead of indices
+8. **Step Parameter Handling** - Proper step parameter preservation
+9. **Unique Track Names** - Validation to prevent duplicate names
+
+All systems work together to provide a robust, reliable, and user-friendly file management experience with clean URLs and proper data integrity.

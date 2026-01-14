@@ -1,7 +1,7 @@
 import React from 'react';
 import { tooltipActions } from '@src/stores/tooltipStore';
 import { PencilIcon, MusicalNoteIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
-import type { Track } from '../hooks/useFileManager';
+import type { Track } from '../types/fileManager';
 
 interface FileManagerFooterProps {
   selectedTrack: string | null;

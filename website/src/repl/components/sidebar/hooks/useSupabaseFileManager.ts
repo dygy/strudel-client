@@ -29,7 +29,6 @@ const getCurrentTrackIdFromURL = (tracksMap: Record<string, Track>, foldersMap: 
   // URL format: /repl/folder/track-slug or /repl/track-slug
   const pathMatch = currentPath.match(/^\/repl\/(.+)$/);
   if (!pathMatch) {
-    console.log('getCurrentTrackIdFromURL - no match for path:', currentPath);
     return null;
   }
   
@@ -38,18 +37,8 @@ const getCurrentTrackIdFromURL = (tracksMap: Record<string, Track>, foldersMap: 
   const trackSlug = segments.pop() || '';
   const urlFolderPath = segments.length > 0 ? segments.join('/') : null;
   
-  console.log('getCurrentTrackIdFromURL - parsed URL:', { currentPath, fullPath, trackSlug, urlFolderPath });
-  
   // Find the track by slug and folder path
   const tracks = Object.values(tracksMap);
-  
-  // Debug: log all tracks with their folder paths
-  console.log('getCurrentTrackIdFromURL - available tracks:', tracks.map(t => ({
-    name: t.name,
-    slug: trackNameToSlug(t.name),
-    folder: t.folder,
-    id: t.id
-  })));
   
   // Try to find track by matching slug and folder
   const track = tracks.find(t => {
@@ -66,27 +55,27 @@ const getCurrentTrackIdFromURL = (tracksMap: Record<string, Track>, foldersMap: 
     // Check if track.folder matches the URL folder path
     // Case 1: track.folder is already a path (new format)
     if (t.folder === urlFolderPath) {
-      console.log('getCurrentTrackIdFromURL - matched by folder path:', t.name);
       return true;
     }
     
     // Case 2: track.folder is a UUID (legacy format) - need to look up the folder's path
     const folder = foldersMap[t.folder];
     if (folder && folder.path === urlFolderPath) {
-      console.log('getCurrentTrackIdFromURL - matched by folder UUID->path:', t.name, 'folder:', folder.path);
       return true;
     }
     
     // Case 3: URL might contain a folder UUID (legacy URL format)
     if (t.folder === urlFolderPath) {
-      console.log('getCurrentTrackIdFromURL - matched by folder UUID:', t.name);
       return true;
     }
     
     return false;
   });
   
-  console.log('getCurrentTrackIdFromURL - result:', track ? { id: track.id, name: track.name } : 'NOT FOUND');
+  // Only log if track not found and we have tracks loaded (to help debug issues)
+  if (!track && tracks.length > 0) {
+    console.warn('getCurrentTrackIdFromURL - track not found for URL:', { trackSlug, urlFolderPath, availableTracks: tracks.length });
+  }
   
   return track?.id || null;
 };

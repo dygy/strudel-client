@@ -152,19 +152,43 @@ export const POST: APIRoute = async ({ request }) => {
           .select('name, folder')
           .eq('user_id', user.id);
 
-        const existingTrackKeys = new Set(
-          existingTracks.data?.map(t => `${t.name}:${t.folder || 'root'}`) || []
-        );
+        // Create a map of existing track names by folder for quick lookup
+        const existingTracksByFolder = new Map<string, Set<string>>();
+        existingTracks.data?.forEach(track => {
+          const folderKey = track.folder || 'root';
+          if (!existingTracksByFolder.has(folderKey)) {
+            existingTracksByFolder.set(folderKey, new Set());
+          }
+          existingTracksByFolder.get(folderKey)!.add(track.name.toLowerCase());
+        });
         
-        const tracksToCreate = tracks
-          .filter(track => {
-            const trackKey = `${track.name}:${track.folder || 'root'}`;
-            return !existingTrackKeys.has(trackKey);
-          })
-          .map(track => ({
+        const tracksToCreate = tracks.map(track => {
+          const folderKey = track.folder || 'root';
+          const existingNames = existingTracksByFolder.get(folderKey) || new Set();
+          
+          // Generate unique name if duplicate exists
+          let uniqueName = track.name;
+          let counter = 2;
+          
+          while (existingNames.has(uniqueName.toLowerCase())) {
+            uniqueName = `${track.name} ${counter}`;
+            counter++;
+          }
+          
+          // Add the new name to the set to prevent duplicates within the batch
+          existingNames.add(uniqueName.toLowerCase());
+          if (!existingTracksByFolder.has(folderKey)) {
+            existingTracksByFolder.set(folderKey, existingNames);
+          }
+          
+          if (uniqueName !== track.name) {
+            console.log(`API /library/batch-import - Renamed duplicate track "${track.name}" to "${uniqueName}"`);
+          }
+          
+          return {
             id: nanoid(), // Always generate new UUID for each import
             user_id: user.id,
-            name: track.name,
+            name: uniqueName,
             code: track.code || '',
             created: new Date().toISOString(),
             modified: new Date().toISOString(),
@@ -172,7 +196,8 @@ export const POST: APIRoute = async ({ request }) => {
             is_multitrack: track.isMultitrack || false,
             steps: track.steps,
             active_step: track.activeStep || 0
-          }));
+          };
+        });
 
         if (tracksToCreate.length > 0) {
           const { data: createdTracks, error: tracksError } = await supabase

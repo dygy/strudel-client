@@ -88,16 +88,49 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    console.log('API /tracks/create - creating track for user:', user.id, { name, folder, isMultitrack });
+    const trimmedName = name.trim();
+    
+    if (!trimmedName) {
+      return new Response(JSON.stringify({ error: 'Track name cannot be empty' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log('API /tracks/create - creating track for user:', user.id, { name: trimmedName, folder, isMultitrack });
 
     // Create the track directly using Supabase service role client
     const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Check if a track with the same name already exists in the same folder
+    const { data: existingTracks, error: checkError } = await supabaseService
+      .from('tracks')
+      .select('id, name')
+      .eq('user_id', user.id)
+      .eq('name', trimmedName)
+      .eq('folder', folder || null);
+
+    if (checkError) {
+      console.error('API /tracks/create - error checking for duplicates:', checkError);
+      throw checkError;
+    }
+
+    if (existingTracks && existingTracks.length > 0) {
+      const folderName = folder || 'root folder';
+      console.log('API /tracks/create - duplicate track name found:', trimmedName, 'in folder:', folderName);
+      return new Response(JSON.stringify({ 
+        error: `A track named "${trimmedName}" already exists in ${folderName}` 
+      }), {
+        status: 409, // Conflict status code
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     // Create the track with service role (bypasses RLS)
     const trackData = {
       id: nanoid(),
       user_id: user.id,
-      name: name.trim(),
+      name: trimmedName,
       code: code || '',
       folder: folder || null,
       is_multitrack: isMultitrack || false,
@@ -115,6 +148,18 @@ export const POST: APIRoute = async ({ request }) => {
 
     if (error) {
       console.error('API /tracks/create - database error:', error);
+      
+      // Check if it's a unique constraint violation
+      if (error.code === '23505' && error.message?.includes('unique_track_name_per_folder')) {
+        const folderName = folder || 'root folder';
+        return new Response(JSON.stringify({ 
+          error: `A track named "${trimmedName}" already exists in ${folderName}` 
+        }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      
       throw error;
     }
 
