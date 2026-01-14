@@ -427,9 +427,6 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
       toastActions.error(t('files:multitrackImportFailed'));
     }
   };
-      toastActions.error(t('files:errors.importFailed'));
-    }
-  };
 
   const handleFileImport = async (file: File) => {
     const fileName = file.name.toLowerCase();
