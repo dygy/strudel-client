@@ -2,20 +2,7 @@ import React from 'react';
 import { Modal } from './Modal';
 import { ExclamationTriangleIcon, DocumentIcon, FolderIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from '@src/i18n';
-
-export interface ImportConflict {
-  type: 'track' | 'folder' | 'multitrack';
-  name: string;
-  path: string;
-  existingItem?: {
-    created: string;
-    modified: string;
-  };
-  newItem?: {
-    size?: number;
-    stepsCount?: number;
-  };
-}
+import type { ImportConflict } from './ImportConflictModal.types';
 
 interface ImportConflictModalProps {
   isOpen: boolean;

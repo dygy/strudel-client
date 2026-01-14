@@ -15,7 +15,8 @@ import { useFileManagerOperations } from './hooks/useFileManagerOperations';
 import { FileManagerHeader } from './components/FileManagerHeader';
 import { FileManagerFooter } from './components/FileManagerFooter';
 import { DragDropOverlay } from './components/DragDropOverlay';
-import { ImportConflictModal, ImportConflict } from '../ui/ImportConflictModal';
+import { ImportConflictModal } from '../ui/ImportConflictModal';
+import type { ImportConflict } from '../ui/ImportConflictModal.types';
 import type { Track } from './types/fileManager';
 
 interface ReplContext {
