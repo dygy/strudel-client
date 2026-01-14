@@ -53,6 +53,8 @@
   
   "rightClickForOptions": "右键点击音轨获取更多选项",
   "currentTrack": "当前",
+  "editing": "编辑中",
+  "playing": "播放中",
   "saveChanges": "保存更改",
   "trackName": "音轨名称",
   "create": "创建",

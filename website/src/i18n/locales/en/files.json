@@ -53,6 +53,8 @@
   
   "rightClickForOptions": "Right-click tracks for more options",
   "currentTrack": "Current",
+  "editing": "Editing",
+  "playing": "Playing",
   "saveChanges": "Save Changes",
   "trackName": "Track name",
   "create": "Create",

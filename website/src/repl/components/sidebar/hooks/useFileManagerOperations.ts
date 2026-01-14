@@ -4,6 +4,7 @@ import { tracksActions } from '@src/stores/tracksStore';
 import { nanoid } from 'nanoid';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 import { setActivePattern } from '@src/user_pattern_utils';
+import { generateTrackUrlPath, trackNameToSlug } from '@src/lib/slugUtils';
 import type { Track, TrackStep, Folder } from './useFileManager';
 
 interface UseFileManagerOperationsProps {
@@ -144,18 +145,65 @@ export function useFileManagerOperations({
       await saveCurrentTrack(false);
     }
     
-    // Trigger URL routing if TrackRouter is available
-    if (context.trackRouter) {
-      try {
-        console.log('FileManager - triggering URL routing for track:', track.id);
-        await context.trackRouter.navigateToTrack(track.id);
-      } catch (error) {
-        console.error('FileManager - URL routing failed:', error);
+    // Generate the track URL path (pass folders map to convert UUIDs to paths)
+    let trackUrl = generateTrackUrlPath(track.name, track.folder, folders);
+    
+    // For multitrack tracks, handle step parameter
+    if (track.isMultitrack && track.steps && track.steps.length > 0) {
+      // Check if there's already a step parameter in the current URL
+      const currentUrl = typeof window !== 'undefined' ? window.location.search : '';
+      const hasStepParam = currentUrl.includes('step=');
+      
+      if (hasStepParam) {
+        // Preserve the existing step parameter (user is navigating between steps)
+        trackUrl = `${trackUrl}${currentUrl}`;
+        console.log('FileManager - preserving existing step parameter:', currentUrl);
+      } else {
+        // Add the first step parameter (user is opening a multitrack for the first time)
+        const firstStepName = track.steps[0].name;
+        const firstStepSlug = trackNameToSlug(firstStepName);
+        trackUrl = `${trackUrl}?step=${firstStepSlug}`;
+        console.log('FileManager - multitrack detected, adding first step to URL:', firstStepSlug);
       }
     }
+    // For regular tracks, don't add any step parameter (even if one exists in current URL)
     
+    console.log('FileManager - smooth navigation to track:', track.name, 'URL:', trackUrl);
+    
+    // CRITICAL: Update activePattern (strip /repl/ prefix)
+    const trackPath = trackUrl.replace('/repl/', '');
+    setActivePattern(trackPath);
+    
+    // Use history API for smooth navigation without page reload
+    window.history.pushState({ trackId: track.id, trackName: track.name }, '', trackUrl);
+    
+    // Update document title
+    if (track.isMultitrack && track.steps && track.steps.length > 0) {
+      // Try to get step name from URL if present
+      const stepMatch = trackUrl.match(/step=([^&]+)/);
+      const stepSlug = stepMatch ? stepMatch[1] : null;
+      if (stepSlug) {
+        const step = track.steps.find(s => trackNameToSlug(s.name) === stepSlug);
+        if (step) {
+          document.title = `Strudel REPL - ${track.name} (${step.name})`;
+        } else {
+          document.title = `Strudel REPL - ${track.name} (${track.steps[0].name})`;
+        }
+      } else {
+        document.title = `Strudel REPL - ${track.name} (${track.steps[0].name})`;
+      }
+    } else {
+      document.title = `Strudel REPL - ${track.name}`;
+    }
+    
+    // Dispatch custom event to update the page content
+    window.dispatchEvent(new CustomEvent('strudel-navigate-track', {
+      detail: { track, url: trackUrl }
+    }));
+    
+    // Load the track immediately
     loadTrack(track);
-  }, [selectedTrack, tracks, saveCurrentTrack, context, loadTrack, setSelectedStepTrack]);
+  }, [selectedTrack, tracks, saveCurrentTrack, loadTrack, setSelectedStepTrack, folders]);
 
   const duplicateTrack = useCallback((track: Track) => {
     const trackId = nanoid();
@@ -193,9 +241,14 @@ export function useFileManagerOperations({
     isDeletingTrackRef.current = true;
     
     const trackName = trackToDelete.name;
+    
+    // Check if we're deleting the currently viewed track (from URL)
+    const currentUrlTrackId = window.location.pathname.match(/^\/repl\/([^\/]+)$/)?.[1];
+    const isDeletingCurrentUrlTrack = currentUrlTrackId === trackToDelete.id;
     const isSelectedTrack = selectedTrack === trackToDelete.id;
     
     console.log('FileManager - STARTING deletion process for track:', trackName, 'ID:', trackToDelete.id);
+    console.log('FileManager - Current URL track:', currentUrlTrackId, 'Deleting current URL track:', isDeletingCurrentUrlTrack);
     
     const performDeletion = async () => {
       console.log('FileManager - PERFORMING actual deletion of track:', trackToDelete.id);
@@ -236,7 +289,7 @@ export function useFileManagerOperations({
       toastActions.success(t('files:trackDeleted'));
     };
     
-    if (isSelectedTrack) {
+    if (isDeletingCurrentUrlTrack) {
       const remainingTrackIds = Object.keys(tracks).filter(id => id !== trackToDelete.id);
       
       if (remainingTrackIds.length > 0) {
@@ -244,24 +297,55 @@ export function useFileManagerOperations({
         const nextTrack = tracks[nextTrackId];
         console.log('FileManager - switching to next track before deletion:', nextTrack.name, 'ID:', nextTrackId);
         
-        loadTrack(nextTrack);
-        setTimeout(() => performDeletion(), 100);
-      } else {
-        console.log('FileManager - no tracks left, clearing selection');
-        setSelectedTrack(null);
+        // Use smooth client-side navigation (no page reload)
+        const trackUrl = generateTrackUrlPath(nextTrack.name, nextTrack.folder, folders);
+        console.log('FileManager - smooth navigation to next track:', nextTrack.name, 'URL:', trackUrl);
         
+        // CRITICAL: Update activePattern (strip /repl/ prefix)
+        const trackPath = trackUrl.replace('/repl/', '');
+        setActivePattern(trackPath);
+        
+        // Use history API for smooth navigation
+        window.history.pushState({ trackId: nextTrack.id, trackName: nextTrack.name }, '', trackUrl);
+        
+        // Update document title
+        document.title = `Strudel REPL - ${nextTrack.name}`;
+        
+        // Dispatch custom event to update the page content
+        window.dispatchEvent(new CustomEvent('strudel-navigate-track', {
+          detail: { track: nextTrack, url: trackUrl }
+        }));
+        
+        // Load the next track
+        loadTrack(nextTrack);
+        
+        // Perform deletion after navigation
+        setTimeout(async () => {
+          await performDeletion();
+        }, 100);
+      } else {
+        console.log('FileManager - no tracks left, navigating to main repl');
+        
+        // Use smooth navigation to main repl
+        window.history.pushState({}, '', '/repl');
+        document.title = 'Strudel REPL';
+        
+        // Clear editor
+        setSelectedTrack(null);
         if (context.editorRef?.current?.setCode) {
           context.editorRef.current.setCode('');
         }
         
+        // Perform deletion
         await performDeletion();
         
+        // Dispatch event
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('strudel-all-tracks-deleted'));
         }, 100);
       }
     } else {
-      console.log('FileManager - deleting non-selected track immediately');
+      console.log('FileManager - deleting non-current track, no navigation needed');
       await performDeletion();
     }
   }, [tracks, setTracks, selectedTrack, isDeletingTrackRef, setTrackToDelete, loadTrack, setSelectedTrack, context, t, deleteTrackAPI]);
@@ -664,16 +748,37 @@ export function useFileManagerOperations({
     console.log('FileManager - loading step code:', track.steps[stepIndex].code.substring(0, 50) + '...');
     loadTrack(updatedTrack);
     
-    // Update URL with step information if TrackRouter is available
-    if (context.trackRouter && selectedTrack === trackId) {
+    // Update URL with step information using step name
+    if (selectedTrack === trackId) {
       try {
         console.log('FileManager - updating URL for step:', stepIndex);
-        await context.trackRouter.navigateToTrack(trackId, { step: stepIndex, replace: true, skipUrlUpdate: false });
+        
+        // Generate track URL with step name parameter
+        const trackUrl = generateTrackUrlPath(track.name, track.folder, folders);
+        const stepName = track.steps[stepIndex].name;
+        const stepSlug = trackNameToSlug(stepName);
+        const stepUrl = `${trackUrl}?step=${stepSlug}`;
+        
+        // Update activePattern (strip /repl/ prefix)
+        const stepPath = stepUrl.replace('/repl/', '');
+        setActivePattern(stepPath);
+        
+        // Update browser URL
+        window.history.replaceState(
+          { trackId: track.id, trackName: track.name, step: stepSlug }, 
+          '', 
+          stepUrl
+        );
+        
+        // Update document title
+        document.title = `Strudel REPL - ${track.name} (${stepName})`;
+        
+        console.log('FileManager - step URL updated to:', stepUrl);
       } catch (error) {
         console.error('FileManager - Failed to update URL for step:', error);
       }
     }
-  }, [tracks, selectedTrack, context, setTracks, loadTrack, setSelectedStepTrack]);
+  }, [tracks, selectedTrack, context, setTracks, loadTrack, setSelectedStepTrack, folders]);
 
   const startRenameStep = useCallback((trackId: string, stepIndex: number) => {
     const track = tracks[trackId];

@@ -24,8 +24,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true, // Always enable session persistence
     detectSessionInUrl: true, // Always enable session detection
     flowType: 'pkce', // Use PKCE flow for security
-    // Increase refresh buffer to prevent race conditions
-    refreshTokenRotationEnabled: true,
   },
 });
 
@@ -368,130 +366,6 @@ export const db = {
 
       return { data, error };
     },
-  },
-};
-
-// Migration helpers
-export const migration = {
-  // Check if user has migrated from localStorage
-  hasMigrated: async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return false;
-
-    // Check if user has any tracks (indicates migration has happened)
-    const { data: tracks, error: tracksError } = await supabase
-      .from(TABLES.TRACKS)
-      .select('id')
-      .eq('user_id', user.id)
-      .limit(1);
-
-    if (tracksError) {
-      console.error('Error checking for migrated tracks:', tracksError);
-      return false;
-    }
-
-    // Also check the profile migration flag
-    const { data: profile, error: profileError } = await supabase
-      .from(TABLES.PROFILES)
-      .select('migrated_from_localstorage')
-      .eq('id', user.id)
-      .maybeSingle(); // Use maybeSingle() instead of single()
-
-    if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows returned
-      console.error('Error checking profile migration flag:', profileError);
-    }
-
-    // User has migrated if they have tracks OR the migration flag is set
-    const hasTracks = tracks && tracks.length > 0;
-    const migrationFlagSet = profile?.migrated_from_localstorage === true;
-    
-    return hasTracks || migrationFlagSet;
-  },
-
-  // Migrate localStorage data to Supabase
-  migrateFromLocalStorage: async () => {
-    if (typeof localStorage === 'undefined') {
-      throw new Error('localStorage not available');
-    }
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Not authenticated');
-
-    // Get data from localStorage
-    const tracksData = localStorage.getItem('strudel_tracks');
-    const foldersData = localStorage.getItem('strudel_folders');
-
-    const results = {
-      tracks: { success: 0, errors: [] as any[] },
-      folders: { success: 0, errors: [] as any[] },
-    };
-
-    // Migrate tracks
-    if (tracksData) {
-      try {
-        const tracks = JSON.parse(tracksData);
-        const trackArray = Object.values(tracks) as any[];
-
-        if (trackArray.length > 0) {
-          const { data, error } = await db.tracks.bulkInsert(trackArray);
-          if (error) {
-            results.tracks.errors.push(error);
-          } else {
-            results.tracks.success = data?.length || 0;
-          }
-        }
-      } catch (error) {
-        results.tracks.errors.push(error);
-      }
-    }
-
-    // Migrate folders
-    if (foldersData) {
-      try {
-        const folders = JSON.parse(foldersData);
-        const folderArray = Object.values(folders) as any[];
-
-        if (folderArray.length > 0) {
-          const { data, error } = await db.folders.bulkInsert(folderArray);
-          if (error) {
-            results.folders.errors.push(error);
-          } else {
-            results.folders.success = data?.length || 0;
-          }
-        }
-      } catch (error) {
-        results.folders.errors.push(error);
-      }
-    }
-
-    // Set migration flag in user profile
-    try {
-      await db.profiles.update({
-        migrated_from_localstorage: true,
-        updated_at: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error setting migration flag:', error);
-      // Don't fail the migration if we can't set the flag
-    }
-
-    return results;
-  },
-
-  // Clear localStorage after successful migration
-  clearLocalStorage: () => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('strudel_tracks');
-      localStorage.removeItem('strudel_folders');
-      // Don't set a localStorage flag - we use Supabase profile flag instead
-    }
-  },
-
-  // Check if localStorage has been cleared (deprecated - use hasMigrated instead)
-  isLocalStorageCleared: () => {
-    // Always return true since we don't use localStorage flags anymore
-    // Migration status is tracked in Supabase profile
-    return true;
   },
 };
 

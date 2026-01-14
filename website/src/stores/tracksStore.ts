@@ -370,15 +370,15 @@ export const tracksActions = {
   /**
    * Initialize with coordination and callbacks
    */
-  initializeWithCoordination(ssrData: any, onComplete: (randomTrack: Track | null) => void): void {
+  initializeWithCoordination(ssrData: any, onComplete: (selectedTrack: Track | null) => void): void {
     const currentState = tracksStore.get();
 
     // Prevent multiple initializations
     if (currentState.initializationPromise) {
       currentState.initializationPromise.then(() => {
         const state = tracksStore.get();
-        const randomTrack = state.randomTrackSelected ? tracksActions.selectRandomTrack() : null;
-        onComplete(randomTrack);
+        const selectedTrack = state.selectedTrack ? state.tracks[state.selectedTrack] : null;
+        onComplete(selectedTrack);
       });
       return;
     }
@@ -393,18 +393,51 @@ export const tracksActions = {
       // Initialize with SSR data
       tracksActions.initializeWithSSR(ssrData);
 
-      // Select random track if tracks are available
-      const updatedState = tracksStore.get();
-      const randomTrack = tracksActions.selectRandomTrack();
+      // Check for target track slug from SSR data (path-based routing)
+      let targetTrack: Track | null = null;
+      let shouldSelectRandom = true;
+      
+      const targetTrackSlug = ssrData?.targetTrackSlug;
+      const targetFolderPath = ssrData?.targetFolderPath;
+      
+      if (targetTrackSlug) {
+        console.log('TracksStore: Found target track slug from path:', targetTrackSlug, 'in folder:', targetFolderPath || 'root');
+        const updatedState = tracksStore.get();
+        
+        // Find track by slug and folder path
+        const tracks = Object.values(updatedState.tracks);
+        targetTrack = tracks.find(track => {
+          const trackSlug = track.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+          const trackMatches = trackSlug === targetTrackSlug;
+          const folderMatches = (track.folder || null) === (targetFolderPath || null);
+          return trackMatches && folderMatches;
+        }) || null;
+        
+        if (targetTrack) {
+          console.log('TracksStore: Loading specific track from path:', targetTrack.name, 'ID:', targetTrack.id);
+          shouldSelectRandom = false;
+        } else {
+          console.warn('TracksStore: Track from path not found in loaded tracks:', targetTrackSlug, 'folder:', targetFolderPath);
+        }
+      } else {
+        console.log('TracksStore: No target track slug provided');
+      }
 
+      // Only select random track if no specific track was requested
+      if (shouldSelectRandom) {
+        console.log('TracksStore: No specific track requested, selecting random track');
+        targetTrack = tracksActions.selectRandomTrack();
+      }
+
+      const updatedState = tracksStore.get();
       tracksStore.set({
         ...updatedState,
-        randomTrackSelected: randomTrack !== null,
+        randomTrackSelected: shouldSelectRandom && targetTrack !== null,
         loadingPhase: 'complete',
-        selectedTrack: randomTrack?.id || null,
+        selectedTrack: targetTrack?.id || null,
       });
 
-      onComplete(randomTrack);
+      onComplete(targetTrack);
       resolve();
     });
 
@@ -425,11 +458,16 @@ export const tracksActions = {
     }
 
     const finalState = tracksStore.get();
-    const randomTrack = finalState.randomTrackSelected ? tracksActions.selectRandomTrack() : null;
+    
+    // Return the selected track (could be from URL or random)
+    let selectedTrack: Track | null = null;
+    if (finalState.selectedTrack) {
+      selectedTrack = finalState.tracks[finalState.selectedTrack] || null;
+    }
 
     return {
       hasData: tracksActions.hasData(),
-      randomTrack,
+      randomTrack: selectedTrack, // This could be URL track or random track
     };
   },
 

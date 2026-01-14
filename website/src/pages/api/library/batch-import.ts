@@ -168,7 +168,7 @@ export const POST: APIRoute = async ({ request }) => {
             code: track.code || '',
             created: new Date().toISOString(),
             modified: new Date().toISOString(),
-            folder: track.folder ? folderPathToUuidMap.get(track.folder) || null : null, // Convert folder path to UUID
+            folder: track.folder || null, // Keep folder path as-is, don't convert to UUID
             is_multitrack: track.isMultitrack || false,
             steps: track.steps,
             active_step: track.activeStep || 0

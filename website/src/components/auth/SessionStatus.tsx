@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { CheckCircleIcon, ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
@@ -8,7 +8,7 @@ interface SessionStatusProps {
 }
 
 export function SessionStatus({ className = '', showOnlyWhenIssues = false }: SessionStatusProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [sessionStatus, setSessionStatus] = useState<'healthy' | 'checking' | 'warning' | 'error'>('healthy');
   const [lastCheck, setLastCheck] = useState<Date | null>(null);
 

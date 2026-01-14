@@ -124,7 +124,7 @@ export const PUT: APIRoute = async ({ request }) => {
       });
     }
 
-    console.log('API /tracks/update - track updated successfully:', updatedTrack.id);
+    console.log('API /tracks/update - track updated successfully:', updatedTrack.id, 'name:', updatedTrack.name);
 
     return new Response(JSON.stringify({ 
       success: true,

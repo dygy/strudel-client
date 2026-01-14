@@ -151,11 +151,23 @@ export async function loadDBPatterns(): Promise<void> {
 }
 
 // reason: https://codeberg.org/uzu/strudel/issues/857
-const $activePattern = sessionAtom('activePattern', '');
+// URL is the source of truth - no need for sessionStorage
+const $activePattern = atom('');
+
+// Initialize from URL on startup
+if (typeof window !== 'undefined' && window.location.pathname.startsWith('/repl/')) {
+  // Strip /repl/ prefix - just use the track path
+  const trackPath = window.location.pathname.replace('/repl/', '') + window.location.search;
+  $activePattern.set(trackPath);
+  console.log('Initialized activePattern from URL:', trackPath);
+}
 
 export function setActivePattern(key: string | null): void {
   const oldPattern = $activePattern.get();
   $activePattern.set(key);
+  
+  // NOTE: Don't update URL here - navigation functions handle that
+  // setActivePattern only updates the state to match what navigation already did
   
   // If this is a new pattern (not just switching between existing ones), 
   // trigger synchronization check

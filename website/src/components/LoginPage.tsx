@@ -66,7 +66,7 @@ export default function LoginPage({ error, hasTrack }: LoginPageProps) {
       const urlParams = new URLSearchParams(window.location.search);
       const trackId = urlParams.get('track');
       if (trackId) {
-        sessionStorage.setItem('strudel_redirect_after_auth', `/repl?track=${trackId}`);
+        sessionStorage.setItem('strudel_redirect_after_auth', `/repl/${trackId}`);
       } else {
         sessionStorage.setItem('strudel_redirect_after_auth', '/repl');
       }

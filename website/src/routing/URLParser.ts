@@ -1,6 +1,8 @@
+import { findTrackBySlug, trackNameToSlug } from '@src/lib/slugUtils';
+
 /**
- * Utility class for parsing and managing URL query parameters
- * for track routing navigation
+ * Utility class for parsing and managing URL parameters
+ * for track routing navigation with name-based routing support
  */
 export class URLParser {
   /**
@@ -35,11 +37,33 @@ export class URLParser {
   }
 
   /**
-   * Get current track ID from URL
+   * Get current track identifier from URL (could be ID or name slug)
    */
-  static getCurrentTrackId(): string | null {
+  static getCurrentTrackIdentifier(): string | null {
+    // Check path-based routing first: /repl/track-name
+    const pathMatch = window.location.pathname.match(/^\/repl\/([^\/]+)$/);
+    if (pathMatch) {
+      return decodeURIComponent(pathMatch[1]);
+    }
+    
+    // Fallback to query parameter for backward compatibility
     const params = this.parseQueryParams();
     return params.track || null;
+  }
+
+  /**
+   * Find track by current URL identifier
+   */
+  static findCurrentTrack(tracks: Array<{id: string, name: string}>): {id: string, name: string} | null {
+    const identifier = this.getCurrentTrackIdentifier();
+    if (!identifier || !tracks.length) return null;
+
+    // First try to find by exact ID (for backward compatibility)
+    const byId = tracks.find(track => track.id === identifier);
+    if (byId) return byId;
+
+    // Then try to find by name slug
+    return findTrackBySlug(tracks, identifier);
   }
 
   /**
@@ -57,28 +81,39 @@ export class URLParser {
   }
 
   /**
-   * Update URL with new track ID and optional step
+   * Update URL with track name (converted to slug) and optional step
    */
-  static updateTrackInURL(trackId: string | null, replace: boolean = false, step?: number): void {
-    const currentParams = this.parseQueryParams();
+  static updateTrackInURL(trackNameOrUrl: string | null, replace: boolean = false, step?: number): void {
+    let newUrl: string;
     
-    if (trackId) {
-      currentParams.track = trackId;
-      
-      // Add step parameter if provided
-      if (step !== undefined && step >= 0) {
-        currentParams.step = step.toString();
+    if (trackNameOrUrl) {
+      // If it's already a full URL path, use it directly
+      if (trackNameOrUrl.startsWith('/repl/')) {
+        newUrl = trackNameOrUrl;
       } else {
-        // Remove step parameter if not provided or invalid
-        delete currentParams.step;
+        // Otherwise, treat it as a track name and convert to slug
+        const slug = trackNameToSlug(trackNameOrUrl);
+        newUrl = `/repl/${encodeURIComponent(slug)}`;
+      }
+      
+      // Add step parameter as query if provided
+      if (step !== undefined && step >= 0) {
+        newUrl += `?step=${step}`;
+      }
+      
+      // Preserve hash
+      if (window.location.hash) {
+        newUrl += window.location.hash;
       }
     } else {
-      delete currentParams.track;
-      delete currentParams.step;
+      // No track, go to main repl
+      newUrl = '/repl';
+      
+      // Preserve hash
+      if (window.location.hash) {
+        newUrl += window.location.hash;
+      }
     }
-    
-    const queryString = this.buildQueryString(currentParams);
-    const newUrl = `${window.location.pathname}${queryString}${window.location.hash}`;
     
     if (replace) {
       window.history.replaceState(null, '', newUrl);
@@ -88,10 +123,26 @@ export class URLParser {
   }
 
   /**
-   * Check if URL has track parameter
+   * Navigate to track using smooth client-side navigation (no page reload)
+   */
+  static navigateToTrack(trackName: string): void {
+    const slug = trackNameToSlug(trackName);
+    const url = `/repl/${encodeURIComponent(slug)}`;
+    
+    // Use smooth navigation instead of page reload
+    window.history.pushState({ trackName }, '', url);
+    
+    // Dispatch navigation event for the app to handle
+    window.dispatchEvent(new CustomEvent('strudel-url-navigation', {
+      detail: { trackName, url }
+    }));
+  }
+
+  /**
+   * Check if URL has track parameter (path or query)
    */
   static hasTrackInURL(): boolean {
-    return this.getCurrentTrackId() !== null;
+    return this.getCurrentTrackIdentifier() !== null;
   }
 
   /**
@@ -99,5 +150,13 @@ export class URLParser {
    */
   static clearTrackFromURL(replace: boolean = true): void {
     this.updateTrackInURL(null, replace);
+  }
+
+  // Legacy methods for backward compatibility
+  /**
+   * @deprecated Use getCurrentTrackIdentifier() instead
+   */
+  static getCurrentTrackId(): string | null {
+    return this.getCurrentTrackIdentifier();
   }
 }

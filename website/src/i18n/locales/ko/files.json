@@ -53,6 +53,8 @@
   
   "rightClickForOptions": "더 많은 옵션을 보려면 트랙을 우클릭하세요",
   "currentTrack": "현재",
+  "editing": "편집 중",
+  "playing": "재생 중",
   "saveChanges": "변경사항 저장",
   "trackName": "트랙 이름",
   "create": "생성",

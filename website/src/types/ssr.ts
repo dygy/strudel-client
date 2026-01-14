@@ -37,6 +37,14 @@ export interface SSRData {
   folders: SSRFolder[];
   // Optional hierarchical format for tracksStore compatibility
   hierarchical?: TreeResponse;
+  // Target track ID for direct loading from URL path (legacy)
+  targetTrackId?: string | null;
+  // Target track slug for matching by name instead of ID
+  targetTrackSlug?: string | null;
+  // Target folder path for the track
+  targetFolderPath?: string | null;
+  // Target step name for multitrack tracks
+  targetStepName?: string | null;
 }
 
 // Hierarchical tree structure returned by /api/tracks/list

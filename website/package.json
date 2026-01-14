@@ -78,6 +78,7 @@
     "worker-timers": "^8.0.13"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.6",
     "@vite-pwa/astro": "^0.5.0",
     "html-escaper": "^3.0.3",
     "sharp": "^0.33.5",

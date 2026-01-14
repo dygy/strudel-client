@@ -10,7 +10,6 @@ import { nanoid } from 'nanoid';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 
 // Import our new components and hooks
-import { useFileManager } from './hooks/useFileManager';
 import { useFileManagerOperations } from './hooks/useFileManagerOperations';
 import { FileManagerHeader } from './components/FileManagerHeader';
 import { FileManagerFooter } from './components/FileManagerFooter';
@@ -233,17 +232,27 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
           // Import to appropriate storage based on file manager type
           if (fileManagerHook && fileManagerHook.isAuthenticated && fileManagerHook.createTrack) {
             // Import to Supabase
+            console.log('FileManager - Importing track to Supabase:', trackName, 'code length:', content.length);
             const createdTrack = await fileManagerHook.createTrack(trackName, content);
             if (createdTrack) {
+              console.log('FileManager - Track created in database:', createdTrack.id, 'code length:', createdTrack.code?.length);
               toastActions.success(t('files:trackImported', { name: trackName }));
-              // Load the imported track with a small delay
-              await new Promise(resolve => setTimeout(resolve, 100));
+              
+              // Wait a bit longer to ensure database write is complete
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
+              // Navigate to the imported track URL
+              window.history.pushState({}, '', `/repl/${createdTrack.id}`);
+              
+              // Load the imported track
               fileManagerHook.loadTrack(createdTrack);
 
               // Dispatch event to notify other components that tracks were imported
               setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('strudel-tracks-imported'));
               }, 150);
+            } else {
+              console.error('FileManager - Failed to create track in database');
             }
           } else {
             // Import to localStorage
@@ -263,6 +272,9 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
             // Update FileManager state
             fileManagerState.setTracks(prev => ({ ...prev, [newTrack.id]: newTrack }));
             toastActions.success(t('files:trackImported', { name: trackName }));
+
+            // Navigate to the imported track URL
+            window.history.pushState({}, '', `/repl/${newTrack.id}`);
 
             // Load the imported track with a small delay
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -811,7 +823,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
 
   return (
     <div
-      className={`h-full flex flex-col bg-lineHighlight text-foreground ${
+      className={`h-full flex flex-col bg-lineHighlight text-foreground relative ${
         fileManagerState.isDragOver ? 'bg-blue-900/20 border-2 border-blue-500 border-dashed' : ''
       }`}
       onDragOver={handleDragOver}
@@ -878,43 +890,45 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
         getEmptySpaceContextItems={getEmptySpaceContextItems}
       />
 
-      <FileTree
-        key={`${Object.keys(fileManagerState.tracks).length}-${Object.keys(fileManagerState.folders).length}`}
-        tracks={fileManagerState.tracks}
-        folders={fileManagerState.folders}
-        selectedTrack={fileManagerState.selectedTrack}
-        activePattern={fileManagerState.activePattern}
-        onTrackSelect={operations.handleTrackSelect}
-        onTrackRename={operations.handleTrackRename}
-        onTrackDelete={operations.deleteTrack}
-        onTrackDuplicate={operations.duplicateTrack}
-        onTrackInfo={handleTrackInfo}
-        onTrackDownload={operations.downloadTrack}
-        onFolderDownload={operations.downloadFolder}
-        onTrackCreate={operations.handleTrackCreate}
-        onFolderCreate={operations.handleFolderCreate}
-        onFolderRename={operations.handleFolderRename}
-        onFolderDelete={operations.deleteFolder}
-        onMoveItem={operations.handleMoveItem}
-        renamingTrack={fileManagerState.renamingTrack}
-        renamingFolder={fileManagerState.renamingFolder}
-        renameValue={fileManagerState.renameValue}
-        setRenameValue={fileManagerState.setRenameValue}
-        onRenameFinish={fileManagerState.renamingTrack ? operations.finishRename : operations.finishRenameFolder}
-        onRenameCancel={operations.cancelRename}
-        emptySpaceContextItems={getEmptySpaceContextItems()}
-        onConvertToMultitrack={operations.convertToMultitrack}
-        onAddStep={(trackId) => {
-          fileManagerState.setSelectedStepTrack(trackId);
-          fileManagerState.setIsCreatingStep(true);
-        }}
-        onSwitchStep={operations.switchToStep}
-        onRenameStep={operations.startRenameStep}
-        onDeleteStep={operations.deleteStep}
-        renamingStep={fileManagerState.renamingStep}
-        onRenameStepFinish={operations.finishRenameStep}
-        onRenameStepCancel={operations.cancelRename}
-      />
+      <div className="flex-1 overflow-hidden mb-16">
+        <FileTree
+          key={`${Object.keys(fileManagerState.tracks).length}-${Object.keys(fileManagerState.folders).length}`}
+          tracks={fileManagerState.tracks}
+          folders={fileManagerState.folders}
+          selectedTrack={fileManagerState.selectedTrack}
+          activePattern={fileManagerState.activePattern}
+          onTrackSelect={operations.handleTrackSelect}
+          onTrackRename={operations.handleTrackRename}
+          onTrackDelete={operations.deleteTrack}
+          onTrackDuplicate={operations.duplicateTrack}
+          onTrackInfo={handleTrackInfo}
+          onTrackDownload={operations.downloadTrack}
+          onFolderDownload={operations.downloadFolder}
+          onTrackCreate={operations.handleTrackCreate}
+          onFolderCreate={operations.handleFolderCreate}
+          onFolderRename={operations.handleFolderRename}
+          onFolderDelete={operations.deleteFolder}
+          onMoveItem={operations.handleMoveItem}
+          renamingTrack={fileManagerState.renamingTrack}
+          renamingFolder={fileManagerState.renamingFolder}
+          renameValue={fileManagerState.renameValue}
+          setRenameValue={fileManagerState.setRenameValue}
+          onRenameFinish={fileManagerState.renamingTrack ? operations.finishRename : operations.finishRenameFolder}
+          onRenameCancel={operations.cancelRename}
+          emptySpaceContextItems={getEmptySpaceContextItems()}
+          onConvertToMultitrack={operations.convertToMultitrack}
+          onAddStep={(trackId) => {
+            fileManagerState.setSelectedStepTrack(trackId);
+            fileManagerState.setIsCreatingStep(true);
+          }}
+          onSwitchStep={operations.switchToStep}
+          onRenameStep={operations.startRenameStep}
+          onDeleteStep={operations.deleteStep}
+          renamingStep={fileManagerState.renamingStep}
+          onRenameStepFinish={operations.finishRenameStep}
+          onRenameStepCancel={operations.cancelRename}
+        />
+      </div>
 
       <FileManagerFooter
         selectedTrack={fileManagerState.selectedTrack}

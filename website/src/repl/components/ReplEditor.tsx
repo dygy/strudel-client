@@ -13,8 +13,9 @@ import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 import { GlobalToastContainer } from '@src/components/GlobalToastContainer';
 import { useTranslation } from '@src/i18n';
 import { nanoid } from 'nanoid';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, memo, useRef } from 'react';
 import { getPendingCode, clearPendingCode, getEditorInstance } from '../../stores/editorStore';
+import { globalSaveManager } from '../globalSaveManager';
 
 interface ReplContext {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -54,61 +55,67 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
   useEffect(() => {
     if (ssrData && !tracks.isInitialized) {
       console.log('🔥 ReplEditor: Initializing tracks store with SSR data and coordination');
-      
+
       // Use the hierarchical format for tracksStore coordination
-      const hierarchicalData = (ssrData as any).hierarchical || ssrData;
-      
-      // Use the new coordination method that includes random track selection
-      tracks.initializeWithCoordination(hierarchicalData, (randomTrack) => {
-        if (randomTrack) {
-          console.log('🔥 ReplEditor: Random track selected:', randomTrack.name);
-          
+      // Pass the entire ssrData object which includes targetTrackSlug and targetFolderPath
+      const hierarchicalData = (ssrData as any).hierarchical 
+        ? { 
+            ...ssrData, 
+            children: (ssrData as any).hierarchical.children 
+          }
+        : ssrData;
+
+      // Use the new coordination method that includes track selection (URL or random)
+      tracks.initializeWithCoordination(hierarchicalData, (selectedTrack) => {
+        if (selectedTrack) {
+          console.log('🔥 ReplEditor: Track selected:', selectedTrack.name, 'ID:', selectedTrack.id);
+
           // Update the file manager's selected track state
           if (fileManagerHook && typeof fileManagerHook === 'object' && fileManagerHook.setSelectedTrack) {
             console.log('🔥 ReplEditor: Updating file manager selected track');
-            console.log('🔥 ReplEditor: Random track folder:', randomTrack.folder);
+            console.log('🔥 ReplEditor: Track folder:', selectedTrack.folder);
             console.log('🔥 ReplEditor: FileManager tracks count:', Object.keys(fileManagerHook.tracks || {}).length);
-            
-            fileManagerHook.setSelectedTrack(randomTrack.id);
-            
+
+            fileManagerHook.setSelectedTrack(selectedTrack.id);
+
             // Force folder expansion by dispatching a custom event
             // This will trigger any listeners that need to expand folders
-            if (randomTrack.folder) {
+            if (selectedTrack.folder) {
               setTimeout(() => {
                 const expandEvent = new CustomEvent('strudel-expand-folder', {
-                  detail: { 
-                    trackId: randomTrack.id,
-                    folderPath: randomTrack.folder,
-                    trackName: randomTrack.name
+                  detail: {
+                    trackId: selectedTrack.id,
+                    folderPath: selectedTrack.folder,
+                    trackName: selectedTrack.name
                   }
                 });
                 window.dispatchEvent(expandEvent);
-                console.log('🔥 ReplEditor: Dispatched folder expansion event for:', randomTrack.folder);
+                console.log('🔥 ReplEditor: Dispatched folder expansion event for:', selectedTrack.folder);
               }, 100);
             }
-            
+
             // Small delay to ensure the FileTree component processes the selectedTrack change
             // and expands the necessary folders
             setTimeout(() => {
-              console.log('🔥 ReplEditor: FileTree should have expanded folders for track:', randomTrack.name);
-              if (randomTrack.folder) {
-                console.log('🔥 ReplEditor: Track is in folder:', randomTrack.folder);
+              console.log('🔥 ReplEditor: FileTree should have expanded folders for track:', selectedTrack.name);
+              if (selectedTrack.folder) {
+                console.log('🔥 ReplEditor: Track is in folder:', selectedTrack.folder);
               } else {
                 console.log('🔥 ReplEditor: Track is in root folder');
               }
             }, 200);
           }
-          
-          // Load the random track code into the editor
-          if (randomTrack.code) {
+
+          // Load the selected track code into the editor
+          if (selectedTrack.code) {
             // Method 1: Use context.editorRef
             if (context.editorRef?.current?.setCode) {
-              context.editorRef.current.setCode(randomTrack.code);
+              context.editorRef.current.setCode(selectedTrack.code);
             }
 
             // Method 2: Use stored editor instance
             if (getEditorInstance()?.setCode) {
-              getEditorInstance().setCode(randomTrack.code);
+              getEditorInstance().setCode(selectedTrack.code);
             }
 
             // Method 3: Direct CodeMirror manipulation as fallback
@@ -117,7 +124,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
               if (cmEditor) {
                 const cmView = (cmEditor as any).cmView || getEditorInstance()?.editor;
                 if (cmView && cmView.dispatch) {
-                  const changes = { from: 0, to: cmView.state.doc.length, insert: randomTrack.code };
+                  const changes = { from: 0, to: cmView.state.doc.length, insert: selectedTrack.code };
                   cmView.dispatch({ changes });
                 }
               }
@@ -161,7 +168,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
     // Listen for track loading events
     const handleTrackLoaded = (event: CustomEvent) => {
       console.log('ReplEditor - track loaded event received:', event.detail);
-      const { trackId, code } = event.detail;
+      const { code } = event.detail;
 
       // AGGRESSIVE: Ensure the editor shows the loaded code using multiple methods
       if (code) {
@@ -197,7 +204,6 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
     // Listen for editor ready events
     const handleEditorReady = (event: CustomEvent) => {
       console.log('ReplEditor - editor ready event received:', event.detail);
-      const { activePattern } = event.detail;
 
       // Check if there's pending code to load
       const pendingCode = getPendingCode();
@@ -291,6 +297,112 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
     }
   };
 
+  // CRITICAL: Register with global save manager to prevent data loss on page unload
+  // Use refs to prevent unnecessary re-registrations
+  const fileManagerRef = useRef(fileManagerHook);
+  const contextRef = useRef(context);
+  
+  useEffect(() => {
+    fileManagerRef.current = fileManagerHook;
+    contextRef.current = context;
+  }, [fileManagerHook, context]);
+
+  useEffect(() => {
+    if (fileManagerRef.current && contextRef.current) {
+      console.log('ReplEditor: Registering with global save manager');
+      globalSaveManager.register(fileManagerRef.current, contextRef.current);
+
+      return () => {
+        console.log('ReplEditor: Unregistering from global save manager');
+        globalSaveManager.unregister();
+      };
+    }
+  }, []); // Empty dependency array to register only once
+
+  // Handle smooth track navigation without page reloads
+  useEffect(() => {
+    const handleSmoothNavigation = (event: CustomEvent) => {
+      const { track, url } = event.detail;
+      console.log('ReplEditor: Smooth navigation to track:', track.name, 'URL:', url);
+      
+      // Note: Track is already loaded by handleTrackSelect, no need to load again
+      // Just update the document title
+      if (!document.title.includes(track.name)) {
+        document.title = `Strudel REPL - ${track.name}`;
+      }
+    };
+
+    // Listen for smooth navigation events
+    window.addEventListener('strudel-navigate-track', handleSmoothNavigation as EventListener);
+
+    // Handle browser back/forward buttons with smooth navigation
+    const handlePopState = () => {
+      console.log('ReplEditor: Browser navigation detected, URL:', window.location.pathname);
+      
+      // Parse the current URL to find the track
+      const currentPath = window.location.pathname;
+      
+      if (currentPath === '/repl') {
+        // Navigated to main repl page
+        console.log('ReplEditor: Navigated to main repl page');
+        document.title = 'Strudel REPL';
+        
+        // Clear selection if needed
+        if (fileManagerHook && typeof fileManagerHook === 'object' && fileManagerHook.setSelectedTrack) {
+          fileManagerHook.setSelectedTrack(null);
+        }
+        
+        return;
+      }
+      
+      // Try to find the track from the URL path
+      if (fileManagerHook && typeof fileManagerHook === 'object' && fileManagerHook.tracks) {
+        const tracks = Object.values(fileManagerHook.tracks);
+        
+        // Parse the URL path to extract folder and track info
+        const pathMatch = currentPath.match(/^\/repl\/(.+)$/);
+        if (pathMatch) {
+          const fullPath = pathMatch[1];
+          const segments = fullPath.split('/');
+          const trackSlug = segments.pop();
+          const folderPath = segments.length > 0 ? segments.join('/') : null;
+          
+          // Find the track by folder and slug
+          const track = tracks.find((t: any) => {
+            const trackMatches = t.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') === trackSlug;
+            const folderMatches = (t.folder || null) === folderPath;
+            return trackMatches && folderMatches;
+          });
+          
+          if (track) {
+            console.log('ReplEditor: Found track for browser navigation:', (track as any).name);
+            fileManagerHook.loadTrack(track);
+            document.title = `Strudel REPL - ${(track as any).name}`;
+            return;
+          }
+        }
+      }
+      
+      // If we can't find the track, stay on current page
+      console.log('ReplEditor: Could not find track for URL, staying on current page');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('strudel-navigate-track', handleSmoothNavigation as EventListener);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [fileManagerHook]);
+
+  // Update context with file manager hook for emergency save
+  useEffect(() => {
+    if (context && fileManagerHook) {
+      // Store file manager hook in context for emergency save access
+      (context as any).fileManagerHook = fileManagerHook;
+    }
+  }, [context, fileManagerHook]);
+
   return (
     <div className="h-full flex flex-col relative" {...editorProps}>
       <Loader active={pending} />
@@ -333,4 +445,4 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
   );
 }
 
-export default React.memo(ReplEditor);
+export default memo(ReplEditor);

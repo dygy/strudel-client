@@ -144,6 +144,14 @@ export class TreeDataTransformer {
     sanitizedFolderItems.forEach(folder => {
       folderMap.set(folder.id, folder);
     });
+    
+    // Also create a path-to-folder map for tracks that store folder paths
+    const folderPathMap = new Map<string, TreeItem>();
+    sanitizedFolderItems.forEach(folder => {
+      if (folder.path) {
+        folderPathMap.set(folder.path, folder);
+      }
+    });
 
     // Build folder hierarchy using UUIDs only
     // Process folders in dependency order: parents first, then children
@@ -226,11 +234,12 @@ export class TreeDataTransformer {
         parentFolder = folderMap.get(originalTrack.folder);
         
         if (!parentFolder) {
-          // Fallback: try to find by path (for backward compatibility)
-          parentFolder = folderItems.find(f => f.path === originalTrack.folder) || root;
+          // Fallback: try to find by path (for tracks that store folder paths)
+          parentFolder = folderPathMap.get(originalTrack.folder);
           
-          if (parentFolder === root) {
+          if (!parentFolder) {
             console.warn(`TreeDataTransformer - Folder not found for track "${track.name}", folder reference: "${originalTrack.folder}", placing in root`);
+            parentFolder = root;
           } else {
             console.log(`TreeDataTransformer - Found folder by path for track "${track.name}": "${parentFolder.name}"`);
           }

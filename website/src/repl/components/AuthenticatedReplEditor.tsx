@@ -1,7 +1,6 @@
 import React from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { AuthInitializer } from '../../components/auth/AuthInitializer';
-import { MigrationModal } from '@components/auth/MigrationModal';
 import ReplEditor from './ReplEditor';
 import { useSupabaseFileManager } from './sidebar/hooks/useSupabaseFileManager';
 import { useReplContext } from '../useReplContext';
@@ -66,15 +65,6 @@ function AuthenticatedReplContent({ context: externalContext, ssrData, ...editor
   // Only authenticated users can access the REPL - always use Supabase storage
   return (
     <div className="h-full flex flex-col relative" {...editorProps}>
-      {/* Migration Modal */}
-      {supabaseFileManager && typeof supabaseFileManager === 'object' && supabaseFileManager.isAuthenticated && (
-        <MigrationModal
-          isOpen={supabaseFileManager.showMigrationModal}
-          onClose={() => supabaseFileManager.setShowMigrationModal(false)}
-          onMigrationComplete={supabaseFileManager.handleMigrationComplete}
-        />
-      )}
-
       {/* Sync Error Display */}
       {supabaseFileManager && typeof supabaseFileManager === 'object' && supabaseFileManager.isAuthenticated && supabaseFileManager.syncError && (
         <div className="absolute top-16 right-4 z-40 bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded-lg max-w-sm">

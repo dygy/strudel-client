@@ -52,6 +52,8 @@
   
   "rightClickForOptions": "Haz clic derecho en las pistas para más opciones",
   "currentTrack": "Actual",
+  "editing": "Editando",
+  "playing": "Reproduciendo",
   "saveChanges": "Guardar cambios",
   "trackName": "Nombre de pista",
   "create": "Crear",

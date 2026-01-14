@@ -248,22 +248,6 @@ export interface AuthTranslations {
     signInButton: string;
     signInFooter: string;
   };
-  migration: {
-    title: string;
-    subtitle: string;
-    hasLocalData: string;
-    noLocalData: string;
-    migrationDescription: string;
-    migrate: string;
-    skip: string;
-    checking: string;
-    migrating: string;
-    success: string;
-    error: string;
-    retry: string;
-    migratedTracks: string;
-    migratedFolders: string;
-  };
   profile: {
     title: string;
     email: string;
@@ -275,7 +259,6 @@ export interface AuthTranslations {
   errors: {
     signInFailed: string;
     signOutFailed: string;
-    migrationFailed: string;
     notAuthenticated: string;
     sessionExpired: string;
     networkError: string;

@@ -1,0 +1,266 @@
+---
+// Dynamic REPL page for tracks with folder support: /repl/folder1/folder2/track-name
+import HeadCommon from '../../components/HeadCommon.astro';
+import { Repl } from '../../repl/Repl';
+import { I18nProvider } from '../../components/I18nProvider';
+import { createClient } from '@supabase/supabase-js';
+import { TreeDataTransformer } from '../../lib/TreeDataTransformer';
+import { parseTrackUrlPath, trackNameToSlug } from '../../lib/slugUtils';
+
+import type { SSRData } from '../../types/ssr';
+
+export const prerender = false; // Enable SSR for authenticated data
+
+// Get track path from URL params (supports folder/track structure)
+const { trackPath } = Astro.params;
+const fullPath = Array.isArray(trackPath) ? trackPath.join('/') : trackPath || '';
+
+// Extract step parameter from query string
+const url = new URL(Astro.request.url);
+const stepParam = url.searchParams.get('step');
+
+console.log('REPL SSR - Processing track path:', fullPath, 'step:', stepParam);
+
+// If no track path provided (just /repl), we'll redirect to a random track later
+let parsedPath: { folderPath: string | null; trackSlug: string } | null = null;
+
+if (fullPath) {
+  const fullUrl = `/repl/${fullPath}`;
+  parsedPath = parseTrackUrlPath(fullUrl);
+  
+  if (!parsedPath) {
+    console.error('REPL SSR - Invalid track path format:', fullUrl);
+    // Will redirect to random track below
+  } else {
+    console.log('REPL SSR - Parsed path:', parsedPath);
+  }
+}
+
+const { folderPath, trackSlug } = parsedPath || { folderPath: null, trackSlug: '' };
+
+// SSR data fetching for authenticated users
+let ssrData: SSRData | null = null;
+let targetTrackId: string | null = null;
+let targetTrackSlug: string | null = null;
+let targetStepName: string | null = stepParam;
+
+try {
+  // Get access token from cookies
+  const accessToken = Astro.cookies.get('sb-access-token')?.value;
+
+  if (accessToken) {
+    console.log('REPL SSR - Access token found, fetching user data for track path:', { folderPath, trackSlug });
+
+    const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (supabaseUrl && supabaseServiceKey && !supabaseUrl.includes('placeholder')) {
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      // Verify the user token
+      const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
+
+      if (user && !userError) {
+        console.log('REPL SSR - User verified:', user.id);
+
+        // Get tracks from database
+        const { data: tracksData, error: tracksError } = await supabase
+          .from('tracks')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('modified', { ascending: false });
+
+        // Get folders from database
+        const { data: foldersData, error: foldersError } = await supabase
+          .from('folders')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created', { ascending: true });
+
+        if (!tracksError && !foldersError) {
+          // Convert to expected format
+          const tracks = (tracksData || []).map(track => ({
+            id: track.id,
+            name: track.name,
+            code: track.code || '',
+            created: track.created,
+            modified: track.modified,
+            folder: track.folder,
+            isMultitrack: track.is_multitrack || false,
+            steps: track.steps || [],
+            activeStep: track.active_step || 0,
+            user_id: track.user_id,
+          }));
+
+          const folders = (foldersData || []).map(folder => ({
+            id: folder.id,
+            name: folder.name,
+            path: folder.path,
+            parent: folder.parent,
+            created: folder.created,
+            user_id: folder.user_id,
+          }));
+
+          // Find track by folder path and track slug (if provided)
+          let targetTrack = null;
+          
+          if (trackSlug) {
+            // Match tracks by folder PATH (not ID) since tracks now store folder paths
+            targetTrack = tracks.find(track => {
+              const trackMatches = trackNameToSlug(track.name) === trackSlug;
+              const folderMatches = (track.folder || null) === (folderPath || null);
+              return trackMatches && folderMatches;
+            }) || null;
+            
+            console.log('REPL SSR - Track search result:', {
+              trackSlug,
+              folderPath,
+              foundTrack: targetTrack?.name,
+              foundTrackId: targetTrack?.id
+            });
+          }
+
+          // If no track slug provided or track not found, redirect to a random track
+          if (!targetTrack && tracks.length > 0) {
+            if (trackSlug) {
+              console.error('REPL SSR - Requested track not found:', { folderPath, trackSlug });
+            } else {
+              console.log('REPL SSR - No track specified, selecting random track');
+            }
+            
+            // Redirect to a random track
+            const randomTrack = tracks[Math.floor(Math.random() * tracks.length)];
+            const { generateTrackUrlPath, trackNameToSlug: slugify } = await import('../../lib/slugUtils');
+            let trackUrl = generateTrackUrlPath(randomTrack.name, randomTrack.folder);
+            
+            // If multitrack, add first step to URL
+            if (randomTrack.isMultitrack && randomTrack.steps && randomTrack.steps.length > 0) {
+              const firstStepSlug = slugify(randomTrack.steps[0].name);
+              trackUrl = `${trackUrl}?step=${firstStepSlug}`;
+            }
+            
+            console.log('REPL SSR - Redirecting to random track:', randomTrack.name, 'URL:', trackUrl);
+            return Astro.redirect(trackUrl);
+          } else if (!targetTrack && tracks.length === 0) {
+            console.error('REPL SSR - No tracks available');
+            // Continue to render empty state
+          } else if (targetTrack) {
+            console.log('REPL SSR - SUCCESS: Target track found:', targetTrack.name, 'in folder:', targetTrack.folder || 'root', 'ID:', targetTrack.id);
+            
+            // Check if this is a multitrack and if we need to redirect to add step parameter
+            if (targetTrack.isMultitrack && targetTrack.steps && targetTrack.steps.length > 0) {
+              const currentUrl = new URL(Astro.request.url);
+              const stepParam = currentUrl.searchParams.get('step');
+              
+              // If no step parameter, redirect to include the first step
+              if (!stepParam) {
+                const { generateTrackUrlPath, trackNameToSlug: slugify } = await import('../../lib/slugUtils');
+                let trackUrl = generateTrackUrlPath(targetTrack.name, targetTrack.folder);
+                const firstStepSlug = slugify(targetTrack.steps[0].name);
+                trackUrl = `${trackUrl}?step=${firstStepSlug}`;
+                
+                console.log('REPL SSR - Multitrack without step parameter, redirecting to:', trackUrl);
+                return Astro.redirect(trackUrl);
+              }
+            } else if (!targetTrack.isMultitrack) {
+              // If this is NOT a multitrack but has a step parameter, redirect to remove it
+              const currentUrl = new URL(Astro.request.url);
+              const stepParam = currentUrl.searchParams.get('step');
+              
+              if (stepParam) {
+                const { generateTrackUrlPath } = await import('../../lib/slugUtils');
+                const trackUrl = generateTrackUrlPath(targetTrack.name, targetTrack.folder);
+                
+                console.log('REPL SSR - Regular track with step parameter, redirecting to remove it:', trackUrl);
+                return Astro.redirect(trackUrl);
+              }
+            }
+            
+            targetTrackId = targetTrack.id;
+            targetTrackSlug = trackSlug;
+          }
+
+          // Transform to hierarchical tree structure for tracksStore
+          const tree = TreeDataTransformer.transformToTree(tracks, folders);
+
+          // Provide both formats for compatibility
+          ssrData = {
+            // Flat format for useSupabaseFileManager
+            tracks,
+            folders,
+            // Hierarchical format for tracksStore
+            hierarchical: {
+              id: 'root' as const,
+              children: tree.root.children || []
+            },
+            // Target track ID for direct loading (legacy)
+            targetTrackId: targetTrackId,
+            // Target track slug for matching by name
+            targetTrackSlug: targetTrackSlug,
+            // Target folder path
+            targetFolderPath: folderPath,
+            // Target step name (if multitrack)
+            targetStepName: targetStepName
+          };
+
+          console.log('REPL SSR - Data loaded successfully:', {
+            tracksCount: tracks.length,
+            foldersCount: folders.length,
+            targetTrackId: targetTrackId,
+            folderPath,
+            trackSlug,
+            stepName: targetStepName,
+            format: 'both'
+          });
+        } else {
+          console.error('REPL SSR - Database error:', tracksError || foldersError);
+        }
+      } else {
+        console.log('REPL SSR - User verification failed, redirecting to login:', userError?.message || 'No user');
+        // Redirect to login if user verification fails
+        return Astro.redirect('/login');
+      }
+    } else {
+      console.log('REPL SSR - Supabase not configured properly');
+    }
+  } else {
+    console.log('REPL SSR - No access token found for track path, redirecting to login:', { folderPath, trackSlug });
+    // Redirect to login if no access token
+    return Astro.redirect('/login');
+  }
+} catch (error) {
+  console.error('REPL SSR - Error fetching data:', error);
+}
+
+// If no SSR data but we have a track path, pass it along
+if (!ssrData && (folderPath || trackSlug)) {
+  ssrData = {
+    tracks: [],
+    folders: [],
+    hierarchical: {
+      id: 'root' as const,
+      children: []
+    },
+    targetTrackId: null,
+    targetTrackSlug: trackSlug,
+    targetFolderPath: folderPath
+  };
+}
+
+// Generate page title from track path
+const pageTitle = trackSlug 
+  ? `Strudel REPL - ${trackSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}${folderPath ? ` (${folderPath})` : ''}`
+  : 'Strudel REPL';
+---
+
+<html lang="en" class="m-0 dark">
+  <head>
+    <HeadCommon />
+    <title>{pageTitle}</title>
+  </head>
+  <body class="h-app-height bg-background m-0">
+    <I18nProvider client:only="react">
+      <Repl client:only="react" ssrData={ssrData} />
+    </I18nProvider>
+  </body>
+</html>

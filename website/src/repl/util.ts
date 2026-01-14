@@ -1,10 +1,9 @@
-import { evalScope, hash2code, logger } from '@strudel/core';
+import { evalScope, logger } from '@strudel/core';
 import { settingPatterns } from '../settings';
 import { setVersionDefaults } from '@strudel/webaudio';
 import { getMetadata } from '../metadata_parser';
 import { isTauri } from '../tauri';
 import './Repl.css';
-import { nanoid } from 'nanoid';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { $featuredPatterns, type PatternData } from '@src/user_pattern_utils';
 
@@ -118,8 +117,6 @@ export function confirmDialog(msg: string): Promise<boolean> {
     resolve(confirmed as boolean);
   });
 }
-
-let lastShared: string | undefined;
 
 /**
  * Shares the current code by copying URL to clipboard

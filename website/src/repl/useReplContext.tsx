@@ -263,7 +263,8 @@ export function useReplContext(): ReplContext {
           id = userPattern.isValidID(id) ? id : createPatternID();
           setViewingPatternData(userPattern.update(id, data).data);
         }
-        setActivePattern(id);
+        // NOTE: Don't set activePattern here - it should only be set by navigation actions
+        // setActivePattern(id); // REMOVED: This was overwriting URL-based activePattern
       },
       bgFill: false,
     });
@@ -593,5 +594,6 @@ export function useReplContext(): ReplContext {
     containerRef,
     trackRouter: trackRouterRef.current,
   };
+  
   return context;
 }

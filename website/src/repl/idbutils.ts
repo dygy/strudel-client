@@ -31,26 +31,6 @@ export const userSamplesDBConfig: DBConfig = {
 };
 
 /**
- * Deletes all IndexedDB databases - useful for debugging
- */
-function clearAllIDB(): void {
-  if (typeof window === 'undefined') return;
-  
-  window.indexedDB
-    .databases()
-    .then((databases) => {
-      for (let i = 0; i < databases.length; i++) {
-        if (databases[i].name) {
-          clearIDB(databases[i].name!);
-        }
-      }
-    })
-    .then(() => {
-      alert('All data cleared.');
-    });
-}
-
-/**
  * Deletes a specific IndexedDB database
  * @param dbName - Name of the database to delete
  */
