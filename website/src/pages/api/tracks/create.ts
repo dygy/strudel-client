@@ -1,77 +1,12 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
+import { getAuthenticatedUser } from '../_auth';
 
 export const prerender = false;
 
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
-
-async function getAuthenticatedUser(request: Request) {
-  try {
-    const cookies = request.headers.get('cookie') || '';
-    
-    console.log('CREATE API - cookies received:', cookies.substring(0, 100) + '...');
-    
-    if (!cookies) {
-      console.log('CREATE API - No cookies found');
-      throw new Error('No cookies found');
-    }
-
-    // Parse cookies to get Supabase session tokens
-    const cookieMap = new Map();
-    cookies.split(';').forEach(cookie => {
-      const [key, value] = cookie.trim().split('=');
-      if (key && value) {
-        cookieMap.set(key, decodeURIComponent(value));
-      }
-    });
-
-    console.log('CREATE API - Parsed cookie keys:', Array.from(cookieMap.keys()));
-
-    // Look for Supabase auth cookies
-    let accessToken = null;
-
-    // Try different cookie patterns that Supabase might use
-    cookieMap.forEach((value, key) => {
-      // Access token should be a JWT (starts with eyJ and has dots)
-      if ((key.includes('access') || key.includes('auth-token') || key.startsWith('sb-access')) && value.includes('.')) {
-        accessToken = value;
-        console.log('CREATE API - Found access token in:', key);
-      }
-    });
-
-    if (!accessToken) {
-      console.log('CREATE API - No access token found in cookies');
-      throw new Error('No access token found');
-    }
-
-    console.log('CREATE API - Attempting to verify access token...');
-
-    // Create Supabase client with anon key and verify the access token
-    const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
-    
-    const { data: { user }, error } = await supabaseAnon.auth.getUser(accessToken);
-
-    console.log('CREATE API - getUser result:', {
-      hasUser: !!user,
-      userId: user?.id,
-      userEmail: user?.email,
-      error: error?.message
-    });
-
-    if (error || !user) {
-      console.log('CREATE API - Authentication failed:', error?.message || 'No user returned');
-      throw new Error('Authentication failed: ' + (error?.message || 'No user returned'));
-    }
-
-    return { user, accessToken };
-  } catch (error) {
-    console.error('CREATE API - getAuthenticatedUser error:', error);
-    throw error;
-  }
-}
 
 export const POST: APIRoute = async ({ request }) => {
   try {

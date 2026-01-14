@@ -57,6 +57,12 @@ class SecureApiClient {
       throw new Error(`Authentication failed: ${sessionResult.error}`);
     }
     
+    // Get the access token from the session to include in headers
+    const accessToken = sessionResult.session?.access_token;
+    if (!accessToken) {
+      throw new Error('No access token found');
+    }
+    
     const url = `${this.baseUrl}/api${endpoint}`;
     
     const response = await fetch(url, {
@@ -64,6 +70,7 @@ class SecureApiClient {
       credentials: 'include', // Include cookies for authentication
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`, // Include access token in header
         ...options.headers,
       },
     });
@@ -76,7 +83,10 @@ class SecureApiClient {
         console.log('Got 401, attempting session refresh and retry...');
         
         const retrySessionResult = await ensureValidSession();
-        if (retrySessionResult.success) {
+        if (retrySessionResult.success && retrySessionResult.session?.access_token) {
+          // Wait a moment for cookies to update
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
           // Retry the request once with a flag to prevent infinite loops
           return this.request(endpoint, {
             ...options,
@@ -85,6 +95,9 @@ class SecureApiClient {
               'X-Retry-After-Refresh': 'true'
             }
           });
+        } else {
+          console.error('Session refresh failed or no access token after refresh');
+          throw new Error('Session refresh failed');
         }
       }
       
