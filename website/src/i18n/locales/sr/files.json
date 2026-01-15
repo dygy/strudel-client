@@ -17,14 +17,14 @@
   "info": "Својства",
   "empty": "Овде нема ничега",
   "helpText": "Кликните десним тастером на фајлове и фолдере за више опција",
-  
+
   "trackProperties": "Својства нумере",
   "fileProperties": "Својства фајла",
   "folderProperties": "Својства фолдера",
   "deleteTrack": "Обриши нумеру",
   "confirmDeleteTrack": "Да ли сте сигурни да желите да обришете",
   "actionCannotBeUndone": "Ова акција се не може опозвати.",
-  
+
   "name": "Име",
   "type": "Тип",
   "path": "Путања",
@@ -37,7 +37,7 @@
   "folder": "Фолдер",
   "audioFile": "Аудио фајл",
   "unknown": "Непознато",
-  
+
   "noCodeToSave": "Нема кода за чување",
   "trackSaved": "Нумера је успешно сачувана!",
   "trackCreatedAndSaved": "Нумера '{{name}}' је креирана и сачувана!",
@@ -48,7 +48,7 @@
   "codeCopied": "Код је копиран у клипборд!",
   "pathCopied": "Путања је копирана у клипборд!",
   "copyFailed": "Неуспешно копирање у клипборд",
-  
+
   "rightClickForOptions": "Кликните десним тастером на нумере за више опција",
   "currentTrack": "Тренутна",
   "saveChanges": "Сачувај измене",
@@ -106,7 +106,43 @@
   "allFoldersDeleted": "Све фасцикле су успешно обрисане!",
   "allTracksAndFoldersDeleted": "Све нумере и фасцикле су успешно обрисане!",
   "noTracksToExport": "Нема нумера за извоз",
-  
+
+  "importConflict": {
+    "title": "Конфликт Увоза",
+    "message": "{{type}} са именом '{{name}}' већ постоји",
+    "multipleConflicts": "Конфликт {{current}} од {{total}}",
+    "existing": "Постојећа Ставка",
+    "new": "Нова Ставка",
+    "fromImport": "Из датотеке увоза",
+    "overwrite": "Препиши",
+    "skip": "Прескочи",
+    "overwriteAll": "Препиши Све",
+    "skipAll": "Прескочи Све"
+  },
+
+  "track": "Нумера",
+  "multitrack": "Мултинумера",
+  "steps": "Кораци",
+
   "loadingTracks": "Учитавам ваше нумере...",
-  "loadingTracksDescription": "Молимо сачекајте док преузимамо ваше податке из облака"
+  "loadingTracksDescription": "Молимо сачекајте док преузимамо ваше податке из облака",
+
+  "errors": {
+    "loadFailed": "Учитавање датотека није успело",
+    "createTrackFailed": "Креирање нумере није успело",
+    "createFolderFailed": "Креирање фасцикле није успело",
+    "deleteFailed": "Брисање ставке није успело",
+    "moveFailed": "Премештање ставке није успело",
+    "updateFailed": "Ажурирање ставке није успело",
+    "importFailed": "Увоз датотеке није успео",
+    "exportFailed": "Извоз датотеке није успео",
+    "saveFailed": "Чување нумере није успело",
+    "renameFailed": "Преименовање ставке није успело"
+  },
+
+  "success": {
+    "folderCreated": "Фасцикла '{{name}}' је успешно креирана",
+    "itemMoved": "Ставка је успешно премештена",
+    "itemDeleted": "Ставка '{{name}}' је успешно обрисана"
+  }
 }

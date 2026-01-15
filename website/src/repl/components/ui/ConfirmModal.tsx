@@ -14,18 +14,18 @@ interface ConfirmModalProps {
   variant?: 'danger' | 'warning' | 'info';
 }
 
-export function ConfirmModal({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
-  title, 
-  message, 
+export function ConfirmModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  title,
+  message,
   confirmText,
   cancelText,
   variant = 'danger'
 }: ConfirmModalProps) {
   const { t } = useTranslation('common');
-  
+
   const handleConfirm = () => {
     onConfirm();
     onClose();
@@ -47,15 +47,15 @@ export function ConfirmModal({
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
       <div className="flex items-start space-x-3">
         <div className="flex-shrink-0">
-          <ExclamationTriangleIcon 
-            className={`w-6 h-6 ${iconStyles[variant]}`} 
+          <ExclamationTriangleIcon
+            className={`w-6 h-6 ${iconStyles[variant]}`}
           />
         </div>
         <div className="flex-1">
           <div className="text-foreground dark:text-foreground/90 leading-relaxed">{message}</div>
         </div>
       </div>
-      
+
       <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-lineHighlight/30">
         <button
           onClick={onClose}

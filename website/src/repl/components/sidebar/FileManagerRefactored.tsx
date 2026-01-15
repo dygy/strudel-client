@@ -32,6 +32,16 @@ interface FileManagerProps {
   fileManagerHook?: any; // Optional override for the file manager hook (e.g., Supabase version)
 }
 
+interface PendingImport {
+  type: 'track' | 'multitrack';
+  name: string;
+  code: string;
+  folder?: string;
+  isMultitrack?: boolean;
+  steps?: any[];
+  activeStep?: number;
+}
+
 export function FileManagerRefactored({ context, fileManagerHook }: FileManagerProps) {
   const { t, i18n } = useTranslation(['files', 'common', 'tabs', 'auth']);
 
@@ -50,15 +60,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
   const [currentConflictIndex, setCurrentConflictIndex] = React.useState(0);
   const [showConflictModal, setShowConflictModal] = React.useState(false);
   const [conflictResolution, setConflictResolution] = React.useState<'overwrite' | 'skip' | null>(null);
-  const [pendingImports, setPendingImports] = React.useState<Array<{
-    type: 'track' | 'multitrack';
-    name: string;
-    code: string;
-    folder?: string;
-    isMultitrack?: boolean;
-    steps?: any[];
-    activeStep?: number;
-  }>>([]);
+  const [pendingImports, setPendingImports] = React.useState<PendingImport[]>([]);
 
   // Always call the operations hook, but with safe defaults when no fileManagerState
   const operations = useFileManagerOperations(fileManagerState ? {
@@ -445,8 +447,8 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
 
   // Helper to check if track name exists
   const checkTrackExists = (name: string, folder?: string): Track | null => {
-    const tracksArray = Object.values(fileManagerState.tracks);
-    return tracksArray.find(track =>
+    const tracksArray = Object.values(fileManagerState.tracks) as Track[];
+    return tracksArray.find((track: Track) =>
       track.name === name && (track.folder || null) === (folder || null)
     ) || null;
   };
@@ -483,7 +485,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
     }
   };
 
-  const importTrackWithOverwrite = async (importData: typeof pendingImports[0]) => {
+  const importTrackWithOverwrite = async (importData: PendingImport) => {
     if (!fileManagerHook || !fileManagerHook.isAuthenticated) return;
 
     try {
@@ -768,7 +770,7 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
 
       console.log('Multitrack Debug - Created steps:', steps.length);
 
-      const multitrackData = {
+      const multitrackData: Track = {
         id: nanoid(), // Use proper UUID
         name: trackName,
         code: steps[0]?.code || '',

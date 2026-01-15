@@ -18,14 +18,14 @@
   "info": "속성",
   "empty": "여기에 아무것도 없습니다",
   "helpText": "더 많은 옵션을 보려면 파일과 폴더를 우클릭하세요",
-  
+
   "trackProperties": "트랙 속성",
-  "fileProperties": "파일 속성", 
+  "fileProperties": "파일 속성",
   "folderProperties": "폴더 속성",
   "deleteTrack": "트랙 삭제",
   "confirmDeleteTrack": "삭제하시겠습니까",
   "actionCannotBeUndone": "이 작업은 되돌릴 수 없습니다.",
-  
+
   "name": "이름",
   "type": "유형",
   "path": "경로",
@@ -38,7 +38,7 @@
   "folder": "폴더",
   "audioFile": "오디오 파일",
   "unknown": "알 수 없음",
-  
+
   "noCodeToSave": "저장할 코드가 없습니다",
   "trackSaved": "트랙이 성공적으로 저장되었습니다!",
   "trackCreated": "트랙이 성공적으로 생성되었습니다!",
@@ -50,7 +50,7 @@
   "codeCopied": "코드가 클립보드에 복사되었습니다!",
   "pathCopied": "경로가 클립보드에 복사되었습니다!",
   "copyFailed": "클립보드 복사에 실패했습니다",
-  
+
   "rightClickForOptions": "더 많은 옵션을 보려면 트랙을 우클릭하세요",
   "currentTrack": "현재",
   "editing": "편집 중",
@@ -111,10 +111,28 @@
   "allTracksDeleted": "모든 트랙이 성공적으로 삭제되었습니다!",
   "allFoldersDeleted": "모든 폴더가 성공적으로 삭제되었습니다!",
   "allTracksAndFoldersDeleted": "모든 트랙과 폴더가 성공적으로 삭제되었습니다!",
-  
+  "noTracksToExport": "내보낼 트랙이 없습니다",
+
+  "importConflict": {
+    "title": "가져오기 충돌",
+    "message": "'{{name}}'이라는 이름의 {{type}}이(가) 이미 존재합니다",
+    "multipleConflicts": "충돌 {{current}}/{{total}}",
+    "existing": "기존 항목",
+    "new": "새 항목",
+    "fromImport": "가져오기 파일에서",
+    "overwrite": "덮어쓰기",
+    "skip": "건너뛰기",
+    "overwriteAll": "모두 덮어쓰기",
+    "skipAll": "모두 건너뛰기"
+  },
+
+  "track": "트랙",
+  "multitrack": "멀티트랙",
+  "steps": "단계",
+
   "loadingTracks": "트랙을 불러오는 중...",
   "loadingTracksDescription": "클라우드에서 데이터를 가져오는 동안 잠시 기다려 주세요",
-  
+
   "errors": {
     "loadFailed": "파일 불러오기 실패",
     "createTrackFailed": "트랙 생성 실패",
@@ -127,7 +145,7 @@
     "saveFailed": "트랙 저장 실패",
     "renameFailed": "항목 이름 변경 실패"
   },
-  
+
   "success": {
     "folderCreated": "폴더 '{{name}}'이 성공적으로 생성되었습니다",
     "itemMoved": "항목이 성공적으로 이동되었습니다",

@@ -109,6 +109,42 @@
   "allTracksAndFoldersDeleted": "Все треки и папки успешно удалены!",
   "noTracksToExport": "Нет треков для экспорта",
 
+  "importConflict": {
+    "title": "Конфликт Импорта",
+    "message": "{{type}} с именем '{{name}}' уже существует",
+    "multipleConflicts": "Конфликт {{current}} из {{total}}",
+    "existing": "Существующий Элемент",
+    "new": "Новый Элемент",
+    "fromImport": "Из файла импорта",
+    "overwrite": "Перезаписать",
+    "skip": "Пропустить",
+    "overwriteAll": "Перезаписать Все",
+    "skipAll": "Пропустить Все"
+  },
+
+  "track": "Трек",
+  "multitrack": "Мультитрек",
+  "steps": "Шаги",
+
   "loadingTracks": "Загружаем ваши треки...",
-  "loadingTracksDescription": "Пожалуйста, подождите, пока мы получаем ваши данные из облака"
+  "loadingTracksDescription": "Пожалуйста, подождите, пока мы получаем ваши данные из облака",
+
+  "errors": {
+    "loadFailed": "Не удалось загрузить файлы",
+    "createTrackFailed": "Не удалось создать трек",
+    "createFolderFailed": "Не удалось создать папку",
+    "deleteFailed": "Не удалось удалить элемент",
+    "moveFailed": "Не удалось переместить элемент",
+    "updateFailed": "Не удалось обновить элемент",
+    "importFailed": "Не удалось импортировать файл",
+    "exportFailed": "Не удалось экспортировать файл",
+    "saveFailed": "Не удалось сохранить трек",
+    "renameFailed": "Не удалось переименовать элемент"
+  },
+
+  "success": {
+    "folderCreated": "Папка '{{name}}' успешно создана",
+    "itemMoved": "Элемент успешно перемещен",
+    "itemDeleted": "Элемент '{{name}}' успешно удален"
+  }
 }

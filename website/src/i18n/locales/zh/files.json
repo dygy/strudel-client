@@ -18,14 +18,14 @@
   "info": "属性",
   "empty": "这里什么都没有",
   "helpText": "右键点击文件和文件夹获取更多选项",
-  
+
   "trackProperties": "音轨属性",
-  "fileProperties": "文件属性", 
+  "fileProperties": "文件属性",
   "folderProperties": "文件夹属性",
   "deleteTrack": "删除音轨",
   "confirmDeleteTrack": "您确定要删除",
   "actionCannotBeUndone": "此操作无法撤销。",
-  
+
   "name": "名称",
   "type": "类型",
   "path": "路径",
@@ -38,7 +38,7 @@
   "folder": "文件夹",
   "audioFile": "音频文件",
   "unknown": "未知",
-  
+
   "noCodeToSave": "没有代码可保存",
   "trackSaved": "音轨保存成功！",
   "trackCreated": "音轨创建成功！",
@@ -50,7 +50,7 @@
   "codeCopied": "代码已复制到剪贴板！",
   "pathCopied": "路径已复制到剪贴板！",
   "copyFailed": "复制到剪贴板失败",
-  
+
   "rightClickForOptions": "右键点击音轨获取更多选项",
   "currentTrack": "当前",
   "editing": "编辑中",
@@ -111,10 +111,28 @@
   "allTracksDeleted": "所有音轨删除成功！",
   "allFoldersDeleted": "所有文件夹删除成功！",
   "allTracksAndFoldersDeleted": "所有音轨和文件夹删除成功！",
-  
+  "noTracksToExport": "没有音轨可导出",
+
+  "importConflict": {
+    "title": "导入冲突",
+    "message": "名为 '{{name}}' 的{{type}}已存在",
+    "multipleConflicts": "冲突 {{current}}/{{total}}",
+    "existing": "现有项目",
+    "new": "新项目",
+    "fromImport": "来自导入文件",
+    "overwrite": "覆盖",
+    "skip": "跳过",
+    "overwriteAll": "全部覆盖",
+    "skipAll": "全部跳过"
+  },
+
+  "track": "音轨",
+  "multitrack": "多轨",
+  "steps": "步骤",
+
   "loadingTracks": "正在加载您的音轨...",
   "loadingTracksDescription": "请稍候，我们正在从云端获取您的数据",
-  
+
   "errors": {
     "loadFailed": "加载文件失败",
     "createTrackFailed": "创建音轨失败",
@@ -127,7 +145,7 @@
     "saveFailed": "保存音轨失败",
     "renameFailed": "重命名项目失败"
   },
-  
+
   "success": {
     "folderCreated": "文件夹 '{{name}}' 创建成功",
     "itemMoved": "项目移动成功",

@@ -18,14 +18,14 @@
   "info": "Propriétés",
   "empty": "Rien ici",
   "helpText": "Clic droit sur les fichiers et dossiers pour plus d'options",
-  
+
   "trackProperties": "Propriétés de la piste",
   "fileProperties": "Propriétés du fichier",
   "folderProperties": "Propriétés du dossier",
   "deleteTrack": "Supprimer la piste",
   "confirmDeleteTrack": "Êtes-vous sûr de vouloir supprimer",
   "actionCannotBeUndone": "Cette action ne peut pas être annulée.",
-  
+
   "name": "Nom",
   "type": "Type",
   "path": "Chemin",
@@ -38,7 +38,7 @@
   "folder": "Dossier",
   "audioFile": "Fichier audio",
   "unknown": "Inconnu",
-  
+
   "noCodeToSave": "Aucun code à enregistrer",
   "trackSaved": "Piste enregistrée avec succès !",
   "trackCreatedAndSaved": "Piste '{{name}}' créée et enregistrée !",
@@ -49,7 +49,7 @@
   "codeCopied": "Code copié dans le presse-papiers !",
   "pathCopied": "Chemin copié dans le presse-papiers !",
   "copyFailed": "Échec de la copie dans le presse-papiers",
-  
+
   "rightClickForOptions": "Clic droit sur les pistes pour plus d'options",
   "currentTrack": "Actuel",
   "editing": "Édition",
@@ -108,7 +108,43 @@
   "allFoldersDeleted": "Tous les dossiers supprimés avec succès !",
   "allTracksAndFoldersDeleted": "Toutes les pistes et dossiers supprimés avec succès !",
   "noTracksToExport": "Aucune piste à exporter",
-  
+
+  "importConflict": {
+    "title": "Conflit d'Importation",
+    "message": "Un {{type}} nommé '{{name}}' existe déjà",
+    "multipleConflicts": "Conflit {{current}} sur {{total}}",
+    "existing": "Élément Existant",
+    "new": "Nouvel Élément",
+    "fromImport": "Du fichier d'importation",
+    "overwrite": "Écraser",
+    "skip": "Ignorer",
+    "overwriteAll": "Tout Écraser",
+    "skipAll": "Tout Ignorer"
+  },
+
+  "track": "Piste",
+  "multitrack": "Multipiste",
+  "steps": "Étapes",
+
   "loadingTracks": "Chargement de vos pistes...",
-  "loadingTracksDescription": "Veuillez patienter pendant que nous récupérons vos données depuis le cloud"
+  "loadingTracksDescription": "Veuillez patienter pendant que nous récupérons vos données depuis le cloud",
+
+  "errors": {
+    "loadFailed": "Échec du chargement des fichiers",
+    "createTrackFailed": "Échec de la création de la piste",
+    "createFolderFailed": "Échec de la création du dossier",
+    "deleteFailed": "Échec de la suppression de l'élément",
+    "moveFailed": "Échec du déplacement de l'élément",
+    "updateFailed": "Échec de la mise à jour de l'élément",
+    "importFailed": "Échec de l'importation du fichier",
+    "exportFailed": "Échec de l'exportation du fichier",
+    "saveFailed": "Échec de l'enregistrement de la piste",
+    "renameFailed": "Échec du renommage de l'élément"
+  },
+
+  "success": {
+    "folderCreated": "Dossier '{{name}}' créé avec succès",
+    "itemMoved": "Élément déplacé avec succès",
+    "itemDeleted": "Élément '{{name}}' supprimé avec succès"
+  }
 }

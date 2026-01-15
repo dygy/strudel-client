@@ -17,14 +17,14 @@
   "info": "الخصائص",
   "empty": "لا يوجد شيء هنا",
   "helpText": "انقر بالزر الأيمن على الملفات والمجلدات للمزيد من الخيارات",
-  
+
   "trackProperties": "خصائص المسار",
   "fileProperties": "خصائص الملف",
   "folderProperties": "خصائص المجلد",
   "deleteTrack": "حذف المسار",
   "confirmDeleteTrack": "هل أنت متأكد من أنك تريد حذف",
   "actionCannotBeUndone": "لا يمكن التراجع عن هذا الإجراء.",
-  
+
   "name": "الاسم",
   "type": "النوع",
   "path": "المسار",
@@ -37,7 +37,7 @@
   "folder": "مجلد",
   "audioFile": "ملف صوتي",
   "unknown": "غير معروف",
-  
+
   "noCodeToSave": "لا يوجد كود للحفظ",
   "trackSaved": "تم حفظ المسار بنجاح!",
   "trackCreatedAndSaved": "تم إنشاء وحفظ المسار '{{name}}'!",
@@ -48,7 +48,7 @@
   "codeCopied": "تم نسخ الكود إلى الحافظة!",
   "pathCopied": "تم نسخ المسار إلى الحافظة!",
   "copyFailed": "فشل في النسخ إلى الحافظة",
-  
+
   "rightClickForOptions": "انقر بالزر الأيمن على المسارات للمزيد من الخيارات",
   "currentTrack": "الحالي",
   "saveChanges": "حفظ التغييرات",
@@ -106,7 +106,43 @@
   "allFoldersDeleted": "تم حذف جميع المجلدات بنجاح!",
   "allTracksAndFoldersDeleted": "تم حذف جميع المسارات والمجلدات بنجاح!",
   "noTracksToExport": "لا توجد مسارات للتصدير",
-  
+
+  "importConflict": {
+    "title": "تعارض الاستيراد",
+    "message": "{{type}} باسم '{{name}}' موجود بالفعل",
+    "multipleConflicts": "تعارض {{current}} من {{total}}",
+    "existing": "العنصر الموجود",
+    "new": "عنصر جديد",
+    "fromImport": "من ملف الاستيراد",
+    "overwrite": "استبدال",
+    "skip": "تخطي",
+    "overwriteAll": "استبدال الكل",
+    "skipAll": "تخطي الكل"
+  },
+
+  "track": "مسار",
+  "multitrack": "مسار متعدد",
+  "steps": "خطوات",
+
   "loadingTracks": "جاري تحميل مساراتك...",
-  "loadingTracksDescription": "يرجى الانتظار بينما نحصل على بياناتك من السحابة"
+  "loadingTracksDescription": "يرجى الانتظار بينما نحصل على بياناتك من السحابة",
+
+  "errors": {
+    "loadFailed": "فشل تحميل الملفات",
+    "createTrackFailed": "فشل إنشاء المسار",
+    "createFolderFailed": "فشل إنشاء المجلد",
+    "deleteFailed": "فشل حذف العنصر",
+    "moveFailed": "فشل نقل العنصر",
+    "updateFailed": "فشل تحديث العنصر",
+    "importFailed": "فشل استيراد الملف",
+    "exportFailed": "فشل تصدير الملف",
+    "saveFailed": "فشل حفظ المسار",
+    "renameFailed": "فشل إعادة تسمية العنصر"
+  },
+
+  "success": {
+    "folderCreated": "تم إنشاء المجلد '{{name}}' بنجاح",
+    "itemMoved": "تم نقل العنصر بنجاح",
+    "itemDeleted": "تم حذف العنصر '{{name}}' بنجاح"
+  }
 }

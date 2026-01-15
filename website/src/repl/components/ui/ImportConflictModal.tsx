@@ -12,17 +12,17 @@ interface ImportConflictModalProps {
   currentIndex: number;
 }
 
-export function ImportConflictModal({ 
-  isOpen, 
-  onClose, 
+export function ImportConflictModal({
+  isOpen,
+  onClose,
   conflicts,
   onResolve,
   currentIndex
 }: ImportConflictModalProps) {
   const { t } = useTranslation(['files', 'common']);
-  
+
   if (conflicts.length === 0) return null;
-  
+
   const conflict = conflicts[currentIndex];
   const hasMore = currentIndex < conflicts.length - 1;
   const isMultiple = conflicts.length > 1;

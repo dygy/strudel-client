@@ -16,7 +16,7 @@ interface InfoModalProps {
 
 export function InfoModal({ isOpen, onClose, title, items }: InfoModalProps) {
   const { t } = useTranslation('common');
-  
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="md">
       <div className="space-y-3">

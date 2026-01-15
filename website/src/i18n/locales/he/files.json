@@ -17,14 +17,14 @@
   "info": "מאפיינים",
   "empty": "אין כאן כלום",
   "helpText": "לחץ לחיצה ימנית על קבצים ותיקיות לאפשרויות נוספות",
-  
+
   "trackProperties": "מאפייני רצועה",
   "fileProperties": "מאפייני קובץ",
   "folderProperties": "מאפייני תיקייה",
   "deleteTrack": "מחק רצועה",
   "confirmDeleteTrack": "האם אתה בטוח שברצונך למחוק",
   "actionCannotBeUndone": "לא ניתן לבטל פעולה זו.",
-  
+
   "name": "שם",
   "type": "סוג",
   "path": "נתיב",
@@ -37,7 +37,7 @@
   "folder": "תיקייה",
   "audioFile": "קובץ שמע",
   "unknown": "לא ידוע",
-  
+
   "noCodeToSave": "אין קוד לשמירה",
   "trackSaved": "הרצועה נשמרה בהצלחה!",
   "trackCreatedAndSaved": "רצועה '{{name}}' נוצרה ונשמרה!",
@@ -48,7 +48,7 @@
   "codeCopied": "הקוד הועתק ללוח!",
   "pathCopied": "הנתיב הועתק ללוח!",
   "copyFailed": "העתקה ללוח נכשלה",
-  
+
   "rightClickForOptions": "לחץ לחיצה ימנית על רצועות לאפשרויות נוספות",
   "currentTrack": "נוכחי",
   "saveChanges": "שמור שינויים",
@@ -106,7 +106,43 @@
   "allFoldersDeleted": "כל התיקיות נמחקו בהצלחה!",
   "allTracksAndFoldersDeleted": "כל הרצועות והתיקיות נמחקו בהצלחה!",
   "noTracksToExport": "אין רצועות לייצוא",
-  
+
+  "importConflict": {
+    "title": "התנגשות בייבוא",
+    "message": "{{type}} בשם '{{name}}' כבר קיים",
+    "multipleConflicts": "התנגשות {{current}} מתוך {{total}}",
+    "existing": "פריט קיים",
+    "new": "פריט חדש",
+    "fromImport": "מקובץ הייבוא",
+    "overwrite": "החלף",
+    "skip": "דלג",
+    "overwriteAll": "החלף הכל",
+    "skipAll": "דלג על הכל"
+  },
+
+  "track": "רצועה",
+  "multitrack": "רצועה מרובה",
+  "steps": "שלבים",
+
   "loadingTracks": "טוען את הרצועות שלך...",
-  "loadingTracksDescription": "אנא המתן בזמן שאנחנו מביאים את הנתונים שלך מהענן"
+  "loadingTracksDescription": "אנא המתן בזמן שאנחנו מביאים את הנתונים שלך מהענן",
+
+  "errors": {
+    "loadFailed": "טעינת הקבצים נכשלה",
+    "createTrackFailed": "יצירת הרצועה נכשלה",
+    "createFolderFailed": "יצירת התיקייה נכשלה",
+    "deleteFailed": "מחיקת הפריט נכשלה",
+    "moveFailed": "העברת הפריט נכשלה",
+    "updateFailed": "עדכון הפריט נכשל",
+    "importFailed": "ייבוא הקובץ נכשל",
+    "exportFailed": "ייצוא הקובץ נכשל",
+    "saveFailed": "שמירת הרצועה נכשלה",
+    "renameFailed": "שינוי שם הפריט נכשל"
+  },
+
+  "success": {
+    "folderCreated": "תיקייה '{{name}}' נוצרה בהצלחה",
+    "itemMoved": "הפריט הועבר בהצלחה",
+    "itemDeleted": "פריט '{{name}}' נמחק בהצלחה"
+  }
 }

@@ -18,14 +18,14 @@
   "info": "Propiedades",
   "empty": "No hay nada aquí",
   "helpText": "Haz clic derecho en archivos y carpetas para más opciones",
-  
+
   "trackProperties": "Propiedades de pista",
   "fileProperties": "Propiedades de archivo",
   "folderProperties": "Propiedades de carpeta",
   "deleteTrack": "Eliminar pista",
   "confirmDeleteTrack": "¿Estás seguro de que quieres eliminar",
   "actionCannotBeUndone": "Esta acción no se puede deshacer.",
-  
+
   "name": "Nombre",
   "type": "Tipo",
   "path": "Ruta",
@@ -38,7 +38,7 @@
   "folder": "Carpeta",
   "audioFile": "Archivo de audio",
   "unknown": "Desconocido",
-  
+
   "noCodeToSave": "No hay código para guardar",
   "trackSaved": "¡Pista guardada exitosamente!",
   "trackCreatedAndSaved": "¡Pista '{{name}}' creada y guardada!",
@@ -49,7 +49,7 @@
   "codeCopied": "¡Código copiado al portapapeles!",
   "pathCopied": "¡Ruta copiada al portapapeles!",
   "copyFailed": "Error al copiar al portapapeles",
-  
+
   "rightClickForOptions": "Haz clic derecho en las pistas para más opciones",
   "currentTrack": "Actual",
   "editing": "Editando",
@@ -108,7 +108,43 @@
   "allFoldersDeleted": "¡Todas las carpetas eliminadas exitosamente!",
   "allTracksAndFoldersDeleted": "¡Todas las pistas y carpetas eliminadas exitosamente!",
   "noTracksToExport": "No hay pistas para exportar",
-  
+
+  "importConflict": {
+    "title": "Conflicto de Importación",
+    "message": "Ya existe un {{type}} llamado '{{name}}'",
+    "multipleConflicts": "Conflicto {{current}} de {{total}}",
+    "existing": "Elemento Existente",
+    "new": "Nuevo Elemento",
+    "fromImport": "Del archivo de importación",
+    "overwrite": "Sobrescribir",
+    "skip": "Omitir",
+    "overwriteAll": "Sobrescribir Todo",
+    "skipAll": "Omitir Todo"
+  },
+
+  "track": "Pista",
+  "multitrack": "Multipista",
+  "steps": "Pasos",
+
   "loadingTracks": "Cargando tus pistas...",
-  "loadingTracksDescription": "Por favor espera mientras obtenemos tus datos de la nube"
+  "loadingTracksDescription": "Por favor espera mientras obtenemos tus datos de la nube",
+
+  "errors": {
+    "loadFailed": "Error al cargar archivos",
+    "createTrackFailed": "Error al crear pista",
+    "createFolderFailed": "Error al crear carpeta",
+    "deleteFailed": "Error al eliminar elemento",
+    "moveFailed": "Error al mover elemento",
+    "updateFailed": "Error al actualizar elemento",
+    "importFailed": "Error al importar archivo",
+    "exportFailed": "Error al exportar archivo",
+    "saveFailed": "Error al guardar pista",
+    "renameFailed": "Error al renombrar elemento"
+  },
+
+  "success": {
+    "folderCreated": "Carpeta '{{name}}' creada exitosamente",
+    "itemMoved": "Elemento movido exitosamente",
+    "itemDeleted": "Elemento '{{name}}' eliminado exitosamente"
+  }
 }
