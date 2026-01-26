@@ -30,6 +30,7 @@ interface ReplContext {
 interface FileManagerProps {
   context: ReplContext;
   fileManagerHook?: any; // Optional override for the file manager hook (e.g., Supabase version)
+  readOnly?: boolean; // When true, hides create/edit/delete actions (for admin viewing)
 }
 
 interface PendingImport {
@@ -42,7 +43,7 @@ interface PendingImport {
   activeStep?: number;
 }
 
-export function FileManagerRefactored({ context, fileManagerHook }: FileManagerProps) {
+export function FileManagerRefactored({ context, fileManagerHook, readOnly = false }: FileManagerProps) {
   const { t, i18n } = useTranslation(['files', 'common', 'tabs', 'auth']);
 
   // Only use Supabase FileManager - no localStorage fallback
@@ -158,47 +159,60 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
     setShowInfoModal(true);
   };
 
-  const getEmptySpaceContextItems = () => [
-    {
-      label: t('files:newTrack'),
-      icon: <span>+</span>,
-      onClick: () => operations.handleTrackCreate(),
-    },
-    {
-      label: t('files:newFolder'),
-      icon: <span>📁</span>,
-      onClick: () => operations.handleFolderCreate(),
-    },
-    ...(Object.keys(fileManagerState.tracks).length > 0 || Object.keys(fileManagerState.folders).length > 0 ? [
+  const getEmptySpaceContextItems = () => {
+    // In read-only mode, only show export functionality
+    if (readOnly) {
+      return Object.keys(fileManagerState.tracks).length > 0 || Object.keys(fileManagerState.folders).length > 0 ? [
+        {
+          label: t('files:exportLibraryAsZip'),
+          icon: <span>📦</span>,
+          onClick: () => operations.downloadFolder(''),
+        },
+      ] : [];
+    }
+
+    return [
       {
-        label: t('files:exportLibraryAsZip'),
-        icon: <span>📦</span>,
-        onClick: () => operations.downloadFolder(''),
+        label: t('files:newTrack'),
+        icon: <span>+</span>,
+        onClick: () => operations.handleTrackCreate(),
       },
       {
-        label: t('files:deleteAllTracks'),
-        icon: <span>🗑️</span>,
-        onClick: () => fileManagerState.setShowDeleteAllModal(true),
-        className: 'text-red-400 hover:text-red-300',
-      }
-    ] : []),
-    {
-      label: t('files:importLibraryFromZip'),
-      icon: <span>📥</span>,
-      onClick: () => {
-        const input = document.getElementById('library-import-input') as HTMLInputElement;
-        if (input) {
-          input.onchange = (e) => {
-            const files = (e.target as HTMLInputElement).files;
-            if (files && files[0]) {
-              handleFileImport(files[0]);
-            }
-          };
-          input.click();
+        label: t('files:newFolder'),
+        icon: <span>📁</span>,
+        onClick: () => operations.handleFolderCreate(),
+      },
+      ...(Object.keys(fileManagerState.tracks).length > 0 || Object.keys(fileManagerState.folders).length > 0 ? [
+        {
+          label: t('files:exportLibraryAsZip'),
+          icon: <span>📦</span>,
+          onClick: () => operations.downloadFolder(''),
+        },
+        {
+          label: t('files:deleteAllTracks'),
+          icon: <span>🗑️</span>,
+          onClick: () => fileManagerState.setShowDeleteAllModal(true),
+          className: 'text-red-400 hover:text-red-300',
         }
+      ] : []),
+      {
+        label: t('files:importLibraryFromZip'),
+        icon: <span>📥</span>,
+        onClick: () => {
+          const input = document.getElementById('library-import-input') as HTMLInputElement;
+          if (input) {
+            input.onchange = (e) => {
+              const files = (e.target as HTMLInputElement).files;
+              if (files && files[0]) {
+                handleFileImport(files[0]);
+              }
+            };
+            input.click();
+          }
+        },
       },
-    },
-  ];
+    ];
+  };
 
   // Drag and drop handlers
   const handleDragOver = (e: React.DragEvent) => {
@@ -1104,63 +1118,65 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
     >
       <DragDropOverlay isDragOver={fileManagerState.isDragOver} t={t} />
 
-      <FileManagerHeader
-        t={t}
-        isCreating={fileManagerState.isCreating}
-        isCreatingFolder={fileManagerState.isCreatingFolder}
-        isCreatingStep={fileManagerState.isCreatingStep}
-        newTrackName={fileManagerState.newTrackName}
-        newFolderName={fileManagerState.newFolderName}
-        newStepName={fileManagerState.newStepName}
-        selectedStepTrack={fileManagerState.selectedStepTrack}
-        setNewTrackName={fileManagerState.setNewTrackName}
-        setNewFolderName={fileManagerState.setNewFolderName}
-        setNewStepName={fileManagerState.setNewStepName}
-        onCreateTrack={async () => {
-          if (fileManagerState.createTrack) {
-            // Use Supabase file manager's createTrack function
-            const newTrack = await fileManagerState.createTrack(
-              fileManagerState.newTrackName.trim(),
-              DEFAULT_TRACK_CODE,
-              fileManagerState.newItemParentPath || undefined
-            );
-            if (newTrack) {
-              fileManagerState.setNewTrackName('');
-              fileManagerState.setNewItemParentPath('');
-              fileManagerState.setIsCreating(false);
-              // Load the newly created track
-              if (fileManagerState.loadTrack) {
-                fileManagerState.loadTrack(newTrack);
+      {!readOnly && (
+        <FileManagerHeader
+          t={t}
+          isCreating={fileManagerState.isCreating}
+          isCreatingFolder={fileManagerState.isCreatingFolder}
+          isCreatingStep={fileManagerState.isCreatingStep}
+          newTrackName={fileManagerState.newTrackName}
+          newFolderName={fileManagerState.newFolderName}
+          newStepName={fileManagerState.newStepName}
+          selectedStepTrack={fileManagerState.selectedStepTrack}
+          setNewTrackName={fileManagerState.setNewTrackName}
+          setNewFolderName={fileManagerState.setNewFolderName}
+          setNewStepName={fileManagerState.setNewStepName}
+          onCreateTrack={async () => {
+            if (fileManagerState.createTrack) {
+              // Use Supabase file manager's createTrack function
+              const newTrack = await fileManagerState.createTrack(
+                fileManagerState.newTrackName.trim(),
+                DEFAULT_TRACK_CODE,
+                fileManagerState.newItemParentPath || undefined
+              );
+              if (newTrack) {
+                fileManagerState.setNewTrackName('');
+                fileManagerState.setNewItemParentPath('');
+                fileManagerState.setIsCreating(false);
+                // Load the newly created track
+                if (fileManagerState.loadTrack) {
+                  fileManagerState.loadTrack(newTrack);
+                }
               }
+            } else {
+              // Fallback to operations if Supabase not available
+              operations.createNewTrack();
             }
-          } else {
-            // Fallback to operations if Supabase not available
-            operations.createNewTrack();
-          }
-        }}
-        onCreateFolder={async () => {
-          if (fileManagerState.createFolder) {
-            // Use Supabase file manager's createFolder function
-            const folderName = fileManagerState.newFolderName.trim();
-            const parentPath = fileManagerState.newItemParentPath;
-            const folderPath = parentPath ? `${parentPath}/${folderName}` : folderName;
+          }}
+          onCreateFolder={async () => {
+            if (fileManagerState.createFolder) {
+              // Use Supabase file manager's createFolder function
+              const folderName = fileManagerState.newFolderName.trim();
+              const parentPath = fileManagerState.newItemParentPath;
+              const folderPath = parentPath ? `${parentPath}/${folderName}` : folderName;
 
-            const newFolder = await fileManagerState.createFolder(folderName, folderPath, parentPath);
-            if (newFolder) {
-              fileManagerState.setNewFolderName('');
-              fileManagerState.setNewItemParentPath('');
-              fileManagerState.setIsCreating(false);
+              const newFolder = await fileManagerState.createFolder(folderName, folderPath, parentPath);
+              if (newFolder) {
+                fileManagerState.setNewFolderName('');
+                fileManagerState.setNewItemParentPath('');
+                fileManagerState.setIsCreating(false);
+              }
+            } else {
+              // Fallback to operations if Supabase not available
+              operations.createNewFolder();
             }
-          } else {
-            // Fallback to operations if Supabase not available
-            operations.createNewFolder();
-          }
-        }}
-        onAddStep={operations.addStep}
-        onCancelCreate={operations.cancelCreate}
-        onCancelCreateStep={operations.cancelCreateStep}
-        getEmptySpaceContextItems={getEmptySpaceContextItems}
-      />
+          }}
+          onAddStep={operations.addStep}
+          onCancelCreate={operations.cancelCreate}
+          onCancelCreateStep={operations.cancelCreateStep}
+          getEmptySpaceContextItems={getEmptySpaceContextItems}
+        />
+      )}
 
       <div className="flex-1 overflow-hidden mb-16">
         <FileTree
@@ -1170,35 +1186,36 @@ export function FileManagerRefactored({ context, fileManagerHook }: FileManagerP
           selectedTrack={fileManagerState.selectedTrack}
           activePattern={fileManagerState.activePattern}
           onTrackSelect={operations.handleTrackSelect}
-          onTrackRename={operations.handleTrackRename}
-          onTrackDelete={operations.deleteTrack}
-          onTrackDuplicate={operations.duplicateTrack}
+          onTrackRename={readOnly ? undefined : operations.handleTrackRename}
+          onTrackDelete={readOnly ? undefined : operations.deleteTrack}
+          onTrackDuplicate={readOnly ? undefined : operations.duplicateTrack}
           onTrackInfo={handleTrackInfo}
           onTrackDownload={operations.downloadTrack}
           onFolderDownload={operations.downloadFolder}
-          onTrackCreate={operations.handleTrackCreate}
-          onFolderCreate={operations.handleFolderCreate}
-          onFolderRename={operations.handleFolderRename}
-          onFolderDelete={operations.deleteFolder}
-          onMoveItem={operations.handleMoveItem}
-          renamingTrack={fileManagerState.renamingTrack}
-          renamingFolder={fileManagerState.renamingFolder}
+          onTrackCreate={readOnly ? undefined : operations.handleTrackCreate}
+          onFolderCreate={readOnly ? undefined : operations.handleFolderCreate}
+          onFolderRename={readOnly ? undefined : operations.handleFolderRename}
+          onFolderDelete={readOnly ? undefined : operations.deleteFolder}
+          onMoveItem={readOnly ? undefined : operations.handleMoveItem}
+          renamingTrack={readOnly ? null : fileManagerState.renamingTrack}
+          renamingFolder={readOnly ? null : fileManagerState.renamingFolder}
           renameValue={fileManagerState.renameValue}
           setRenameValue={fileManagerState.setRenameValue}
           onRenameFinish={fileManagerState.renamingTrack ? operations.finishRename : operations.finishRenameFolder}
           onRenameCancel={operations.cancelRename}
           emptySpaceContextItems={getEmptySpaceContextItems()}
-          onConvertToMultitrack={operations.convertToMultitrack}
-          onAddStep={(trackId) => {
+          onConvertToMultitrack={readOnly ? undefined : operations.convertToMultitrack}
+          onAddStep={readOnly ? undefined : (trackId) => {
             fileManagerState.setSelectedStepTrack(trackId);
             fileManagerState.setIsCreatingStep(true);
           }}
           onSwitchStep={operations.switchToStep}
-          onRenameStep={operations.startRenameStep}
-          onDeleteStep={operations.deleteStep}
-          renamingStep={fileManagerState.renamingStep}
+          onRenameStep={readOnly ? undefined : operations.startRenameStep}
+          onDeleteStep={readOnly ? undefined : operations.deleteStep}
+          renamingStep={readOnly ? null : fileManagerState.renamingStep}
           onRenameStepFinish={operations.finishRenameStep}
           onRenameStepCancel={operations.cancelRename}
+          readOnly={readOnly}
         />
       </div>
 

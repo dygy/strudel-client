@@ -62,6 +62,7 @@ interface ReplContext {
   pending?: boolean;
   isDirty?: boolean;
   activeCode?: string;
+  readOnly?: boolean;
   handleTogglePlay: () => Promise<void>;
   handleUpdate: (patternData: Partial<PatternData> & { code: string }, reset?: boolean) => Promise<void>;
   handleShuffle: () => Promise<void>;
@@ -186,7 +187,12 @@ async function getModule(name: string): Promise<Module | undefined> {
 
 const initialCode = `// LOADING`;
 
-export function useReplContext(): ReplContext {
+interface UseReplContextOptions {
+  readOnly?: boolean;
+}
+
+export function useReplContext(options: UseReplContextOptions = {}): ReplContext {
+  const { readOnly = false } = options;
   const { isSyncEnabled, audioEngineTarget } = useSettings();
   const shouldUseWebaudio = audioEngineTarget !== audioEngineTargets.osc;
   const defaultOutput = shouldUseWebaudio ? webaudioOutput : superdirtOutput;
@@ -214,6 +220,7 @@ export function useReplContext(): ReplContext {
       pattern: silence,
       drawTime,
       drawContext,
+      readOnly,
       prebake: async () => Promise.all([modulesLoading, presets]),
       onUpdateState: (state: any) => {
         setReplState({ ...state });
@@ -327,7 +334,7 @@ export function useReplContext(): ReplContext {
     });
 
     editorRef.current = editor;
-  }, [isSyncEnabled, defaultOutput, getTime]);
+  }, [isSyncEnabled, defaultOutput, getTime, readOnly]);
 
   const [replState, setReplState] = useState<ReplState>({});
   const { started, isDirty, error, activeCode, pending } = replState;
@@ -583,6 +590,7 @@ export function useReplContext(): ReplContext {
     pending,
     isDirty,
     activeCode,
+    readOnly,
     handleTogglePlay,
     handleUpdate,
     handleShuffle,

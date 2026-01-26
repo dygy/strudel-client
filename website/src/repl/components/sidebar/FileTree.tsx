@@ -68,17 +68,17 @@ interface FileTreeProps {
   selectedTrack: string | null; // Track opened for editing
   activePattern: string; // Track currently playing
   onTrackSelect: (track: Track) => void;
-  onTrackRename: (trackId: string) => void;
-  onTrackDelete: (trackId: string) => void;
-  onTrackDuplicate: (track: Track) => void;
+  onTrackRename?: (trackId: string) => void;
+  onTrackDelete?: (trackId: string) => void;
+  onTrackDuplicate?: (track: Track) => void;
   onTrackInfo: (track: Track) => void;
   onTrackDownload: (track: Track) => void;
   onFolderDownload: (folderPath: string) => void;
-  onTrackCreate: (parentPath?: string) => void;
-  onFolderCreate: (parentPath?: string) => void;
-  onFolderRename: (folderPath: string) => void;
-  onFolderDelete: (folderPath: string) => void;
-  onMoveItem: (itemId: string, itemType: 'track' | 'folder', targetPath: string) => void;
+  onTrackCreate?: (parentPath?: string) => void;
+  onFolderCreate?: (parentPath?: string) => void;
+  onFolderRename?: (folderPath: string) => void;
+  onFolderDelete?: (folderPath: string) => void;
+  onMoveItem?: (itemId: string, itemType: 'track' | 'folder', targetPath: string) => void;
   renamingTrack: string | null;
   renamingFolder: string | null;
   renameValue: string;
@@ -86,14 +86,15 @@ interface FileTreeProps {
   onRenameFinish: () => void;
   onRenameCancel: () => void;
   emptySpaceContextItems: Array<ContextMenuItem | Separator>;
-  onConvertToMultitrack: (track: Track) => void;
-  onAddStep: (trackId: string) => void;
+  onConvertToMultitrack?: (track: Track) => void;
+  onAddStep?: (trackId: string) => void;
   onSwitchStep: (trackId: string, stepIndex: number) => void;
-  onRenameStep: (trackId: string, stepIndex: number) => void;
-  onDeleteStep: (trackId: string, stepIndex: number) => void;
+  onRenameStep?: (trackId: string, stepIndex: number) => void;
+  onDeleteStep?: (trackId: string, stepIndex: number) => void;
   renamingStep: { trackId: string; stepIndex: number } | null;
   onRenameStepFinish: () => void;
   onRenameStepCancel: () => void;
+  readOnly?: boolean;
 }
 
 export function FileTree({
@@ -128,6 +129,7 @@ export function FileTree({
   renamingStep,
   onRenameStepFinish,
   onRenameStepCancel,
+  readOnly = false,
 }: FileTreeProps) {
   const { t } = useTranslation(['files', 'common']);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['root'])); // Root is expanded by default
@@ -414,44 +416,49 @@ export function FileTree({
   };
 
   const getTrackContextItems = (track: Track) => {
-
     const baseItems: (ContextMenuItem | Separator)[] = [
       {
         label: t('files:load'),
         icon: <DocumentIcon className="w-4 h-4" />,
         onClick: () => onTrackSelect(track),
       },
-      {
-        label: t('files:rename'),
-        icon: <PencilIcon className="w-4 h-4" />,
-        onClick: () => onTrackRename(track.id),
-      },
-      {
-        label: t('files:duplicate'),
-        icon: <DocumentIcon className="w-4 h-4" />,
-        onClick: () => onTrackDuplicate(track),
-      },
     ];
 
-    // Add multitrack-specific options
-    if (track.isMultitrack) {
+    // Only add edit/delete options if not in read-only mode
+    if (!readOnly) {
       baseItems.push(
-        { separator: true, label: '', onClick: () => {} },
         {
-          label: t('files:addStep'),
-          icon: <PlusIcon className="w-4 h-4" />,
-          onClick: () => onAddStep(track.id),
-        }
-      );
-    } else {
-      baseItems.push(
-        { separator: true, label: '', onClick: () => {} },
+          label: t('files:rename'),
+          icon: <PencilIcon className="w-4 h-4" />,
+          onClick: () => onTrackRename?.(track.id),
+        },
         {
-          label: t('files:convertToMultitrack'),
+          label: t('files:duplicate'),
           icon: <DocumentIcon className="w-4 h-4" />,
-          onClick: () => onConvertToMultitrack(track),
+          onClick: () => onTrackDuplicate?.(track),
         }
       );
+
+      // Add multitrack-specific options
+      if (track.isMultitrack) {
+        baseItems.push(
+          { separator: true, label: '', onClick: () => {} },
+          {
+            label: t('files:addStep'),
+            icon: <PlusIcon className="w-4 h-4" />,
+            onClick: () => onAddStep?.(track.id),
+          }
+        );
+      } else {
+        baseItems.push(
+          { separator: true, label: '', onClick: () => {} },
+          {
+            label: t('files:convertToMultitrack'),
+            icon: <DocumentIcon className="w-4 h-4" />,
+            onClick: () => onConvertToMultitrack?.(track),
+          }
+        );
+      }
     }
 
     baseItems.push(
@@ -465,14 +472,20 @@ export function FileTree({
         label: t('files:info'),
         icon: <InformationCircleIcon className="w-4 h-4" />,
         onClick: () => onTrackInfo(track),
-      },
-      { separator: true, label: '', onClick: () => {} },
-      {
-        label: t('files:delete'),
-        icon: <TrashIcon className="w-4 h-4" />,
-        onClick: () => onTrackDelete(track.id),
       }
     );
+
+    // Only add delete option if not in read-only mode
+    if (!readOnly) {
+      baseItems.push(
+        { separator: true, label: '', onClick: () => {} },
+        {
+          label: t('files:delete'),
+          icon: <TrashIcon className="w-4 h-4" />,
+          onClick: () => onTrackDelete?.(track.id),
+        }
+      );
+    }
 
     return baseItems;
   };
@@ -501,54 +514,78 @@ export function FileTree({
       });
     }
 
-    return [
-    {
-      label: t('files:newTrack'),
-      icon: <PlusIcon className="w-4 h-4" />,
-      onClick: () => onTrackCreate(folderPath),
-    },
-    {
-      label: t('files:newFolder'),
-      icon: <FolderIcon className="w-4 h-4" />,
-      onClick: () => onFolderCreate(folderPath),
-    },
-    { separator: true, label: '', onClick: () => {} },
-    {
+    const items: (ContextMenuItem | Separator)[] = [];
+
+    // Only add create options if not in read-only mode
+    if (!readOnly) {
+      items.push(
+        {
+          label: t('files:newTrack'),
+          icon: <PlusIcon className="w-4 h-4" />,
+          onClick: () => onTrackCreate?.(folderPath),
+        },
+        {
+          label: t('files:newFolder'),
+          icon: <FolderIcon className="w-4 h-4" />,
+          onClick: () => onFolderCreate?.(folderPath),
+        },
+        { separator: true, label: '', onClick: () => {} }
+      );
+    }
+
+    items.push({
       label: t('files:downloadFolder'),
       icon: <ArrowDownTrayIcon className="w-4 h-4" />,
       onClick: () => onFolderDownload(folderPath),
-    },
-    {
-      label: t('files:rename'),
-      icon: <PencilIcon className="w-4 h-4" />,
-      onClick: () => onFolderRename(folderPath),
-    },
-    {
-      label: t('files:delete'),
-      icon: <TrashIcon className="w-4 h-4" />,
-      onClick: () => onFolderDelete(folderPath),
-    },
-  ];
+    });
+
+    // Only add edit/delete options if not in read-only mode
+    if (!readOnly) {
+      items.push(
+        {
+          label: t('files:rename'),
+          icon: <PencilIcon className="w-4 h-4" />,
+          onClick: () => onFolderRename?.(folderPath),
+        },
+        {
+          label: t('files:delete'),
+          icon: <TrashIcon className="w-4 h-4" />,
+          onClick: () => onFolderDelete?.(folderPath),
+        }
+      );
+    }
+
+    return items;
   };
 
-  const getStepContextItems = (trackId: string, stepIndex: number, step: TrackStep) => [
-    {
-      label: t('files:load'),
-      icon: <DocumentIcon className="w-4 h-4" />,
-      onClick: () => onSwitchStep(trackId, stepIndex),
-    },
-    {
-      label: t('files:rename'),
-      icon: <PencilIcon className="w-4 h-4" />,
-      onClick: () => onRenameStep(trackId, stepIndex),
-    },
-    { separator: true, label: '', onClick: () => {} },
-    {
-      label: t('files:delete'),
-      icon: <TrashIcon className="w-4 h-4" />,
-      onClick: () => onDeleteStep(trackId, stepIndex),
-    },
-  ];
+  const getStepContextItems = (trackId: string, stepIndex: number, step: TrackStep) => {
+    const items: (ContextMenuItem | Separator)[] = [
+      {
+        label: t('files:load'),
+        icon: <DocumentIcon className="w-4 h-4" />,
+        onClick: () => onSwitchStep(trackId, stepIndex),
+      },
+    ];
+
+    // Only add edit/delete options if not in read-only mode
+    if (!readOnly) {
+      items.push(
+        {
+          label: t('files:rename'),
+          icon: <PencilIcon className="w-4 h-4" />,
+          onClick: () => onRenameStep?.(trackId, stepIndex),
+        },
+        { separator: true, label: '', onClick: () => {} },
+        {
+          label: t('files:delete'),
+          icon: <TrashIcon className="w-4 h-4" />,
+          onClick: () => onDeleteStep?.(trackId, stepIndex),
+        }
+      );
+    }
+
+    return items;
+  };
 
   const renderNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
     const isExpanded = expandedFolders.has(node.id); // Use node ID for expansion state
@@ -609,7 +646,7 @@ export function FileTree({
               dragOverTarget === node.id ? 'bg-blue-600/30 border-2 border-blue-400 border-dashed' : ''
             }`}
             style={{ paddingLeft: `${depth * 16 + 8}px` }}
-            draggable={!isRenaming}
+            draggable={!isRenaming && !readOnly}
             onDragStart={(e) => handleDragStart(e, node)}
             onDragOver={(e) => handleDragOver(e, node)}
             onDragLeave={handleDragLeave}

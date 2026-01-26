@@ -1,0 +1,163 @@
+---
+// Admin Dashboard Page
+// Only accessible to admin users (a.shvartcman@gmail.com)
+import HeadCommon from '../components/HeadCommon.astro';
+import { AdminDashboard } from '../components/admin/AdminDashboard';
+import { createClient } from '@supabase/supabase-js';
+import { isAdmin } from '../lib/adminAuth';
+
+export const prerender = false; // Enable SSR
+
+// Check authentication and admin status
+const accessToken = Astro.cookies.get('sb-access-token')?.value;
+
+if (!accessToken) {
+  console.log('Admin page - No access token, redirecting to login');
+  return Astro.redirect('/login');
+}
+
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey || supabaseUrl.includes('placeholder')) {
+  console.error('Admin page - Supabase not configured');
+  return Astro.redirect('/repl');
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
+
+// Verify user token
+const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
+
+if (!user || userError) {
+  console.log('Admin page - User verification failed:', userError?.message);
+  return Astro.redirect('/login');
+}
+
+// Check admin status
+if (!isAdmin(user.email)) {
+  console.log('Admin page - Non-admin access attempt:', user.email);
+  return Astro.redirect('/repl');
+}
+
+console.log('Admin page - Admin verified:', user.email);
+
+// Fetch initial data server-side
+let initialData = null;
+let debugInfo = { totalUsers: 0, totalTracks: 0, error: null as string | null };
+try {
+  // First, get ALL users from auth.users using admin API
+  const { data: allUsersData, error: usersError } = await supabase.auth.admin.listUsers();
+
+  if (usersError) {
+    console.error('Admin page - Error fetching users:', usersError);
+    debugInfo.error = usersError.message;
+  } else {
+    const allUsers = allUsersData?.users || [];
+    debugInfo.totalUsers = allUsers.length;
+    console.log('Admin page - Total users:', allUsers.length);
+
+    // Get all tracks to calculate counts per user
+    const { data: trackStats, error: statsError } = await supabase
+      .from('tracks')
+      .select('user_id, modified');
+
+    if (statsError) {
+      console.error('Admin page - Error fetching tracks:', statsError);
+      debugInfo.error = statsError.message;
+    }
+
+    debugInfo.totalTracks = trackStats?.length || 0;
+
+    // Aggregate track counts and last modified per user
+    const userStats: Record<string, { track_count: number; last_active: string }> = {};
+
+    for (const track of trackStats || []) {
+      if (!track.user_id) continue;
+
+      if (!userStats[track.user_id]) {
+        userStats[track.user_id] = { track_count: 0, last_active: track.modified || '' };
+      }
+
+      userStats[track.user_id].track_count++;
+
+      if (track.modified && track.modified > userStats[track.user_id].last_active) {
+        userStats[track.user_id].last_active = track.modified;
+      }
+    }
+
+    // Build users list with track counts (including users with 0 tracks)
+    const usersWithEmail: Array<{
+      user_id: string;
+      email: string;
+      track_count: number;
+      last_active: string;
+      created_at: string;
+    }> = [];
+
+    for (const authUser of allUsers) {
+      const stats = userStats[authUser.id] || { track_count: 0, last_active: '' };
+      usersWithEmail.push({
+        user_id: authUser.id,
+        email: authUser.email || 'unknown',
+        track_count: stats.track_count,
+        last_active: stats.last_active || authUser.last_sign_in_at || '',
+        created_at: authUser.created_at || '',
+      });
+    }
+
+    // Sort by track_count desc by default
+    usersWithEmail.sort((a, b) => b.track_count - a.track_count);
+
+    initialData = {
+      users: usersWithEmail,
+      total: usersWithEmail.length,
+      page: 1,
+      limit: 20,
+      totalPages: Math.ceil(usersWithEmail.length / 20),
+    };
+
+    console.log('Admin page - Loaded', usersWithEmail.length, 'users');
+  }
+} catch (error) {
+  console.error('Admin page - Error loading initial data:', error);
+  debugInfo.error = String(error);
+}
+---
+
+<html lang="en" class="m-0 dark">
+  <head>
+    <HeadCommon />
+    <title>Admin Dashboard - Strudel</title>
+  </head>
+  <body class="min-h-screen bg-background text-foreground">
+    <!-- Header -->
+    <header class="bg-lineHighlight border-b border-gray-700 px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <a href="/repl" class="text-xl font-bold text-foreground hover:text-blue-400">
+            Strudel
+          </a>
+          <span class="text-gray-500">/</span>
+          <span class="text-foreground">Admin</span>
+        </div>
+        <div class="flex items-center gap-4 text-sm text-gray-400">
+          <span>Logged in as: {user.email}</span>
+          <a href="/repl" class="text-blue-400 hover:text-blue-300">
+            Back to REPL
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+      <AdminDashboard client:load initialData={initialData} />
+    </main>
+  </body>
+</html>

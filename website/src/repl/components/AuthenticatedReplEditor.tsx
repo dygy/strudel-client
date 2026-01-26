@@ -26,13 +26,14 @@ interface ReplContext {
 interface AuthenticatedReplEditorProps extends React.HTMLAttributes<HTMLDivElement> {
   context?: ReplContext; // Make context optional since we'll create our own
   ssrData?: SSRData | null;
+  readOnly?: boolean;
 }
 
-function AuthenticatedReplContent({ context: externalContext, ssrData, ...editorProps }: AuthenticatedReplEditorProps) {
+function AuthenticatedReplContent({ context: externalContext, ssrData, readOnly = false, ...editorProps }: AuthenticatedReplEditorProps) {
   const { isAuthenticated, loading } = useAuth();
 
-  // Create standard REPL context
-  const replContext = useReplContext();
+  // Create standard REPL context with readOnly option
+  const replContext = useReplContext({ readOnly });
 
   // Always call the hook - it will handle authentication state internally
   const supabaseFileManager = useSupabaseFileManager(replContext, ssrData);
@@ -88,6 +89,7 @@ function AuthenticatedReplContent({ context: externalContext, ssrData, ...editor
         context={replContext}
         fileManagerHook={supabaseFileManager}
         ssrData={ssrData}
+        readOnly={readOnly}
         {...editorProps}
       />
     </div>

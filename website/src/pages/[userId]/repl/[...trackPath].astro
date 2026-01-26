@@ -1,0 +1,218 @@
+---
+// Admin view of another user's REPL (read-only)
+// URL: /[userId]/repl/[trackPath]
+import HeadCommon from '../../../components/HeadCommon.astro';
+import { Repl } from '../../../repl/Repl';
+import { I18nProvider } from '../../../components/I18nProvider';
+import { createClient } from '@supabase/supabase-js';
+import { TreeDataTransformer } from '../../../lib/TreeDataTransformer';
+import { parseTrackUrlPath, trackNameToSlug } from '../../../lib/slugUtils';
+import { isAdmin } from '../../../lib/adminAuth';
+
+import type { SSRData } from '../../../types/ssr';
+
+export const prerender = false; // Enable SSR for authenticated data
+
+// Get user ID and track path from URL params
+const { userId, trackPath } = Astro.params;
+const fullPath = Array.isArray(trackPath) ? trackPath.join('/') : trackPath || '';
+
+// Extract step parameter from query string
+const url = new URL(Astro.request.url);
+const stepParam = url.searchParams.get('step');
+
+console.log('Admin REPL SSR - Viewing user:', userId, 'track path:', fullPath, 'step:', stepParam);
+
+// Parse track path if provided
+let parsedPath: { folderPath: string | null; trackSlug: string } | null = null;
+
+if (fullPath) {
+  const fullUrl = `/repl/${fullPath}`;
+  parsedPath = parseTrackUrlPath(fullUrl);
+
+  if (!parsedPath) {
+    console.error('Admin REPL SSR - Invalid track path format:', fullUrl);
+  } else {
+    console.log('Admin REPL SSR - Parsed path:', parsedPath);
+  }
+}
+
+const { folderPath, trackSlug } = parsedPath || { folderPath: null, trackSlug: '' };
+
+// SSR data fetching
+let ssrData: SSRData | null = null;
+let targetTrackId: string | null = null;
+let targetTrackSlug: string | null = null;
+let targetStepName: string | null = stepParam;
+let viewedUserEmail: string | null = null;
+
+try {
+  // Get access token from cookies
+  const accessToken = Astro.cookies.get('sb-access-token')?.value;
+
+  if (!accessToken) {
+    console.log('Admin REPL SSR - No access token, redirecting to login');
+    return Astro.redirect('/login');
+  }
+
+  const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey || supabaseUrl.includes('placeholder')) {
+    console.error('Admin REPL SSR - Supabase not configured');
+    return Astro.redirect('/repl');
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  // Verify the current user token
+  const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser(accessToken);
+
+  if (!currentUser || userError) {
+    console.log('Admin REPL SSR - User verification failed:', userError?.message);
+    return Astro.redirect('/login');
+  }
+
+  // Check if current user is admin
+  if (!isAdmin(currentUser.email)) {
+    console.log('Admin REPL SSR - Non-admin user attempting to access:', currentUser.email);
+    return Astro.redirect('/repl');
+  }
+
+  console.log('Admin REPL SSR - Admin verified:', currentUser.email);
+
+  // Get the viewed user's email for display
+  const { data: viewedUser } = await supabase.auth.admin.getUserById(userId);
+  if (viewedUser?.user) {
+    viewedUserEmail = viewedUser.user.email || null;
+  }
+
+  // Fetch the target user's tracks
+  const { data: tracksData, error: tracksError } = await supabase
+    .from('tracks')
+    .select('*')
+    .eq('user_id', userId)
+    .order('modified', { ascending: false });
+
+  // Fetch the target user's folders
+  const { data: foldersData, error: foldersError } = await supabase
+    .from('folders')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created', { ascending: true });
+
+  if (tracksError || foldersError) {
+    console.error('Admin REPL SSR - Database error:', tracksError || foldersError);
+  } else {
+    // Convert to expected format
+    const tracks = (tracksData || []).map(track => ({
+      id: track.id,
+      name: track.name,
+      code: track.code || '',
+      created: track.created,
+      modified: track.modified,
+      folder: track.folder,
+      isMultitrack: track.is_multitrack || false,
+      steps: track.steps || [],
+      activeStep: track.active_step || 0,
+      user_id: track.user_id,
+    }));
+
+    const folders = (foldersData || []).map(folder => ({
+      id: folder.id,
+      name: folder.name,
+      path: folder.path,
+      parent: folder.parent,
+      created: folder.created,
+      user_id: folder.user_id,
+    }));
+
+    // Find target track if specified
+    let targetTrack = null;
+
+    if (trackSlug) {
+      targetTrack = tracks.find(track => {
+        const trackMatches = trackNameToSlug(track.name) === trackSlug;
+        const folderMatches = (track.folder || null) === (folderPath || null);
+        return trackMatches && folderMatches;
+      }) || null;
+
+      console.log('Admin REPL SSR - Track search result:', {
+        trackSlug,
+        folderPath,
+        foundTrack: targetTrack?.name,
+        foundTrackId: targetTrack?.id
+      });
+    }
+
+    // If no track specified but tracks exist, select the first one
+    if (!targetTrack && tracks.length > 0 && !trackSlug) {
+      targetTrack = tracks[0];
+      console.log('Admin REPL SSR - Auto-selecting first track:', targetTrack.name);
+    }
+
+    if (targetTrack) {
+      targetTrackId = targetTrack.id;
+      targetTrackSlug = trackSlug || trackNameToSlug(targetTrack.name);
+    }
+
+    // Transform to hierarchical tree structure
+    const tree = TreeDataTransformer.transformToTree(tracks, folders);
+
+    ssrData = {
+      tracks,
+      folders,
+      hierarchical: {
+        id: 'root' as const,
+        children: tree.root.children || []
+      },
+      targetTrackId,
+      targetTrackSlug,
+      targetFolderPath: folderPath,
+      targetStepName
+    };
+
+    console.log('Admin REPL SSR - Data loaded:', {
+      tracksCount: tracks.length,
+      foldersCount: folders.length,
+      targetTrackId,
+      viewedUser: viewedUserEmail
+    });
+  }
+} catch (error) {
+  console.error('Admin REPL SSR - Error:', error);
+  return Astro.redirect('/repl');
+}
+
+// Generate page title
+const pageTitle = viewedUserEmail
+  ? `Admin View - ${viewedUserEmail}'s REPL${trackSlug ? ` - ${trackSlug}` : ''}`
+  : `Admin View - User REPL`;
+---
+
+<html lang="en" class="m-0 dark">
+  <head>
+    <HeadCommon />
+    <title>{pageTitle}</title>
+  </head>
+  <body class="h-app-height bg-background m-0">
+    <!-- Admin banner -->
+    <div class="bg-yellow-600 text-white px-4 py-2 text-sm flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="font-semibold">Admin View</span>
+        <span>-</span>
+        <span>Viewing: {viewedUserEmail || userId}</span>
+        <span class="text-yellow-200">(Read-only)</span>
+      </div>
+      <a href="/admin" class="text-white hover:text-yellow-200 underline">
+        ← Back to Admin Dashboard
+      </a>
+    </div>
+
+    <div class="h-[calc(100%-40px)]">
+      <I18nProvider client:only="react">
+        <Repl client:only="react" ssrData={ssrData} readOnly={true} />
+      </I18nProvider>
+    </div>
+  </body>
+</html>

@@ -19,11 +19,12 @@ import type { SSRData } from '@src/types/ssr';
 interface ReplProps {
   embedded?: boolean;
   ssrData?: SSRData | null;
+  readOnly?: boolean;
 }
 
-export function Repl({ embedded = false, ssrData = null }: ReplProps) {
+export function Repl({ embedded = false, ssrData = null, readOnly = false }: ReplProps) {
   const isEmbedded = embedded || isIframe();
-  const context = useReplContext();
+  const context = useReplContext({ readOnly });
   const { fontFamily } = useSettings();
 
   // Choose the appropriate editor based on context
@@ -39,6 +40,6 @@ export function Repl({ embedded = false, ssrData = null }: ReplProps) {
   }
 
   return (
-    <Editor context={context} style={{ fontFamily }} ssrData={ssrData} />
+    <Editor context={context} style={{ fontFamily }} ssrData={ssrData} readOnly={readOnly} />
   );
 }

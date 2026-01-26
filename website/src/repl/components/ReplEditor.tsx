@@ -40,9 +40,10 @@ interface ReplEditorProps extends React.HTMLAttributes<HTMLDivElement> {
     tracks: any[];
     folders: any[];
   } | null;
+  readOnly?: boolean;
 }
 
-function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplEditorProps) {
+function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, ...editorProps }: ReplEditorProps) {
   const { containerRef, editorRef, error, init, pending } = context;
   const settings = useSettings();
   const { panelPosition, isZen, isFileManagerOpen } = settings;
@@ -410,7 +411,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, ...editorProps }: ReplE
       <div className="grow flex relative overflow-hidden">
         {!isZen && isFileManagerOpen && (
           <ResizableSidebar defaultWidth={300} minWidth={200} maxWidth={500}>
-            <FileManager context={context} fileManagerHook={fileManagerHook} />
+            <FileManager context={context} fileManagerHook={fileManagerHook} readOnly={readOnly} />
           </ResizableSidebar>
         )}
         {shouldShowWelcome ? (
