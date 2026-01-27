@@ -133,7 +133,18 @@ try {
     if (trackSlug) {
       targetTrack = tracks.find(track => {
         const trackMatches = trackNameToSlug(track.name) === trackSlug;
-        const folderMatches = (track.folder || null) === (folderPath || null);
+        // Handle folder ID vs path - look up folder by ID to get its path
+        let trackFolderPath: string | null = null;
+        if (track.folder) {
+          const folder = folders.find(f => f.id === track.folder);
+          if (folder) {
+            trackFolderPath = folder.path;
+          } else {
+            // Fallback: track.folder might already be a path
+            trackFolderPath = track.folder;
+          }
+        }
+        const folderMatches = trackFolderPath === (folderPath || null);
         return trackMatches && folderMatches;
       }) || null;
 
@@ -141,7 +152,8 @@ try {
         trackSlug,
         folderPath,
         foundTrack: targetTrack?.name,
-        foundTrackId: targetTrack?.id
+        foundTrackId: targetTrack?.id,
+        foundTrackFolder: targetTrack?.folder
       });
     }
 
