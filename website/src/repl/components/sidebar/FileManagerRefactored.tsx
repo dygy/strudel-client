@@ -69,6 +69,7 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
     context,
     t,
     deleteTrack: fileManagerState.deleteTrack,
+    readOnly,
   } : {
     // Provide safe defaults when fileManagerState is null
     tracks: {},
@@ -114,6 +115,7 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
     isDeletingFolderRef: { current: new Set() },
     context,
     t,
+    readOnly,
   });
 
   // If no fileManagerHook (unauthenticated), show sign-in prompt

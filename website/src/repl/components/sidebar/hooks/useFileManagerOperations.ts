@@ -50,6 +50,8 @@ interface UseFileManagerOperationsProps {
   t: (key: string) => string;
   // API functions
   deleteTrack?: (trackId: string) => Promise<boolean>;
+  // Read-only mode (for admin viewing other users' repls)
+  readOnly?: boolean;
 }
 
 export function useFileManagerOperations({
@@ -93,6 +95,7 @@ export function useFileManagerOperations({
   context,
   t,
   deleteTrack: deleteTrackAPI,
+  readOnly = false,
 }: UseFileManagerOperationsProps) {
 
   const createNewTrack = useCallback((parentPath?: string) => {
@@ -180,42 +183,45 @@ export function useFileManagerOperations({
     }
     // For regular tracks, don't add any step parameter (even if one exists in current URL)
     
-    console.log('FileManager - smooth navigation to track:', track.name, 'URL:', trackUrl);
-    
-    // CRITICAL: Update activePattern (strip /repl/ prefix)
-    const trackPath = trackUrl.replace('/repl/', '');
-    setActivePattern(trackPath);
-    
-    // Use history API for smooth navigation without page reload
-    window.history.pushState({ trackId: track.id, trackName: track.name }, '', trackUrl);
-    
-    // Update document title
-    if (track.isMultitrack && track.steps && track.steps.length > 0) {
-      // Try to get step name from URL if present
-      const stepMatch = trackUrl.match(/step=([^&]+)/);
-      const stepSlug = stepMatch ? stepMatch[1] : null;
-      if (stepSlug) {
-        const step = track.steps.find(s => trackNameToSlug(s.name) === stepSlug);
-        if (step) {
-          document.title = `Strudel REPL - ${track.name} (${step.name})`;
+    console.log('FileManager - smooth navigation to track:', track.name, 'URL:', trackUrl, 'readOnly:', readOnly);
+
+    // Skip URL changes in read-only mode (admin viewing other users' repls)
+    if (!readOnly) {
+      // CRITICAL: Update activePattern (strip /repl/ prefix)
+      const trackPath = trackUrl.replace('/repl/', '');
+      setActivePattern(trackPath);
+
+      // Use history API for smooth navigation without page reload
+      window.history.pushState({ trackId: track.id, trackName: track.name }, '', trackUrl);
+
+      // Update document title
+      if (track.isMultitrack && track.steps && track.steps.length > 0) {
+        // Try to get step name from URL if present
+        const stepMatch = trackUrl.match(/step=([^&]+)/);
+        const stepSlug = stepMatch ? stepMatch[1] : null;
+        if (stepSlug) {
+          const step = track.steps.find(s => trackNameToSlug(s.name) === stepSlug);
+          if (step) {
+            document.title = `Strudel REPL - ${track.name} (${step.name})`;
+          } else {
+            document.title = `Strudel REPL - ${track.name} (${track.steps[0].name})`;
+          }
         } else {
           document.title = `Strudel REPL - ${track.name} (${track.steps[0].name})`;
         }
       } else {
-        document.title = `Strudel REPL - ${track.name} (${track.steps[0].name})`;
+        document.title = `Strudel REPL - ${track.name}`;
       }
-    } else {
-      document.title = `Strudel REPL - ${track.name}`;
+
+      // Dispatch custom event to update the page content
+      window.dispatchEvent(new CustomEvent('strudel-navigate-track', {
+        detail: { track, url: trackUrl }
+      }));
     }
-    
-    // Dispatch custom event to update the page content
-    window.dispatchEvent(new CustomEvent('strudel-navigate-track', {
-      detail: { track, url: trackUrl }
-    }));
-    
-    // Load the track immediately
+
+    // Load the track immediately (always needed, even in read-only mode)
     loadTrack(track);
-  }, [selectedTrack, tracks, saveCurrentTrack, loadTrack, setSelectedStepTrack, folders]);
+  }, [selectedTrack, tracks, saveCurrentTrack, loadTrack, setSelectedStepTrack, folders, readOnly]);
 
   const duplicateTrack = useCallback((track: Track) => {
     const trackId = nanoid();
@@ -775,37 +781,37 @@ export function useFileManagerOperations({
     console.log('FileManager - loading step code:', track.steps[stepIndex].code.substring(0, 50) + '...');
     loadTrack(updatedTrack);
     
-    // Update URL with step information using step name
-    if (selectedTrack === trackId) {
+    // Update URL with step information using step name (skip in read-only mode)
+    if (selectedTrack === trackId && !readOnly) {
       try {
         console.log('FileManager - updating URL for step:', stepIndex);
-        
+
         // Generate track URL with step name parameter
         const trackUrl = generateTrackUrlPath(track.name, track.folder, folders);
         const stepName = track.steps[stepIndex].name;
         const stepSlug = trackNameToSlug(stepName);
         const stepUrl = `${trackUrl}?step=${stepSlug}`;
-        
+
         // Update activePattern (strip /repl/ prefix)
         const stepPath = stepUrl.replace('/repl/', '');
         setActivePattern(stepPath);
-        
+
         // Update browser URL
         window.history.replaceState(
-          { trackId: track.id, trackName: track.name, step: stepSlug }, 
-          '', 
+          { trackId: track.id, trackName: track.name, step: stepSlug },
+          '',
           stepUrl
         );
-        
+
         // Update document title
         document.title = `Strudel REPL - ${track.name} (${stepName})`;
-        
+
         console.log('FileManager - step URL updated to:', stepUrl);
       } catch (error) {
         console.error('FileManager - Failed to update URL for step:', error);
       }
     }
-  }, [tracks, selectedTrack, context, setTracks, loadTrack, setSelectedStepTrack, folders]);
+  }, [tracks, selectedTrack, context, setTracks, loadTrack, setSelectedStepTrack, folders, readOnly]);
 
   const startRenameStep = useCallback((trackId: string, stepIndex: number) => {
     const track = tracks[trackId];
