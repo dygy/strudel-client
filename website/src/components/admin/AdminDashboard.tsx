@@ -96,17 +96,17 @@ export function AdminDashboard({ initialData }: AdminDashboardProps) {
       : <ChevronDownIcon className="w-4 h-4 ml-1 inline" />;
   };
 
-  // Use ISO format to avoid hydration mismatch (locale-independent)
+  // Use fixed format to avoid hydration mismatch (locale-independent)
+  // Format: dd.mm.yyyy hh:mm (24-hour, no AM/PM)
   const formatDate = (dateString: string) => {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
-    // Use ISO format: YYYY-MM-DD HH:MM
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}`;
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const year = date.getUTCFullYear();
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    return `${day}.${month}.${year} ${hours}:${minutes}`;
   };
 
   if (loading && users.length === 0) {
