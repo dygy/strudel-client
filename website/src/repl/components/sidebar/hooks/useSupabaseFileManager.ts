@@ -766,6 +766,12 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
   }, [activePattern, isInitialized, selectedTrack, loadTrack, tracks, user, selectedStepTrack, setSelectedStepTrack, setTracks]);
 
   const saveSpecificTrack = useCallback(async (trackId: string, showToast: boolean = true) => {
+    // In read-only mode (admin viewing another user), never save
+    if (readOnly) {
+      console.log('SupabaseFileManager - saveSpecificTrack: read-only mode, skipping save');
+      return false;
+    }
+
     if (!trackId || !user) {
       console.warn('SupabaseFileManager - saveSpecificTrack: not authenticated or invalid track ID:', trackId);
       return false;
@@ -905,7 +911,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       // Always clear the autosaving flag
       autosaveContext.isAutosaving = false;
     }
-  }, [context, t, selectedTrack, tracks, user, getTrackAutosaveContext]);
+  }, [context, t, selectedTrack, tracks, user, getTrackAutosaveContext, readOnly]);
 
   const saveCurrentTrack = useCallback(async (showToast: boolean = true) => {
     if (!selectedTrack || !user) return false;
@@ -916,7 +922,8 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
    * Schedule autosave for a specific track with strict isolation
    */
   const scheduleTrackAutosave = useCallback((trackId: string) => {
-    if (!isAutosaveEnabled || !trackId || !user) return;
+    // Don't schedule autosave in read-only mode
+    if (readOnly || !isAutosaveEnabled || !trackId || !user) return;
 
     const autosaveContext = getTrackAutosaveContext(trackId);
 
@@ -948,7 +955,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
         });
       }
     }, autosaveInterval);
-  }, [isAutosaveEnabled, user, autosaveInterval, selectedTrack, folders, getTrackAutosaveContext, clearTrackAutosaveTimer, saveSpecificTrack]);
+  }, [isAutosaveEnabled, user, autosaveInterval, selectedTrack, folders, getTrackAutosaveContext, clearTrackAutosaveTimer, saveSpecificTrack, readOnly]);
 
   /**
    * Handle code changes to trigger autosave scheduling - URL-based

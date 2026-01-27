@@ -185,8 +185,27 @@ export function useFileManagerOperations({
     
     console.log('FileManager - smooth navigation to track:', track.name, 'URL:', trackUrl, 'readOnly:', readOnly);
 
-    // Skip URL changes in read-only mode (admin viewing other users' repls)
-    if (!readOnly) {
+    // In read-only mode (admin viewing other users' repls), use admin URL format
+    if (readOnly) {
+      // Extract userId from current URL (format: /{userId}/repl/...)
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+      const adminMatch = currentPath.match(/^\/([a-f0-9-]{36})\/repl/);
+
+      if (adminMatch) {
+        const userId = adminMatch[1];
+        // Convert /repl/... to /{userId}/repl/...
+        const adminUrl = trackUrl.replace('/repl/', `/${userId}/repl/`);
+
+        console.log('FileManager - admin view URL update:', adminUrl);
+
+        // Update browser URL without affecting app state
+        window.history.pushState({ trackId: track.id, trackName: track.name, adminView: true }, '', adminUrl);
+
+        // Update document title with admin prefix
+        document.title = `Admin View - ${track.name}`;
+      }
+    } else {
+      // Normal mode - update URL and app state
       // CRITICAL: Update activePattern (strip /repl/ prefix)
       const trackPath = trackUrl.replace('/repl/', '');
       setActivePattern(trackPath);
@@ -781,8 +800,8 @@ export function useFileManagerOperations({
     console.log('FileManager - loading step code:', track.steps[stepIndex].code.substring(0, 50) + '...');
     loadTrack(updatedTrack);
     
-    // Update URL with step information using step name (skip in read-only mode)
-    if (selectedTrack === trackId && !readOnly) {
+    // Update URL with step information using step name
+    if (selectedTrack === trackId) {
       try {
         console.log('FileManager - updating URL for step:', stepIndex);
 
@@ -790,21 +809,39 @@ export function useFileManagerOperations({
         const trackUrl = generateTrackUrlPath(track.name, track.folder, folders);
         const stepName = track.steps[stepIndex].name;
         const stepSlug = trackNameToSlug(stepName);
-        const stepUrl = `${trackUrl}?step=${stepSlug}`;
+        let stepUrl = `${trackUrl}?step=${stepSlug}`;
 
-        // Update activePattern (strip /repl/ prefix)
-        const stepPath = stepUrl.replace('/repl/', '');
-        setActivePattern(stepPath);
+        if (readOnly) {
+          // In read-only mode, use admin URL format
+          const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+          const adminMatch = currentPath.match(/^\/([a-f0-9-]{36})\/repl/);
 
-        // Update browser URL
-        window.history.replaceState(
-          { trackId: track.id, trackName: track.name, step: stepSlug },
-          '',
-          stepUrl
-        );
+          if (adminMatch) {
+            const userId = adminMatch[1];
+            stepUrl = stepUrl.replace('/repl/', `/${userId}/repl/`);
+            console.log('FileManager - admin view step URL:', stepUrl);
 
-        // Update document title
-        document.title = `Strudel REPL - ${track.name} (${stepName})`;
+            window.history.replaceState(
+              { trackId: track.id, trackName: track.name, step: stepSlug, adminView: true },
+              '',
+              stepUrl
+            );
+
+            document.title = `Admin View - ${track.name} (${stepName})`;
+          }
+        } else {
+          // Normal mode
+          const stepPath = stepUrl.replace('/repl/', '');
+          setActivePattern(stepPath);
+
+          window.history.replaceState(
+            { trackId: track.id, trackName: track.name, step: stepSlug },
+            '',
+            stepUrl
+          );
+
+          document.title = `Strudel REPL - ${track.name} (${stepName})`;
+        }
 
         console.log('FileManager - step URL updated to:', stepUrl);
       } catch (error) {
