@@ -149,8 +149,17 @@ try {
     if (!targetTrack && tracks.length > 0 && !trackSlug) {
       const firstTrack = tracks[0];
       const firstTrackSlug = trackNameToSlug(firstTrack.name);
-      const redirectUrl = firstTrack.folder
-        ? `/${userId}/repl/${firstTrack.folder}/${firstTrackSlug}`
+
+      // Get folder path (track.folder might be an ID, so look up the actual path)
+      let folderPath = '';
+      if (firstTrack.folder) {
+        // Check if it's already a path or if we need to look up by ID
+        const folder = folders.find(f => f.id === firstTrack.folder || f.path === firstTrack.folder);
+        folderPath = folder?.path || firstTrack.folder;
+      }
+
+      const redirectUrl = folderPath
+        ? `/${userId}/repl/${folderPath}/${firstTrackSlug}`
         : `/${userId}/repl/${firstTrackSlug}`;
       console.log('Admin REPL SSR - Redirecting to first track:', redirectUrl);
       return Astro.redirect(redirectUrl);
