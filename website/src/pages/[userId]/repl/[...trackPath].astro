@@ -145,10 +145,15 @@ try {
       });
     }
 
-    // If no track specified but tracks exist, select the first one
+    // If no track specified but tracks exist, redirect to first track URL
     if (!targetTrack && tracks.length > 0 && !trackSlug) {
-      targetTrack = tracks[0];
-      console.log('Admin REPL SSR - Auto-selecting first track:', targetTrack.name);
+      const firstTrack = tracks[0];
+      const firstTrackSlug = trackNameToSlug(firstTrack.name);
+      const redirectUrl = firstTrack.folder
+        ? `/${userId}/repl/${firstTrack.folder}/${firstTrackSlug}`
+        : `/${userId}/repl/${firstTrackSlug}`;
+      console.log('Admin REPL SSR - Redirecting to first track:', redirectUrl);
+      return Astro.redirect(redirectUrl);
     }
 
     if (targetTrack) {

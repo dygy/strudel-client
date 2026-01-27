@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ChevronUpDownIcon, ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
 interface User {
   user_id: string;
@@ -88,15 +89,24 @@ export function AdminDashboard({ initialData }: AdminDashboardProps) {
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) {
-      return <span className="text-gray-500 ml-1">↕</span>;
+      return <ChevronUpDownIcon className="w-4 h-4 text-gray-500 ml-1 inline" />;
     }
-    return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>;
+    return sortOrder === 'asc'
+      ? <ChevronUpIcon className="w-4 h-4 ml-1 inline" />
+      : <ChevronDownIcon className="w-4 h-4 ml-1 inline" />;
   };
 
+  // Use ISO format to avoid hydration mismatch (locale-independent)
   const formatDate = (dateString: string) => {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Use ISO format: YYYY-MM-DD HH:MM
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
   };
 
   if (loading && users.length === 0) {
