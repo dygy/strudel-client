@@ -36,7 +36,8 @@ function AuthenticatedReplContent({ context: externalContext, ssrData, readOnly 
   const replContext = useReplContext({ readOnly });
 
   // Always call the hook - it will handle authentication state internally
-  const supabaseFileManager = useSupabaseFileManager(replContext, ssrData);
+  // Pass readOnly to prevent API calls when admin is viewing another user's repl
+  const supabaseFileManager = useSupabaseFileManager(replContext, ssrData, readOnly);
 
   if (loading) {
     return (

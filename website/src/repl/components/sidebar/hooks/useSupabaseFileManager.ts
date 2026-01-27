@@ -194,7 +194,7 @@ interface ReplContext {
   trackRouter?: any;
 }
 
-export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks: any[]; folders: any[]; } | null) {
+export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks: any[]; folders: any[]; } | null, readOnly: boolean = false) {
   const { user, isAuthenticated, loading, checkAuth } = useAuth();
 
   // Always call all hooks at the top level - never conditionally!
@@ -260,6 +260,27 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
   // Load data from Supabase when user is authenticated
   useEffect(() => {
+    // In read-only mode (admin viewing another user), ONLY use SSR data
+    if (readOnly) {
+      if (ssrData) {
+        const tracksObj = arrayToRecord(ssrData.tracks || []);
+        const foldersObj = arrayToRecord(ssrData.folders || []);
+
+        console.log('SupabaseFileManager - READ-ONLY mode, using SSR data only:', Object.keys(tracksObj).length, 'tracks,', Object.keys(foldersObj).length, 'folders');
+
+        setTracks(tracksObj);
+        setFolders(foldersObj);
+        setIsInitialized(true);
+        setHasLoadedData(true);
+        // Don't sync to global store in read-only mode to avoid overwriting user's own data
+      } else {
+        console.log('SupabaseFileManager - READ-ONLY mode but no SSR data, initializing empty');
+        setIsInitialized(true);
+        setHasLoadedData(true);
+      }
+      return;
+    }
+
     if (!user) {
       // Clear data when no user
       setTracks({});
@@ -325,7 +346,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     return () => {
       clearTimeout(loadTimeout);
     };
-  }, [user, loading, isAuthenticated, ssrData]); // Add isAuthenticated to dependencies
+  }, [user, loading, isAuthenticated, ssrData, readOnly]); // Add readOnly to dependencies
 
 
 
@@ -1421,6 +1442,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
   }
 
   // Return all state and functions needed by the UI
+  // In read-only mode, replace mutating functions with no-ops
   return {
     // State
     tracks,
@@ -1454,46 +1476,46 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     selectedStepTrack,
     isDragOver,
 
-    // Setters
-    setTracks,
-    setFolders,
+    // Setters (no-ops in read-only mode to prevent state changes that trigger saves)
+    setTracks: readOnly ? noop : setTracks,
+    setFolders: readOnly ? noop : setFolders,
     setSelectedTrack,
-    setIsCreating,
-    setIsCreatingFolder,
-    setNewTrackName,
-    setNewFolderName,
-    setNewItemParentPath,
+    setIsCreating: readOnly ? noop : setIsCreating,
+    setIsCreatingFolder: readOnly ? noop : setIsCreatingFolder,
+    setNewTrackName: readOnly ? noop : setNewTrackName,
+    setNewFolderName: readOnly ? noop : setNewFolderName,
+    setNewItemParentPath: readOnly ? noop : setNewItemParentPath,
     setSaveStatus,
-    setRenamingTrack,
-    setRenamingFolder,
-    setRenamingStep,
-    setRenameValue,
-    setShowDeleteModal,
-    setTrackToDelete,
-    setShowDeleteFolderModal,
-    setFolderToDelete,
-    setFolderContents,
-    setShowDeleteAllModal,
-    setIsCreatingStep,
-    setNewStepName,
+    setRenamingTrack: readOnly ? noop : setRenamingTrack,
+    setRenamingFolder: readOnly ? noop : setRenamingFolder,
+    setRenamingStep: readOnly ? noop : setRenamingStep,
+    setRenameValue: readOnly ? noop : setRenameValue,
+    setShowDeleteModal: readOnly ? noop : setShowDeleteModal,
+    setTrackToDelete: readOnly ? noop : setTrackToDelete,
+    setShowDeleteFolderModal: readOnly ? noop : setShowDeleteFolderModal,
+    setFolderToDelete: readOnly ? noop : setFolderToDelete,
+    setFolderContents: readOnly ? noop : setFolderContents,
+    setShowDeleteAllModal: readOnly ? noop : setShowDeleteAllModal,
+    setIsCreatingStep: readOnly ? noop : setIsCreatingStep,
+    setNewStepName: readOnly ? noop : setNewStepName,
     setSelectedStepTrack,
-    setIsDragOver,
+    setIsDragOver: readOnly ? noop : setIsDragOver,
 
-    // Functions
+    // Functions (no-ops in read-only mode to prevent API calls)
     loadTrack,
-    saveCurrentTrack,
-    saveSpecificTrack,
-    createTrack,
-    createFolder,
-    updateFolder,
-    deleteTrack,
-    deleteAllTracks,
-    loadDataFromSupabase,
-    refreshFromSupabase,
+    saveCurrentTrack: readOnly ? asyncNoopFalse : saveCurrentTrack,
+    saveSpecificTrack: readOnly ? asyncNoopFalse : saveSpecificTrack,
+    createTrack: readOnly ? asyncNoopNull : createTrack,
+    createFolder: readOnly ? asyncNoopNull : createFolder,
+    updateFolder: readOnly ? asyncNoopVoid : updateFolder,
+    deleteTrack: readOnly ? asyncNoopFalse : deleteTrack,
+    deleteAllTracks: readOnly ? asyncNoopFalse : deleteAllTracks,
+    loadDataFromSupabase: readOnly ? asyncNoopVoid : loadDataFromSupabase,
+    refreshFromSupabase: readOnly ? asyncNoopVoid : refreshFromSupabase,
 
-    // Strict Autosave Functions
-    scheduleTrackAutosave,
-    handleCodeChange,
+    // Strict Autosave Functions (disabled in read-only mode)
+    scheduleTrackAutosave: readOnly ? noop : scheduleTrackAutosave,
+    handleCodeChange: readOnly ? noop : handleCodeChange,
     getTrackAutosaveContext,
     clearTrackAutosaveTimer,
     cleanupTrackAutosaveContext,
@@ -1505,8 +1527,8 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     isDeletingTrackRef,
     isDeletingFolderRef,
 
-    // Settings
-    isAutosaveEnabled,
+    // Settings (disable autosave in read-only mode)
+    isAutosaveEnabled: readOnly ? false : isAutosaveEnabled,
     autosaveInterval,
 
     // Translation
