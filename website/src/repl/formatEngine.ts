@@ -268,12 +268,12 @@ export class FormatEngine {
    */
   private formatStrudelCode(code: string, options: PrettierOptions): string {
     // First, protect strings from preprocessing by replacing them with placeholders
-    // Use placeholders that won't be affected by preprocessing regexes
+    // Use unique placeholders that won't conflict with actual code
     const globalStringParts: string[] = [];
     let globalStringIndex = 0;
     
     let protectedCode = code.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
-      const placeholder = `XSTRINGPLACEHOLDERX${String.fromCharCode(65 + globalStringIndex)}XSTRINGPLACEHOLDERX`;
+      const placeholder = `__STRUDEL_STRING_${globalStringIndex}_PLACEHOLDER__`;
       globalStringParts[globalStringIndex] = match;
       globalStringIndex++;
       return placeholder;
@@ -296,8 +296,8 @@ export class FormatEngine {
 
     // Restore global strings after preprocessing
     for (let i = 0; i < globalStringParts.length; i++) {
-      const placeholder = `XSTRINGPLACEHOLDERX${String.fromCharCode(65 + i)}XSTRINGPLACEHOLDERX`;
-      preprocessedCode = preprocessedCode.replace(placeholder, globalStringParts[i]);
+      const placeholder = `__STRUDEL_STRING_${i}_PLACEHOLDER__`;
+      preprocessedCode = preprocessedCode.replace(new RegExp(placeholder, 'g'), globalStringParts[i]);
     }
 
     const lines = preprocessedCode.split('\n');
@@ -325,15 +325,15 @@ export class FormatEngine {
       let spacedLine = indentedLine;
       
       // Split by strings to avoid modifying content inside quotes
-      const stringParts = [];
+      const localStringParts: string[] = [];
       let tempLine = spacedLine;
-      let stringIndex = 0;
+      let localStringIndex = 0;
       
-      // Replace strings with placeholders (improved regex to handle all quote types)
+      // Replace strings with temporary placeholders for this line only
       tempLine = tempLine.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
-        const placeholder = `__STRING_${stringIndex}__`;
-        stringParts[stringIndex] = match;
-        stringIndex++;
+        const placeholder = `__LOCAL_STRING_${localStringIndex}__`;
+        localStringParts[localStringIndex] = match;
+        localStringIndex++;
         return placeholder;
       });
       
@@ -349,9 +349,9 @@ export class FormatEngine {
         .replace(/\{\s+/g, '{ ')                   // Normalize space after opening braces
         .replace(/\s+\}/g, ' }');                  // Normalize space before closing braces
       
-      // Restore strings (this preserves original content including URLs)
-      for (let i = 0; i < stringParts.length; i++) {
-        tempLine = tempLine.replace(`__STRING_${i}__`, stringParts[i]);
+      // Restore local strings immediately (this preserves original content including URLs)
+      for (let j = 0; j < localStringParts.length; j++) {
+        tempLine = tempLine.replace(new RegExp(`__LOCAL_STRING_${j}__`, 'g'), localStringParts[j]);
       }
       
       spacedLine = tempLine;
@@ -370,12 +370,14 @@ export class FormatEngine {
       formattedLines.push(spacedLine);
     }
 
-    let result = formattedLines.join('\n');
+    // Join all lines - at this point all strings should already be restored
+    const result = formattedLines.join('\n');
     
-    // Restore global strings at the very end
-    for (let i = 0; i < globalStringParts.length; i++) {
-      const placeholder = `XSTRINGPLACEHOLDERX${String.fromCharCode(65 + i)}XSTRINGPLACEHOLDERX`;
-      result = result.replace(placeholder, globalStringParts[i]);
+    // Final verification: ensure no placeholders remain
+    if (result.includes('__STRUDEL_STRING_') || result.includes('__LOCAL_STRING_')) {
+      console.error('[FormatEngine] String placeholder restoration failed!');
+      // Return original code if restoration failed
+      return code;
     }
 
     return result;
