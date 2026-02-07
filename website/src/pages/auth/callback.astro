@@ -48,9 +48,13 @@ export const prerender = true;
         <p>Please wait while we complete your sign in.</p>
     </div>
 
-    <script type="module" define:vars={{ supabaseUrl: import.meta.env.PUBLIC_SUPABASE_URL, supabaseAnonKey: import.meta.env.PUBLIC_SUPABASE_ANON_KEY }}>
-        // Import Supabase client from CDN for the callback page
-        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+    <script type="module">
+        // Import Supabase client from bundled module
+        import { createSupabaseClient } from '../../lib/supabaseClient';
+        
+        // Get environment variables from meta tags
+        const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+        const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
         
         async function handleCallback() {
             try {
@@ -70,18 +74,7 @@ export const prerender = true;
                 }
                 
                 // Create Supabase client with environment variables
-                const supabase = createClient(
-                    supabaseUrl,
-                    supabaseAnonKey,
-                    {
-                        auth: {
-                            autoRefreshToken: true,
-                            persistSession: true,
-                            detectSessionInUrl: true,
-                            flowType: 'pkce'
-                        }
-                    }
-                );
+                const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey);
                 
                 console.log('OAuth callback - Starting...');
                 
