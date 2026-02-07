@@ -130,8 +130,118 @@ function isStrudelCode(code) {
  * Formats Strudel code with basic formatting while preserving DSL syntax
  */
 function formatStrudelCode(code, options) {
-  // Temporarily disabled due to placeholder bug
-  return code;
+  // First, protect strings from preprocessing by replacing them with placeholders
+  // Use placeholders that won't be affected by preprocessing regexes
+  const globalStringParts = [];
+  let globalStringIndex = 0;
+  
+  let protectedCode = code.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
+    const placeholder = `__STRUDEL_STRING_${globalStringIndex}_PLACEHOLDER__`;
+    globalStringParts[globalStringIndex] = match;
+    globalStringIndex++;
+    return placeholder;
+  });
+
+  // Now apply line break preprocessing to the protected code
+  let preprocessedCode = protectedCode
+    // Add line breaks after function calls that end with ) followed by await/let/const/var/function
+    .replace(/\)(await|let|const|var|function)\s/g, ')\n$1 ')
+    // Add line breaks after semicolons followed by await/let/const/var/function
+    .replace(/;(await|let|const|var|function)\s/g, ';\n$1 ')
+    // Add line breaks after ) followed by any identifier (more general)
+    .replace(/\)([a-zA-Z_$][a-zA-Z0-9_$]*)/g, ')\n$1')
+    // Add line breaks after numbers followed by identifiers (like "175let")
+    .replace(/([0-9])([a-zA-Z_$][a-zA-Z0-9_$]*)/g, '$1\n$2')
+    // Add line breaks before Strudel patterns (identifier:) when they follow ) or numbers
+    .replace(/(\)|[0-9])([a-zA-Z_$][a-zA-Z0-9_$]*\s*:)/g, '$1\n$2')
+    // Add line breaks after } followed by identifiers
+    .replace(/\}([a-zA-Z_$][a-zA-Z0-9_$]*)/g, '}\n$1');
+
+  // Restore global strings after preprocessing
+  for (let i = 0; i < globalStringParts.length; i++) {
+    const placeholder = `__STRUDEL_STRING_${i}_PLACEHOLDER__`;
+    preprocessedCode = preprocessedCode.replaceAll(placeholder, globalStringParts[i]);
+  }
+
+  const lines = preprocessedCode.split('\n');
+  const formattedLines = [];
+  let indentLevel = 0;
+  const indentStr = options.useTabs ? '\t' : ' '.repeat(options.tabWidth);
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i].trim();
+    
+    if (line === '') {
+      formattedLines.push('');
+      continue;
+    }
+
+    // Handle closing brackets/parentheses - decrease indent before the line
+    if (line.match(/^[\}\)\]]/)) {
+      indentLevel = Math.max(0, indentLevel - 1);
+    }
+
+    // Apply current indentation
+    let indentedLine = indentStr.repeat(indentLevel) + line;
+    
+    // Add proper spacing around operators and after commas
+    let spacedLine = indentedLine;
+    
+    // Split by strings to avoid modifying content inside quotes
+    const stringParts = [];
+    let tempLine = spacedLine;
+    let stringIndex = 0;
+    
+    // Replace strings with placeholders (improved regex to handle all quote types)
+    tempLine = tempLine.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
+      const placeholder = `__STRING_${stringIndex}__`;
+      stringParts[stringIndex] = match;
+      stringIndex++;
+      return placeholder;
+    });
+    
+    // Apply formatting to non-string parts only
+    tempLine = tempLine
+      .replace(/([^=!<>+\-*\/])=([^=>])/g, '$1 = $2')  // Add spaces around = (but not ==, !=, =>, +=, -=, *=, /=)
+      .replace(/([0-9])\s*([\+\-\*\/])\s*([0-9])/g, '$1 $2 $3')  // Add spaces around math operators between numbers only
+      .replace(/,([^\s])/g, ', $1')              // Add space after commas
+      .replace(/\s+/g, ' ')                      // Normalize multiple spaces to single
+      .replace(/\s*;\s*/g, ';')                  // Normalize semicolons
+      .replace(/\(\s+/g, '(')                    // Remove space after opening parentheses
+      .replace(/\s+\)/g, ')')                    // Remove space before closing parentheses
+      .replace(/\{\s+/g, '{ ')                   // Normalize space after opening braces
+      .replace(/\s+\}/g, ' }');                  // Normalize space before closing braces
+    
+    // Restore strings (this preserves original content including URLs)
+    for (let i = 0; i < stringParts.length; i++) {
+      tempLine = tempLine.replace(`__STRING_${i}__`, stringParts[i]);
+    }
+    
+    spacedLine = tempLine;
+
+    // Handle opening brackets/parentheses - increase indent after the line
+    if (line.match(/[\{\(\[]$/)) {
+      indentLevel++;
+    }
+
+    // Handle method chaining - add proper indentation for continued lines
+    if (line.startsWith('.') && i > 0) {
+      // This is a chained method, add extra indentation
+      spacedLine = indentStr.repeat(Math.max(0, indentLevel - 1)) + indentStr + line;
+    }
+
+    formattedLines.push(spacedLine);
+  }
+
+  let result = formattedLines.join('\n');
+  
+  // Restore global strings at the very end
+  for (let i = 0; i < globalStringParts.length; i++) {
+    const placeholder = `__STRUDEL_STRING_${i}_PLACEHOLDER__`;
+    result = result.replaceAll(placeholder, globalStringParts[i]);
+  }
+
+  return result;
 }
 
 /**
