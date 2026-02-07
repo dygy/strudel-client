@@ -131,12 +131,21 @@ function isStrudelCode(code) {
  */
 function formatStrudelCode(code, options) {
   // First, protect strings from preprocessing by replacing them with placeholders
-  // Use placeholders that won't be affected by preprocessing regexes
+  // Use placeholders with format that won't match preprocessing regexes (no numbers followed by letters)
   const globalStringParts = [];
   let globalStringIndex = 0;
   
   let protectedCode = code.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
-    const placeholder = `__STRUDEL_STRING_${globalStringIndex}_PLACEHOLDER__`;
+    // Use format: XSTRUDELSTRINGXAXSTRUDELSTRINGX, XSTRUDELSTRINGXBXSTRUDELSTRINGX, etc.
+    // Convert index to letter sequence: 0=A, 1=B, ..., 25=Z, 26=AA, 27=AB, etc.
+    let letterCode = '';
+    let num = globalStringIndex;
+    do {
+      letterCode = String.fromCharCode(65 + (num % 26)) + letterCode;
+      num = Math.floor(num / 26) - 1;
+    } while (num >= 0);
+    
+    const placeholder = `XSTRUDELSTRINGX${letterCode}XSTRUDELSTRINGX`;
     globalStringParts[globalStringIndex] = match;
     globalStringIndex++;
     return placeholder;
@@ -157,12 +166,7 @@ function formatStrudelCode(code, options) {
     // Add line breaks after } followed by identifiers
     .replace(/\}([a-zA-Z_$][a-zA-Z0-9_$]*)/g, '}\n$1');
 
-  // Restore global strings after preprocessing
-  for (let i = 0; i < globalStringParts.length; i++) {
-    const placeholder = `__STRUDEL_STRING_${i}_PLACEHOLDER__`;
-    preprocessedCode = preprocessedCode.replaceAll(placeholder, globalStringParts[i]);
-  }
-
+  // DON'T restore strings yet - keep placeholders through formatting
   const lines = preprocessedCode.split('\n');
   const formattedLines = [];
   let indentLevel = 0;
@@ -188,11 +192,20 @@ function formatStrudelCode(code, options) {
     let spacedLine = indentedLine;
     
     // Split by strings to avoid modifying content inside quotes
+    // Also protect global placeholders from being modified
     const stringParts = [];
     let tempLine = spacedLine;
     let stringIndex = 0;
     
-    // Replace strings with placeholders (improved regex to handle all quote types)
+    // First protect global placeholders (now with letter codes)
+    tempLine = tempLine.replace(/XSTRUDELSTRINGX[A-Z]+XSTRUDELSTRINGX/g, (match) => {
+      const placeholder = `__STRING_${stringIndex}__`;
+      stringParts[stringIndex] = match;
+      stringIndex++;
+      return placeholder;
+    });
+    
+    // Then protect actual strings (improved regex to handle all quote types)
     tempLine = tempLine.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
       const placeholder = `__STRING_${stringIndex}__`;
       stringParts[stringIndex] = match;
@@ -237,7 +250,15 @@ function formatStrudelCode(code, options) {
   
   // Restore global strings at the very end
   for (let i = 0; i < globalStringParts.length; i++) {
-    const placeholder = `__STRUDEL_STRING_${i}_PLACEHOLDER__`;
+    // Convert index back to letter code
+    let letterCode = '';
+    let num = i;
+    do {
+      letterCode = String.fromCharCode(65 + (num % 26)) + letterCode;
+      num = Math.floor(num / 26) - 1;
+    } while (num >= 0);
+    
+    const placeholder = `XSTRUDELSTRINGX${letterCode}XSTRUDELSTRINGX`;
     result = result.replaceAll(placeholder, globalStringParts[i]);
   }
 
