@@ -160,8 +160,7 @@ function formatStrudelCode(code, options) {
   // Restore global strings after preprocessing
   for (let i = 0; i < globalStringParts.length; i++) {
     const placeholder = `__STRUDEL_STRING_${i}_PLACEHOLDER__`;
-    preprocessedCode = preprocessedCode.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), globalStringParts[i]);
-  }
+    preprocessedCode = preprocessedCode.replaceAll(placeholder, globalStringParts[i]);
 
   const lines = preprocessedCode.split('\n');
   const formattedLines = [];
@@ -238,8 +237,7 @@ function formatStrudelCode(code, options) {
   // Restore global strings at the very end
   for (let i = 0; i < globalStringParts.length; i++) {
     const placeholder = `__STRUDEL_STRING_${i}_PLACEHOLDER__`;
-    result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), globalStringParts[i]);
-  }
+    result = result.replaceAll(placeholder, globalStringParts[i]);
 
   return result;
 }
