@@ -136,7 +136,7 @@ function formatStrudelCode(code, options) {
   let globalStringIndex = 0;
   
   let protectedCode = code.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
-    const placeholder = `XSTRINGPLACEHOLDERX${String.fromCharCode(65 + globalStringIndex)}XSTRINGPLACEHOLDERX`;
+    const placeholder = `__STRUDEL_STRING_${globalStringIndex}_PLACEHOLDER__`;
     globalStringParts[globalStringIndex] = match;
     globalStringIndex++;
     return placeholder;
@@ -159,8 +159,8 @@ function formatStrudelCode(code, options) {
 
   // Restore global strings after preprocessing
   for (let i = 0; i < globalStringParts.length; i++) {
-    const placeholder = `XSTRINGPLACEHOLDERX${String.fromCharCode(65 + i)}XSTRINGPLACEHOLDERX`;
-    preprocessedCode = preprocessedCode.replace(placeholder, globalStringParts[i]);
+    const placeholder = `__STRUDEL_STRING_${i}_PLACEHOLDER__`;
+    preprocessedCode = preprocessedCode.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), globalStringParts[i]);
   }
 
   const lines = preprocessedCode.split('\n');
@@ -237,8 +237,8 @@ function formatStrudelCode(code, options) {
   
   // Restore global strings at the very end
   for (let i = 0; i < globalStringParts.length; i++) {
-    const placeholder = `XSTRINGPLACEHOLDERX${String.fromCharCode(65 + i)}XSTRINGPLACEHOLDERX`;
-    result = result.replace(placeholder, globalStringParts[i]);
+    const placeholder = `__STRUDEL_STRING_${i}_PLACEHOLDER__`;
+    result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), globalStringParts[i]);
   }
 
   return result;
