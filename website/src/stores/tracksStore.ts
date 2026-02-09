@@ -396,14 +396,13 @@ export const tracksActions = {
       // Check for target track slug from SSR data (path-based routing)
       let targetTrack: Track | null = null;
       let shouldSelectRandom = true;
-      
+
       const targetTrackSlug = ssrData?.targetTrackSlug;
       const targetFolderPath = ssrData?.targetFolderPath;
-      
+
       if (targetTrackSlug) {
-        console.log('TracksStore: Found target track slug from path:', targetTrackSlug, 'in folder:', targetFolderPath || 'root');
         const updatedState = tracksStore.get();
-        
+
         // Find track by slug and folder path
         const tracks = Object.values(updatedState.tracks);
         targetTrack = tracks.find(track => {
@@ -412,7 +411,7 @@ export const tracksActions = {
           const folderMatches = (track.folder || null) === (targetFolderPath || null);
           return trackMatches && folderMatches;
         }) || null;
-        
+
         if (targetTrack) {
           console.log('TracksStore: Loading specific track from path:', targetTrack.name, 'ID:', targetTrack.id);
           shouldSelectRandom = false;
@@ -458,7 +457,7 @@ export const tracksActions = {
     }
 
     const finalState = tracksStore.get();
-    
+
     // Return the selected track (could be from URL or random)
     let selectedTrack: Track | null = null;
     if (finalState.selectedTrack) {

@@ -88,5 +88,10 @@
     "maxSize": "最大缓存大小",
     "preloadDelay": "预加载延迟",
     "clearCache": "清除缓存"
-  }
+  },
+  "audioMixer": "音频预览",
+  "mixerNotAvailable": "预览引擎不可用",
+  "mixerPreviewDevice": "预览输出设备（耳机）",
+  "mixerDefaultDevice": "默认设备",
+  "mixerPreviewEngineActive": "预览引擎已激活"
 }

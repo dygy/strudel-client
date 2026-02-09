@@ -88,5 +88,10 @@
     "maxSize": "최대 캐시 크기",
     "preloadDelay": "미리 로드 지연",
     "clearCache": "캐시 지우기"
-  }
+  },
+  "audioMixer": "오디오 미리듣기",
+  "mixerNotAvailable": "미리듣기 엔진을 사용할 수 없습니다",
+  "mixerPreviewDevice": "미리듣기 출력 장치 (헤드폰)",
+  "mixerDefaultDevice": "기본 장치",
+  "mixerPreviewEngineActive": "미리듣기 엔진 활성"
 }

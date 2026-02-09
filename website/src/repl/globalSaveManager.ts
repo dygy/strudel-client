@@ -1,6 +1,6 @@
 /**
  * Global Save Manager - URL-Based Version
- * 
+ *
  * Provides a global interface for emergency saves that can be accessed
  * from anywhere in the application, especially beforeunload handlers.
  * Uses URL as the source of truth for track ID instead of state management.
@@ -49,7 +49,7 @@ class GlobalSaveManager {
 
     try {
       const { fileManagerHook, context } = this.saveManager;
-      
+
       if (!fileManagerHook || !context) return false;
 
       // Get track identifier from URL (source of truth)
@@ -69,7 +69,7 @@ class GlobalSaveManager {
       }
 
       const hasChanges = currentCode !== trackData.code;
-      
+
       if (hasChanges) {
         console.log('GlobalSaveManager: Unsaved changes detected', {
           trackId: currentTrackId,
@@ -98,7 +98,7 @@ class GlobalSaveManager {
 
     try {
       const { fileManagerHook, context } = this.saveManager;
-      
+
       if (!fileManagerHook || !context) {
         console.log('GlobalSaveManager: No file manager or context available');
         return false;
@@ -120,7 +120,7 @@ class GlobalSaveManager {
       // Check if track exists in state
       const currentTracks = fileManagerHook.tracks || {};
       const trackData = currentTracks[currentTrackId];
-      
+
       if (!trackData) {
         console.warn('GlobalSaveManager: Track not found in state:', currentTrackId);
         return false;
@@ -141,7 +141,7 @@ class GlobalSaveManager {
 
       // Perform the save using URL-based track ID
       let result = false;
-      
+
       if (fileManagerHook.saveSpecificTrack) {
         result = await fileManagerHook.saveSpecificTrack(currentTrackId, false);
       } else if (fileManagerHook.saveCurrentTrack && fileManagerHook.selectedTrack === currentTrackId) {
@@ -151,15 +151,15 @@ class GlobalSaveManager {
         console.warn('GlobalSaveManager: No suitable save method available');
         return false;
       }
-      
+
       if (result) {
         console.log('✅ GlobalSaveManager: Emergency save successful (URL-based)');
       } else {
         console.error('❌ GlobalSaveManager: Emergency save failed (URL-based)');
       }
-      
+
       return result;
-      
+
     } catch (error) {
       console.error('GlobalSaveManager: Emergency save error:', error);
       return false;
@@ -191,19 +191,19 @@ if (typeof window !== 'undefined') {
   const handleBeforeUnload = (event: BeforeUnloadEvent) => {
     if (globalSaveManager.hasUnsavedChanges()) {
       console.log('🚨 Global beforeunload: Unsaved changes detected (URL-based)');
-      
+
       // Show browser confirmation
       const message = 'You have unsaved changes. Are you sure you want to leave?';
       event.preventDefault();
       event.returnValue = message;
-      
+
       // Attempt emergency save (non-blocking)
       globalSaveManager.performEmergencySave().then(success => {
         console.log('Global beforeunload: Emergency save result (URL-based):', success);
       }).catch(error => {
         console.error('Global beforeunload: Emergency save error:', error);
       });
-      
+
       return message;
     }
   };
@@ -226,6 +226,4 @@ if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', handleBeforeUnload);
   document.addEventListener('visibilitychange', handleVisibilityChange);
   window.addEventListener('pagehide', handlePageHide);
-  
-  console.log('GlobalSaveManager: Global event listeners registered (URL-based)');
 }

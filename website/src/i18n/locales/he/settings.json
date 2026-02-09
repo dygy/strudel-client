@@ -88,5 +88,10 @@
     "maxSize": "גודל מטמון מקסימלי",
     "preloadDelay": "עיכוב טעינה מראש",
     "clearCache": "נקה מטמון"
-  }
+  },
+  "audioMixer": "תצוגה מקדימה של שמע",
+  "mixerNotAvailable": "מנוע תצוגה מקדימה לא זמין",
+  "mixerPreviewDevice": "התקן תצוגה מקדימה (אוזניות)",
+  "mixerDefaultDevice": "התקן ברירת מחדל",
+  "mixerPreviewEngineActive": "מנוע תצוגה מקדימה פעיל"
 }

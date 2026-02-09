@@ -88,5 +88,10 @@
     "maxSize": "Tamaño máximo del caché",
     "preloadDelay": "Retraso de precarga",
     "clearCache": "Limpiar caché"
-  }
+  },
+  "audioMixer": "Vista previa de audio",
+  "mixerNotAvailable": "Motor de vista previa no disponible",
+  "mixerPreviewDevice": "Dispositivo de vista previa (auriculares)",
+  "mixerDefaultDevice": "Dispositivo predeterminado",
+  "mixerPreviewEngineActive": "Motor de vista previa activo"
 }

@@ -57,6 +57,27 @@ declare module '@strudel/webaudio' {
   export function removeCacheListener(callback: (event: any) => void): void;
   export function clearCache(): void;
   export function preloadTrackSamples(code: string, trackName?: string): Promise<void>;
+
+  // Superdough audio engine
+  export function superdough(
+    value: any,
+    t: number,
+    hapDuration: number,
+    cps?: number,
+    cycle?: number,
+    _controller?: any,
+  ): Promise<any>;
+
+  export class SuperdoughAudioController {
+    constructor(audioContext: AudioContext);
+    output: {
+      destinationGain: GainNode;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  }
+
+  export function getSuperdoughAudioController(): SuperdoughAudioController;
   
   // Add other exports as needed
 }
@@ -80,6 +101,34 @@ declare module '@strudel/core' {
     set: any;
     // Add Pattern methods as needed
   }
+  export function repl(options: {
+    defaultOutput?: Function;
+    onEvalError?: Function;
+    beforeEval?: Function;
+    beforeStart?: Function;
+    afterEval?: Function;
+    getTime?: () => number;
+    transpiler?: Function;
+    onToggle?: (started: boolean) => void;
+    editPattern?: Function;
+    onUpdateState?: Function;
+    sync?: boolean;
+    setInterval?: Function;
+    clearInterval?: Function;
+    id?: string;
+    mondo?: boolean;
+  }): {
+    scheduler: any;
+    evaluate: (code: string, autostart?: boolean, shouldHush?: boolean) => Promise<any>;
+    start: () => void;
+    stop: () => void;
+    pause: () => void;
+    setCps: (cps: number) => any;
+    setPattern: (pattern: any, autostart?: boolean) => Promise<any>;
+    setCode: (code: string) => void;
+    toggle: () => void;
+    state: any;
+  };
   // Add other exports as needed
 }
 
@@ -157,4 +206,53 @@ declare module '@strudel/hydra' {
 declare module '@strudel/soundfonts' {
   export function registerSoundfonts(): Promise<void>;
   // Add other exports as needed
+}
+
+declare module '@strudel/mixer' {
+  export class PreviewEngine {
+    constructor(audioContext: AudioContext, deps: {
+      superdough: Function;
+      repl: Function;
+      getTime: () => number;
+      SuperdoughAudioController: new (ctx: AudioContext) => any;
+      transpiler?: Function;
+    });
+
+    audioContext: AudioContext;
+    controller: any | null;
+    replInstance: any | null;
+    audioElement: HTMLAudioElement | null;
+    mediaStreamDest: MediaStreamAudioDestinationNode | null;
+    isInitialized: boolean;
+    isPlaying: boolean;
+    deviceId: string | null;
+
+    initialize(): Promise<void>;
+    ensurePlaying(): Promise<void>;
+    setDevice(deviceId: string | null): Promise<void>;
+    evaluate(code: string): Promise<any>;
+    stop(): void;
+    destroy(): void;
+  }
+
+  export class AudioMixer {
+    constructor(audioContext: AudioContext, options?: any);
+    [key: string]: any;
+  }
+  export class AudioStream {
+    constructor(name: string, audioContext: AudioContext);
+    [key: string]: any;
+  }
+  export class TransitionMixer {
+    constructor(audioContext: AudioContext, liveStream: any, previewStream: any);
+    [key: string]: any;
+  }
+  export class ErrorNotifier {
+    constructor();
+    [key: string]: any;
+  }
+  export class KeyboardShortcutManager {
+    constructor();
+    [key: string]: any;
+  }
 }

@@ -92,12 +92,12 @@ function parsePageNum(page: number | string): number {
 export function loadPublicPatterns(page: number | string = 0): Promise<SupabaseResponse<PatternData>> {
   const pageNum = parsePageNum(page);
   const offset = pageNum * patternQueryLimit;
-  
+
   // Note: This functionality is currently disabled as it requires a different database
   // with a 'code_v1' table that contains public patterns
   console.warn('loadPublicPatterns: Public patterns functionality is currently disabled');
   return Promise.resolve({ data: [], error: null });
-  
+
   // Original implementation (commented out):
   // return supabase
   //   .from('code_v1')
@@ -110,12 +110,12 @@ export function loadPublicPatterns(page: number | string = 0): Promise<SupabaseR
 export function loadFeaturedPatterns(page: number | string = 0): Promise<SupabaseResponse<PatternData>> {
   const pageNum = parsePageNum(page);
   const offset = pageNum * patternQueryLimit;
-  
+
   // Note: This functionality is currently disabled as it requires a different database
   // with a 'code_v1' table that contains featured patterns
   console.warn('loadFeaturedPatterns: Featured patterns functionality is currently disabled');
   return Promise.resolve({ data: [], error: null });
-  
+
   // Original implementation (commented out):
   // return supabase
   //   .from('code_v1')
@@ -159,21 +159,20 @@ if (typeof window !== 'undefined' && window.location.pathname.startsWith('/repl/
   // Strip /repl/ prefix - just use the track path
   const trackPath = window.location.pathname.replace('/repl/', '') + window.location.search;
   $activePattern.set(trackPath);
-  console.log('Initialized activePattern from URL:', trackPath);
 }
 
 export function setActivePattern(key: string | null): void {
   const oldPattern = $activePattern.get();
   $activePattern.set(key);
-  
+
   // NOTE: Don't update URL here - navigation functions handle that
   // setActivePattern only updates the state to match what navigation already did
-  
-  // If this is a new pattern (not just switching between existing ones), 
+
+  // If this is a new pattern (not just switching between existing ones),
   // trigger synchronization check
   if (key && key !== oldPattern && typeof window !== 'undefined') {
     console.log('setActivePattern - pattern changed from', oldPattern, 'to', key);
-    
+
     // Dispatch event to trigger FileManager synchronization
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('strudel-active-pattern-changed', {
@@ -198,21 +197,21 @@ export const defaultCode = DEFAULT_TRACK_CODE;
 
 export const userPattern: UserPatternMethods = {
   collection: patternFilterName.user,
-  
+
   getAll(): PatternCollection {
     const patterns = parseJSON(settingsMap.get().userPatterns);
     return patterns ?? {};
   },
-  
+
   getPatternData(id: string): PatternData | undefined {
     const userPatterns = this.getAll();
     return userPatterns[id];
   },
-  
+
   exists(id: string): boolean {
     return this.getPatternData(id) != null;
   },
-  
+
   isValidID(id: string | null | undefined): boolean {
     return id != null && id.length > 0;
   },
@@ -220,15 +219,15 @@ export const userPattern: UserPatternMethods = {
   create(): { id: string; data: PatternData } {
     const newID = createPatternID();
     const code = DEFAULT_TRACK_CODE;
-    const data: PatternData = { 
-      code, 
-      created_at: Date.now(), 
-      id: newID, 
-      collection: this.collection 
+    const data: PatternData = {
+      code,
+      created_at: Date.now(),
+      id: newID,
+      collection: this.collection
     };
     return { id: newID, data };
   },
-  
+
   createAndAddToDB(): { id: string; data: PatternData } {
     const newPattern = this.create();
     return this.update(newPattern.id, newPattern.data);
@@ -237,13 +236,13 @@ export const userPattern: UserPatternMethods = {
   update(id: string, data: Partial<PatternData>): { id: string; data: PatternData } {
     const userPatterns = this.getAll();
     const isNewPattern = !userPatterns[id];
-    const updatedData: PatternData = { 
-      ...data as PatternData, 
-      id, 
-      collection: this.collection 
+    const updatedData: PatternData = {
+      ...data as PatternData,
+      id,
+      collection: this.collection
     };
     setUserPatterns({ ...userPatterns, [id]: updatedData });
-    
+
     // Dispatch event for new patterns to notify FileManager
     if (isNewPattern && typeof window !== 'undefined') {
       console.log('userPattern.update - dispatching user pattern created event for:', id);
@@ -251,57 +250,57 @@ export const userPattern: UserPatternMethods = {
         detail: { patternId: id, patternData: updatedData }
       }));
     }
-    
+
     return { id, data: updatedData };
   },
-  
+
   duplicate(data: PatternData): { id: string; data: PatternData } {
     const newPattern = this.create();
     return this.update(newPattern.id, { ...newPattern.data, code: data.code });
   },
-  
+
   async clearAll(): Promise<{ id: string | null; data: PatternData } | undefined> {
     const confirmed = await confirmDialog(`This will delete all your patterns. Are you really sure?`);
     if (confirmed === false) {
       return;
     }
-    
+
     const viewingPatternData = getViewingPatternData();
     setUserPatterns({});
 
     if (viewingPatternData.collection !== this.collection) {
       return { id: viewingPatternData.id, data: viewingPatternData };
     }
-    
+
     setActivePattern(null);
     const newPattern = this.create();
     return { id: newPattern.id, data: newPattern.data };
   },
-  
+
   delete(id: string): { id: string | null; data: PatternData } {
     const userPatterns = this.getAll();
     delete userPatterns[id];
-    
+
     if (getActivePattern() === id) {
       setActivePattern(null);
     }
-    
+
     setUserPatterns(userPatterns);
     const viewingPatternData = getViewingPatternData();
     const viewingID = viewingPatternData?.id;
-    
+
     if (viewingID === id) {
-      return { 
-        id: null, 
-        data: { 
-          id: '', 
-          code: DEFAULT_TRACK_CODE, 
-          collection: this.collection, 
-          created_at: Date.now() 
-        } 
+      return {
+        id: null,
+        data: {
+          id: '',
+          code: DEFAULT_TRACK_CODE,
+          collection: this.collection,
+          created_at: Date.now()
+        }
       };
     }
-    
+
     return { id: viewingID, data: userPatterns[viewingID] };
   },
 };

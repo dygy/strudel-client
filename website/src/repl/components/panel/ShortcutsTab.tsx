@@ -109,6 +109,25 @@ export function ShortcutsTab() {
           />
         </ShortcutSection>
 
+        <ShortcutSection title={t('shortcuts:sections.mixer', 'Audio Mixer')}>
+          <ShortcutItem
+            keys={[modKey, 'Shift', 'M']}
+            description={t('shortcuts:toggleMixerMode', 'Toggle Live/Preview mode')}
+          />
+          <ShortcutItem
+            keys={[modKey, 'Shift', 'I']}
+            description={t('shortcuts:instantTransition', 'Instant transition to live')}
+          />
+          <ShortcutItem
+            keys={[modKey, 'Shift', 'X']}
+            description={t('shortcuts:crossfadeTransition', 'Crossfade transition to live')}
+          />
+          <ShortcutItem
+            keys={[modKey, 'Shift', 'S']}
+            description={t('shortcuts:stopPreview', 'Stop preview stream')}
+          />
+        </ShortcutSection>
+
         <div className="mt-8 p-4 bg-gray-800/30 rounded-lg">
           <h4 className="text-sm font-semibold text-gray-300 mb-2">
             {t('shortcuts:tip.title', 'Pro Tip')}

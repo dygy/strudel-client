@@ -17,7 +17,7 @@ const configCache = new Map();
  */
 function getPrettierConfig(options) {
   const configKey = JSON.stringify(options);
-  
+
   if (configCache.has(configKey)) {
     return configCache.get(configKey);
   }
@@ -38,7 +38,7 @@ function getPrettierConfig(options) {
 
   // Cache the configuration
   configCache.set(configKey, config);
-  
+
   return config;
 }
 
@@ -122,7 +122,7 @@ function isStrudelCode(code) {
     /gm_\w+/,                        // General MIDI sounds
     /RolandTR\d+/,                   // Roland drum machine sounds
   ];
-  
+
   return strudelPatterns.some(pattern => pattern.test(code));
 }
 
@@ -134,7 +134,7 @@ function formatStrudelCode(code, options) {
   // Use placeholders with format that won't match preprocessing regexes (no numbers followed by letters)
   const globalStringParts = [];
   let globalStringIndex = 0;
-  
+
   let protectedCode = code.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
     // Use format: XSTRUDELSTRINGXAXSTRUDELSTRINGX, XSTRUDELSTRINGXBXSTRUDELSTRINGX, etc.
     // Convert index to letter sequence: 0=A, 1=B, ..., 25=Z, 26=AA, 27=AB, etc.
@@ -144,7 +144,7 @@ function formatStrudelCode(code, options) {
       letterCode = String.fromCharCode(65 + (num % 26)) + letterCode;
       num = Math.floor(num / 26) - 1;
     } while (num >= 0);
-    
+
     const placeholder = `XSTRUDELSTRINGX${letterCode}XSTRUDELSTRINGX`;
     globalStringParts[globalStringIndex] = match;
     globalStringIndex++;
@@ -174,7 +174,7 @@ function formatStrudelCode(code, options) {
 
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i].trim();
-    
+
     if (line === '') {
       formattedLines.push('');
       continue;
@@ -187,16 +187,16 @@ function formatStrudelCode(code, options) {
 
     // Apply current indentation
     let indentedLine = indentStr.repeat(indentLevel) + line;
-    
+
     // Add proper spacing around operators and after commas
     let spacedLine = indentedLine;
-    
+
     // Split by strings to avoid modifying content inside quotes
     // Also protect global placeholders from being modified
     const stringParts = [];
     let tempLine = spacedLine;
     let stringIndex = 0;
-    
+
     // First protect global placeholders (now with letter codes)
     tempLine = tempLine.replace(/XSTRUDELSTRINGX[A-Z]+XSTRUDELSTRINGX/g, (match) => {
       const placeholder = `__STRING_${stringIndex}__`;
@@ -204,7 +204,7 @@ function formatStrudelCode(code, options) {
       stringIndex++;
       return placeholder;
     });
-    
+
     // Then protect actual strings (improved regex to handle all quote types)
     tempLine = tempLine.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
       const placeholder = `__STRING_${stringIndex}__`;
@@ -212,7 +212,7 @@ function formatStrudelCode(code, options) {
       stringIndex++;
       return placeholder;
     });
-    
+
     // Apply formatting to non-string parts only
     tempLine = tempLine
       .replace(/([^=!<>+\-*\/])=([^=>])/g, '$1 = $2')  // Add spaces around = (but not ==, !=, =>, +=, -=, *=, /=)
@@ -224,12 +224,12 @@ function formatStrudelCode(code, options) {
       .replace(/\s+\)/g, ')')                    // Remove space before closing parentheses
       .replace(/\{\s+/g, '{ ')                   // Normalize space after opening braces
       .replace(/\s+\}/g, ' }');                  // Normalize space before closing braces
-    
+
     // Restore strings (this preserves original content including URLs)
     for (let i = 0; i < stringParts.length; i++) {
       tempLine = tempLine.replace(`__STRING_${i}__`, stringParts[i]);
     }
-    
+
     spacedLine = tempLine;
 
     // Handle opening brackets/parentheses - increase indent after the line
@@ -247,7 +247,7 @@ function formatStrudelCode(code, options) {
   }
 
   let result = formattedLines.join('\n');
-  
+
   // Restore global strings at the very end
   for (let i = 0; i < globalStringParts.length; i++) {
     // Convert index back to letter code
@@ -257,7 +257,7 @@ function formatStrudelCode(code, options) {
       letterCode = String.fromCharCode(65 + (num % 26)) + letterCode;
       num = Math.floor(num / 26) - 1;
     } while (num >= 0);
-    
+
     const placeholder = `XSTRUDELSTRINGX${letterCode}XSTRUDELSTRINGX`;
     result = result.replaceAll(placeholder, globalStringParts[i]);
   }
@@ -272,7 +272,6 @@ async function formatCode(code, options) {
   try {
     // Check if this is Strudel code
     if (isStrudelCode(code)) {
-      console.log('[PrettierWorker] Strudel code detected, applying Strudel-specific formatting');
       const formattedCode = formatStrudelCode(code, options);
       return {
         success: true,
@@ -313,7 +312,7 @@ async function formatSelection(code, start, end, options) {
   try {
     // Extract the selected text
     const selectedText = code.substring(start, end);
-    
+
     // Check if the full code or selection contains Strudel syntax
     if (isStrudelCode(code) || isStrudelCode(selectedText)) {
       console.log('[PrettierWorker] Strudel code detected in selection, applying Strudel-specific formatting');
@@ -323,10 +322,10 @@ async function formatSelection(code, start, end, options) {
         formattedCode: formattedCode
       };
     }
-    
+
     // Format only the selection
     const formatResult = await formatCode(selectedText, options);
-    
+
     if (!formatResult.success || !formatResult.formattedCode) {
       return formatResult;
     }
@@ -352,31 +351,31 @@ async function formatSelection(code, start, end, options) {
 // Handle messages from main thread
 self.onmessage = async function(e) {
   const { id, type, data } = e.data;
-  
+
   try {
     let result;
-    
+
     switch (type) {
       case 'format':
         result = await formatCode(data.code, data.options);
         break;
-        
+
       case 'formatSelection':
         result = await formatSelection(
-          data.code, 
-          data.start, 
-          data.end, 
+          data.code,
+          data.start,
+          data.end,
           data.options
         );
         break;
-        
+
       case 'validate':
         result = {
           success: true,
           isValid: validateSyntax(data.code)
         };
         break;
-        
+
       case 'clearCache':
         configCache.clear();
         result = {
@@ -384,21 +383,21 @@ self.onmessage = async function(e) {
           message: 'Cache cleared'
         };
         break;
-        
+
       default:
         result = {
           success: false,
           error: `Unknown operation: ${type}`
         };
     }
-    
+
     // Send result back to main thread
     self.postMessage({
       id,
       success: true,
       result
     });
-    
+
   } catch (error) {
     // Send error back to main thread
     self.postMessage({

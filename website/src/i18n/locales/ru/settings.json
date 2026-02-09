@@ -87,5 +87,10 @@
     "maxSize": "Максимальный размер кэша",
     "preloadDelay": "Задержка предзагрузки",
     "clearCache": "Очистить кэш"
-  }
+  },
+  "audioMixer": "Аудио превью",
+  "mixerNotAvailable": "Движок превью недоступен",
+  "mixerPreviewDevice": "Устройство предпросмотра (наушники)",
+  "mixerDefaultDevice": "Устройство по умолчанию",
+  "mixerPreviewEngineActive": "Движок превью активен"
 }

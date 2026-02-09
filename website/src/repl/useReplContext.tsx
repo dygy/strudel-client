@@ -4,7 +4,7 @@ Copyright (C) 2022 Strudel contributors - see <https://codeberg.org/uzu/strudel/
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details. You should have received a copy of the GNU Affero General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { getPerformanceTimeSeconds, logger, silence } from '@strudel/core';
+import { getPerformanceTimeSeconds, logger, silence, repl as createRepl } from '@strudel/core';
 import { getDrawContext } from '@strudel/draw';
 import { transpiler } from '@strudel/transpiler';
 import {
@@ -14,7 +14,11 @@ import {
   resetLoadedSounds,
   initAudioOnFirstClick,
   resetDefaults,
+  getAudioContext,
+  superdough,
+  SuperdoughAudioController,
 } from '@strudel/webaudio';
+import { PreviewEngine } from '@strudel/mixer';
 import { setVersionDefaultsFrom } from './util';
 import { StrudelMirror, defaultSettings } from '@strudel/codemirror';
 import { clearHydra } from '@strudel/hydra';
@@ -35,7 +39,6 @@ import { audioEngineTargets } from '../settings';
 import { useStore } from '@nanostores/react';
 import { prebake } from './prebake';
 import { getRandomTune, initCode, loadModules, shareCode } from './util';
-import { DEFAULT_TRACK_CODE } from '../constants/defaultCode';
 import './Repl.css';
 import { setInterval, clearInterval } from 'worker-timers';
 import { getMetadata } from '../metadata_parser';
@@ -77,6 +80,10 @@ interface ReplContext {
     isAuthenticated: boolean;
     fileManagerHook?: any;
   };
+  mixer?: any;
+  isPreviewing?: boolean;
+  handlePreviewToggle?: () => Promise<void>;
+  previewEngine?: PreviewEngine | null;
 }
 
 let modulesLoading: Promise<Module[]> | undefined;
@@ -185,7 +192,7 @@ async function getModule(name: string): Promise<Module | undefined> {
   return modules.find((m) => m.packageName === name);
 }
 
-const initialCode = `// LOADING`;
+const initialCode = ``;
 
 interface UseReplContextOptions {
   readOnly?: boolean;
@@ -323,9 +330,9 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
           console.log('[repl] Using pending code for initialization:', code.substring(0, 50) + '...');
           clearPendingCode(); // Clear it
         } else {
-          // Always start with default code - authentication required, no localStorage
-          code = DEFAULT_TRACK_CODE;
-          msg = `Default code loaded - authentication required`;
+          // Don't set default code - wait for tracks to load
+          console.log('[repl] No code to load yet, waiting for tracks...');
+          return; // Exit early, don't set any code
         }
       }
       editor.setCode(code);
@@ -340,6 +347,58 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   const { started, isDirty, error, activeCode, pending } = replState;
   const editorRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const mixerRef = useRef<PreviewEngine | null>(null);
+  const [mixer, setMixer] = useState<PreviewEngine | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+
+  // Initialize PreviewEngine — creates an independent audio chain
+  // (its own SuperdoughAudioController + repl) for preview on headphones.
+  // The live audio chain (main StrudelMirror repl) is untouched.
+  useEffect(() => {
+    const initPreview = async () => {
+      try {
+        const audioContext = getAudioContext();
+        if (!audioContext) {
+          console.warn('AudioContext not available, preview engine skipped');
+          return;
+        }
+
+        const engine = new PreviewEngine(audioContext, {
+          superdough,
+          repl: createRepl,
+          getTime: () => audioContext.currentTime,
+          SuperdoughAudioController,
+          transpiler,
+        });
+
+        await engine.initialize();
+
+        // Restore saved preview device from localStorage
+        try {
+          const stored = localStorage.getItem('strudel-preview-device');
+          if (stored) {
+            await engine.setDevice(stored);
+          }
+        } catch (e) { /* non-fatal */ }
+
+        mixerRef.current = engine;
+        setMixer(engine);
+        console.log('[PreviewEngine] ready — independent audio chain for headphones');
+      } catch (err) {
+        console.error('Failed to initialize PreviewEngine:', err);
+      }
+    };
+
+    initPreview();
+
+    return () => {
+      if (mixerRef.current) {
+        mixerRef.current.destroy();
+        mixerRef.current = null;
+        setMixer(null);
+      }
+    };
+  }, []);
 
   // Initialize TrackRouter
   const trackRouterRef = useRef<TrackRouter | null>(null);
@@ -516,6 +575,13 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     // Clean up any existing canvas elements before evaluating new pattern
     await cleanupCanvasElements();
     
+    // If previewing, "Update" means: stop preview, push code to live speakers
+    if (isPreviewing && mixerRef.current) {
+      mixerRef.current.stop();
+      setIsPreviewing(false);
+      console.log('[Preview] Stopped preview, pushing code to live');
+    }
+
     if (editorRef.current && editorRef.current.evaluate) {
       editorRef.current.evaluate();
     }
@@ -546,6 +612,40 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   };
 
   const handleShare = async (): Promise<void> => shareCode();
+
+  // Preview toggle: "Play Preview" evaluates current editor code on an
+  // independent audio engine routed to headphones. The live pattern on
+  // speakers keeps playing untouched. "Stop Preview" stops the preview engine.
+  // "Update" stops preview and evaluates the code on the main (live) repl.
+  const handlePreviewToggle = async (): Promise<void> => {
+    const engine = mixerRef.current;
+    if (!engine || !engine.isInitialized) {
+      console.warn('[Preview] PreviewEngine not initialized');
+      return;
+    }
+
+    try {
+      if (!isPreviewing) {
+        // Play Preview: evaluate current editor code on the preview engine (headphones)
+        // The main repl (speakers) keeps playing whatever it was playing
+        const code = editorRef.current?.code;
+        if (!code) {
+          console.warn('[Preview] No code to preview');
+          return;
+        }
+        await engine.evaluate(code);
+        setIsPreviewing(true);
+        console.log('[Preview] Started — code playing on headphones, live untouched on speakers');
+      } else {
+        // Stop Preview: stop the preview engine, live continues
+        engine.stop();
+        setIsPreviewing(false);
+        console.log('[Preview] Stopped — headphones silent, speakers continue');
+      }
+    } catch (err) {
+      console.error('[Preview] Failed to toggle:', err);
+    }
+  };
 
   // Global keyboard shortcuts - placed after function declarations
   useEffect(() => {
@@ -601,6 +701,10 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     editorRef,
     containerRef,
     trackRouter: trackRouterRef.current,
+    mixer: mixer, // PreviewEngine instance for Header button visibility
+    isPreviewing,
+    handlePreviewToggle,
+    previewEngine: mixer,
   };
   
   return context;

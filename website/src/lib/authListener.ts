@@ -9,7 +9,6 @@ let authListener: { data: { subscription: { unsubscribe: () => void } } } | null
  */
 export function initializeAuthListener() {
   if (authListener) {
-    console.log('Auth listener already initialized');
     return;
   }
 
@@ -68,7 +67,6 @@ export function initializeAuthListener() {
     }
   });
 
-  console.log('Auth listener initialized');
 }
 
 /**

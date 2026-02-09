@@ -9,6 +9,7 @@ import { batch, db } from '@src/lib/secureApi';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 import { generateTrackUrlPath } from '@src/lib/slugUtils';
 import { setActivePattern } from '@src/user_pattern_utils';
+import { useTracks } from '@src/hooks/useTracks';
 
 // Import our new components and hooks
 import { useFileManagerOperations } from './hooks/useFileManagerOperations';
@@ -45,6 +46,9 @@ interface PendingImport {
 
 export function FileManagerRefactored({ context, fileManagerHook, readOnly = false }: FileManagerProps) {
   const { t, i18n } = useTranslation(['files', 'common', 'tabs', 'auth']);
+  
+  // CRITICAL: Call useTracks() at the top level before any conditional returns
+  const tracks = useTracks();
 
   // Only use Supabase FileManager - no localStorage fallback
   const fileManagerState = fileManagerHook;
@@ -1218,6 +1222,7 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
           onRenameStepFinish={operations.finishRenameStep}
           onRenameStepCancel={operations.cancelRename}
           readOnly={readOnly}
+          isLoading={tracks.isLoading || !tracks.isInitialized}
         />
       </div>
 

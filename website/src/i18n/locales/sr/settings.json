@@ -85,5 +85,10 @@
     "maxSize": "Максимална величина кеша",
     "preloadDelay": "Кашњење претходног учитавања",
     "clearCache": "Обриши кеш"
-  }
+  },
+  "audioMixer": "Преглед звука",
+  "mixerNotAvailable": "Мотор за преглед није доступан",
+  "mixerPreviewDevice": "Уређај за преглед (слушалице)",
+  "mixerDefaultDevice": "Подразумевани уређај",
+  "mixerPreviewEngineActive": "Мотор за преглед активан"
 }

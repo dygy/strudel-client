@@ -19,6 +19,9 @@ interface ReplContext {
   handleEvaluate: () => void;
   handleShuffle: () => void;
   handleShare: () => void;
+  mixer?: any;
+  isPreviewing?: boolean;
+  handlePreviewToggle?: () => void;
 }
 
 interface HeaderProps {
@@ -27,7 +30,7 @@ interface HeaderProps {
 }
 
 export function Header({ context, embedded = false }: HeaderProps) {
-  const { started, pending, isDirty, activeCode, handleTogglePlay, handleEvaluate, handleShuffle, handleShare } =
+  const { started, pending, isDirty, activeCode, handleTogglePlay, handleEvaluate, handleShuffle, handleShare, mixer, isPreviewing, handlePreviewToggle } =
     context;
   const isEmbedded = typeof window !== 'undefined' && (embedded || window.location !== window.parent.location);
   const { isZen, isButtonRowHidden, isCSSAnimationDisabled, fontFamily, isFileManagerOpen } = useSettings();
@@ -122,6 +125,21 @@ export function Header({ context, embedded = false }: HeaderProps) {
               >
                 {!isEmbedded && <span>{t('update')}</span>}
               </button>
+              {mixer && mixer.isInitialized && handlePreviewToggle && (
+                <button
+                  onClick={handlePreviewToggle}
+                  title={isPreviewing ? t('stopPreview') : t('playPreview')}
+                  className={cx(
+                    'p-2 hover:opacity-50 flex items-center space-x-1',
+                    isPreviewing && 'bg-blue-500 bg-opacity-20'
+                  )}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M12 12h.01M9 9l-6 6M9 15l-6-6" />
+                  </svg>
+                  {!isEmbedded && <span>{isPreviewing ? t('stopPreview') : t('playPreview')}</span>}
+                </button>
+              )}
             </div>
           )}
           

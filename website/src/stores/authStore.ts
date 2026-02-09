@@ -171,6 +171,11 @@ export const authActions = {
         localStorage.setItem('auth-change', Date.now().toString());
         localStorage.removeItem('auth-change');
       }
+
+      // Redirect to login page after successful logout
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
     } catch (error) {
       console.error('Sign out error:', error);
     } finally {

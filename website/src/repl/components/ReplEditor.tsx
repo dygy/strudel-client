@@ -14,7 +14,7 @@ import { GlobalToastContainer } from '@src/components/GlobalToastContainer';
 import { useTranslation } from '@src/i18n';
 import { nanoid } from 'nanoid';
 import { useState, useEffect, memo, useRef } from 'react';
-import { getPendingCode, clearPendingCode, getEditorInstance } from '../../stores/editorStore';
+import { getPendingCode, clearPendingCode, getEditorInstance, setPendingCode } from '../../stores/editorStore';
 import { globalSaveManager } from '../globalSaveManager';
 
 interface ReplContext {
@@ -41,9 +41,10 @@ interface ReplEditorProps extends React.HTMLAttributes<HTMLDivElement> {
     folders: any[];
   } | null;
   readOnly?: boolean;
+  mixer?: any; // AudioMixer instance for dual-stream support
 }
 
-function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, ...editorProps }: ReplEditorProps) {
+function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer, ...editorProps }: ReplEditorProps) {
   const { containerRef, editorRef, error, init, pending } = context;
   const settings = useSettings();
   const { panelPosition, isZen, isFileManagerOpen } = settings;
@@ -57,8 +58,6 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, ...ed
     if (ssrData && !tracks.isInitialized) {
       console.log('🔥 ReplEditor: Initializing tracks store with SSR data and coordination');
 
-      // Use the hierarchical format for tracksStore coordination
-      // Pass the entire ssrData object which includes targetTrackSlug and targetFolderPath
       const hierarchicalData = (ssrData as any).hierarchical 
         ? { 
             ...ssrData, 
@@ -66,21 +65,13 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, ...ed
           }
         : ssrData;
 
-      // Use the new coordination method that includes track selection (URL or random)
       tracks.initializeWithCoordination(hierarchicalData, (selectedTrack) => {
         if (selectedTrack) {
           console.log('🔥 ReplEditor: Track selected:', selectedTrack.name, 'ID:', selectedTrack.id);
 
-          // Update the file manager's selected track state
           if (fileManagerHook && typeof fileManagerHook === 'object' && fileManagerHook.setSelectedTrack) {
-            console.log('🔥 ReplEditor: Updating file manager selected track');
-            console.log('🔥 ReplEditor: Track folder:', selectedTrack.folder);
-            console.log('🔥 ReplEditor: FileManager tracks count:', Object.keys(fileManagerHook.tracks || {}).length);
-
             fileManagerHook.setSelectedTrack(selectedTrack.id);
 
-            // Force folder expansion by dispatching a custom event
-            // This will trigger any listeners that need to expand folders
             if (selectedTrack.folder) {
               setTimeout(() => {
                 const expandEvent = new CustomEvent('strudel-expand-folder', {
@@ -91,35 +82,22 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, ...ed
                   }
                 });
                 window.dispatchEvent(expandEvent);
-                console.log('🔥 ReplEditor: Dispatched folder expansion event for:', selectedTrack.folder);
               }, 100);
             }
-
-            // Small delay to ensure the FileTree component processes the selectedTrack change
-            // and expands the necessary folders
-            setTimeout(() => {
-              console.log('🔥 ReplEditor: FileTree should have expanded folders for track:', selectedTrack.name);
-              if (selectedTrack.folder) {
-                console.log('🔥 ReplEditor: Track is in folder:', selectedTrack.folder);
-              } else {
-                console.log('🔥 ReplEditor: Track is in root folder');
-              }
-            }, 200);
           }
 
-          // Load the selected track code into the editor
+          // Set code immediately
           if (selectedTrack.code) {
-            // Method 1: Use context.editorRef
+            setPendingCode(selectedTrack.code);
+            
             if (context.editorRef?.current?.setCode) {
               context.editorRef.current.setCode(selectedTrack.code);
             }
 
-            // Method 2: Use stored editor instance
             if (getEditorInstance()?.setCode) {
               getEditorInstance().setCode(selectedTrack.code);
             }
 
-            // Method 3: Direct CodeMirror manipulation as fallback
             setTimeout(() => {
               const cmEditor = document.querySelector('.cm-editor');
               if (cmEditor) {
@@ -131,8 +109,6 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, ...ed
               }
             }, 100);
           }
-        } else {
-          console.log('🔥 ReplEditor: No random track selected (no tracks available)');
         }
       });
     } else if (!ssrData && !tracks.isInitialized) {
@@ -143,19 +119,13 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, ...ed
 
   // CRITICAL: Only initialize state once and prevent re-renders
   const [codeComponentKey] = useState(() => Math.random().toString(36));
-  const [showWelcomeDelayed, setShowWelcomeDelayed] = useState(false);
 
-  // Delay showing welcome screen to give time for authentication and track loading
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowWelcomeDelayed(true);
-    }, 2000); // Wait 2 seconds before showing welcome screen
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Welcome screen logic - only show after delay and when we're sure there are no tracks
-  const shouldShowWelcome = showWelcomeDelayed && tracks.isInitialized && !tracks.hasTracks && !tracks.isLoading;
+  // Welcome screen logic - only show when we're sure there are no tracks
+  // Show welcome screen when:
+  // 1. Tracks are initialized (not loading initial data)
+  // 2. There are no tracks
+  // 3. Not currently loading
+  const shouldShowWelcome = tracks.isInitialized && !tracks.hasTracks && !tracks.isLoading;
 
   useEffect(() => {
     // Listen for when tracks are imported
@@ -163,6 +133,16 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, ...ed
       console.log('🔥 ReplEditor: Tracks imported, refreshing store');
       if (fileManagerHook?.isAuthenticated) {
         await tracks.loadFromAPI();
+        
+        // After loading, auto-select the first track if none is selected
+        setTimeout(() => {
+          const tracksArray = Object.values(fileManagerHook.tracks || {});
+          if (tracksArray.length > 0 && !fileManagerHook.selectedTrack) {
+            console.log('🔥 ReplEditor: Auto-selecting first track after import');
+            const firstTrack = tracksArray[0];
+            fileManagerHook.loadTrack(firstTrack);
+          }
+        }, 200);
       }
     };
 
@@ -408,6 +388,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, ...ed
     <div className="h-full flex flex-col relative" {...editorProps}>
       <Loader active={pending} />
       <Header context={context} />
+      
       <div className="grow flex relative overflow-hidden">
         {!isZen && isFileManagerOpen && (
           <ResizableSidebar defaultWidth={300} minWidth={200} maxWidth={500}>
@@ -419,18 +400,10 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, ...ed
             onCreateTrack={handleCreateTrack}
             onImportTracks={handleImportTracks}
           />
-        ) : tracks.isLoading ? (
-          <div className="h-full w-full flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-lg text-gray-600 mb-2">{t('files:loadingTracks')}</p>
-              <p className="text-sm text-gray-500">{t('files:loadingTracksDescription')}</p>
-            </div>
-          </div>
         ) : (
-          <>
+          <div className="flex-1 relative transition-all duration-200 flex flex-col overflow-hidden">
             <Code key={codeComponentKey} containerRef={containerRef} editorRef={editorRef} init={init} />
-          </>
+          </div>
         )}
         {!isZen && panelPosition === 'right' && <VerticalPanel context={context} />}
       </div>

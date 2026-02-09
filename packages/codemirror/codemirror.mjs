@@ -123,8 +123,6 @@ if (typeof window !== 'undefined') {
 
 // https://codemirror.net/docs/guide/
 export function initEditor({ initialCode = '', onChange, onEvaluate, onStop, root, mondo }) {
-  console.log('[initEditor] Called with root:', !!root, root);
-
   const settings = codemirrorSettings.get();
   const initialSettings = Object.keys(compartments).map((key) =>
     compartments[key].of(extensions[key](parseBooleans(settings[key]))),

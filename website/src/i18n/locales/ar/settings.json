@@ -85,5 +85,10 @@
     "maxSize": "الحد الأقصى لحجم ذاكرة التخزين المؤقت",
     "preloadDelay": "تأخير التحميل المسبق",
     "clearCache": "مسح ذاكرة التخزين المؤقت"
-  }
+  },
+  "audioMixer": "معاينة الصوت",
+  "mixerNotAvailable": "محرك المعاينة غير متوفر",
+  "mixerPreviewDevice": "جهاز المعاينة (سماعات الرأس)",
+  "mixerDefaultDevice": "الجهاز الافتراضي",
+  "mixerPreviewEngineActive": "محرك المعاينة نشط"
 }

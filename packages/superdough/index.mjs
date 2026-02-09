@@ -5,6 +5,7 @@ This program is free software: you can redistribute it and/or modify it under th
 */
 
 export * from './superdough.mjs';
+export * from './superdoughoutput.mjs';
 export * from './sampler.mjs';
 export * from './sampleCache.mjs';
 export * from './helpers.mjs';

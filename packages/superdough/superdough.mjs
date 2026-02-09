@@ -279,7 +279,7 @@ export async function initAudioOnFirstClick(options) {
 }
 
 let controller;
-function getSuperdoughAudioController() {
+export function getSuperdoughAudioController() {
   if (controller == null) {
     controller = new SuperdoughAudioController(getAudioContext());
   }
@@ -366,10 +366,10 @@ function mapChannelNumbers(channels) {
   return (Array.isArray(channels) ? channels : [channels]).map((ch) => ch - 1);
 }
 
-export const superdough = async (value, t, hapDuration, cps = 0.5, cycle = 0.5) => {
+export const superdough = async (value, t, hapDuration, cps = 0.5, cycle = 0.5, _controller) => {
   // new: t is always expected to be the absolute target onset time
   const ac = getAudioContext();
-  const audioController = getSuperdoughAudioController();
+  const audioController = _controller || getSuperdoughAudioController();
 
   let { stretch } = value;
   if (stretch != null) {

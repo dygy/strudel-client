@@ -91,6 +91,7 @@ function AuthenticatedReplContent({ context: externalContext, ssrData, readOnly 
         fileManagerHook={supabaseFileManager}
         ssrData={ssrData}
         readOnly={readOnly}
+        mixer={replContext.mixer}
         {...editorProps}
       />
     </div>

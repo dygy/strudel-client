@@ -6,15 +6,9 @@ const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || 'https://placeholder.
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 
 // Only create client if we have real values (not placeholders)
-const hasRealConfig = supabaseUrl !== 'https://placeholder.supabase.co' && 
-                     supabaseAnonKey !== 'placeholder-key' && 
+const hasRealConfig = supabaseUrl !== 'https://placeholder.supabase.co' &&
+                     supabaseAnonKey !== 'placeholder-key' &&
                      supabaseUrl.includes('.supabase.co');
-
-console.log('Supabase config check:', {
-  supabaseUrl: supabaseUrl.substring(0, 30) + '...',
-  hasRealConfig,
-  persistSession: hasRealConfig
-});
 
 // Create Supabase client with proper OAuth configuration
 // Always enable session persistence in production
@@ -92,18 +86,18 @@ const convertTrackFromDB = (dbTrack: Track): Track => ({
 
 const convertTrackToDB = (uiTrack: any): any => {
   const dbTrack = { ...uiTrack };
-  
+
   // Convert UI fields to database fields
   if (uiTrack.isMultitrack !== undefined) {
     dbTrack.is_multitrack = uiTrack.isMultitrack;
     delete dbTrack.isMultitrack;
   }
-  
+
   if (uiTrack.activeStep !== undefined) {
     dbTrack.active_step = uiTrack.activeStep;
     delete dbTrack.activeStep;
   }
-  
+
   return dbTrack;
 };
 
@@ -114,22 +108,22 @@ export const db = {
     getAll: async () => {
       // First check session and refresh if needed
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
+
       if (sessionError) {
         console.error('db.tracks.getAll - Session error:', sessionError);
         throw new Error('Session error: ' + sessionError.message);
       }
-      
+
       if (!session) {
         console.error('db.tracks.getAll - No session found');
         throw new Error('Not authenticated');
       }
-      
+
       // Check if session is expired or expiring soon (within 10 minutes)
       const now = Math.floor(Date.now() / 1000);
       const expiresAt = session.expires_at || 0;
       const timeUntilExpiry = expiresAt - now;
-      
+
       if (timeUntilExpiry < 600) { // Less than 10 minutes
         console.log('db.tracks.getAll - Session expiring soon, attempting refresh...');
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
@@ -142,9 +136,9 @@ export const db = {
         }
         console.log('db.tracks.getAll - Session refreshed successfully');
       }
-      
+
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
+
       if (!user) {
         console.error('db.tracks.getAll - No authenticated user found');
         throw new Error('Not authenticated');

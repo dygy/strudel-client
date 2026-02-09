@@ -7,6 +7,7 @@ import { AudioDeviceSelector } from './AudioDeviceSelector';
 import { AudioEngineTargetSelector } from './AudioEngineTargetSelector';
 import { LanguageSelector } from './LanguageSelector';
 import { SampleCacheSettings } from './SampleCacheSettings';
+import { MixerSettings } from './MixerSettings';
 import { DEFAULT_MAX_POLYPHONY, setMaxPolyphony, setMultiChannelOrbits } from '@strudel/webaudio';
 import { useTranslation } from '@src/i18n';
 
@@ -162,9 +163,10 @@ const fontFamilyOptions = {
 
 interface SettingsTabProps {
   started: boolean;
+  mixer?: any; // AudioMixer instance
 }
 
-export function SettingsTab({ started }: SettingsTabProps) {
+export function SettingsTab({ started, mixer }: SettingsTabProps) {
   const { t } = useTranslation('settings');
   const { t: tMessages } = useTranslation('messages');
   const {
@@ -290,6 +292,10 @@ export function SettingsTab({ started }: SettingsTabProps) {
             }}
             value={multiChannelOrbits}
           />
+        </FormItem>
+
+        <FormItem label={t('audioMixer')}>
+          <MixerSettings mixer={mixer} isDisabled={started} />
         </FormItem>
 
         <FormItem>

@@ -83,5 +83,10 @@
     "maxSize": "Taille maximale du cache",
     "preloadDelay": "Délai de préchargement",
     "clearCache": "Vider le cache"
-  }
+  },
+  "audioMixer": "Aperçu audio",
+  "mixerNotAvailable": "Moteur d'aperçu non disponible",
+  "mixerPreviewDevice": "Appareil d'aperçu (casque)",
+  "mixerDefaultDevice": "Appareil par défaut",
+  "mixerPreviewEngineActive": "Moteur d'aperçu actif"
 }

@@ -95,6 +95,7 @@ interface FileTreeProps {
   onRenameStepFinish: () => void;
   onRenameStepCancel: () => void;
   readOnly?: boolean;
+  isLoading?: boolean;
 }
 
 export function FileTree({
@@ -130,6 +131,7 @@ export function FileTree({
   onRenameStepFinish,
   onRenameStepCancel,
   readOnly = false,
+  isLoading = false,
 }: FileTreeProps) {
   const { t } = useTranslation(['files', 'common']);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['root'])); // Root is expanded by default
@@ -840,17 +842,25 @@ export function FileTree({
   };
 
   const tree = buildTree();
+  const hasAnyData = Object.keys(tracks).length > 0 || Object.keys(folders).length > 0;
+  
+  // Only show empty state message when NOT loading and tree is truly empty
+  const showEmptyState = !isLoading && tree.length === 0 && !hasAnyData;
 
   return (
     <WorkingContextMenu items={emptySpaceContextItems}>
       <div className="flex-1 overflow-auto min-h-0 h-full">
-        {tree.length === 0 ? (
+        {isLoading ? (
+          <div className="h-full" />
+        ) : showEmptyState ? (
           <div className="p-4 text-center text-gray-400 text-sm h-full flex flex-col justify-center">
             {t('files:noTracksYet')}
             <div className="mt-2 text-xs">
               {t('files:rightClickToCreate')}
             </div>
           </div>
+        ) : tree.length === 0 ? (
+          <div className="h-full" />
         ) : (
           <div className="py-2 min-h-full flex flex-col">
             <div>

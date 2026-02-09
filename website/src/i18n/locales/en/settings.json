@@ -88,5 +88,10 @@
     "maxSize": "Max Cache Size",
     "preloadDelay": "Preload Delay",
     "clearCache": "Clear Cache"
-  }
+  },
+  "audioMixer": "Audio Preview",
+  "mixerNotAvailable": "Preview engine is not available",
+  "mixerPreviewDevice": "Preview Output Device (Headphones)",
+  "mixerDefaultDevice": "Default Device",
+  "mixerPreviewEngineActive": "Preview Engine Active"
 }

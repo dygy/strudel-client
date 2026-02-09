@@ -288,6 +288,28 @@ importers:
         specifier: ^3.0.4
         version: 3.0.4(@types/debug@4.1.12)(@types/node@22.19.3)(@vitest/ui@3.0.4)(jiti@2.4.2)(jsdom@27.4.0)(lightningcss@1.29.1)(terser@5.44.1)(yaml@2.7.1)
 
+  packages/mixer:
+    dependencies:
+      '@strudel/core':
+        specifier: workspace:*
+        version: link:../core
+      '@strudel/webaudio':
+        specifier: workspace:*
+        version: link:../webaudio
+      superdough:
+        specifier: workspace:*
+        version: link:../superdough
+    devDependencies:
+      fast-check:
+        specifier: ^3.22.0
+        version: 3.23.2
+      vite:
+        specifier: ^6.0.11
+        version: 6.0.11(@types/node@22.19.3)(jiti@2.4.2)(lightningcss@1.29.1)(terser@5.44.1)(yaml@2.7.1)
+      vitest:
+        specifier: ^3.0.4
+        version: 3.0.4(@types/debug@4.1.12)(@types/node@22.19.3)(@vitest/ui@3.0.4)(jiti@2.4.2)(jsdom@27.4.0)(lightningcss@1.29.1)(terser@5.44.1)(yaml@2.7.1)
+
   packages/mondo:
     devDependencies:
       vite:
@@ -676,6 +698,9 @@ importers:
       '@strudel/mini':
         specifier: workspace:*
         version: link:../packages/mini
+      '@strudel/mixer':
+        specifier: workspace:*
+        version: link:../packages/mixer
       '@strudel/mondo':
         specifier: workspace:*
         version: link:../packages/mondough

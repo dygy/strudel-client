@@ -44,6 +44,7 @@ interface ReplContext {
   handleEvaluate: () => void;
   handleShuffle: () => void;
   handleShare: () => void;
+  mixer?: any;
 }
 
 interface PanelProps {
@@ -295,7 +296,7 @@ function PanelContent({ context, tab }: PanelContentProps) {
         return <FilesTab />;
       case 'settings':
       default:
-        return <SettingsTab started={context.started} />;
+        return <SettingsTab started={context.started} mixer={context.mixer} />;
     }
   };
 
