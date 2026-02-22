@@ -8,6 +8,8 @@
  * @license AGPL-3.0-or-later
  */
 
+import { AudioEqualizer } from '@strudel/equalizer';
+
 export class AudioStream {
   /**
    * @param {string} name - 'live' or 'preview'
@@ -17,8 +19,9 @@ export class AudioStream {
     this.name = name;
     this.audioContext = audioContext;
     
-    // Audio routing: inputGain → mediaStreamDest → audioElement
+    // Audio routing: inputGain → equalizer → mediaStreamDest → audioElement
     this.inputGain = null;
+    this.equalizer = null;
     this.mediaStreamDest = null;
     this.audioElement = null;
     
@@ -37,9 +40,15 @@ export class AudioStream {
     this.inputGain = this.audioContext.createGain();
     this.inputGain.gain.value = 1.0;
 
+    // Create equalizer
+    this.equalizer = new AudioEqualizer(this.audioContext);
+
+    // Connect: inputGain -> equalizer -> mediaStreamDest
+    this.inputGain.connect(this.equalizer.getInput());
+
     // MediaStreamDestination captures audio into a MediaStream
     this.mediaStreamDest = this.audioContext.createMediaStreamDestination();
-    this.inputGain.connect(this.mediaStreamDest);
+    this.equalizer.getOutput().connect(this.mediaStreamDest);
 
     // HTMLAudioElement plays the stream - setSinkId routes to specific device
     this.audioElement = new Audio();
@@ -55,7 +64,7 @@ export class AudioStream {
       console.warn(`[AudioStream:${this.name}] play() deferred until user interaction`);
     }
 
-    console.log(`[AudioStream:${this.name}] initialized`);
+    console.log(`[AudioStream:${this.name}] initialized with equalizer`);
   }
 
   /**
@@ -125,6 +134,7 @@ export class AudioStream {
       isActive: this.isActive,
       deviceId: this.deviceId,
       gain: this.getGain(),
+      equalizer: this.equalizer?.getState(),
     };
   }
 
@@ -133,6 +143,10 @@ export class AudioStream {
       this.audioElement.pause();
       this.audioElement.srcObject = null;
       this.audioElement = null;
+    }
+    if (this.equalizer) {
+      this.equalizer.destroy();
+      this.equalizer = null;
     }
     if (this.inputGain) {
       this.inputGain.disconnect();

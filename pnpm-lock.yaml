@@ -214,6 +214,24 @@ importers:
 
   packages/embed: {}
 
+  packages/equalizer:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.19.3
+      fast-check:
+        specifier: ^3.22.0
+        version: 3.23.2
+      typescript:
+        specifier: ^5.7.2
+        version: 5.7.3
+      vite:
+        specifier: ^6.0.11
+        version: 6.0.11(@types/node@22.19.3)(jiti@2.4.2)(lightningcss@1.29.1)(terser@5.44.1)(yaml@2.7.1)
+      vitest:
+        specifier: ^3.0.4
+        version: 3.0.4(@types/debug@4.1.12)(@types/node@22.19.3)(@vitest/ui@3.0.4)(jiti@2.4.2)(jsdom@27.4.0)(lightningcss@1.29.1)(terser@5.44.1)(yaml@2.7.1)
+
   packages/gamepad:
     dependencies:
       '@strudel/core':
@@ -293,6 +311,9 @@ importers:
       '@strudel/core':
         specifier: workspace:*
         version: link:../core
+      '@strudel/equalizer':
+        specifier: workspace:*
+        version: link:../equalizer
       '@strudel/webaudio':
         specifier: workspace:*
         version: link:../webaudio
@@ -686,6 +707,9 @@ importers:
       '@strudel/draw':
         specifier: workspace:*
         version: link:../packages/draw
+      '@strudel/equalizer':
+        specifier: workspace:*
+        version: link:../packages/equalizer
       '@strudel/gamepad':
         specifier: workspace:*
         version: link:../packages/gamepad
@@ -12004,7 +12028,7 @@ snapshots:
 
   '@types/ws@8.5.14':
     dependencies:
-      '@types/node': 22.10.10
+      '@types/node': 22.19.3
 
   '@typescript-eslint/types@7.18.0': {}
 

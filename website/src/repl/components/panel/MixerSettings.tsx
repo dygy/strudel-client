@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from '@src/i18n';
 import { getAudioDevices } from '@strudel/webaudio';
+import { EqualizerUI } from './EqualizerUI';
 
 const PREVIEW_DEVICE_KEY = 'strudel-preview-device';
 
@@ -127,6 +128,11 @@ export function MixerSettings({ mixer, isDisabled = false }: MixerSettingsProps)
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Equalizer UI */}
+      <div className="pt-4 border-t border-lineHighlight">
+        <EqualizerUI mixer={null} previewEngine={mixer} />
       </div>
     </div>
   );

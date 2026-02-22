@@ -1,11 +1,25 @@
 {
-  "name": "@strudel/mixer",
+  "name": "@strudel/equalizer",
   "version": "0.1.0",
-  "description": "DJ-style audio mixer with preview stream for Strudel",
-  "main": "index.mjs",
+  "description": "Multi-band parametric equalizer for Strudel audio processing",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "import": "./index.ts"
+    }
+  },
   "publishConfig": {
-    "main": "dist/index.mjs"
+    "main": "dist/index.js",
+    "module": "dist/index.js",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      }
+    }
   },
   "scripts": {
     "test": "vitest run",
@@ -20,12 +34,11 @@
   "keywords": [
     "tidalcycles",
     "strudel",
-    "pattern",
-    "livecoding",
-    "algorave",
-    "mixer",
-    "preview",
-    "dj"
+    "equalizer",
+    "eq",
+    "audio",
+    "webaudio",
+    "filter"
   ],
   "author": "Felix Roos <flix91@gmail.com>",
   "license": "AGPL-3.0-or-later",
@@ -33,14 +46,11 @@
     "url": "https://codeberg.org/uzu/strudel/issues"
   },
   "homepage": "https://strudel.cc",
-  "dependencies": {
-    "@strudel/core": "workspace:*",
-    "@strudel/equalizer": "workspace:*",
-    "@strudel/webaudio": "workspace:*",
-    "superdough": "workspace:*"
-  },
+  "dependencies": {},
   "devDependencies": {
+    "@types/node": "^22.10.2",
     "fast-check": "^3.22.0",
+    "typescript": "^5.7.2",
     "vite": "^6.0.11",
     "vitest": "^3.0.4"
   }

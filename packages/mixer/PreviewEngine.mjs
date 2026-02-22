@@ -8,11 +8,13 @@
  *
  * Audio chain:
  *   previewRepl → previewSuperdough(controller) → previewController.output
- *     → destinationGain → MediaStreamDest → HTMLAudioElement.setSinkId(headphones)
+ *     → destinationGain → equalizer → MediaStreamDest → HTMLAudioElement.setSinkId(headphones)
  *
  * @class PreviewEngine
  * @license AGPL-3.0-or-later
  */
+
+import { AudioEqualizer } from '@strudel/equalizer';
 
 export class PreviewEngine {
   /**
@@ -30,6 +32,7 @@ export class PreviewEngine {
 
     this.controller = null;   // Own SuperdoughAudioController
     this.replInstance = null;  // Own repl instance
+    this.equalizer = null;     // Own AudioEqualizer
     this.audioElement = null;  // HTMLAudioElement for device routing
     this.mediaStreamDest = null;
     this.isInitialized = false;
@@ -50,12 +53,18 @@ export class PreviewEngine {
     this.controller = new SuperdoughAudioController(ac);
 
     // 2. Disconnect the controller's default output from audioContext.destination
-    //    and route it through MediaStreamDest → HTMLAudioElement for device routing
+    //    and route it through equalizer → MediaStreamDest → HTMLAudioElement for device routing
     const destGain = this.controller.output.destinationGain;
     try { destGain.disconnect(); } catch (e) { /* may not be connected */ }
 
+    // Create equalizer
+    this.equalizer = new AudioEqualizer(ac);
+
+    // Connect: destGain → equalizer → mediaStreamDest
+    destGain.connect(this.equalizer.getInput());
+
     this.mediaStreamDest = ac.createMediaStreamDestination();
-    destGain.connect(this.mediaStreamDest);
+    this.equalizer.getOutput().connect(this.mediaStreamDest);
 
     this.audioElement = new Audio();
     this.audioElement.srcObject = this.mediaStreamDest.stream;
@@ -81,7 +90,7 @@ export class PreviewEngine {
     });
 
     this.isInitialized = true;
-    console.log('[PreviewEngine] initialized with independent audio chain');
+    console.log('[PreviewEngine] initialized with independent audio chain and equalizer');
   }
 
   /**
@@ -149,6 +158,10 @@ export class PreviewEngine {
       this.audioElement.pause();
       this.audioElement.srcObject = null;
       this.audioElement = null;
+    }
+    if (this.equalizer) {
+      this.equalizer.destroy();
+      this.equalizer = null;
     }
     if (this.controller?.output?.destinationGain) {
       try { this.controller.output.destinationGain.disconnect(); } catch (e) { /* ok */ }
