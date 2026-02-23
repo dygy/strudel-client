@@ -17,8 +17,9 @@ import {
   getAudioContext,
   superdough,
   SuperdoughAudioController,
+  getSuperdoughAudioController,
 } from '@strudel/webaudio';
-import { PreviewEngine } from '@strudel/mixer';
+import { PreviewEngine, SmoothTransitionManager } from '@strudel/mixer';
 import { setVersionDefaultsFrom } from './util';
 import { StrudelMirror, defaultSettings } from '@strudel/codemirror';
 import { clearHydra } from '@strudel/hydra';
@@ -84,6 +85,7 @@ interface ReplContext {
   isPreviewing?: boolean;
   handlePreviewToggle?: () => Promise<void>;
   previewEngine?: PreviewEngine | null;
+  smoothTransitionManager?: any;
 }
 
 let modulesLoading: Promise<Module[]> | undefined;
@@ -245,10 +247,16 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
           
           clearHydra();
           
-          // Clean up canvas elements when stopping
-          cleanupCanvasElements().catch(error => {
-            console.warn('[canvas-cleanup] Error during cleanup:', error);
-          });
+          // IMPORTANT: Don't clean up canvases during smooth transitions
+          // The transition manager handles the lifecycle properly
+          if (!isSmoothTransitioningRef.current) {
+            // Clean up canvas elements when stopping
+            cleanupCanvasElements().catch(error => {
+              console.warn('[canvas-cleanup] Error during cleanup:', error);
+            });
+          } else {
+            console.log('[canvas-cleanup] Skipping cleanup during smooth transition');
+          }
         }
       },
       beforeEval: () => audioReady,
@@ -348,6 +356,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   const editorRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mixerRef = useRef<PreviewEngine | null>(null);
+  const smoothTransitionManagerRef = useRef<any>(null);
+  const isSmoothTransitioningRef = useRef<boolean>(false);
   const [mixer, setMixer] = useState<PreviewEngine | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
 
@@ -396,6 +406,107 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         mixerRef.current.destroy();
         mixerRef.current = null;
         setMixer(null);
+      }
+    };
+  }, []);
+
+  // Initialize SmoothTransitionManager for smooth track transitions
+  useEffect(() => {
+    const initSmoothTransitions = async () => {
+      try {
+        const audioContext = getAudioContext();
+        if (!audioContext) {
+          console.warn('[SmoothTransitionManager] AudioContext not available');
+          return;
+        }
+
+        // Wait for editor and repl to be ready
+        if (!editorRef.current?.repl) {
+          console.log('[SmoothTransitionManager] Waiting for repl to initialize');
+          return;
+        }
+
+        // Get destinationGain from SuperdoughAudioController
+        const controller = getSuperdoughAudioController();
+        const destinationGain = controller?.output?.destinationGain;
+
+        if (!destinationGain) {
+          console.warn('[SmoothTransitionManager] destinationGain not available');
+          return;
+        }
+
+        // Import cleanupDraw to pass as a dependency
+        const { cleanupDraw } = await import('@strudel/draw');
+
+        // Create a specialized cleanup function that only cleans draw canvases (not Hydra)
+        const cleanupDrawCanvases = () => {
+          console.log('[SmoothTransition-cleanup] Cleaning draw canvases only');
+          
+          // 1. Cancel global animation frame
+          if ((window as any).frame) {
+            cancelAnimationFrame((window as any).frame);
+            (window as any).frame = null;
+          }
+          
+          // 2. Use cleanupDraw to stop animations and clear the test-canvas
+          cleanupDraw(true);
+          
+          // 3. Clear the main draw context if it exists
+          if (clearCanvas) {
+            clearCanvas();
+          }
+          
+          // 4. Remove duplicate test-canvas elements (keep the first one)
+          const testCanvases = document.querySelectorAll('canvas[id="test-canvas"]');
+          if (testCanvases.length > 1) {
+            for (let i = 1; i < testCanvases.length; i++) {
+              console.log(`[SmoothTransition-cleanup] Removing duplicate test-canvas #${i}`);
+              testCanvases[i].remove();
+            }
+          }
+          
+          // 5. Remove orphaned graphics canvases (but NOT hydra-canvas)
+          const orphanedSelectors = [
+            'canvas[id*="graphics"]:not(#test-canvas):not(#hydra-canvas)',
+            'canvas[id*="visual"]:not(#test-canvas):not(#hydra-canvas)',
+            'canvas[style*="position:fixed"]:not(#test-canvas):not(#hydra-canvas)'
+          ];
+          
+          orphanedSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(element => {
+              console.log(`[SmoothTransition-cleanup] Removing orphaned canvas: ${element.id || element.className}`);
+              element.remove();
+            });
+          });
+          
+          console.log('[SmoothTransition-cleanup] Draw canvas cleanup complete');
+        };
+
+        const manager = new SmoothTransitionManager(
+          audioContext,
+          editorRef.current.repl,
+          { 
+            destinationGain,
+            cleanupCanvases: cleanupDrawCanvases // Pass specialized cleanup function
+          }
+        );
+
+        smoothTransitionManagerRef.current = manager;
+        console.log('[SmoothTransitionManager] Initialized');
+      } catch (err) {
+        console.error('[SmoothTransitionManager] Failed to initialize:', err);
+      }
+    };
+
+    // Delay initialization to ensure audio context and repl are ready
+    const timer = setTimeout(initSmoothTransitions, 1000);
+
+    return () => {
+      clearTimeout(timer);
+      if (smoothTransitionManagerRef.current) {
+        smoothTransitionManagerRef.current.destroy();
+        smoothTransitionManagerRef.current = null;
       }
     };
   }, []);
@@ -572,9 +683,6 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   }, []);
 
   const handleEvaluate = async (): Promise<void> => {
-    // Clean up any existing canvas elements before evaluating new pattern
-    await cleanupCanvasElements();
-    
     // If previewing, "Update" means: stop preview, push code to live speakers
     if (isPreviewing && mixerRef.current) {
       mixerRef.current.stop();
@@ -582,8 +690,34 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
       console.log('[Preview] Stopped preview, pushing code to live');
     }
 
-    if (editorRef.current && editorRef.current.evaluate) {
-      editorRef.current.evaluate();
+    // Check if smooth transitions are enabled
+    const manager = smoothTransitionManagerRef.current;
+    const code = editorRef.current?.code;
+
+    if (manager && manager.getSettings().enabled && code) {
+      // Use smooth transition WITHOUT canvas cleanup
+      // Set flag to prevent onToggle from cleaning up canvases
+      isSmoothTransitioningRef.current = true;
+      console.log('[SmoothTransitionManager] Using smooth transition for code update');
+      try {
+        await manager.executeTransition(code);
+      } catch (error) {
+        console.error('[SmoothTransitionManager] Transition failed, falling back to instant:', error);
+        // Fallback to instant evaluation with cleanup
+        await cleanupCanvasElements();
+        if (editorRef.current && editorRef.current.evaluate) {
+          editorRef.current.evaluate();
+        }
+      } finally {
+        // Clear the flag after transition completes
+        isSmoothTransitioningRef.current = false;
+      }
+    } else {
+      // Use instant transition (current behavior) - cleanup before evaluation
+      await cleanupCanvasElements();
+      if (editorRef.current && editorRef.current.evaluate) {
+        editorRef.current.evaluate();
+      }
     }
   };
 
@@ -705,6 +839,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     isPreviewing,
     handlePreviewToggle,
     previewEngine: mixer,
+    smoothTransitionManager: smoothTransitionManagerRef.current,
   };
   
   return context;

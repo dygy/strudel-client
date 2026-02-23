@@ -164,9 +164,10 @@ const fontFamilyOptions = {
 interface SettingsTabProps {
   started: boolean;
   mixer?: any; // AudioMixer instance
+  smoothTransitionManager?: any; // SmoothTransitionManager instance
 }
 
-export function SettingsTab({ started, mixer }: SettingsTabProps) {
+export function SettingsTab({ started, mixer, smoothTransitionManager }: SettingsTabProps) {
   const { t } = useTranslation('settings');
   const { t: tMessages } = useTranslation('messages');
   const {
@@ -295,7 +296,7 @@ export function SettingsTab({ started, mixer }: SettingsTabProps) {
         </FormItem>
 
         <FormItem label={t('audioMixer')}>
-          <MixerSettings mixer={mixer} isDisabled={started} />
+          <MixerSettings mixer={mixer} isDisabled={started} smoothTransitionManager={smoothTransitionManager} />
         </FormItem>
 
         <FormItem>

@@ -8,13 +8,27 @@ const PREVIEW_DEVICE_KEY = 'strudel-preview-device';
 interface MixerSettingsProps {
   mixer: any; // PreviewEngine instance
   isDisabled?: boolean;
+  smoothTransitionManager?: any; // SmoothTransitionManager instance
 }
 
-export function MixerSettings({ mixer, isDisabled = false }: MixerSettingsProps) {
+export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManager }: MixerSettingsProps) {
   const { t } = useTranslation('settings');
   const [devices, setDevices] = useState<Map<string, string>>(new Map());
   const [previewDeviceId, setPreviewDeviceId] = useState<string>('');
   const [devicesLoaded, setDevicesLoaded] = useState(false);
+  
+  // Smooth transition settings
+  const [smoothTransitionsEnabled, setSmoothTransitionsEnabled] = useState(false);
+  const [transitionDuration, setTransitionDuration] = useState(2.0);
+
+  // Load smooth transition settings on mount
+  useEffect(() => {
+    if (smoothTransitionManager) {
+      const settings = smoothTransitionManager.getSettings();
+      setSmoothTransitionsEnabled(settings.enabled);
+      setTransitionDuration(settings.duration);
+    }
+  }, [smoothTransitionManager]);
 
   const loadDevices = useCallback(async () => {
     try {
@@ -80,6 +94,20 @@ export function MixerSettings({ mixer, isDisabled = false }: MixerSettingsProps)
     }
   };
 
+  const handleSmoothTransitionsToggle = (enabled: boolean) => {
+    setSmoothTransitionsEnabled(enabled);
+    if (smoothTransitionManager) {
+      smoothTransitionManager.updateSettings({ enabled });
+    }
+  };
+
+  const handleTransitionDurationChange = (duration: number) => {
+    setTransitionDuration(duration);
+    if (smoothTransitionManager) {
+      smoothTransitionManager.updateSettings({ duration });
+    }
+  };
+
   if (!mixer) {
     return (
       <div className="p-4 bg-lineHighlight rounded-lg">
@@ -107,6 +135,59 @@ export function MixerSettings({ mixer, isDisabled = false }: MixerSettingsProps)
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <span className="text-sm font-medium">{t('mixerPreviewEngineActive')}</span>
           </div>
+        </div>
+      )}
+
+      {/* Smooth Track Transitions */}
+      {smoothTransitionManager && (
+        <div className="p-4 bg-background border border-lineHighlight rounded-lg space-y-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-foreground">
+                Smooth Track Transitions
+              </label>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={smoothTransitionsEnabled}
+                  onChange={(e) => handleSmoothTransitionsToggle(e.target.checked)}
+                  disabled={isDisabled}
+                />
+                <div className="w-11 h-6 bg-lineHighlight peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-foreground rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-foreground"></div>
+              </label>
+            </div>
+            <p className="text-xs text-foreground opacity-70">
+              Fade between tracks when updating code
+            </p>
+          </div>
+
+          {smoothTransitionsEnabled && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-foreground">
+                  Transition Duration
+                </label>
+                <span className="text-sm text-foreground opacity-70">
+                  {transitionDuration.toFixed(1)}s
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0.5"
+                max="10"
+                step="0.5"
+                value={transitionDuration}
+                onChange={(e) => handleTransitionDurationChange(parseFloat(e.target.value))}
+                disabled={isDisabled}
+                className="w-full h-2 bg-lineHighlight rounded-lg appearance-none cursor-pointer accent-foreground"
+              />
+              <div className="flex justify-between text-xs text-foreground opacity-50 mt-1">
+                <span>0.5s</span>
+                <span>10s</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

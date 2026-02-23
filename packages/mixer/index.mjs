@@ -15,3 +15,4 @@ export { TransitionMixer } from './TransitionMixer.mjs';
 export { ErrorNotifier } from './ErrorNotifier.mjs';
 export { KeyboardShortcutManager } from './KeyboardShortcutManager.mjs';
 export { PreviewEngine } from './PreviewEngine.mjs';
+export { SmoothTransitionManager } from './SmoothTransitionManager.mjs';
