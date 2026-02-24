@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from '@src/i18n';
 import { 
   EQUALIZER_PRESETS, 
   saveEqualizerSettings, 
@@ -22,6 +23,7 @@ interface BandControl {
 }
 
 export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
+  const { t } = useTranslation('settings');
   const [isEnabled, setIsEnabled] = useState(true);
   const [bands, setBands] = useState<BandControl[]>([]);
   const [activePreset, setActivePreset] = useState('flat');
@@ -263,7 +265,7 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
   };
 
   const handleReset = () => {
-    if (confirm('Reset equalizer to flat settings?')) {
+    if (confirm(t('equalizerResetConfirm'))) {
       handlePresetChange('flat');
     }
   };
@@ -272,7 +274,7 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
     return (
       <div className="p-4 bg-lineHighlight rounded-lg">
         <div className="flex items-center gap-2 text-foreground opacity-70">
-          <span className="text-sm">Equalizer not available</span>
+          <span className="text-sm">{t('equalizerNotAvailable')}</span>
         </div>
       </div>
     );
@@ -283,8 +285,8 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
       {/* Header with enable/disable toggle */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-medium text-foreground">Equalizer</h3>
-          <p className="text-xs text-gray-500 mt-0.5">10-band parametric EQ with 22 presets</p>
+          <h3 className="text-lg font-medium text-foreground">{t('equalizer')}</h3>
+          <p className="text-xs text-gray-500 mt-0.5">{t('equalizerSubtitle')}</p>
         </div>
         <button
           onClick={handleEnableToggle}
@@ -295,14 +297,14 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
           }`}
         >
           <div className={`w-2 h-2 rounded-full ${isEnabled ? 'bg-white' : 'bg-gray-500'}`}></div>
-          {isEnabled ? 'Enabled' : 'Disabled'}
+          {isEnabled ? t('equalizerEnabled') : t('equalizerDisabled')}
         </button>
       </div>
 
       {/* Preset selector */}
       <div>
         <label className="block text-sm font-medium text-foreground mb-2">
-          Preset
+          {t('equalizerPreset')}
         </label>
         <div className="relative">
           <select
@@ -310,13 +312,17 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
             value={activePreset}
             onChange={(e) => handlePresetChange(e.target.value)}
           >
-            {Object.entries(EQUALIZER_PRESETS).map(([key, preset]) => (
-              <option key={key} value={key} className="bg-gray-800">
-                {preset.name}
-              </option>
-            ))}
+            {Object.keys(EQUALIZER_PRESETS).map((key) => {
+              // Convert preset key to translation key (e.g., 'flat' -> 'equalizerPresetFlat')
+              const translationKey = `equalizerPreset${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+              return (
+                <option key={key} value={key} className="bg-gray-800">
+                  {t(translationKey)}
+                </option>
+              );
+            })}
             {activePreset === 'custom' && (
-              <option value="custom" className="bg-gray-800">Custom</option>
+              <option value="custom" className="bg-gray-800">{t('equalizerCustom')}</option>
             )}
           </select>
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
@@ -330,7 +336,7 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Custom settings active
+            {t('equalizerCustomActive')}
           </div>
         )}
       </div>
@@ -339,16 +345,16 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
       <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 hover:border-gray-600 transition-colors">
         <div className="flex items-center justify-between mb-3">
           <label className="text-sm font-medium text-foreground">
-            Frequency Response
+            {t('equalizerFrequencyResponse')}
           </label>
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <div className="flex items-center gap-1">
               <div className="w-3 h-0.5 bg-green-500"></div>
-              <span>EQ Curve</span>
+              <span>{t('equalizerEQCurve')}</span>
             </div>
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-green-400"></div>
-              <span>Bands</span>
+              <span>{t('equalizerBands')}</span>
             </div>
           </div>
         </div>
@@ -363,7 +369,7 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
       {/* Band controls */}
       <div className="space-y-3">
         <label className="block text-sm font-medium text-foreground">
-          Frequency Bands
+          {t('equalizerFrequencyBands')}
         </label>
         <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
           {bands.map((band, index) => (
@@ -446,7 +452,7 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
         
         {/* Info text */}
         <div className="text-xs text-foreground opacity-50 text-center mt-2">
-          Drag sliders to adjust frequency bands • Range: -12dB to +12dB
+          {t('equalizerDragSliders')} • {t('equalizerRange')}
         </div>
       </div>
 
@@ -458,7 +464,7 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
         <svg className="w-4 h-4 group-hover:rotate-180 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
-        Reset to Flat
+        {t('equalizerResetToFlat')}
       </button>
     </div>
   );

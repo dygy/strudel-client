@@ -144,7 +144,7 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-foreground">
-                Smooth Track Transitions
+                {t('smoothTransitions')}
               </label>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
@@ -154,11 +154,11 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
                   onChange={(e) => handleSmoothTransitionsToggle(e.target.checked)}
                   disabled={isDisabled}
                 />
-                <div className="w-11 h-6 bg-lineHighlight peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-foreground rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-foreground"></div>
+                <div className="w-11 h-6 bg-lineHighlight peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-foreground rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-foreground peer-checked:after:bg-background peer-checked:after:border-background"></div>
               </label>
             </div>
             <p className="text-xs text-foreground opacity-70">
-              Fade between tracks when updating code
+              {t('smoothTransitionsDescription')}
             </p>
           </div>
 
@@ -166,7 +166,7 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium text-foreground">
-                  Transition Duration
+                  {t('transitionDuration')}
                 </label>
                 <span className="text-sm text-foreground opacity-70">
                   {transitionDuration.toFixed(1)}s
