@@ -51,6 +51,8 @@
 
   "rightClickForOptions": "انقر بالزر الأيمن على المسارات للمزيد من الخيارات",
   "currentTrack": "الحالي",
+  "editing": "التحرير",
+  "playing": "التشغيل",
   "saveChanges": "حفظ التغييرات",
   "trackName": "اسم المسار",
   "create": "إنشاء",

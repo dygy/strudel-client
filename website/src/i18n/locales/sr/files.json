@@ -51,6 +51,8 @@
 
   "rightClickForOptions": "Кликните десним тастером на нумере за више опција",
   "currentTrack": "Тренутна",
+  "editing": "Уређивање",
+  "playing": "Пуштање",
   "saveChanges": "Сачувај измене",
   "trackName": "Име нумере",
   "create": "Креирај",
