@@ -276,18 +276,15 @@ export class FormatEngine {
     const functionPattern = /(\b(arrange|stack)|\.stack)\s*\(/g;
     
     let result = code;
-    let hasChanges = true;
+    const processedRanges = new Set<string>(); // Track processed function calls to avoid infinite loop
     
-    // Keep processing until no more changes are made
-    while (hasChanges) {
-      hasChanges = false;
-      functionPattern.lastIndex = 0;
-      
-      let match: RegExpExecArray | null;
-      while ((match = functionPattern.exec(result)) !== null) {
-        const functionName = match[1]; // 'arrange', 'stack', or '.stack'
-        const startIndex = match.index;
-        const openParenIndex = match.index + match[0].length - 1;
+    let match: RegExpExecArray | null;
+    functionPattern.lastIndex = 0;
+    
+    while ((match = functionPattern.exec(result)) !== null) {
+      const functionName = match[1]; // 'arrange', 'stack', or '.stack'
+      const startIndex = match.index;
+      const openParenIndex = match.index + match[0].length - 1;
       
       // Find the matching closing parenthesis
       let depth = 1;
@@ -329,9 +326,23 @@ export class FormatEngine {
         continue;
       }
       
+      // Create a unique key for this function call to track if we've processed it
+      const rangeKey = `${startIndex}-${closeParenIndex}`;
+      if (processedRanges.has(rangeKey)) {
+        // Already processed this function call, skip it
+        continue;
+      }
+      
       // Extract the full function call
       const fullCall = result.substring(startIndex, closeParenIndex + 1);
       const argsContent = result.substring(openParenIndex + 1, closeParenIndex);
+      
+      // Check if already formatted as multi-line (contains newlines in args)
+      if (argsContent.includes('\n')) {
+        // Already multi-line formatted, skip it
+        processedRanges.add(rangeKey);
+        continue;
+      }
       
       // Count arguments by counting commas at depth 0 (not inside nested parentheses/brackets)
       let argCount = 0;
@@ -438,18 +449,24 @@ export class FormatEngine {
       }
       
       // Build multi-line formatted version
+      // Detect current indentation level by looking at the line containing the function call
+      const lineStart = result.lastIndexOf('\n', startIndex) + 1;
+      const currentLinePrefix = result.substring(lineStart, startIndex);
+      const baseIndent = currentLinePrefix.match(/^(\s*)/)?.[1] || '';
       const indentStr = options.useTabs ? '\t' : ' '.repeat(options.tabWidth);
-      const formattedArgs = args.map(arg => `${indentStr}${arg}`).join(',\n');
-      const formattedCall = `${functionName}(\n${formattedArgs}\n)`;
+      const argIndent = baseIndent + indentStr;
+      const formattedArgs = args.map(arg => `${argIndent}${arg}`).join(',\n');
+      const formattedCall = `${functionName}(\n${formattedArgs}\n${baseIndent})`;
       
       // Replace in result
       result = result.substring(0, startIndex) + formattedCall + result.substring(closeParenIndex + 1);
       
-      // Mark that we made a change and break to restart the search
-      hasChanges = true;
-      break;
+      // Mark this range as processed
+      processedRanges.add(rangeKey);
+      
+      // Reset the regex to search from the beginning since we modified the string
+      functionPattern.lastIndex = 0;
     }
-  }
     
     return result;
   }
@@ -464,7 +481,10 @@ export class FormatEngine {
     let globalStringIndex = 0;
     
     let protectedCode = code.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
-      const placeholder = `__STRUDEL_STRING_${globalStringIndex}_PLACEHOLDER__`;
+      // Encode index as letters (A=0, B=1, etc.) to avoid digit-adjacent-to-letter
+      // patterns that would be split by preprocessing regexes
+      const idxLetters = String(globalStringIndex).split('').map(c => String.fromCharCode(65 + Number(c))).join('');
+      const placeholder = `XSTRX${idxLetters}XENDX`;
       globalStringParts[globalStringIndex] = match;
       globalStringIndex++;
       return placeholder;
@@ -487,7 +507,8 @@ export class FormatEngine {
 
     // Restore global strings after preprocessing
     for (let i = 0; i < globalStringParts.length; i++) {
-      const placeholder = `__STRUDEL_STRING_${i}_PLACEHOLDER__`;
+      const idxLetters = String(i).split('').map(c => String.fromCharCode(65 + Number(c))).join('');
+      const placeholder = `XSTRX${idxLetters}XENDX`;
       preprocessedCode = preprocessedCode.replace(new RegExp(placeholder, 'g'), globalStringParts[i]);
     }
 
@@ -529,7 +550,10 @@ export class FormatEngine {
       });
       
       // Apply formatting to non-string parts only
-      tempLine = tempLine
+      // First, extract leading whitespace so normalization doesn't collapse indentation
+      const leadingWS = tempLine.match(/^(\s*)/)?.[1] || '';
+      let contentPart = tempLine.substring(leadingWS.length);
+      contentPart = contentPart
         .replace(/([^=!<>+\-*\/])=([^=>])/g, '$1 = $2')  // Add spaces around = (but not ==, !=, =>, +=, -=, *=, /=)
         .replace(/([0-9])\s*([\+\-\*\/])\s*([0-9])/g, '$1 $2 $3')  // Add spaces around math operators between numbers only
         .replace(/,([^\s])/g, ', $1')              // Add space after commas
@@ -539,6 +563,7 @@ export class FormatEngine {
         .replace(/\s+\)/g, ')')                    // Remove space before closing parentheses
         .replace(/\{\s+/g, '{ ')                   // Normalize space after opening braces
         .replace(/\s+\}/g, ' }');                  // Normalize space before closing braces
+      tempLine = leadingWS + contentPart;
       
       // Restore local strings immediately (this preserves original content including URLs)
       for (let j = 0; j < localStringParts.length; j++) {
@@ -568,7 +593,7 @@ export class FormatEngine {
     result = this.formatCompositionFunctions(result, options);
     
     // Final verification: ensure no placeholders remain
-    if (result.includes('__STRUDEL_STRING_') || result.includes('__LOCAL_STRING_')) {
+    if (result.includes('XSTRX') || result.includes('__LOCAL_STRING_')) {
       console.error('[FormatEngine] String placeholder restoration failed!');
       // Return original code if restoration failed
       return code;

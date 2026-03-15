@@ -241,13 +241,13 @@ describe('Bug Condition Exploration: arrange() and stack() Multi-line Formatting
   });
 
   describe('Property-Based Test: arrange() and stack() with multiple arguments', () => {
-    it('should format any arrange() with 2+ arguments as multi-line', () => {
-      fc.assert(
-        fc.property(
+    it('should format any arrange() with 2+ arguments as multi-line', async () => {
+      await fc.assert(
+        fc.asyncProperty(
           // Generate arrange() calls with 2-4 arguments
           fc.integer({ min: 2, max: 4 }),
           fc.array(fc.constantFrom('bd', 'sd', 'hh', 'cp', 'oh'), { minLength: 1, maxLength: 4 }),
-          (argCount, sounds) => {
+          async (argCount, sounds) => {
             // Build arrange() call with multiple array arguments
             const args = Array.from({ length: argCount }, (_, i) => {
               const soundPattern = sounds.slice(0, 2).join(' ');
@@ -257,28 +257,27 @@ describe('Bug Condition Exploration: arrange() and stack() Multi-line Formatting
             const code = `arrange(${args.join(', ')})`;
             
             // Format the code
-            return formatEngine.formatCode(code, defaultOptions).then(result => {
-              expect(result.success).toBe(true);
-              expect(result.formattedCode).toBeDefined();
-              
-              const formatted = result.formattedCode!;
-              
-              // EXPECTED TO FAIL: arrange() with multiple arguments should be multi-line
-              expect(isMultiLineFormatted(formatted, 'arrange')).toBe(true);
-            });
+            const result = await formatEngine.formatCode(code, defaultOptions);
+            expect(result.success).toBe(true);
+            expect(result.formattedCode).toBeDefined();
+            
+            const formatted = result.formattedCode!;
+            
+            // arrange() with multiple arguments should be multi-line
+            expect(isMultiLineFormatted(formatted, 'arrange')).toBe(true);
           }
         ),
-        { numRuns: 50 } // Run 50 iterations to find counterexamples
+        { numRuns: 50 }
       );
     });
 
-    it('should format any stack() with 2+ arguments as multi-line', () => {
-      fc.assert(
-        fc.property(
+    it('should format any stack() with 2+ arguments as multi-line', async () => {
+      await fc.assert(
+        fc.asyncProperty(
           // Generate stack() calls with 2-4 arguments
           fc.integer({ min: 2, max: 4 }),
           fc.array(fc.constantFrom('bd', 'sd', 'hh', 'bass:0', 'pad:0'), { minLength: 1, maxLength: 4 }),
-          (argCount, sounds) => {
+          async (argCount, sounds) => {
             // Build stack() call with multiple pattern arguments
             const args = Array.from({ length: argCount }, (_, i) => {
               const soundPattern = sounds[i % sounds.length];
@@ -288,18 +287,17 @@ describe('Bug Condition Exploration: arrange() and stack() Multi-line Formatting
             const code = `stack(${args.join(', ')})`;
             
             // Format the code
-            return formatEngine.formatCode(code, defaultOptions).then(result => {
-              expect(result.success).toBe(true);
-              expect(result.formattedCode).toBeDefined();
-              
-              const formatted = result.formattedCode!;
-              
-              // EXPECTED TO FAIL: stack() with multiple arguments should be multi-line
-              expect(isMultiLineFormatted(formatted, 'stack')).toBe(true);
-            });
+            const result = await formatEngine.formatCode(code, defaultOptions);
+            expect(result.success).toBe(true);
+            expect(result.formattedCode).toBeDefined();
+            
+            const formatted = result.formattedCode!;
+            
+            // stack() with multiple arguments should be multi-line
+            expect(isMultiLineFormatted(formatted, 'stack')).toBe(true);
           }
         ),
-        { numRuns: 50 } // Run 50 iterations to find counterexamples
+        { numRuns: 50 }
       );
     });
   });
@@ -564,6 +562,24 @@ describe('Bug Condition Exploration: arrange() and stack() Multi-line Formatting
         expect(formatted).toContain('.room(');
         expect(formatted).toContain('.delay(');
         expect(formatted).toContain('.pan(');
+      });
+
+      it('should keep single-line method chains with .bank() on one line', async () => {
+        const code = `s("bd*<2!3 [2 4]>").bank('<EmuSP12 AlesisSR16>').speed(.8).gain(0.5),`;
+        
+        const result = await formatEngine.formatCode(code, defaultOptions);
+        
+        expect(result.success).toBe(true);
+        expect(result.formattedCode).toBeDefined();
+        
+        const formatted = result.formattedCode!.trim();
+        
+        // Single-line method chains must stay on one line
+        expect(formatted.split('\n').length).toBe(1);
+        // All methods should be preserved
+        expect(formatted).toContain('.bank(');
+        expect(formatted).toContain('.speed(');
+        expect(formatted).toContain('.gain(');
       });
     });
 
