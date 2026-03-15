@@ -100,7 +100,7 @@ export function bankCompletions() {
   }
   return Array.from(banks)
     .sort()
-    .map((name) => ({ label: name, type: 'bank' }));
+    .map((name) => ({ label: name.toLowerCase(), type: 'bank' }));
 }
 
 // Attempt to get all scale names from Tonal
@@ -433,6 +433,8 @@ function soundHandler(context) {
 // Cached regex patterns for bankHandler
 const BANK_NO_QUOTES_REGEX = /bank\(\s*$/;
 const BANK_WITH_QUOTES_REGEX = /bank\(\s*['"][^'"]*$/;
+// Regex to extract the last word fragment (after mini-notation separators)
+const BANK_FRAGMENT_MATCH_REGEX = /(?:[\s[{(<>,])([\w]*)$/;
 
 function bankHandler(context) {
   // First check for bank context without quotes - block with empty completions
@@ -452,9 +454,15 @@ function bankHandler(context) {
   const quoteIdx = Math.max(text.lastIndexOf('"'), text.lastIndexOf("'"));
   if (quoteIdx === -1) return null;
   const inside = text.slice(quoteIdx + 1);
-  const fragment = inside;
+  
+  // Extract the current word fragment, handling mini-notation separators
+  // e.g. "<r EmuSP12>" -> after "<" and space, fragment is current word
+  const fragMatch = inside.match(BANK_FRAGMENT_MATCH_REGEX);
+  const fragment = fragMatch ? fragMatch[1] : inside;
+  
   let banks = bankCompletions();
-  const filteredBanks = banks.filter((b) => b.label.startsWith(fragment));
+  // Case-insensitive filtering
+  const filteredBanks = banks.filter((b) => b.label.toLowerCase().startsWith(fragment.toLowerCase()));
   const from = bankMatch.to - fragment.length;
   return {
     from,

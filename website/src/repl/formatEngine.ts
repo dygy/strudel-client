@@ -211,7 +211,11 @@ export class FormatEngine {
     // Check for common Strudel patterns
     const strudelPatterns = [
       /\$:/,                           // Strudel pattern syntax
+      /\bs\(/,                         // s() function
       /\.s\(/,                         // .s() method
+      /\barrange\(/,                   // arrange() function
+      /\bstack\(/,                     // stack() function
+      /\.stack\(/,                     // .stack() method
       /\.sound\(/,                     // .sound() method
       /\.note\(/,                      // .note() method
       /\.scale\(/,                     // .scale() method
@@ -264,6 +268,210 @@ export class FormatEngine {
   }
 
   /**
+   * Formats arrange() and stack() function calls with multi-line argument lists
+   */
+  private formatCompositionFunctions(code: string, options: PrettierOptions): string {
+    // Detect arrange() and stack() function calls (both standalone and chained)
+    // Pattern matches: arrange(...), stack(...), .stack(...)
+    const functionPattern = /(\b(arrange|stack)|\.stack)\s*\(/g;
+    
+    let result = code;
+    const processedRanges = new Set<string>(); // Track processed function calls to avoid infinite loop
+    
+    let match: RegExpExecArray | null;
+    functionPattern.lastIndex = 0;
+    
+    while ((match = functionPattern.exec(result)) !== null) {
+      const functionName = match[1]; // 'arrange', 'stack', or '.stack'
+      const startIndex = match.index;
+      const openParenIndex = match.index + match[0].length - 1;
+      
+      // Find the matching closing parenthesis
+      let depth = 1;
+      let closeParenIndex = -1;
+      
+      for (let i = openParenIndex + 1; i < result.length; i++) {
+        const char = result[i];
+        
+        // Skip string content to avoid counting parentheses inside strings
+        if (char === '"' || char === "'" || char === '`') {
+          const quote = char;
+          i++; // Move past opening quote
+          while (i < result.length) {
+            if (result[i] === '\\') {
+              i += 2; // Skip escaped character
+              continue;
+            }
+            if (result[i] === quote) {
+              break; // Found closing quote
+            }
+            i++;
+          }
+          continue;
+        }
+        
+        if (char === '(') {
+          depth++;
+        } else if (char === ')') {
+          depth--;
+          if (depth === 0) {
+            closeParenIndex = i;
+            break;
+          }
+        }
+      }
+      
+      if (closeParenIndex === -1) {
+        // No matching closing parenthesis found, skip this function call
+        continue;
+      }
+      
+      // Create a unique key for this function call to track if we've processed it
+      const rangeKey = `${startIndex}-${closeParenIndex}`;
+      if (processedRanges.has(rangeKey)) {
+        // Already processed this function call, skip it
+        continue;
+      }
+      
+      // Extract the full function call
+      const fullCall = result.substring(startIndex, closeParenIndex + 1);
+      const argsContent = result.substring(openParenIndex + 1, closeParenIndex);
+      
+      // Check if already formatted as multi-line (contains newlines in args)
+      if (argsContent.includes('\n')) {
+        // Already multi-line formatted, skip it
+        processedRanges.add(rangeKey);
+        continue;
+      }
+      
+      // Count arguments by counting commas at depth 0 (not inside nested parentheses/brackets)
+      let argCount = 0;
+      let argDepth = 0;
+      let hasNonWhitespace = false;
+      
+      for (let i = 0; i < argsContent.length; i++) {
+        const char = argsContent[i];
+        
+        // Skip string content
+        if (char === '"' || char === "'" || char === '`') {
+          const quote = char;
+          i++; // Move past opening quote
+          hasNonWhitespace = true;
+          while (i < argsContent.length) {
+            if (argsContent[i] === '\\') {
+              i += 2; // Skip escaped character
+              continue;
+            }
+            if (argsContent[i] === quote) {
+              break; // Found closing quote
+            }
+            i++;
+          }
+          continue;
+        }
+        
+        if (char === '(' || char === '[' || char === '{') {
+          argDepth++;
+          hasNonWhitespace = true;
+        } else if (char === ')' || char === ']' || char === '}') {
+          argDepth--;
+          hasNonWhitespace = true;
+        } else if (char === ',' && argDepth === 0) {
+          argCount++;
+        } else if (char.trim() !== '') {
+          hasNonWhitespace = true;
+        }
+      }
+      
+      // If there's any non-whitespace content, we have at least one argument
+      if (hasNonWhitespace) {
+        argCount++;
+      }
+      
+      // Determine if multi-line formatting is needed
+      const shouldFormatMultiLine = argCount > 1 || fullCall.length > options.printWidth;
+      
+      if (!shouldFormatMultiLine) {
+        // Skip formatting for single-argument or short calls
+        continue;
+      }
+      
+      // Apply multi-line formatting
+      // Split arguments by commas at depth 0
+      const args: string[] = [];
+      let currentArg = '';
+      argDepth = 0;
+      
+      for (let i = 0; i < argsContent.length; i++) {
+        const char = argsContent[i];
+        
+        // Handle string content
+        if (char === '"' || char === "'" || char === '`') {
+          const quote = char;
+          currentArg += char;
+          i++; // Move past opening quote
+          while (i < argsContent.length) {
+            currentArg += argsContent[i];
+            if (argsContent[i] === '\\') {
+              i++; // Skip next character
+              if (i < argsContent.length) {
+                currentArg += argsContent[i];
+              }
+              i++;
+              continue;
+            }
+            if (argsContent[i] === quote) {
+              break; // Found closing quote
+            }
+            i++;
+          }
+          continue;
+        }
+        
+        if (char === '(' || char === '[' || char === '{') {
+          argDepth++;
+          currentArg += char;
+        } else if (char === ')' || char === ']' || char === '}') {
+          argDepth--;
+          currentArg += char;
+        } else if (char === ',' && argDepth === 0) {
+          // Found argument separator
+          args.push(currentArg.trim());
+          currentArg = '';
+        } else {
+          currentArg += char;
+        }
+      }
+      
+      // Add the last argument
+      if (currentArg.trim()) {
+        args.push(currentArg.trim());
+      }
+      
+      // Build multi-line formatted version
+      // Detect current indentation level by looking at the line containing the function call
+      const lineStart = result.lastIndexOf('\n', startIndex) + 1;
+      const currentLinePrefix = result.substring(lineStart, startIndex);
+      const baseIndent = currentLinePrefix.match(/^(\s*)/)?.[1] || '';
+      const indentStr = options.useTabs ? '\t' : ' '.repeat(options.tabWidth);
+      const argIndent = baseIndent + indentStr;
+      const formattedArgs = args.map(arg => `${argIndent}${arg}`).join(',\n');
+      const formattedCall = `${functionName}(\n${formattedArgs}\n${baseIndent})`;
+      
+      // Replace in result
+      result = result.substring(0, startIndex) + formattedCall + result.substring(closeParenIndex + 1);
+      
+      // Mark this range as processed
+      processedRanges.add(rangeKey);
+      
+      // Reset the regex to search from the beginning since we modified the string
+      functionPattern.lastIndex = 0;
+    }
+    
+    return result;
+  }
+
+  /**
    * Formats Strudel code with basic formatting while preserving DSL syntax
    */
   private formatStrudelCode(code: string, options: PrettierOptions): string {
@@ -273,7 +481,10 @@ export class FormatEngine {
     let globalStringIndex = 0;
     
     let protectedCode = code.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
-      const placeholder = `__STRUDEL_STRING_${globalStringIndex}_PLACEHOLDER__`;
+      // Encode index as letters (A=0, B=1, etc.) to avoid digit-adjacent-to-letter
+      // patterns that would be split by preprocessing regexes
+      const idxLetters = String(globalStringIndex).split('').map(c => String.fromCharCode(65 + Number(c))).join('');
+      const placeholder = `XSTRX${idxLetters}XENDX`;
       globalStringParts[globalStringIndex] = match;
       globalStringIndex++;
       return placeholder;
@@ -296,7 +507,8 @@ export class FormatEngine {
 
     // Restore global strings after preprocessing
     for (let i = 0; i < globalStringParts.length; i++) {
-      const placeholder = `__STRUDEL_STRING_${i}_PLACEHOLDER__`;
+      const idxLetters = String(i).split('').map(c => String.fromCharCode(65 + Number(c))).join('');
+      const placeholder = `XSTRX${idxLetters}XENDX`;
       preprocessedCode = preprocessedCode.replace(new RegExp(placeholder, 'g'), globalStringParts[i]);
     }
 
@@ -338,7 +550,10 @@ export class FormatEngine {
       });
       
       // Apply formatting to non-string parts only
-      tempLine = tempLine
+      // First, extract leading whitespace so normalization doesn't collapse indentation
+      const leadingWS = tempLine.match(/^(\s*)/)?.[1] || '';
+      let contentPart = tempLine.substring(leadingWS.length);
+      contentPart = contentPart
         .replace(/([^=!<>+\-*\/])=([^=>])/g, '$1 = $2')  // Add spaces around = (but not ==, !=, =>, +=, -=, *=, /=)
         .replace(/([0-9])\s*([\+\-\*\/])\s*([0-9])/g, '$1 $2 $3')  // Add spaces around math operators between numbers only
         .replace(/,([^\s])/g, ', $1')              // Add space after commas
@@ -348,6 +563,7 @@ export class FormatEngine {
         .replace(/\s+\)/g, ')')                    // Remove space before closing parentheses
         .replace(/\{\s+/g, '{ ')                   // Normalize space after opening braces
         .replace(/\s+\}/g, ' }');                  // Normalize space before closing braces
+      tempLine = leadingWS + contentPart;
       
       // Restore local strings immediately (this preserves original content including URLs)
       for (let j = 0; j < localStringParts.length; j++) {
@@ -371,10 +587,13 @@ export class FormatEngine {
     }
 
     // Join all lines - at this point all strings should already be restored
-    const result = formattedLines.join('\n');
+    let result = formattedLines.join('\n');
+    
+    // Format arrange() and stack() calls (AFTER line-by-line formatting)
+    result = this.formatCompositionFunctions(result, options);
     
     // Final verification: ensure no placeholders remain
-    if (result.includes('__STRUDEL_STRING_') || result.includes('__LOCAL_STRING_')) {
+    if (result.includes('XSTRX') || result.includes('__LOCAL_STRING_')) {
       console.error('[FormatEngine] String placeholder restoration failed!');
       // Return original code if restoration failed
       return code;
@@ -389,7 +608,6 @@ export class FormatEngine {
   private async formatCodeMainThread(code: string, options: PrettierOptions): Promise<FormatResult> {
     // Check if this is Strudel code
     if (this.isStrudelCode(code)) {
-      console.log('[FormatEngine] Strudel code detected, applying Strudel-specific formatting');
       const formattedCode = this.formatStrudelCode(code, options);
       return {
         success: true,
