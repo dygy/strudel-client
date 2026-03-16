@@ -1,4 +1,6 @@
 import Loader from '@src/repl/components/Loader';
+import { ExportDialog } from './ExportDialog';
+import { getAudioContext } from '@strudel/webaudio';
 import { HorizontalPanel, VerticalPanel } from '@src/repl/components/panel/Panel';
 import { Code } from '@src/repl/components/Code';
 import UserFacingErrorMessage from '@src/repl/components/UserFacingErrorMessage';
@@ -31,6 +33,10 @@ interface ReplContext {
   handleShuffle: () => void;
   handleShare: () => void;
   handleUpdate: (data: any, reset?: boolean) => void;
+  isScreenRecording?: boolean;
+  screenRecordingElapsedSeconds?: number;
+  handleScreenRecordToggle?: () => void;
+  isScreenRecordingSupported?: boolean;
 }
 
 interface ReplEditorProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -415,6 +421,15 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
 
       {/* Global Tooltip - Temporarily disabled for cleaner UX */}
       {/* <GlobalTooltip /> */}
+
+      {/* Export Dialog — shown after a recording session ends (Req 5.1) */}
+      {(context as any).exportBlob && (
+        <ExportDialog
+          audioBlob={(context as any).exportBlob}
+          audioContext={getAudioContext()}
+          onClose={() => (context as any).clearExport?.()}
+        />
+      )}
     </div>
   );
 }

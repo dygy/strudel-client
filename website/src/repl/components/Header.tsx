@@ -5,6 +5,7 @@ import cx from '@src/cx';
 import { useSettings, setIsZen, setIsFileManagerOpen } from '../../settings';
 import { useTranslation } from '@src/i18n';
 import { AuthButton } from '../../components/auth/AuthButton';
+import { formatElapsedTime } from '../recording/formatUtils';
 import '../Repl.css';
 
 const { BASE_URL } = import.meta.env;
@@ -22,6 +23,13 @@ interface ReplContext {
   mixer?: any;
   isPreviewing?: boolean;
   handlePreviewToggle?: () => void;
+  isRecording?: boolean;
+  recordingElapsedSeconds?: number;
+  handleRecordToggle?: () => void;
+  isScreenRecording?: boolean;
+  screenRecordingElapsedSeconds?: number;
+  handleScreenRecordToggle?: () => void;
+  isScreenRecordingSupported?: boolean;
 }
 
 interface HeaderProps {
@@ -30,7 +38,7 @@ interface HeaderProps {
 }
 
 export function Header({ context, embedded = false }: HeaderProps) {
-  const { started, pending, isDirty, activeCode, handleTogglePlay, handleEvaluate, handleShuffle, handleShare, mixer, isPreviewing, handlePreviewToggle } =
+  const { started, pending, isDirty, activeCode, handleTogglePlay, handleEvaluate, handleShuffle, handleShare, mixer, isPreviewing, handlePreviewToggle, isRecording, recordingElapsedSeconds, handleRecordToggle, isScreenRecording, screenRecordingElapsedSeconds, handleScreenRecordToggle, isScreenRecordingSupported } =
     context;
   const isEmbedded = typeof window !== 'undefined' && (embedded || window.location !== window.parent.location);
   const { isZen, isButtonRowHidden, isCSSAnimationDisabled, fontFamily, isFileManagerOpen } = useSettings();
@@ -138,6 +146,63 @@ export function Header({ context, embedded = false }: HeaderProps) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M12 12h.01M9 9l-6 6M9 15l-6-6" />
                   </svg>
                   {!isEmbedded && <span>{isPreviewing ? t('stopPreview') : t('playPreview')}</span>}
+                </button>
+              )}
+              {!isEmbedded && handleRecordToggle && (
+                <button
+                  onClick={isScreenRecording ? undefined : handleRecordToggle}
+                  title={isScreenRecording ? 'Audio recording unavailable during screen recording' : isRecording ? t('stopRecording') : t('record')}
+                  className={cx(
+                    'p-2 flex items-center space-x-1',
+                    isScreenRecording ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-50',
+                    isRecording && 'bg-red-500 bg-opacity-20'
+                  )}
+                >
+                  <span
+                    className={cx(
+                      'block w-4 h-4 rounded-full',
+                      isRecording ? 'bg-red-500 recording-pulse' : 'bg-red-600'
+                    )}
+                  />
+                  {!isEmbedded && (
+                    <span>
+                      {isRecording
+                        ? formatElapsedTime(recordingElapsedSeconds ?? 0)
+                        : t('record')}
+                    </span>
+                  )}
+                </button>
+              )}
+              {!isEmbedded && !isZen && isScreenRecordingSupported && handleScreenRecordToggle && (
+                <button
+                  onClick={isRecording ? undefined : handleScreenRecordToggle}
+                  title={isRecording ? 'Screen recording unavailable during audio recording' : isScreenRecording ? 'Stop screen recording' : 'Screen record'}
+                  className={cx(
+                    'p-2 flex items-center space-x-1',
+                    isRecording ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-50',
+                    isScreenRecording && 'bg-red-500 bg-opacity-20'
+                  )}
+                >
+                  <svg
+                    className={cx('w-5 h-5', isScreenRecording && 'recording-pulse')}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9A2.25 2.25 0 0013.5 5.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"
+                    />
+                  </svg>
+                  {!isEmbedded && (
+                    <span>
+                      {isScreenRecording
+                        ? formatElapsedTime(screenRecordingElapsedSeconds ?? 0)
+                        : 'screen'}
+                    </span>
+                  )}
                 </button>
               )}
             </div>

@@ -481,3 +481,13 @@
   padding: 0 !important;
   box-shadow: none !important;
 }
+
+/* Recording pulse animation for the record button */
+@keyframes recordingPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.recording-pulse {
+  animation: recordingPulse 1.2s ease-in-out infinite;
+}

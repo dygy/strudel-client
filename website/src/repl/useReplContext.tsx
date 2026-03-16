@@ -45,6 +45,8 @@ import { setInterval, clearInterval } from 'worker-timers';
 import { getMetadata } from '../metadata_parser';
 import { TrackRouter } from '../routing';
 import { setEditorInstance, setPendingCode, getPendingCode, clearPendingCode, setActiveCode, getEditorInstance } from '../stores/editorStore';
+import { useAudioRecorder } from './recording/useAudioRecorder';
+import { useScreenRecorder } from './recording/useScreenRecorder';
 
 // Type definitions
 interface ReplState {
@@ -86,6 +88,15 @@ interface ReplContext {
   handlePreviewToggle?: () => Promise<void>;
   previewEngine?: PreviewEngine | null;
   smoothTransitionManager?: any;
+  isRecording?: boolean;
+  recordingElapsedSeconds?: number;
+  handleRecordToggle?: () => void;
+  exportBlob?: Blob | null;
+  clearExport?: () => void;
+  isScreenRecording?: boolean;
+  screenRecordingElapsedSeconds?: number;
+  handleScreenRecordToggle?: () => void;
+  isScreenRecordingSupported?: boolean;
 }
 
 let modulesLoading: Promise<Module[]> | undefined;
@@ -360,6 +371,16 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   const isSmoothTransitioningRef = useRef<boolean>(false);
   const [mixer, setMixer] = useState<PreviewEngine | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
+
+  // Audio & screen recorder hooks (Req 8.1, 8.2: mutual exclusion via ref)
+  const screenRecordingRef = useRef(false);
+  const audioRecorder = useAudioRecorder(screenRecordingRef.current);
+  const screenRecorder = useScreenRecorder(audioRecorder.isRecording);
+
+  // Keep ref in sync so audioRecorder sees latest screen recording state
+  useEffect(() => {
+    screenRecordingRef.current = screenRecorder.isScreenRecording;
+  }, [screenRecorder.isScreenRecording]);
 
   // Initialize PreviewEngine — creates an independent audio chain
   // (its own SuperdoughAudioController + repl) for preview on headphones.
@@ -840,6 +861,15 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     handlePreviewToggle,
     previewEngine: mixer,
     smoothTransitionManager: smoothTransitionManagerRef.current,
+    isRecording: audioRecorder.isRecording,
+    recordingElapsedSeconds: audioRecorder.elapsedSeconds,
+    handleRecordToggle: audioRecorder.handleRecordToggle,
+    exportBlob: audioRecorder.exportBlob,
+    clearExport: audioRecorder.clearExport,
+    isScreenRecording: screenRecorder.isScreenRecording,
+    screenRecordingElapsedSeconds: screenRecorder.screenRecordingElapsedSeconds,
+    handleScreenRecordToggle: screenRecorder.handleScreenRecordToggle,
+    isScreenRecordingSupported: screenRecorder.isScreenRecordingSupported,
   };
   
   return context;
