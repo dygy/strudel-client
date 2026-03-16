@@ -1,9 +1,15 @@
+import { useState, useRef, useEffect } from 'react';
 import PlayCircleIcon from '@heroicons/react/20/solid/PlayCircleIcon';
 import StopCircleIcon from '@heroicons/react/20/solid/StopCircleIcon';
-import { Bars3Icon } from '@heroicons/react/24/outline';
+import {
+  Bars3Icon,
+  ArrowPathIcon,
+  EyeIcon,
+  MicrophoneIcon,
+  VideoCameraIcon,
+} from '@heroicons/react/24/outline';
 import cx from '@src/cx';
-import { useSettings, setIsZen, setIsFileManagerOpen } from '../../settings';
-import { useTranslation } from '@src/i18n';
+import { useSettings, setIsFileManagerOpen } from '../../settings';
 import { AuthButton } from '../../components/auth/AuthButton';
 import { formatElapsedTime } from '../recording/formatUtils';
 import '../Repl.css';
@@ -37,184 +43,303 @@ interface HeaderProps {
   embedded?: boolean;
 }
 
-export function Header({ context, embedded = false }: HeaderProps) {
-  const { started, pending, isDirty, activeCode, handleTogglePlay, handleEvaluate, handleShuffle, handleShare, mixer, isPreviewing, handlePreviewToggle, isRecording, recordingElapsedSeconds, handleRecordToggle, isScreenRecording, screenRecordingElapsedSeconds, handleScreenRecordToggle, isScreenRecordingSupported } =
-    context;
-  const isEmbedded = typeof window !== 'undefined' && (embedded || window.location !== window.parent.location);
-  const { isZen, isButtonRowHidden, isCSSAnimationDisabled, fontFamily, isFileManagerOpen } = useSettings();
-  const { t } = useTranslation('common');
+/* ------------------------------------------------------------------ */
+/*  Reusable icon button with hover glow + scale                      */
+/* ------------------------------------------------------------------ */
+function IconBtn({
+  onClick,
+  title,
+  disabled,
+  active,
+  glow,
+  pulse,
+  className,
+  children,
+}: {
+  onClick?: () => void;
+  title: string;
+  disabled?: boolean;
+  active?: boolean;
+  glow?: 'blue' | 'red' | 'green' | 'orange';
+  pulse?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={disabled ? undefined : onClick}
+      title={title}
+      className={cx(
+        'relative w-7 h-7 flex items-center justify-center rounded-md',
+        'transition-all duration-200 ease-out select-none',
+        disabled
+          ? 'opacity-25 cursor-not-allowed'
+          : 'hover:bg-lineHighlight hover:scale-110 active:scale-90 cursor-pointer',
+        active && glow === 'blue' && 'bg-blue-500 bg-opacity-10 shadow-[0_0_10px_rgba(59,130,246,0.45)]',
+        active && glow === 'red' && 'bg-red-500 bg-opacity-10 shadow-[0_0_10px_rgba(239,68,68,0.45)]',
+        active && glow === 'green' && 'bg-green-500 bg-opacity-10 shadow-[0_0_10px_rgba(34,197,94,0.45)]',
+        active && glow === 'orange' && 'bg-orange-400 bg-opacity-10 shadow-[0_0_10px_rgba(251,146,60,0.45)]',
+        pulse && 'animate-pulse',
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  Recording popover (audio / screen)                                */
+/* ------------------------------------------------------------------ */
+function RecordPopover({
+  context,
+  open,
+  onClose,
+  anchorRef,
+}: {
+  context: ReplContext;
+  open: boolean;
+  onClose: () => void;
+  anchorRef: React.RefObject<HTMLButtonElement>;
+}) {
+  const popRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        popRef.current &&
+        !popRef.current.contains(e.target as Node) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(e.target as Node)
+      ) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open, onClose, anchorRef]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      ref={popRef}
+      className={cx(
+        'absolute right-0 top-full mt-2 z-[100]',
+        'min-w-[200px] rounded-lg overflow-hidden',
+        'bg-background border border-lineHighlight',
+        'shadow-[0_8px_32px_rgba(0,0,0,0.6)]',
+        'animate-[popoverIn_0.18s_ease-out]',
+      )}
+    >
+      {/* Audio recording */}
+      <button
+        onClick={() => {
+          context.handleRecordToggle?.();
+          if (!context.isRecording) onClose();
+        }}
+        disabled={context.isScreenRecording}
+        className={cx(
+          'w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground',
+          'transition-all duration-150',
+          context.isScreenRecording
+            ? 'opacity-30 cursor-not-allowed'
+            : 'hover:bg-lineHighlight cursor-pointer',
+          context.isRecording && 'bg-red-500 bg-opacity-10',
+        )}
+      >
+        <MicrophoneIcon className={cx('w-4 h-4', context.isRecording ? 'text-red-400' : 'text-foreground opacity-70')} />
+        <span className="flex-1 text-left">
+          {context.isRecording ? 'Stop Audio' : 'Record Audio'}
+        </span>
+        {context.isRecording && (
+          <span className="text-xs font-mono text-red-400 tabular-nums">
+            {formatElapsedTime(context.recordingElapsedSeconds ?? 0)}
+          </span>
+        )}
+      </button>
+
+      {/* Divider */}
+      <div className="h-px bg-lineHighlight mx-3" />
+
+      {/* Screen recording */}
+      <button
+        onClick={() => {
+          context.handleScreenRecordToggle?.();
+          if (!context.isScreenRecording) onClose();
+        }}
+        disabled={context.isRecording || !context.isScreenRecordingSupported}
+        className={cx(
+          'w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground',
+          'transition-all duration-150',
+          context.isRecording || !context.isScreenRecordingSupported
+            ? 'opacity-30 cursor-not-allowed'
+            : 'hover:bg-lineHighlight cursor-pointer',
+          context.isScreenRecording && 'bg-red-500 bg-opacity-10',
+        )}
+      >
+        <VideoCameraIcon
+          className={cx('w-4 h-4', context.isScreenRecording ? 'text-red-400' : 'text-foreground opacity-70')}
+        />
+        <span className="flex-1 text-left">
+          {context.isScreenRecording ? 'Stop Screen' : 'Record Screen'}
+        </span>
+        {context.isScreenRecording && (
+          <span className="text-xs font-mono text-red-400 tabular-nums">
+            {formatElapsedTime(context.screenRecordingElapsedSeconds ?? 0)}
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+
+/* ------------------------------------------------------------------ */
+/*  Main Header                                                       */
+/* ------------------------------------------------------------------ */
+export function Header({ context, embedded }: HeaderProps) {
+  const { isZen, isFileManagerOpen } = useSettings();
+  const [recordPopoverOpen, setRecordPopoverOpen] = useState(false);
+  const recordBtnRef = useRef<HTMLButtonElement>(null);
+
+  const isAnyRecording = context.isRecording || context.isScreenRecording;
+  const recordingSeconds = context.isRecording
+    ? context.recordingElapsedSeconds ?? 0
+    : context.screenRecordingElapsedSeconds ?? 0;
+
+  useEffect(() => {
+    if (!isAnyRecording) setRecordPopoverOpen(false);
+  }, [isAnyRecording]);
+
+  if (isZen) return null;
 
   return (
     <header
-      id="header"
       className={cx(
-        'flex-none text-black  z-[100] text-lg select-none h-20 md:h-14',
-        !isZen && !isEmbedded && 'bg-lineHighlight',
-        isZen ? 'h-12 w-8 fixed top-0 left-0' : 'sticky top-0 w-full py-1 justify-between',
-        isEmbedded ? 'flex' : 'md:flex',
+        'relative z-20 flex items-center h-10 px-3 select-none',
+        'bg-background border-b border-lineHighlight',
+        'transition-all duration-300',
       )}
-      style={{ fontFamily }}
     >
-        <div className="px-4 flex space-x-2 md:pt-0 select-none">
-          <h1
-            dir="ltr"
-            onClick={() => {
-              if (isEmbedded) window.open(window.location.href.replace('embed', ''));
-            }}
+      {/* ---- LEFT SIDE ---- */}
+      <div className="flex items-center gap-2 min-w-0">
+        {/* Logo spinner */}
+        <a
+          href={`${baseNoTrailing}/`}
+          title="Strudel home"
+          className={cx(
+            'text-lg leading-none text-foreground transition-transform duration-500 hover:rotate-[360deg]',
+            context.pending && 'animate-spin',
+          )}
+        >
+          ꩜
+        </a>
+
+        {/* Brand */}
+        <a
+          href={`${baseNoTrailing}/`}
+          className="text-sm font-medium text-foreground opacity-80 hover:opacity-100 transition-opacity duration-200 hidden sm:inline"
+        >
+          strudel
+        </a>
+        <span className="text-[10px] text-foreground opacity-30 hidden sm:inline">by Dygy</span>
+
+        {/* Files toggle */}
+        <IconBtn
+          onClick={() => setIsFileManagerOpen(!isFileManagerOpen)}
+          title={isFileManagerOpen ? 'Hide files' : 'Show files'}
+          active={isFileManagerOpen}
+          glow="blue"
+        >
+          <Bars3Icon className="w-4 h-4 text-foreground opacity-70" />
+        </IconBtn>
+      </div>
+
+      {/* ---- SPACER ---- */}
+      <div className="flex-1" />
+
+      {/* ---- RIGHT SIDE (macOS menu bar style) ---- */}
+      <div className="flex items-center gap-1">
+        {/* Play / Stop */}
+        <IconBtn
+          onClick={() => context.handleTogglePlay()}
+          title={context.started ? 'Stop (Ctrl+P)' : 'Play (Ctrl+P)'}
+          active={context.started}
+          glow={context.started ? 'green' : undefined}
+        >
+          {context.started ? (
+            <StopCircleIcon className="w-4 h-4 text-foreground" />
+          ) : (
+            <PlayCircleIcon className="w-4 h-4 text-foreground" />
+          )}
+        </IconBtn>
+
+        {/* Update / Evaluate */}
+        <IconBtn
+          onClick={() => context.handleEvaluate()}
+          title="Update (Ctrl+U)"
+          active={context.isDirty}
+          glow={context.isDirty ? 'orange' : undefined}
+        >
+          <ArrowPathIcon className="w-4 h-4 text-foreground opacity-70" />
+        </IconBtn>
+
+        {/* Preview (headphones) — only when mixer is available */}
+        {context.mixer && (
+          <IconBtn
+            onClick={() => context.handlePreviewToggle?.()}
+            title={context.isPreviewing ? 'Stop preview' : 'Preview on headphones'}
+            active={context.isPreviewing}
+            glow={context.isPreviewing ? 'blue' : undefined}
+          >
+            <EyeIcon className="w-4 h-4 text-foreground opacity-70" />
+          </IconBtn>
+        )}
+
+        {/* Record button with popover */}
+        <div className="relative">
+          <button
+            ref={recordBtnRef}
+            onClick={() => setRecordPopoverOpen((v) => !v)}
+            title="Recording options"
             className={cx(
-              isEmbedded ? 'text-l cursor-pointer' : 'text-xl',
-              'text-foreground font-bold flex space-x-2 items-center',
+              'relative flex items-center gap-1.5 h-7 rounded-md px-2',
+              'transition-all duration-200 ease-out select-none',
+              'hover:bg-lineHighlight hover:scale-105 active:scale-95 cursor-pointer',
+              isAnyRecording && 'bg-red-500 bg-opacity-10 shadow-[0_0_12px_rgba(239,68,68,0.35)]',
             )}
           >
-            <div
+            <span
               className={cx(
-                'mt-[1px]',
-                started && !isCSSAnimationDisabled && 'animate-spin',
-                'cursor-pointer text-blue-500',
-                isZen && 'fixed top-2 right-4',
+                'w-2 h-2 rounded-full transition-all duration-300',
+                isAnyRecording
+                  ? 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.8)] recording-pulse'
+                  : 'bg-foreground opacity-40',
               )}
-              onClick={() => {
-                if (!isEmbedded) {
-                  setIsZen(!isZen);
-                }
-              }}
-            >
-              <span className="block text-foreground rotate-90">꩜</span>
-            </div>
-            {!isZen && (
-              <div className="space-x-2">
-                <span className="">strudel</span>
-                <span className="text-sm font-medium">by Dygy</span>
-              </div>
+            />
+            {isAnyRecording && (
+              <span className="text-[11px] font-mono text-red-400 tabular-nums leading-none">
+                {formatElapsedTime(recordingSeconds)}
+              </span>
             )}
-          </h1>
+          </button>
+
+          <RecordPopover
+            context={context}
+            open={recordPopoverOpen}
+            onClose={() => setRecordPopoverOpen(false)}
+            anchorRef={recordBtnRef}
+          />
         </div>
-        
-        {/* Main controls and auth button container */}
-        <div className="flex items-center">
-          {!isZen && !isButtonRowHidden && (
-            <div className="flex max-w-full overflow-auto text-foreground px-1 md:px-2">
-              {!isEmbedded && (
-                <button
-                  onClick={() => setIsFileManagerOpen(!isFileManagerOpen)}
-                  title={t('toggleFileManager')}
-                  className={cx('p-2 hover:opacity-50 flex items-center space-x-1')}
-                >
-                  <Bars3Icon className="w-5 h-5" />
-                  <span>{t('files')}</span>
-                </button>
-              )}
-              <button
-                onClick={handleTogglePlay}
-                title={started ? t('stop') : t('play')}
-                className={cx(
-                  !isEmbedded ? 'p-2' : 'px-2',
-                  'hover:opacity-50',
-                  !started && !isCSSAnimationDisabled && 'animate-pulse',
-                )}
-              >
-                {!pending ? (
-                  <span className={cx('flex items-center space-x-2')}>
-                    {started ? <StopCircleIcon className="w-6 h-6" /> : <PlayCircleIcon className="w-6 h-6" />}
-                    {!isEmbedded && <span>{started ? t('stop') : t('play')}</span>}
-                  </span>
-                ) : (
-                  <>{t('loading')}</>
-                )}
-              </button>
-              <button
-                onClick={handleEvaluate}
-                title={t('update')}
-                className={cx(
-                  'flex items-center space-x-1',
-                  !isEmbedded ? 'p-2' : 'px-2',
-                  !isDirty || !activeCode ? 'opacity-50' : 'hover:opacity-50',
-                )}
-              >
-                {!isEmbedded && <span>{t('update')}</span>}
-              </button>
-              {mixer && mixer.isInitialized && handlePreviewToggle && (
-                <button
-                  onClick={handlePreviewToggle}
-                  title={isPreviewing ? t('stopPreview') : t('playPreview')}
-                  className={cx(
-                    'p-2 hover:opacity-50 flex items-center space-x-1',
-                    isPreviewing && 'bg-blue-500 bg-opacity-20'
-                  )}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M12 12h.01M9 9l-6 6M9 15l-6-6" />
-                  </svg>
-                  {!isEmbedded && <span>{isPreviewing ? t('stopPreview') : t('playPreview')}</span>}
-                </button>
-              )}
-              {!isEmbedded && handleRecordToggle && (
-                <button
-                  onClick={isScreenRecording ? undefined : handleRecordToggle}
-                  title={isScreenRecording ? 'Audio recording unavailable during screen recording' : isRecording ? t('stopRecording') : t('record')}
-                  className={cx(
-                    'p-2 flex items-center space-x-1',
-                    isScreenRecording ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-50',
-                    isRecording && 'bg-red-500 bg-opacity-20'
-                  )}
-                >
-                  <span
-                    className={cx(
-                      'block w-4 h-4 rounded-full',
-                      isRecording ? 'bg-red-500 recording-pulse' : 'bg-red-600'
-                    )}
-                  />
-                  {!isEmbedded && (
-                    <span>
-                      {isRecording
-                        ? formatElapsedTime(recordingElapsedSeconds ?? 0)
-                        : t('record')}
-                    </span>
-                  )}
-                </button>
-              )}
-              {!isEmbedded && !isZen && isScreenRecordingSupported && handleScreenRecordToggle && (
-                <button
-                  onClick={isRecording ? undefined : handleScreenRecordToggle}
-                  title={isRecording ? 'Screen recording unavailable during audio recording' : isScreenRecording ? 'Stop screen recording' : 'Screen record'}
-                  className={cx(
-                    'p-2 flex items-center space-x-1',
-                    isRecording ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-50',
-                    isScreenRecording && 'bg-red-500 bg-opacity-20'
-                  )}
-                >
-                  <svg
-                    className={cx('w-5 h-5', isScreenRecording && 'recording-pulse')}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9A2.25 2.25 0 0013.5 5.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"
-                    />
-                  </svg>
-                  {!isEmbedded && (
-                    <span>
-                      {isScreenRecording
-                        ? formatElapsedTime(screenRecordingElapsedSeconds ?? 0)
-                        : 'screen'}
-                    </span>
-                  )}
-                </button>
-              )}
-            </div>
-          )}
-          
-          {/* Auth Button - always visible when not embedded or zen mode */}
-          {!isZen && !isEmbedded && (
-            <div className="px-4">
-              <AuthButton />
-            </div>
-          )}
+
+        {/* Auth */}
+        <div className="ml-1">
+          <AuthButton className="!p-0" showProfile={true} />
         </div>
-      </header>
-    );
-  }
+      </div>
+    </header>
+  );
+}
