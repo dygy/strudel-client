@@ -13,7 +13,6 @@ import { userPattern } from '@src/user_pattern_utils';
 import { useTracks } from '@src/hooks/useTracks';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 import { GlobalToastContainer } from '@src/components/GlobalToastContainer';
-import { useTranslation } from '@src/i18n';
 import { nanoid } from 'nanoid';
 import { useState, useEffect, memo, useRef } from 'react';
 import { getPendingCode, clearPendingCode, getEditorInstance, setPendingCode } from '../../stores/editorStore';
@@ -54,7 +53,6 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
   const { containerRef, editorRef, error, init, pending } = context;
   const settings = useSettings();
   const { panelPosition, isZen, isFileManagerOpen } = settings;
-  const { t } = useTranslation(['files']);
 
   // Use the tracks store instead of complex state management
   const tracks = useTracks();
@@ -396,10 +394,18 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
       <Header context={context} />
       
       <div className="grow flex relative overflow-hidden">
-        {!isZen && isFileManagerOpen && (
-          <ResizableSidebar defaultWidth={300} minWidth={200} maxWidth={500}>
-            <FileManager context={context} fileManagerHook={fileManagerHook} readOnly={readOnly} />
-          </ResizableSidebar>
+        {!isZen && (
+          <div
+            className="flex-shrink-0 overflow-hidden"
+            style={{
+              maxWidth: isFileManagerOpen ? 500 : 0,
+              transition: 'max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            }}
+          >
+            <ResizableSidebar defaultWidth={300} minWidth={200} maxWidth={500}>
+              <FileManager context={context} fileManagerHook={fileManagerHook} readOnly={readOnly} />
+            </ResizableSidebar>
+          </div>
         )}
         {shouldShowWelcome ? (
           <WelcomeScreen

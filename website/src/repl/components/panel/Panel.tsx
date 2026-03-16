@@ -2,7 +2,6 @@ import cx from '@src/cx';
 import { setPanelPinned, setActiveFooter as setTab, setIsPanelOpened, useSettings } from '../../../settings';
 import { ConsoleTab } from './ConsoleTab';
 import { FilesTab } from './FilesTab';
-import { Reference } from './Reference';
 import { EnhancedReference } from './EnhancedReference';
 import { SettingsTab } from './SettingsTab';
 import { SoundsTab } from './SoundsTab';
@@ -66,7 +65,11 @@ export function HorizontalPanel({ context }: PanelProps) {
     <ToastContext.Provider value={toastActions}>
       <PanelNav
         settings={settings}
-        className={cx(isPanelOpen ? `min-h-[360px] max-h-[360px]` : 'min-h-12 max-h-12', 'overflow-hidden flex flex-col')}
+        className="overflow-hidden flex flex-col"
+        style={{
+          height: isPanelOpen ? 360 : 48,
+          transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
       >
         {isPanelOpen && (
           <div className="flex h-full overflow-auto pr-10 ">
@@ -147,10 +150,12 @@ export function VerticalPanel({ context }: PanelProps) {
       <PanelNav
         settings={settings}
         className={cx(
-          'relative',
-          isPanelOpen ? `flex-shrink-0` : 'min-w-12 max-w-12'
+          'relative flex-shrink-0 overflow-hidden',
         )}
-        style={isPanelOpen ? { width: `${width}px` } : undefined}
+        style={{
+          width: isPanelOpen ? width : 48,
+          transition: isResizing ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
         ref={panelRef}
       >
         {isPanelOpen ? (
@@ -183,11 +188,12 @@ export function VerticalPanel({ context }: PanelProps) {
             }}
             aria-label="open menu panel"
             className={cx(
-              'flex flex-col hover:bg-lineBackground items-center cursor-pointer justify-center w-full  h-full',
+              'flex flex-col hover:bg-lineBackground items-center cursor-pointer justify-center w-full h-full',
+              'transition-colors duration-200',
             )}
           >
             <ChevronLeftIcon className={cx(
-              'text-foreground opacity-50 w-6 h-6',
+              'text-foreground opacity-50 w-6 h-6 transition-transform duration-200 hover:scale-125',
               isRTL && 'rotate-180'
             )} />
           </button>
@@ -304,8 +310,11 @@ function PanelContent({ context, tab }: PanelContentProps) {
     <div className="w-full h-full">
       <div
         className={cx(
-          'w-full h-full transition-opacity duration-150 ease-out',
-          isTransitioning ? 'opacity-0' : 'opacity-100'
+          'w-full h-full',
+          'transition-[opacity,transform] duration-200 ease-out',
+          isTransitioning
+            ? 'opacity-0 translate-y-1'
+            : 'opacity-100 translate-y-0',
         )}
       >
         {renderTabContent(displayTab)}
@@ -322,17 +331,24 @@ interface PanelTabProps {
 
 function PanelTab({ label, isSelected, onClick }: PanelTabProps) {
   return (
-    <>
-      <button
-        onClick={onClick}
+    <button
+      onClick={onClick}
+      className={cx(
+        'relative h-8 px-2 text-foreground cursor-pointer flex items-center space-x-1',
+        'transition-all duration-200 ease-out',
+        isSelected ? 'opacity-100' : 'opacity-50 hover:opacity-75',
+      )}
+    >
+      {label}
+      {/* Animated underline */}
+      <span
         className={cx(
-          'h-8 px-2 text-foreground cursor-pointer hover:opacity-50 flex items-center space-x-1 border-b',
-          isSelected ? 'border-foreground' : 'border-transparent',
+          'absolute bottom-0 left-0 right-0 h-[2px] bg-foreground',
+          'transition-transform duration-200 ease-out origin-center',
+          isSelected ? 'scale-x-100' : 'scale-x-0',
         )}
-      >
-        {label}
-      </button>
-    </>
+      />
+    </button>
   );
 }
 

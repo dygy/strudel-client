@@ -12,7 +12,7 @@ export function WelcomeScreen({ onCreateTrack, onImportTracks }: WelcomeScreenPr
 
   return (
     <div className="flex-1 flex items-center justify-center bg-background">
-      <div className="text-center max-w-md mx-auto p-8">
+      <div className="text-center max-w-md mx-auto p-8 animate-[welcomeFadeUp_0.4s_ease-out]">
         {/* Strudel Logo/Icon */}
         <div className="mb-8">
           <div className="w-16 h-16 mx-auto mb-4 bg-purple-600 rounded-full flex items-center justify-center">
@@ -40,7 +40,7 @@ export function WelcomeScreen({ onCreateTrack, onImportTracks }: WelcomeScreenPr
         <div className="space-y-3">
           <button
             onClick={onCreateTrack}
-            className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
+            className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-purple-600 hover:bg-purple-700 hover:scale-[1.02] active:scale-[0.98] text-white rounded-lg transition-all duration-200 font-medium"
           >
             <PlusIcon className="w-5 h-5" />
             {t('welcome:fileManager.createNewTrack')}
@@ -48,7 +48,7 @@ export function WelcomeScreen({ onCreateTrack, onImportTracks }: WelcomeScreenPr
           
           <button
             onClick={onImportTracks}
-            className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-medium"
+            className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gray-700 hover:bg-gray-600 hover:scale-[1.02] active:scale-[0.98] text-white rounded-lg transition-all duration-200 font-medium"
           >
             <ArrowDownTrayIcon className="w-5 h-5" />
             {t('welcome:fileManager.importTracks')}
