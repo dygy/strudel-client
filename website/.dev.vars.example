@@ -1,0 +1,3 @@
+# Copy to .dev.vars for `wrangler dev` / `astro dev` against the Cloudflare
+# adapter. .dev.vars is git-ignored; never commit real keys.
+SUPABASE_SERVICE_ROLE_KEY=

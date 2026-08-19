@@ -1,17 +1,23 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
+import { serverEnv } from '../../../lib/server-env';
 
 export const prerender = false;
 
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase environment variables');
+// Cloudflare supplies vars and secrets per request rather than at build
+// time, so the client is created on first use instead of at module scope.
+let supabaseClient: ReturnType<typeof createClient> | undefined;
+function getSupabase() {
+  if (!supabaseClient) {
+    const { supabaseUrl, supabaseServiceKey: supabaseKey } = serverEnv();
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase environment variables');
+    }
+    supabaseClient = createClient(supabaseUrl, supabaseKey);
+  }
+  return supabaseClient;
 }
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -24,7 +30,7 @@ export const POST: APIRoute = async ({ request }) => {
     // Parse cookies manually
     const cookieObj: Record<string, string> = {};
     if (cookies) {
-      cookies.split(';').forEach(cookie => {
+      cookies.split(';').forEach((cookie) => {
         const [key, value] = cookie.trim().split('=');
         if (key && value) {
           cookieObj[key] = value;
@@ -46,20 +52,23 @@ export const POST: APIRoute = async ({ request }) => {
       console.log('API /library/batch-import - No access token found');
       return new Response(JSON.stringify({ error: 'Not authenticated' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     console.log('API /library/batch-import - Attempting to verify access token...');
 
     // Get user from access token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
+    const {
+      data: { user },
+      error: userError,
+    } = await getSupabase().auth.getUser(accessToken);
 
     if (userError || !user) {
       console.log('API /library/batch-import - User verification failed:', userError?.message);
       return new Response(JSON.stringify({ error: 'Invalid session' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
@@ -71,14 +80,14 @@ export const POST: APIRoute = async ({ request }) => {
 
     console.log('API /library/batch-import - Received data:', {
       tracksCount: tracks.length,
-      foldersCount: folders.length
+      foldersCount: folders.length,
     });
 
     // Validate input
     if (!Array.isArray(tracks) || !Array.isArray(folders)) {
       return new Response(JSON.stringify({ error: 'Invalid data format' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
@@ -86,29 +95,26 @@ export const POST: APIRoute = async ({ request }) => {
     const results = {
       tracksCreated: 0,
       foldersCreated: 0,
-      errors: []
+      errors: [],
     };
 
     try {
       // Create a mapping from old folder paths to new UUIDs
       const folderPathToUuidMap = new Map<string, string>();
-      
+
       // First, create all folders (they need to exist before tracks can reference them)
       if (folders.length > 0) {
         console.log('API /library/batch-import - Creating folders...');
-        
-        // Check for existing folders to avoid duplicates
-        const existingFolders = await supabase
-          .from('folders')
-          .select('id, path')
-          .eq('user_id', user.id);
 
-        const existingPaths = new Set(existingFolders.data?.map(f => f.path) || []);
-        
+        // Check for existing folders to avoid duplicates
+        const existingFolders = await getSupabase().from('folders').select('id, path').eq('user_id', user.id);
+
+        const existingPaths = new Set(existingFolders.data?.map((f) => f.path) || []);
+
         // Filter out folders that already exist
         const foldersToCreate = folders
-          .filter(folder => !existingPaths.has(folder.path))
-          .map(folder => {
+          .filter((folder) => !existingPaths.has(folder.path))
+          .map((folder) => {
             const newUuid = nanoid();
             folderPathToUuidMap.set(folder.path, newUuid);
             return {
@@ -117,17 +123,17 @@ export const POST: APIRoute = async ({ request }) => {
               path: folder.path,
               parent: folder.parent ? folderPathToUuidMap.get(folder.parent) || null : null,
               user_id: user.id,
-              created: new Date().toISOString()
+              created: new Date().toISOString(),
             };
           });
 
         // Also map existing folders
-        existingFolders.data?.forEach(folder => {
+        existingFolders.data?.forEach((folder) => {
           folderPathToUuidMap.set(folder.path, folder.id);
         });
 
         if (foldersToCreate.length > 0) {
-          const { data: createdFolders, error: foldersError } = await supabase
+          const { data: createdFolders, error: foldersError } = await getSupabase()
             .from('folders')
             .insert(foldersToCreate)
             .select();
@@ -145,46 +151,43 @@ export const POST: APIRoute = async ({ request }) => {
       // Then, create all tracks
       if (tracks.length > 0) {
         console.log('API /library/batch-import - Creating tracks...');
-        
+
         // Check for existing tracks to avoid duplicates
-        const existingTracks = await supabase
-          .from('tracks')
-          .select('name, folder')
-          .eq('user_id', user.id);
+        const existingTracks = await getSupabase().from('tracks').select('name, folder').eq('user_id', user.id);
 
         // Create a map of existing track names by folder for quick lookup
         const existingTracksByFolder = new Map<string, Set<string>>();
-        existingTracks.data?.forEach(track => {
+        existingTracks.data?.forEach((track) => {
           const folderKey = track.folder || 'root';
           if (!existingTracksByFolder.has(folderKey)) {
             existingTracksByFolder.set(folderKey, new Set());
           }
           existingTracksByFolder.get(folderKey)!.add(track.name.toLowerCase());
         });
-        
-        const tracksToCreate = tracks.map(track => {
+
+        const tracksToCreate = tracks.map((track) => {
           const folderKey = track.folder || 'root';
           const existingNames = existingTracksByFolder.get(folderKey) || new Set();
-          
+
           // Generate unique name if duplicate exists
           let uniqueName = track.name;
           let counter = 2;
-          
+
           while (existingNames.has(uniqueName.toLowerCase())) {
             uniqueName = `${track.name} ${counter}`;
             counter++;
           }
-          
+
           // Add the new name to the set to prevent duplicates within the batch
           existingNames.add(uniqueName.toLowerCase());
           if (!existingTracksByFolder.has(folderKey)) {
             existingTracksByFolder.set(folderKey, existingNames);
           }
-          
+
           if (uniqueName !== track.name) {
             console.log(`API /library/batch-import - Renamed duplicate track "${track.name}" to "${uniqueName}"`);
           }
-          
+
           return {
             id: nanoid(), // Always generate new UUID for each import
             user_id: user.id,
@@ -195,12 +198,12 @@ export const POST: APIRoute = async ({ request }) => {
             folder: track.folder || null, // Keep folder path as-is, don't convert to UUID
             is_multitrack: track.isMultitrack || false,
             steps: track.steps,
-            active_step: track.activeStep || 0
+            active_step: track.activeStep || 0,
           };
         });
 
         if (tracksToCreate.length > 0) {
-          const { data: createdTracks, error: tracksError } = await supabase
+          const { data: createdTracks, error: tracksError } = await getSupabase()
             .from('tracks')
             .insert(tracksToCreate)
             .select();
@@ -217,36 +220,40 @@ export const POST: APIRoute = async ({ request }) => {
 
       console.log('API /library/batch-import - Batch import completed:', results);
 
-      return new Response(JSON.stringify({
-        success: true,
-        results: {
-          tracksCreated: results.tracksCreated,
-          foldersCreated: results.foldersCreated,
-          totalCreated: results.tracksCreated + results.foldersCreated,
-          errors: results.errors
-        }
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
-
+      return new Response(
+        JSON.stringify({
+          success: true,
+          results: {
+            tracksCreated: results.tracksCreated,
+            foldersCreated: results.foldersCreated,
+            totalCreated: results.tracksCreated + results.foldersCreated,
+            errors: results.errors,
+          },
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
     } catch (batchError) {
       console.error('API /library/batch-import - Batch operation failed:', batchError);
-      return new Response(JSON.stringify({ 
-        error: 'Batch import failed',
-        details: batchError instanceof Error ? batchError.message : 'Unknown error',
-        results
-      }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return new Response(
+        JSON.stringify({
+          error: 'Batch import failed',
+          details: batchError instanceof Error ? batchError.message : 'Unknown error',
+          results,
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
     }
-
   } catch (error) {
     console.error('API /library/batch-import - Unexpected error:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
     });
   }
 };

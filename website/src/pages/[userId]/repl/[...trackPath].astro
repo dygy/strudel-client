@@ -10,6 +10,7 @@ import { parseTrackUrlPath, trackNameToSlug } from '../../../lib/slugUtils';
 import { isAdmin } from '../../../lib/adminAuth';
 
 import type { SSRData } from '../../../types/ssr';
+import { serverEnv } from '../../../lib/server-env';
 
 export const prerender = false; // Enable SSR for authenticated data
 
@@ -55,8 +56,8 @@ try {
     return Astro.redirect('/login');
   }
 
-  const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = serverEnv().supabaseUrl;
+  const supabaseServiceKey = serverEnv().supabaseServiceKey;
 
   if (!supabaseUrl || !supabaseServiceKey || supabaseUrl.includes('placeholder')) {
     console.error('Admin REPL SSR - Supabase not configured');

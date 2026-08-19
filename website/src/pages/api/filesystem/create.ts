@@ -1,16 +1,22 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
+import { serverEnv } from '../../../lib/server-env';
 
 export const prerender = false;
 
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase environment variables');
+// Cloudflare supplies vars and secrets per request rather than at build
+// time, so the client is created on first use instead of at module scope.
+let supabaseClient: ReturnType<typeof createClient> | undefined;
+function getSupabase() {
+  if (!supabaseClient) {
+    const { supabaseUrl, supabaseServiceKey: supabaseKey } = serverEnv();
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase environment variables');
+    }
+    supabaseClient = createClient(supabaseUrl, supabaseKey);
+  }
+  return supabaseClient;
 }
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // POST /api/filesystem/create - Create a new node (folder or track)
 export const POST: APIRoute = async ({ request }) => {
@@ -19,11 +25,11 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Get user from session
     const cookies = request.headers.get('cookie') || '';
-    
+
     // Parse cookies manually
     const cookieObj: Record<string, string> = {};
     if (cookies) {
-      cookies.split(';').forEach(cookie => {
+      cookies.split(';').forEach((cookie) => {
         const [key, value] = cookie.trim().split('=');
         if (key && value) {
           cookieObj[key] = value;
@@ -43,17 +49,20 @@ export const POST: APIRoute = async ({ request }) => {
     if (!accessToken) {
       return new Response(JSON.stringify({ error: 'Not authenticated' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     // Get user from access token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
+    const {
+      data: { user },
+      error: userError,
+    } = await getSupabase().auth.getUser(accessToken);
 
     if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Invalid session' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
@@ -64,14 +73,14 @@ export const POST: APIRoute = async ({ request }) => {
     if (!id || !name || !type) {
       return new Response(JSON.stringify({ error: 'Missing required fields: id, name, type' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     if (!['folder', 'track'].includes(type)) {
       return new Response(JSON.stringify({ error: 'Invalid type. Must be "folder" or "track"' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
@@ -85,7 +94,7 @@ export const POST: APIRoute = async ({ request }) => {
       type,
       parent_id: parentId || null,
       created: now,
-      modified: now
+      modified: now,
     };
 
     // Add track-specific fields
@@ -97,35 +106,33 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     // Insert the node
-    const { data: newNode, error } = await supabase
-      .from('file_system_nodes')
-      .insert(nodeData)
-      .select()
-      .single();
+    const { data: newNode, error } = await getSupabase().from('file_system_nodes').insert(nodeData).select().single();
 
     if (error) {
       console.error('Error creating node:', error);
       return new Response(JSON.stringify({ error: 'Failed to create node' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     console.log('Node created successfully:', newNode.id, newNode.name);
 
-    return new Response(JSON.stringify({
-      success: true,
-      node: newNode
-    }), {
-      status: 201,
-      headers: { 'Content-Type': 'application/json' }
-    });
-
+    return new Response(
+      JSON.stringify({
+        success: true,
+        node: newNode,
+      }),
+      {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
   } catch (error) {
     console.error('API /filesystem/create - Unexpected error:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
     });
   }
 };

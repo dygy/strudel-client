@@ -8,6 +8,7 @@ import { TreeDataTransformer } from '../../lib/TreeDataTransformer';
 import { parseTrackUrlPath, trackNameToSlug } from '../../lib/slugUtils';
 
 import type { SSRData } from '../../types/ssr';
+import { serverEnv } from '../../lib/server-env';
 
 export const prerender = false; // Enable SSR for authenticated data
 
@@ -51,8 +52,8 @@ try {
   if (accessToken) {
     console.log('REPL SSR - Access token found, fetching user data for track path:', { folderPath, trackSlug });
 
-    const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseUrl = serverEnv().supabaseUrl;
+    const supabaseServiceKey = serverEnv().supabaseServiceKey;
 
     if (supabaseUrl && supabaseServiceKey && !supabaseUrl.includes('placeholder')) {
       const supabase = createClient(supabaseUrl, supabaseServiceKey);

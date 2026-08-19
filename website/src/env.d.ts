@@ -11,6 +11,20 @@ interface ImportMetaEnv {
   readonly PUBLIC_SUPABASE_ANON_KEY: string;
 }
 
+// Cloudflare bindings, vars and secrets reach the app on `locals.runtime.env`.
+// See src/lib/server-env.ts.
+type CloudflareEnv = {
+  PUBLIC_SUPABASE_URL: string;
+  PUBLIC_SUPABASE_ANON_KEY: string;
+  SUPABASE_SERVICE_ROLE_KEY: string;
+};
+
+type CloudflareRuntime = import('@astrojs/cloudflare').Runtime<CloudflareEnv>;
+
+declare namespace App {
+  interface Locals extends CloudflareRuntime {}
+}
+
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }

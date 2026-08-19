@@ -1,56 +1,57 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
+import { serverEnv } from '../../../lib/server-env';
 
 export const prerender = false;
-
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const GET: APIRoute = async ({ url, cookies, redirect }) => {
   console.log('🔥 AUTH CALLBACK API STARTED 🔥');
   console.log('🔥 AUTH CALLBACK API STARTED 🔥');
   console.log('🔥 AUTH CALLBACK API STARTED 🔥');
-  
+
   try {
     // Debug environment variables
     console.log('🔧 Environment check:', {
-      supabaseUrl: supabaseUrl?.substring(0, 30) + '...',
-      hasServiceKey: !!supabaseServiceKey,
-      serviceKeyLength: supabaseServiceKey?.length
+      supabaseUrl: serverEnv().supabaseUrl?.substring(0, 30) + '...',
+      hasServiceKey: !!serverEnv().supabaseServiceKey,
+      serviceKeyLength: serverEnv().supabaseServiceKey?.length,
     });
 
     const code = url.searchParams.get('code');
     const error = url.searchParams.get('error');
     const allParams = Object.fromEntries(url.searchParams.entries());
-    
-    console.log('📥 Callback params:', { 
-      hasCode: !!code, 
+
+    console.log('📥 Callback params:', {
+      hasCode: !!code,
       codeLength: code?.length,
       hasError: !!error,
       errorMessage: error,
-      allParamsCount: Object.keys(allParams).length
+      allParamsCount: Object.keys(allParams).length,
     });
-    
+
     // TEMPORARY: Return debug info as JSON response to see what's happening
     if (url.searchParams.get('debug') === 'true') {
-      return new Response(JSON.stringify({
-        debug: 'Auth callback debug info',
-        supabaseUrl: supabaseUrl?.substring(0, 30) + '...',
-        hasServiceKey: !!supabaseServiceKey,
-        hasCode: !!code,
-        codeLength: code?.length,
-        allParams
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return new Response(
+        JSON.stringify({
+          debug: 'Auth callback debug info',
+          supabaseUrl: serverEnv().supabaseUrl?.substring(0, 30) + '...',
+          hasServiceKey: !!serverEnv().supabaseServiceKey,
+          hasCode: !!code,
+          codeLength: code?.length,
+          allParams,
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
     }
-    
-    console.log('Auth callback API - received params:', { 
-      code: !!code, 
-      error, 
+
+    console.log('Auth callback API - received params:', {
+      code: !!code,
+      error,
       allParams,
-      fullUrl: url.toString()
+      fullUrl: url.toString(),
     });
 
     if (error) {
@@ -62,7 +63,7 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
       console.error('No authorization code provided - this might be a direct access to callback URL');
       console.log('Full URL:', url.toString());
       console.log('All search params:', allParams);
-      
+
       // If no code and no error, this might be a direct access
       // Redirect to login with a specific error
       return redirect('/login?error=invalid_callback_access');
@@ -70,10 +71,10 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
 
     console.log('🔧 Creating Supabase client...');
     // Create Supabase client with service role key
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(serverEnv().supabaseUrl, serverEnv().supabaseServiceKey);
 
     console.log('🔄 Attempting to exchange code for session...');
-    console.log('🔄 Using Supabase URL:', supabaseUrl);
+    console.log('🔄 Using Supabase URL:', serverEnv().supabaseUrl);
     console.log('🔄 Code length:', code?.length);
 
     // Exchange the code for a session
@@ -85,14 +86,14 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
       hasUser: !!data?.session?.user,
       errorMessage: exchangeError?.message,
       errorStatus: exchangeError?.status,
-      fullError: exchangeError
+      fullError: exchangeError,
     });
 
     if (exchangeError) {
       console.error('Error exchanging code for session:', {
         message: exchangeError.message,
         status: exchangeError.status,
-        details: exchangeError
+        details: exchangeError,
       });
       return redirect(`/login?error=${encodeURIComponent(exchangeError.message)}`);
     }
@@ -115,7 +116,7 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
       secure: isProduction, // Only secure in production (HTTPS)
       sameSite: 'lax',
       maxAge,
-      path: '/'
+      path: '/',
     });
 
     cookies.set('sb-refresh-token', data.session.refresh_token, {
@@ -123,7 +124,7 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
       secure: isProduction, // Only secure in production (HTTPS)
       sameSite: 'lax',
       maxAge,
-      path: '/'
+      path: '/',
     });
 
     // Store user info in a readable cookie for client-side use
@@ -131,7 +132,7 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
       id: data.session.user.id,
       email: data.session.user.email,
       name: (data.session.user as any).user_metadata?.full_name || data.session.user.email,
-      avatar: (data.session.user as any).user_metadata?.avatar_url
+      avatar: (data.session.user as any).user_metadata?.avatar_url,
     };
 
     cookies.set('sb-user', JSON.stringify(userInfo), {
@@ -139,7 +140,7 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
       secure: isProduction, // Only secure in production (HTTPS)
       sameSite: 'lax',
       maxAge,
-      path: '/'
+      path: '/',
     });
 
     console.log('Auth callback API - cookies set successfully');
@@ -148,7 +149,7 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
     // Check if there's a track parameter to redirect to
     const trackParam = url.searchParams.get('state');
     let redirectUrl = '/repl';
-    
+
     if (trackParam) {
       try {
         // The state parameter might contain the original URL
@@ -165,7 +166,6 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
 
     // Redirect to the main app
     return redirect(redirectUrl);
-
   } catch (error) {
     console.error('Auth callback API error:', error);
     return redirect('/login?error=callback_error');

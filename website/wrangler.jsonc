@@ -1,0 +1,25 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "strudel-client",
+  "account_id": "503e92d7d95838d80c33802d3274f284",
+  "main": "./dist/_worker.js/index.js",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  // dygy.app is served by Cloudflare nameservers, so the Worker can own this
+  // hostname directly. Cloudflare creates and manages the DNS record for it.
+  "routes": [{ "pattern": "strudel.dygy.app", "custom_domain": true }],
+  // Public values only. SUPABASE_SERVICE_ROLE_KEY is a secret:
+  //   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+  // and locally it comes from .dev.vars (git-ignored).
+  "vars": {
+    "PUBLIC_SUPABASE_URL": "https://iarlunyimplczudavrcl.supabase.co",
+    "PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlhcmx1bnlpbXBsY3p1ZGF2cmNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyODczMzksImV4cCI6MjA4Mjg2MzMzOX0.px2ShuMyEogGaoUrRKWupogB1D0Ra2gPF4wNMCGV63w",
+  },
+}

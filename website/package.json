@@ -13,6 +13,7 @@
   "dependencies": {
     "@algolia/client-search": "^5.20.0",
     "@astro-community/astro-embed-youtube": "^0.5.6",
+    "@astrojs/cloudflare": "^12.6.13",
     "@astrojs/mdx": "^4.0.7",
     "@astrojs/node": "^9.5.1",
     "@astrojs/react": "^4.1.6",
@@ -56,7 +57,7 @@
     "@types/node": "^22.10.10",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
-    "astro": "^5.1.9",
+    "astro": "^5.18.2",
     "claviature": "^0.1.0",
     "date-fns": "^4.1.0",
     "hs2js": "0.1.0",
@@ -87,6 +88,7 @@
     "sharp": "^0.33.5",
     "typescript": "^5.7.3",
     "vite-plugin-bundle-audioworklet": "^0.1.1",
-    "workbox-window": "^7.3.0"
+    "workbox-window": "^7.3.0",
+    "wrangler": "^4.59.2"
   }
 }

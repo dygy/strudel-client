@@ -1,30 +1,37 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
+import { TreeManager } from '../../../lib/TreeManager';
+import { serverEnv } from '../../../lib/server-env';
 
 export const prerender = false;
 
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase environment variables');
+// Cloudflare supplies vars and secrets per request rather than at build
+// time, so the client is created on first use instead of at module scope.
+let supabaseClient: ReturnType<typeof createClient> | undefined;
+function getSupabase() {
+  if (!supabaseClient) {
+    const { supabaseUrl, supabaseServiceKey: supabaseKey } = serverEnv();
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase environment variables');
+    }
+    supabaseClient = createClient(supabaseUrl, supabaseKey);
+  }
+  return supabaseClient;
 }
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
  * Get authenticated user from request
  */
 async function getAuthenticatedUser(request: Request) {
   const cookies = request.headers.get('cookie') || '';
-  
+
   if (!cookies) {
     throw new Error('No authentication cookies found');
   }
 
   // Parse cookies to get Supabase session tokens
   const cookieMap = new Map();
-  cookies.split(';').forEach(cookie => {
+  cookies.split(';').forEach((cookie) => {
     const [key, value] = cookie.trim().split('=');
     if (key && value) {
       cookieMap.set(key, decodeURIComponent(value));
@@ -48,8 +55,11 @@ async function getAuthenticatedUser(request: Request) {
   }
 
   // Create anon client for token verification
-  const supabaseAnon = createClient(supabaseUrl, import.meta.env.PUBLIC_SUPABASE_ANON_KEY);
-  const { data: { user }, error } = await supabaseAnon.auth.getUser(accessToken);
+  const supabaseAnon = createClient(serverEnv().supabaseUrl, serverEnv().supabaseAnonKey);
+  const {
+    data: { user },
+    error,
+  } = await supabaseAnon.auth.getUser(accessToken);
 
   if (error || !user) {
     throw new Error('Invalid session');
@@ -62,9 +72,7 @@ async function getAuthenticatedUser(request: Request) {
  * Create TreeManager instance for user
  */
 function createTreeManager(userId: string) {
-  // Import TreeManager dynamically to avoid issues
-  const { TreeManager } = require('../../../lib/TreeManager');
-  return new TreeManager(supabase, userId);
+  return new TreeManager(getSupabase(), userId);
 }
 
 // GET /api/tree/validate - Validate tree integrity
@@ -77,30 +85,35 @@ export const GET: APIRoute = async ({ request }) => {
     const cycles = await treeManager.detectCycles();
     const orphans = await treeManager.findOrphans();
 
-    return new Response(JSON.stringify({
-      success: true,
-      validation: {
-        ...validation,
-        cycles,
-        orphans: orphans.map(node => ({
-          ...node,
-          path: treeManager.getPath(node.id)
-        }))
-      }
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-
+    return new Response(
+      JSON.stringify({
+        success: true,
+        validation: {
+          ...validation,
+          cycles,
+          orphans: orphans.map((node) => ({
+            ...node,
+            path: treeManager.getPath(node.id),
+          })),
+        },
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
   } catch (error) {
     console.error('Tree validation error:', error);
 
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message || 'Validation failed'
-    }), {
-      status: error.message?.includes('authorization') ? 401 : 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || 'Validation failed',
+      }),
+      {
+        status: error.message?.includes('authorization') ? 401 : 500,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
   }
 };
