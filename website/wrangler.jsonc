@@ -20,6 +20,6 @@
   // and locally it comes from .dev.vars (git-ignored).
   "vars": {
     "PUBLIC_SUPABASE_URL": "https://iarlunyimplczudavrcl.supabase.co",
-    "PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlhcmx1bnlpbXBsY3p1ZGF2cmNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcyODczMzksImV4cCI6MjA4Mjg2MzMzOX0.px2ShuMyEogGaoUrRKWupogB1D0Ra2gPF4wNMCGV63w",
+    "PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_TrzPO2LYvui4ipk9IKWiaQ_gsdZXQKX",
   },
 }
