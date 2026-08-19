@@ -63,17 +63,17 @@ export default defineConfig({
     react(),
     mdx(options),
     tailwind(),
-    // PWA disabled for Heroku builds to reduce complexity
+    // PWA disabled for the plain static build
   ],
   site,
   base,
   vite: {
     plugins: [bundleAudioWorkletPlugin()],
     define: {
-      'import.meta.env.MODE': JSON.stringify('heroku')
+      'import.meta.env.MODE': JSON.stringify('static')
     },
     build: {
-      // Optimize for Heroku build constraints
+      // Keep the static build lean
       chunkSizeWarningLimit: 2000,
       minify: 'esbuild',
       target: 'es2020',

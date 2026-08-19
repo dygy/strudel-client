@@ -6,7 +6,7 @@ import rehypeSlug from 'rehype-slug';
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import rehypeUrls from 'rehype-urls';
 import bundleAudioWorkletPlugin from 'vite-plugin-bundle-audioworklet';
-import node from '@astrojs/node';
+import cloudflare from '@astrojs/cloudflare';
 import tailwind from '@astrojs/tailwind';
 
 const site = `https://strudel.cc/`; // root url without a path
@@ -56,29 +56,45 @@ const options = {
   rehypePlugins: [rehypeSlug, [rehypeAutolinkHeadings, { behavior: 'append' }], relativeURLFix],
 };
 
+// Cloudflare Workers build. Run it with:
+//   astro build --config astro.config.cloudflare.mjs
 // https://astro.build/config
 export default defineConfig({
-  output: 'server',
-  adapter: node({
-    mode: 'standalone'
+  // Static by default, on-demand only where a route declares
+  // `export const prerender = false` (the API routes, /admin and the two /repl
+  // pages). Rendering the 55 MDX doc pages at build time instead of per request
+  // keeps MiniRepl/csound out of the Worker bundle, which the 3 MiB free-plan
+  // script limit does not have room for.
+  output: 'static',
+  adapter: cloudflare({
+    // The site renders no <Image />, so skip the image endpoint entirely
+    // rather than shipping sharp (unavailable in workerd) to the Worker.
+    imageService: 'passthrough',
   }),
   integrations: [
     react(),
     mdx(options),
     tailwind(),
-    // PWA completely disabled for Heroku
+    // PWA is disabled here, matching the previous Heroku build.
   ],
   site,
   base,
   vite: {
     plugins: [bundleAudioWorkletPlugin()],
+    worker: {
+      // mp3Worker/prettierWorker are instantiated with `{ type: 'module' }`, and
+      // their bundles code-split. Rollup rejects the Vite default of 'iife' for
+      // split output, so build them as ES modules.
+      format: 'es',
+    },
     define: {
-      'import.meta.env.MODE': JSON.stringify('heroku')
+      'import.meta.env.MODE': JSON.stringify('cloudflare')
     },
     build: {
-      // Ultra-simplified build config for Heroku
-      chunkSizeWarningLimit: 10000, // Increase warning limit to reduce warnings
-      minify: false, // Disable minification to speed up build
+      chunkSizeWarningLimit: 10000,
+      // Workers cap the compressed script at 3 MB (free) / 10 MB (paid), so the
+      // server bundle is minified here even though the Heroku build was not.
+      minify: 'esbuild',
       target: 'es2020',
       sourcemap: false, // Disable source maps to save memory
       rollupOptions: {
@@ -86,17 +102,8 @@ export default defineConfig({
         output: {}
       }
     },
-    ssr: {
-      // Force problematic packages to be external to reduce build complexity
-      external: [
-        'jszip',
-        '@strudel/csound',
-        '@strudel/soundfonts',
-        '@strudel/hydra',
-        '@strudel/motion',
-        '@strudel/gamepad',
-        '@strudel/desktopbridge'
-      ],
-    },
+    // No `ssr.external` here: unlike Node on Heroku, the Worker has no
+    // node_modules to resolve from at runtime, so anything reachable from the
+    // server entry has to be bundled in.
   },
 });

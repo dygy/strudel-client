@@ -2,11 +2,9 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
 import { getAuthenticatedUser } from '../_auth';
+import { serverEnv } from '../../../lib/server-env';
 
 export const prerender = false;
-
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -19,23 +17,23 @@ export const POST: APIRoute = async ({ request }) => {
     if (!name) {
       return new Response(JSON.stringify({ error: 'Track name is required' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     const trimmedName = name.trim();
-    
+
     if (!trimmedName) {
       return new Response(JSON.stringify({ error: 'Track name cannot be empty' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     console.log('API /tracks/create - creating track for user:', user.id, { name: trimmedName, folder, isMultitrack });
 
     // Create the track directly using Supabase service role client
-    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseService = createClient(serverEnv().supabaseUrl, serverEnv().supabaseServiceKey);
 
     // Check if a track with the same name already exists in the same folder
     const { data: existingTracks, error: checkError } = await supabaseService
@@ -53,12 +51,15 @@ export const POST: APIRoute = async ({ request }) => {
     if (existingTracks && existingTracks.length > 0) {
       const folderName = folder || 'root folder';
       console.log('API /tracks/create - duplicate track name found:', trimmedName, 'in folder:', folderName);
-      return new Response(JSON.stringify({ 
-        error: `A track named "${trimmedName}" already exists in ${folderName}` 
-      }), {
-        status: 409, // Conflict status code
-        headers: { 'Content-Type': 'application/json' }
-      });
+      return new Response(
+        JSON.stringify({
+          error: `A track named "${trimmedName}" already exists in ${folderName}`,
+        }),
+        {
+          status: 409, // Conflict status code
+          headers: { 'Content-Type': 'application/json' },
+        },
+      );
     }
 
     // Create the track with service role (bypasses RLS)
@@ -75,26 +76,25 @@ export const POST: APIRoute = async ({ request }) => {
       modified: new Date().toISOString(),
     };
 
-    const { data: newTrack, error } = await supabaseService
-      .from('tracks')
-      .insert(trackData)
-      .select()
-      .single();
+    const { data: newTrack, error } = await supabaseService.from('tracks').insert(trackData).select().single();
 
     if (error) {
       console.error('API /tracks/create - database error:', error);
-      
+
       // Check if it's a unique constraint violation
       if (error.code === '23505' && error.message?.includes('unique_track_name_per_folder')) {
         const folderName = folder || 'root folder';
-        return new Response(JSON.stringify({ 
-          error: `A track named "${trimmedName}" already exists in ${folderName}` 
-        }), {
-          status: 409,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return new Response(
+          JSON.stringify({
+            error: `A track named "${trimmedName}" already exists in ${folderName}`,
+          }),
+          {
+            status: 409,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        );
       }
-      
+
       throw error;
     }
 
@@ -118,24 +118,29 @@ export const POST: APIRoute = async ({ request }) => {
       user_id: newTrack.user_id,
     };
 
-    return new Response(JSON.stringify({ 
-      success: true,
-      track: responseTrack 
-    }), {
-      status: 201,
-      headers: { 'Content-Type': 'application/json' }
-    });
-
+    return new Response(
+      JSON.stringify({
+        success: true,
+        track: responseTrack,
+      }),
+      {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
   } catch (error) {
     console.error('API /tracks/create error:', error);
-    
+
     const status = error.message?.includes('Authentication') || error.message?.includes('token') ? 401 : 500;
-    
-    return new Response(JSON.stringify({ 
-      error: error.message || 'Internal server error' 
-    }), {
-      status,
-      headers: { 'Content-Type': 'application/json' }
-    });
+
+    return new Response(
+      JSON.stringify({
+        error: error.message || 'Internal server error',
+      }),
+      {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
   }
 };

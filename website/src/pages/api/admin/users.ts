@@ -1,11 +1,9 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { isAdmin } from '../../../lib/adminAuth';
+import { serverEnv } from '../../../lib/server-env';
 
 export const prerender = false;
-
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export const GET: APIRoute = async ({ cookies, request }) => {
   try {
@@ -15,7 +13,7 @@ export const GET: APIRoute = async ({ cookies, request }) => {
     if (!accessToken) {
       const cookieHeader = request.headers.get('cookie') || '';
       const cookieMap = new Map();
-      cookieHeader.split(';').forEach(cookie => {
+      cookieHeader.split(';').forEach((cookie) => {
         const [key, value] = cookie.trim().split('=');
         if (key && value) {
           cookieMap.set(key, decodeURIComponent(value));
@@ -27,11 +25,11 @@ export const GET: APIRoute = async ({ cookies, request }) => {
     if (!accessToken) {
       return new Response(JSON.stringify({ error: 'Not authenticated' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    const supabase = createClient(serverEnv().supabaseUrl, serverEnv().supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -39,19 +37,22 @@ export const GET: APIRoute = async ({ cookies, request }) => {
     });
 
     // Verify the user token and check admin status
-    const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(accessToken);
 
     if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     if (!isAdmin(user.email)) {
       return new Response(JSON.stringify({ error: 'Unauthorized - admin access required' }), {
         status: 403,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
@@ -70,16 +71,14 @@ export const GET: APIRoute = async ({ cookies, request }) => {
       console.error('Error fetching users:', usersError);
       return new Response(JSON.stringify({ error: 'Failed to fetch users' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     const allUsers = allUsersData?.users || [];
 
     // Get all tracks to calculate counts per user
-    const { data: trackStats, error: statsError } = await supabase
-      .from('tracks')
-      .select('user_id, modified');
+    const { data: trackStats, error: statsError } = await supabase.from('tracks').select('user_id, modified');
 
     if (statsError) {
       console.error('Error fetching track stats:', statsError);
@@ -151,25 +150,27 @@ export const GET: APIRoute = async ({ cookies, request }) => {
     const totalPages = Math.ceil(total / limit);
     const paginatedUsers = usersWithEmail.slice(offset, offset + limit);
 
-    return new Response(JSON.stringify({
-      users: paginatedUsers,
-      total,
-      page,
-      limit,
-      totalPages,
-    }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache'
-      }
-    });
-
+    return new Response(
+      JSON.stringify({
+        users: paginatedUsers,
+        total,
+        page,
+        limit,
+        totalPages,
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+      },
+    );
   } catch (error) {
     console.error('Admin users API error:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
     });
   }
 };

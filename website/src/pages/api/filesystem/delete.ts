@@ -1,16 +1,22 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
+import { serverEnv } from '../../../lib/server-env';
 
 export const prerender = false;
 
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase environment variables');
+// Cloudflare supplies vars and secrets per request rather than at build
+// time, so the client is created on first use instead of at module scope.
+let supabaseClient: ReturnType<typeof createClient> | undefined;
+function getSupabase() {
+  if (!supabaseClient) {
+    const { supabaseUrl, supabaseServiceKey: supabaseKey } = serverEnv();
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase environment variables');
+    }
+    supabaseClient = createClient(supabaseUrl, supabaseKey);
+  }
+  return supabaseClient;
 }
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // DELETE /api/filesystem/delete - Delete a node and all its children (cascade)
 export const DELETE: APIRoute = async ({ request }) => {
@@ -19,11 +25,11 @@ export const DELETE: APIRoute = async ({ request }) => {
 
     // Get user from session
     const cookies = request.headers.get('cookie') || '';
-    
+
     // Parse cookies manually
     const cookieObj: Record<string, string> = {};
     if (cookies) {
-      cookies.split(';').forEach(cookie => {
+      cookies.split(';').forEach((cookie) => {
         const [key, value] = cookie.trim().split('=');
         if (key && value) {
           cookieObj[key] = value;
@@ -43,17 +49,20 @@ export const DELETE: APIRoute = async ({ request }) => {
     if (!accessToken) {
       return new Response(JSON.stringify({ error: 'Not authenticated' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     // Get user from access token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
+    const {
+      data: { user },
+      error: userError,
+    } = await getSupabase().auth.getUser(accessToken);
 
     if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Invalid session' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
@@ -64,12 +73,12 @@ export const DELETE: APIRoute = async ({ request }) => {
     if (!id) {
       return new Response(JSON.stringify({ error: 'Missing required field: id' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     // First, get the node to verify ownership and get info for response
-    const { data: nodeToDelete, error: fetchError } = await supabase
+    const { data: nodeToDelete, error: fetchError } = await getSupabase()
       .from('file_system_nodes')
       .select('*')
       .eq('id', id)
@@ -79,12 +88,12 @@ export const DELETE: APIRoute = async ({ request }) => {
     if (fetchError || !nodeToDelete) {
       return new Response(JSON.stringify({ error: 'Node not found or access denied' }), {
         status: 404,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     // Delete the node (cascade will handle children due to foreign key constraint)
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await getSupabase()
       .from('file_system_nodes')
       .delete()
       .eq('id', id)
@@ -94,29 +103,31 @@ export const DELETE: APIRoute = async ({ request }) => {
       console.error('Error deleting node:', deleteError);
       return new Response(JSON.stringify({ error: 'Failed to delete node' }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     console.log('Node deleted successfully:', nodeToDelete.id, nodeToDelete.name);
 
-    return new Response(JSON.stringify({
-      success: true,
-      deletedNode: {
-        id: nodeToDelete.id,
-        name: nodeToDelete.name,
-        type: nodeToDelete.type
-      }
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-
+    return new Response(
+      JSON.stringify({
+        success: true,
+        deletedNode: {
+          id: nodeToDelete.id,
+          name: nodeToDelete.name,
+          type: nodeToDelete.type,
+        },
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      },
+    );
   } catch (error) {
     console.error('API /filesystem/delete - Unexpected error:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
     });
   }
 };

@@ -5,6 +5,7 @@ import HeadCommon from '../components/HeadCommon.astro';
 import { AdminDashboard } from '../components/admin/AdminDashboard';
 import { createClient } from '@supabase/supabase-js';
 import { isAdmin } from '../lib/adminAuth';
+import { serverEnv } from '../lib/server-env';
 
 export const prerender = false; // Enable SSR
 
@@ -16,8 +17,8 @@ if (!accessToken) {
   return Astro.redirect('/login');
 }
 
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = serverEnv().supabaseUrl;
+const supabaseServiceKey = serverEnv().supabaseServiceKey;
 
 if (!supabaseUrl || !supabaseServiceKey || supabaseUrl.includes('placeholder')) {
   console.error('Admin page - Supabase not configured');

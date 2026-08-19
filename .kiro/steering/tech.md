@@ -57,10 +57,28 @@ pnpm --filter @strudel/core build  # Build specific package
 ```
 
 ### Deployment
+The site runs on Cloudflare Workers (Astro SSR via `@astrojs/cloudflare`,
+static assets served from the same Worker).
+
 ```bash
-npm run deploy:heroku:prod  # Deploy to Heroku production
-npm run deploy:heroku       # Deploy to Heroku staging
+npm run build:cloudflare    # Build with astro.config.cloudflare.mjs
+npm run deploy:cloudflare   # Build + wrangler deploy
+npm run dev:cloudflare      # astro dev against the Cloudflare adapter
+npm run preview:cloudflare  # wrangler dev (workerd, real bindings)
+npm run deploy:cloudflare:logs  # wrangler tail
 ```
+
+Config lives in `website/wrangler.jsonc`. Public values are `vars` there;
+`SUPABASE_SERVICE_ROLE_KEY` is a Worker secret:
+
+```bash
+cd website && npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+```
+
+Locally that secret comes from `website/.dev.vars` (git-ignored, see
+`.dev.vars.example`). Server code reads env through `src/lib/server-env.ts`
+rather than `import.meta.env`, because Cloudflare supplies vars and secrets
+per request instead of at build time.
 
 ## Package Development
 - All `@strudel/*` packages use `workspace:*` dependencies
