@@ -25,6 +25,18 @@ const baseNoTrailing = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL
 <!-- Scrollable a11y code helper -->
 <script src={`${baseNoTrailing}/make-scrollable-code-focusable.js`} is:inline></script>
 
+<!-- Weaver analytics tracker -->
+<script is:inline>
+  window.WEAVER_CONFIG = { apiKey: 'b1404fccab7f1cdc34b45a5d6be26af9289624b3f2e7cac040af48e3cc45c38b' };
+</script>
+<script
+  src="https://d1e87nhhrakq25.cloudfront.net/tracker.min.js"
+  data-no-minify="1"
+  async
+  crossorigin="anonymous"
+  is:inline
+></script>
+
 
 <!-- this does not work for some reason: -->
 <!-- <style is:global define:vars={strudelTheme}></style> -->
