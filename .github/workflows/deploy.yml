@@ -1,0 +1,71 @@
+name: CI / Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Never let two deploys of main race each other.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Advisory only. format-check, lint and test all fail on code that predates
+  # this workflow (228 unformatted files, 29 lint errors, 20 failing tests), so
+  # every step is continue-on-error and the deploy below does NOT wait on them.
+  # Once a category is clean, drop its continue-on-error and add this job to
+  # the deploy job's `needs:` so it starts gating.
+  check:
+    name: Format, lint, test (advisory)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run format-check
+        continue-on-error: true
+
+      - run: pnpm run lint
+        continue-on-error: true
+
+      - run: pnpm run test
+        continue-on-error: true
+
+  deploy:
+    name: Build and deploy to Cloudflare
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run build:cloudflare
+
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: website
+          command: deploy
