@@ -4,6 +4,8 @@
  * Handles saving and loading equalizer settings to/from localStorage.
  */
 
+import { EQUALIZER_PRESETS } from './presets';
+
 const STORAGE_KEY = 'strudel-equalizer-settings';
 
 /**
@@ -60,11 +62,33 @@ export function loadEqualizerSettings(): EqualizerSettings | null {
       return null;
     }
 
-    return settings;
+    // Validate every band: the panel reads band.gain / band.Q and hands them to the
+    // audio graph, where a missing band throws and a non-finite value is rejected.
+    if (!settings.bands.every(isValidBand) || typeof settings.isEnabled !== 'boolean') {
+      console.warn('[Equalizer] Damaged band settings, using defaults');
+      return null;
+    }
+
+    // An unknown preset name would leave the preset menu showing a preset that is not applied.
+    const preset =
+      typeof settings.preset === 'string' && settings.preset in EQUALIZER_PRESETS ? settings.preset : 'custom';
+    return { ...settings, preset };
   } catch (err) {
     console.warn('[Equalizer] Failed to load settings:', err);
     return null;
   }
+}
+
+const isNumberIn = (v: unknown, min: number, max: number) =>
+  typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
+
+// Ranges match what the UI can produce and the audio graph accepts (AudioEqualizer clamps
+// gain to ±12 dB and Q to 0.5–4). An out-of-range value would be clamped in the audio but
+// kept by the panel, so the sliders, the curve and what is heard would disagree.
+function isValidBand(band: unknown): band is BandSettings {
+  if (!band || typeof band !== 'object') return false;
+  const { frequency, gain, Q } = band as Record<string, unknown>;
+  return isNumberIn(frequency, 1, 24000) && isNumberIn(gain, -12, 12) && isNumberIn(Q, 0.5, 4);
 }
 
 /**

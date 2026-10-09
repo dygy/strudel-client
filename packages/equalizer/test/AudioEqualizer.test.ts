@@ -2,7 +2,7 @@
  * AudioEqualizer (spec 015 §2.2): chain wiring, per-band gain, clamps, presets, on/off.
  * Runs on the shared Web Audio mock; no real AudioContext.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AudioEqualizer } from '../AudioEqualizer';
 import { EQUALIZER_PRESETS } from '../presets';
 // @ts-expect-error untyped .mjs test helper shared with @strudel/mixer
@@ -204,14 +204,34 @@ describe('AudioEqualizer (spec 015 §2.2)', () => {
   });
 
   describe('a non-numeric gain', () => {
-    // FINDING (spec 015 §4): Math.max(-12, Math.min(12, NaN)) is NaN, so setBand passes NaN to
-    // the filter and stores it (packages/equalizer/AudioEqualizer.ts:182-184). A real AudioParam
-    // throws on a non-finite value. Reached from damaged saved settings (see persistence.test.ts).
-    it.fails('leaves the band at a finite value', () => {
+    // Regression (spec 015 finding 7, fixed 2026-10-09): Math.max(-12, Math.min(12, NaN)) is NaN,
+    // so setBand used to pass NaN to the filter (a real AudioParam throws) and store it.
+    it('leaves the band at a finite value', () => {
       eq.setBand(BAND_1K, { gain: 'abc' as unknown as number });
 
       expect(Number.isFinite(appliedGains(eq)[BAND_1K])).toBe(true);
       expect(Number.isFinite(storedGains(eq)[BAND_1K])).toBe(true);
+    });
+
+    it('keeps the previous value instead of the bad one, for gain and Q', () => {
+      eq.setBand(BAND_1K, { gain: 4, Q: 2 });
+      eq.setBand(BAND_1K, { gain: Number.NaN, Q: Number.POSITIVE_INFINITY });
+
+      expect(appliedGains(eq)[BAND_1K]).toBe(4);
+      expect(eq.getState().bands[BAND_1K]).toMatchObject({ gain: 4, Q: 2 });
+    });
+
+    it('warns when it skips a value, so an unparsed input is noticed', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      eq.setBand(BAND_1K, { gain: '6' as unknown as number });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('non-numeric gain'), '6');
+
+      warn.mockClear();
+      eq.setBand(BAND_1K, { gain: 6 });
+      expect(warn).not.toHaveBeenCalled();
+
+      warn.mockRestore();
     });
   });
 });

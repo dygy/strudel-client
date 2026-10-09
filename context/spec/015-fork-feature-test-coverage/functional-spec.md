@@ -136,6 +136,6 @@ Found while writing the checks (each guarded by a check that is expected to fail
 5. **Some malformed imports get the wrong answer.** An empty-valued track or folder list, or an import that is not a list at all, either reports a generic error or claims success, instead of "invalid data". Nothing is saved in any of these cases, so the user's library is safe; only the message is wrong.
 6. **An unused import route copies whatever fields it is sent onto the saved tracks.** It is not called by the app today, and the owner of each track is still forced to the signed-in user. Remove it or narrow it.
 
-7. **Damaged EQ settings can break the EQ panel on load.** Settings with the right number of bands but unreadable values (empty bands, non-numeric gains) are accepted. The panel then fails to open, or passes an invalid gain to the audio engine, instead of starting flat. The same "audible while off" problem (finding 3) also happened when a whole saved EQ state was restored with the EQ off; that part is fixed along with finding 3.
+7. **FIXED 2026-10-09.** **Damaged EQ settings can break the EQ panel on load.** Settings with the right number of bands but unreadable values (empty bands, non-numeric gains) are accepted. The panel then fails to open, or passes an invalid gain to the audio engine, instead of starting flat. The same "audible while off" problem (finding 3) also happened when a whole saved EQ state was restored with the EQ off; that part is fixed along with finding 3.
 
 Follow-ups for 1–7 are on the roadmap under Phase 4.

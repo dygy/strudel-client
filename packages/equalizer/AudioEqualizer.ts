@@ -177,7 +177,17 @@ export class AudioEqualizer {
     const band = this.bands[index];
     const now = this.audioContext.currentTime;
 
-    if (gain !== undefined) {
+    // Ignore non-finite values (damaged settings, bad input): an AudioParam rejects them
+    // and Math.max/min would turn them into NaN instead of clamping. Warn, so a caller that
+    // forgets to parse a number (e.g. passes an input's string value) is noticed.
+    if (gain !== undefined && !Number.isFinite(gain)) {
+      console.warn(`[Equalizer] Ignoring non-numeric gain for band ${index}:`, gain);
+    }
+    if (Q !== undefined && !Number.isFinite(Q)) {
+      console.warn(`[Equalizer] Ignoring non-numeric Q for band ${index}:`, Q);
+    }
+
+    if (gain !== undefined && Number.isFinite(gain)) {
       // Clamp gain to [-12, 12] dB range
       const clampedGain = Math.max(-12, Math.min(12, gain));
       band.config.gain = clampedGain;
@@ -188,7 +198,7 @@ export class AudioEqualizer {
       }
     }
 
-    if (Q !== undefined) {
+    if (Q !== undefined && Number.isFinite(Q)) {
       // Clamp Q to [0.5, 4.0] range
       const clampedQ = Math.max(0.5, Math.min(4.0, Q));
       band.filter.Q.setValueAtTime(clampedQ, now);
