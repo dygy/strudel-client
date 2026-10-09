@@ -175,13 +175,11 @@ export class SmoothTransitionManager {
       console.log('[SmoothTransitionManager] Starting fade down');
       await this.fadeDown(this.duration);
       
-      // Phase 2: Stop current pattern (this will trigger onToggle but won't clean canvases due to flag)
-      if (this.replInstance && this.replInstance.stop) {
-        console.log('[SmoothTransitionManager] Stopping current pattern');
-        this.replInstance.stop();
-      }
-      
-      // Phase 3: Clean up OLD regular canvases (but not Hydra)
+      // Do NOT stop the pattern here. Cyclist.stop() resets the clock, so the
+      // evaluate below would restart from cycle 0 (and onToggle resets cps).
+      // Like the instant path, evaluate hot-swaps at the current position.
+
+      // Phase 2: Clean up OLD canvases (the website callback also clears Hydra)
       // This ensures old draw() canvases are removed before new ones are created
       if (this.cleanupCanvases) {
         console.log('[SmoothTransitionManager] Cleaning up old draw canvases');
@@ -193,16 +191,18 @@ export class SmoothTransitionManager {
         }
       }
       
-      // Phase 4: Small delay to ensure cleanup completes
+      // Phase 3: Small delay to ensure cleanup completes
       await new Promise(resolve => setTimeout(resolve, 50));
       
-      // Phase 5: Evaluate new code (this will create new canvases)
+      // Phase 4: Evaluate new code (hot-swap; this will create new canvases)
       if (this.replInstance && this.replInstance.evaluate) {
         console.log('[SmoothTransitionManager] Evaluating new code');
-        this.replInstance.evaluate(newCode);
+        // Await it: repl.evaluate is async (transpile, samples(), setPattern). Fading up
+        // before it resolves would ramp the OLD pattern back up, then cut to the new one.
+        await this.replInstance.evaluate(newCode);
       }
       
-      // Phase 6: Fade up new track
+      // Phase 5: Fade up new track
       console.log('[SmoothTransitionManager] Starting fade up');
       await this.fadeUp(this.duration, this.targetVolume);
       

@@ -462,7 +462,16 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         // Create a specialized cleanup function that only cleans draw canvases (not Hydra)
         const cleanupDrawCanvases = () => {
           console.log('[SmoothTransition-cleanup] Cleaning draw canvases only');
-          
+
+          // 0. Clear Hydra. This used to happen implicitly via repl.stop() -> onToggle(false);
+          // the transition no longer stops (that restarted from cycle 0), so do it here,
+          // at the same moment (after fade-down, before evaluate), like the instant path.
+          try {
+            clearHydra();
+          } catch (error) {
+            console.warn('[SmoothTransition-cleanup] Error clearing hydra:', error);
+          }
+
           // 1. Cancel global animation frame
           if ((window as any).frame) {
             cancelAnimationFrame((window as any).frame);
@@ -698,11 +707,14 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
       
       if (editorRef.current?.repl) {
         await resetEditor();
-        await handleEvaluate();
+        await evaluateNewTrack();
       }
     }
   }, []);
 
+  // Update / Ctrl+U on the CURRENT track: a pure hot-swap, exactly like Ctrl+Enter in the
+  // editor. No fade, no canvas or Hydra cleanup, no stop — the pattern keeps its cycle
+  // position and tempo. Fades and cleanup belong to switching tracks (evaluateNewTrack).
   const handleEvaluate = async (): Promise<void> => {
     // If previewing, "Update" means: stop preview, push code to live speakers
     if (isPreviewing && mixerRef.current) {
@@ -711,6 +723,14 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
       console.log('[Preview] Stopped preview, pushing code to live');
     }
 
+    if (editorRef.current && editorRef.current.evaluate) {
+      await editorRef.current.evaluate();
+    }
+  };
+
+  // Loading a DIFFERENT track (handleUpdate with reset): smooth crossfade when enabled,
+  // otherwise clean up the old track's canvases and evaluate.
+  const evaluateNewTrack = async (): Promise<void> => {
     // Check if smooth transitions are enabled
     const manager = smoothTransitionManagerRef.current;
     const code = editorRef.current?.code;
@@ -719,7 +739,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
       // Use smooth transition WITHOUT canvas cleanup
       // Set flag to prevent onToggle from cleaning up canvases
       isSmoothTransitioningRef.current = true;
-      console.log('[SmoothTransitionManager] Using smooth transition for code update');
+      console.log('[SmoothTransitionManager] Using smooth transition for track change');
       try {
         await manager.executeTransition(code);
       } catch (error) {

@@ -338,13 +338,13 @@ A property is a characteristic or behavior that should hold true across all vali
 
 ### Property 4: Track Stops After Fade Down
 
-*For any* track, when a fade down transition completes, the track's pattern should be stopped (no longer producing audio events).
+*For any* track, when a fade down transition completes, the new pattern is hot-swapped into the running scheduler — it is NOT stopped (stopping resets the cycle to 0; amended 2026-10-09).
 
 **Validates: Requirements 2.3**
 
 ### Property 5: Instant Mode Immediate Stop
 
-*For any* track, when smooth transitions are disabled, triggering an update should stop the current track immediately without any fade duration.
+*For any* track, when smooth transitions are disabled, triggering an update should hot-swap the pattern immediately without any fade duration.
 
 **Validates: Requirements 2.4**
 

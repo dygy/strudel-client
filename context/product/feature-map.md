@@ -19,7 +19,7 @@ Last surveyed: 2026-10-08.
 
 | Feature | Origin | Code | Spec | Tests | Owner |
 |---|---|---|---|---|---|
-| Pattern core, mini-notation, mondo, tonal, xen, transpiler, tidal/hs2js | U | `packages/{core,mini,mondo,mondough,tonal,xen,transpiler,tidal,hs2js}` | none | `packages/{core,mini,mondo,tonal,transpiler,xen}/test` (`xen` is known-red: `document is not defined`) | engine |
+| Pattern core, mini-notation, mondo, tonal, xen, transpiler, tidal/hs2js | U | `packages/{core,mini,mondo,mondough,tonal,xen,transpiler,tidal,hs2js}` | none | `packages/{core,mini,mondo,tonal,transpiler,xen}/test`  | engine |
 
 ## Audio
 
@@ -27,8 +27,8 @@ Last surveyed: 2026-10-08.
 |---|---|---|---|---|---|
 | Synthesis and sample engine | U | `packages/{superdough,supradough,webaudio,sampler,soundfonts,csound}` | none | none | audio |
 | I/O: MIDI, OSC, MQTT, serial, gamepad, motion | U | `packages/{midi,osc,mqtt,serial,gamepad,motion}` | none | none | audio |
-| Mixer and headphone preview on a second engine, plus device selection | F | `packages/mixer/{AudioMixer,PreviewEngine,KeyboardShortcutManager}.mjs`; `website/src/repl/components/{MixerControls,MixerHealthIndicator}.tsx`; `panel/{MixerSettings,AudioDeviceSelector,AudioEngineTargetSelector}.tsx` | [006](../spec/006-audio-mixer-preview/) | `packages/mixer/test/AudioMixer.test.mjs` (known-red, 11 failing) | audio |
-| Smooth crossfade transitions | F | `packages/mixer/{SmoothTransitionManager,TransitionMixer}.mjs` | [009](../spec/009-smooth-track-transitions/) | none | audio |
+| Mixer and headphone preview on a second engine, plus device selection | F | `packages/mixer/{AudioMixer,PreviewEngine,KeyboardShortcutManager}.mjs`; `website/src/repl/components/{MixerControls,MixerHealthIndicator}.tsx`; `panel/{MixerSettings,AudioDeviceSelector,AudioEngineTargetSelector}.tsx` | [006](../spec/006-audio-mixer-preview/) | `packages/mixer/test/AudioMixer.test.mjs` (16, incl. EQ routing; mock in `webAudioMock.mjs`) | audio |
+| Smooth crossfade transitions | F | `packages/mixer/{SmoothTransitionManager,TransitionMixer}.mjs` | [009](../spec/009-smooth-track-transitions/) | `packages/mixer/test/SmoothTransitionManager.test.mjs` (Update must hot-swap, never stop: regression 2026-10-09) | audio |
 | 10-band parametric EQ, presets and visualisation | F | `packages/equalizer/*`; `panel/EqualizerUI.tsx` | [008](../spec/008-audio-equalizer/) | none | audio |
 | Sample cache settings | F | `panel/SampleCacheSettings.tsx` | none | none | audio |
 
@@ -48,7 +48,7 @@ Last surveyed: 2026-10-08.
 |---|---|---|---|---|---|
 | REPL shell and panels | U | `website/src/repl/{Repl.tsx,useReplContext.tsx,panel/*}` | none | none | web |
 | Authenticated REPL, welcome screen, toasts and tooltips, burger and context menus | F | `website/src/repl/{useAuthenticatedReplContext.tsx,AuthenticatedReplEditor.tsx,WelcomeScreen.tsx}`; `stores/{toastStore,tooltipStore}.ts` | none | none | web |
-| Global save manager and emergency save | F | `website/src/repl/globalSaveManager.ts`; `hooks/useEmergencySave.ts` | none | `repl/__tests__/globalSaveManager.test.ts` (known-red, 9 failing) | web |
+| Global save manager and emergency save | F | `website/src/repl/globalSaveManager.ts`; `hooks/useEmergencySave.ts` | none | `repl/__tests__/globalSaveManager.test.ts` | web |
 | i18n: 9 locales, lazy loading, RTL | F | `website/src/i18n/*`; `I18nProvider.tsx`; `LanguageSelector.tsx` | none | none | web |
 
 ## Library: file manager and tracks
@@ -58,7 +58,7 @@ Last surveyed: 2026-10-08.
 | Sidebar file tree, with folders, multitracks/steps and drag and drop | F | `website/src/repl/components/sidebar/*` | none | none | web |
 | Strict autosave | F | `sidebar/hooks/useStrictAutosave*` | none | `sidebar/hooks/__tests__/strictAutosave*` | web |
 | ZIP and folder import with conflict modal; folder and multitrack export | F | `ui/ImportConflictModal.tsx`; `/api/library/batch-import`; `/api/{tracks,folders}/bulk-create` | [003](../spec/003-supabase-import-fix/) | none | web |
-| Track routing (`/repl/<folder>/<track>/<step>`) | F | `website/src/routing/{TrackRouter,URLParser,NavigationState,TrackPersistence}.ts`; `stores/tracksStore.ts` | [001](../spec/001-track-routing-navigation/) | `routing/__tests__/*` (4 known-red: `@src` alias not resolved by the root vitest config); `stores/__tests__/tracksStore-url-fix` | web |
+| Track routing (`/repl/<folder>/<track>/<step>`) | F | `website/src/routing/{TrackRouter,URLParser,NavigationState,TrackPersistence}.ts`; `stores/tracksStore.ts` | [001](../spec/001-track-routing-navigation/) | `routing/__tests__/*` (path `/repl/<slug>` contract); `stores/__tests__/tracksStore-url-fix` | web |
 | Random track on `/repl` | F | `pages/repl/[...trackPath].astro` | [005](../spec/005-random-track-loading-fix/) | none | web |
 | Scalable tree filesystem (`tree_*` tables, `/api/tree/*`) | F | `website/src/lib/{TreeManager,TreeSystem,FileSystemGraph,TreeDataTransformer}.ts`; `lib/database/tree-schema.sql` | [002](../spec/002-scalable-tree-filesystem/) | none | web. **Partial**: the API went back to the `tracks` table in `d8b4bdf` and `4d671f2`. |
 
