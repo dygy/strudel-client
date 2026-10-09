@@ -109,4 +109,4 @@ A subagent starts cold, re-reads what you already know, and returns a *claim*.
 - **Supabase.** RLS by `auth.uid()` on every table. The service-role key is used in `/api/admin/*` only. `tracks` is the live store; the `tree_*` layer is partial (spec 002). Schema changes ship as a migration file, and are applied to prod only as an approved step.
 - **Upstream packages** (`core`, `mini`, `superdough`, …) stay mergeable. Prefer additive changes and say when you diverge. Public functions need JSDoc, which drives the docs and the autocomplete.
 - **i18n.** A new string goes into all 9 locales under `website/src/i18n`.
-- **CI gates on tests only.** A failing vitest test blocks the deploy. Format and lint are still advisory (pre-existing red, see `static-suites.md`), so the push gate catches regressions before they reach CI, and your own verification remains the gate for behaviour.
+- **CI gates the deploy on format, lint and tests.** Any of them failing blocks it. Run `pnpm run format-check`, `pnpm run lint` and `pnpm exec vitest run` before pushing; the push gate covers tests only.

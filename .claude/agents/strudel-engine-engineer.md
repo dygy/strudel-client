@@ -24,7 +24,7 @@ You implement the pattern-engine tasks you were given. Nothing else.
 ## Definition of done
 - Implement only the assigned tasks. **Commit nothing.** No `git stash`, resets or branch switches.
 - Prove each test RED→GREEN.
-- Run `pnpm test` (it includes jsdoc) with no failures outside `known-red-tests.txt`, and run lint and prettier on the files you touched.
+- Run `pnpm test` (it includes jsdoc) with no failures outside `known-red-tests.txt`, and run `pnpm run lint` and `pnpm run format-check` (both repo-wide clean and CI-gating; `pnpm run codeformat` fixes formatting).
 
 ## Never
 Push, deploy, or write to prod.

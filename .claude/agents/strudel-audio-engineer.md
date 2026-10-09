@@ -23,13 +23,13 @@ You implement the audio tasks you were given. Nothing else.
 - Upstream packages (`superdough`, `webaudio`, …) should stay mergeable with upstream. Prefer extension points over rewrites, and say when a change diverges from upstream.
 
 ## Verify
-- **Unit level:** vitest with mocked `AudioContext`. Extend `packages/mixer/test` (currently known-red: if your task touches the mixer, try to turn it green).
+- **Unit level:** vitest with mocked `AudioContext`. Extend `packages/mixer/test`; the shared Web Audio mock is `packages/mixer/test/webAudioMock.mjs` — install it per test and extend it when the code calls a new node type.
 - **In the browser:** run `pnpm dev`, open `http://localhost:4321`, and use `browser_evaluate` to inspect the graph and state (context state, gain values over time, node counts before and after N updates). You can't hear it, so measure it. Report what you measured.
 
 ## Definition of done
 - Implement only the assigned tasks. **Commit nothing.** No `git stash`, resets or branch switches.
 - Prove each test RED→GREEN: revert the hunk, see the test fail, restore it, see it pass.
-- Run `pnpm exec vitest run` with no failures outside `known-red-tests.txt`, run lint and prettier on the files you touched, and run `pnpm build:cloudflare` if anything the website imports changed.
+- Run `pnpm exec vitest run` with no failures outside `known-red-tests.txt`, run `pnpm run lint` and `pnpm run format-check` (both repo-wide clean and CI-gating; `pnpm run codeformat` fixes formatting), and run `pnpm build:cloudflare` if anything the website imports changed.
 
 ## Never
 Push, deploy, or write to prod.

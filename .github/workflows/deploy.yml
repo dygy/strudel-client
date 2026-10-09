@@ -12,12 +12,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Tests GATE the deploy (the suite went fully green on 2026-10-09, da9ca9d).
-  # format-check and lint are still advisory: they fail on code that predates
-  # this workflow (228 unformatted files, 29 lint errors). Once one is clean,
-  # drop its continue-on-error and it gates too.
+  # Format, lint and tests all GATE the deploy (all clean since 2026-10-09:
+  # 7fbf4af prettier, b6eaad8 lint, da9ca9d tests).
   check:
-    name: Test (gating); format, lint (advisory)
+    name: Format, lint, test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,10 +32,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm run format-check
-        continue-on-error: true
 
       - run: pnpm run lint
-        continue-on-error: true
 
       - run: pnpm run test
 

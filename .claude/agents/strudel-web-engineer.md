@@ -30,7 +30,7 @@ You implement the web and editor tasks you were given. Nothing else.
 - Prove every test you write **RED→GREEN**: copy the covered file aside, revert the hunk, see the test fail, restore the file, see it pass.
 - Run the suite from `context/product/static-suites.md`:
   - `pnpm exec vitest run`, with no failures outside `known-red-tests.txt`
-  - `eslint` and `prettier --check` on the files you touched
+  - `pnpm run lint` and `pnpm run format-check`: both are repo-wide clean and gate the CI deploy (`pnpm run codeformat` fixes formatting)
   - **`pnpm build:cloudflare`** for any `website/` change, then report the size of `website/dist/_worker.js`
 
 ## Never
