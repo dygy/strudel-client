@@ -13,19 +13,38 @@
  */
 import { vi } from 'vitest';
 
-function createAudioParam(value) {
+/**
+ * An AudioParam whose automation calls are recorded, in order, in `calls` as
+ * `[method, ...args]` (e.g. `['linearRampToValueAtTime', 0, 2]`). A direct
+ * `param.value = v` write is an instant jump and is recorded as `['value=', v]`.
+ * `value` reads the last scheduled target so code that reads `param.value` keeps working.
+ */
+export function createAudioParam(initial) {
+  let current = initial;
   return {
-    value,
-    setValueAtTime(v) {
-      this.value = v;
+    calls: [],
+    get value() {
+      return current;
     },
-    linearRampToValueAtTime(v) {
-      this.value = v;
+    set value(v) {
+      this.calls.push(['value=', v]);
+      current = v;
     },
-    exponentialRampToValueAtTime(v) {
-      this.value = v;
+    setValueAtTime(v, t) {
+      this.calls.push(['setValueAtTime', v, t]);
+      current = v;
     },
-    cancelScheduledValues() {},
+    linearRampToValueAtTime(v, t) {
+      this.calls.push(['linearRampToValueAtTime', v, t]);
+      current = v;
+    },
+    exponentialRampToValueAtTime(v, t) {
+      this.calls.push(['exponentialRampToValueAtTime', v, t]);
+      current = v;
+    },
+    cancelScheduledValues(t) {
+      this.calls.push(['cancelScheduledValues', t]);
+    },
   };
 }
 
@@ -117,7 +136,7 @@ export const MOCK_DEVICES = [
   { deviceId: 'device2', kind: 'audiooutput', label: 'Headphones' },
 ];
 
-function createMemoryStorage() {
+export function createMemoryStorage() {
   const store = new Map();
   return {
     getItem: (key) => (store.has(key) ? store.get(key) : null),
