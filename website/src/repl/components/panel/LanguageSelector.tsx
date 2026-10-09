@@ -13,12 +13,12 @@ export function LanguageSelector({ currentLanguage, onChange }: LanguageSelector
   const handleLanguageChange = (newLanguage: Language) => {
     // Update i18next
     i18n.changeLanguage(newLanguage);
-    
+
     // Also update localStorage directly to ensure persistence
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('strudel-language', newLanguage);
     }
-    
+
     // Call the onChange callback to update settings store
     onChange?.(newLanguage);
   };

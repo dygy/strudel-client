@@ -92,9 +92,7 @@ export function ExportDialog({ audioBlob, audioContext, onClose }: ExportDialogP
           setErrorMessage('MP3 encoding failed. You can still download as WAV.');
           setExportState('error');
         } else {
-          setErrorMessage(
-            `Export failed: ${err instanceof Error ? err.message : String(err)}`,
-          );
+          setErrorMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
           setExportState('error');
         }
       }
@@ -110,9 +108,7 @@ export function ExportDialog({ audioBlob, audioContext, onClose }: ExportDialogP
         {/* Empty recording warning (Req 4.3) */}
         {exportState === 'empty' && (
           <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded">
-            <p className="text-sm text-foreground">
-              Recording is empty (zero duration). Nothing to export.
-            </p>
+            <p className="text-sm text-foreground">Recording is empty (zero duration). Nothing to export.</p>
           </div>
         )}
 
@@ -120,9 +116,7 @@ export function ExportDialog({ audioBlob, audioContext, onClose }: ExportDialogP
         {exportState === 'encoding' && (
           <div className="flex items-center space-x-3 p-3 bg-lineHighlight/30 rounded">
             <div className="w-4 h-4 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />
-            <p className="text-sm text-foreground">
-              Encoding {encodingFormat?.toUpperCase()}…
-            </p>
+            <p className="text-sm text-foreground">Encoding {encodingFormat?.toUpperCase()}…</p>
           </div>
         )}
 

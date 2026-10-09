@@ -71,13 +71,10 @@ function preserveCursorPosition(view, originalCode, formattedCode, originalCurso
   try {
     // Simple cursor preservation: try to maintain relative position
     const ratio = originalCursor / originalCode.length;
-    const newCursor = Math.min(
-      Math.round(ratio * formattedCode.length),
-      formattedCode.length
-    );
-    
+    const newCursor = Math.min(Math.round(ratio * formattedCode.length), formattedCode.length);
+
     view.dispatch({
-      selection: { anchor: newCursor, head: newCursor }
+      selection: { anchor: newCursor, head: newCursor },
     });
   } catch (error) {
     console.warn('[PrettierExtension] Cursor preservation failed:', error);
@@ -107,7 +104,7 @@ function showLoadingIndicator() {
     align-items: center;
     gap: 8px;
   `;
-  
+
   // Add spinner
   const spinner = document.createElement('div');
   spinner.style.cssText = `
@@ -118,7 +115,7 @@ function showLoadingIndicator() {
     border-radius: 50%;
     animation: spin 1s linear infinite;
   `;
-  
+
   // Add CSS animation for spinner
   if (!document.getElementById('prettier-spinner-style')) {
     const style = document.createElement('style');
@@ -131,12 +128,12 @@ function showLoadingIndicator() {
     `;
     document.head.appendChild(style);
   }
-  
+
   indicator.appendChild(spinner);
   indicator.appendChild(document.createTextNode('Formatting...'));
-  
+
   document.body.appendChild(indicator);
-  
+
   return indicator;
 }
 
@@ -161,25 +158,26 @@ function hideLoadingIndicator(indicator) {
 function logFormattingError(error, code) {
   try {
     // Only log in development or when explicitly enabled
-    const isDevelopment = typeof window !== 'undefined' && 
+    const isDevelopment =
+      typeof window !== 'undefined' &&
       (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    
+
     if (!isDevelopment) {
       return; // Don't log in production to protect user privacy
     }
-    
+
     // Sanitize code to remove potentially sensitive information
     const sanitizedCode = code
       .replace(/(['"`])(?:(?!\1)[^\\]|\\.)*\1/g, '$1[STRING]$1') // Replace string contents
       .replace(/\/\*[\s\S]*?\*\//g, '/* [COMMENT] */') // Replace block comments
       .replace(/\/\/.*$/gm, '// [COMMENT]') // Replace line comments
       .substring(0, 200); // Limit length
-    
+
     console.warn('[PrettierExtension] Formatting error:', {
       error: error.message,
       codeLength: code.length,
       codePreview: sanitizedCode,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (logError) {
     // Fail silently if logging fails
@@ -210,12 +208,13 @@ function showFormattingFeedback(view, success, error = null) {
     transition: all 0.3s ease;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     backdrop-filter: blur(10px);
-    ${success 
-      ? 'background: linear-gradient(135deg, #10b981, #059669); border: 1px solid rgba(16, 185, 129, 0.3);' 
-      : 'background: linear-gradient(135deg, #ef4444, #dc2626); border: 1px solid rgba(239, 68, 68, 0.3);'
+    ${
+      success
+        ? 'background: linear-gradient(135deg, #10b981, #059669); border: 1px solid rgba(16, 185, 129, 0.3);'
+        : 'background: linear-gradient(135deg, #ef4444, #dc2626); border: 1px solid rgba(239, 68, 68, 0.3);'
     }
   `;
-  
+
   if (success) {
     notification.textContent = getTranslatedMessage('prettierFormatSuccess', '✓ Code formatted');
   } else {
@@ -224,15 +223,15 @@ function showFormattingFeedback(view, success, error = null) {
     const escapedError = (error || 'Unknown error').replace(/\$/g, '$$$$');
     notification.textContent = errorMsg.replace('{error}', escapedError);
   }
-  
+
   document.body.appendChild(notification);
-  
+
   // Animate in
   requestAnimationFrame(() => {
     notification.style.transform = 'translateX(0)';
     notification.style.opacity = '1';
   });
-  
+
   // Remove after 3 seconds with fade out
   setTimeout(() => {
     notification.style.opacity = '0';
@@ -255,7 +254,7 @@ const formatCommand = {
   run: async (view) => {
     try {
       const settings = await getCurrentSettings();
-      
+
       // Check if prettier is enabled
       if (!settings.isPrettierEnabled) {
         console.log('[PrettierExtension] Prettier is disabled in settings');
@@ -264,31 +263,26 @@ const formatCommand = {
 
       const { formatEngine, createPrettierOptions } = await getFormatEngine();
       const prettierOptions = createPrettierOptions(settings);
-      
+
       const state = view.state;
       const selection = state.selection.main;
       const hasSelection = !selection.empty;
-      
+
       let result;
       const originalCode = state.doc.toString();
       const originalCursor = selection.head;
-      
+
       // Show loading indicator for large files
       let loadingIndicator = null;
       if (originalCode.length > 1000) {
         loadingIndicator = showLoadingIndicator();
       }
-      
+
       try {
         if (hasSelection) {
           // Format selection
           const selectedText = state.sliceDoc(selection.from, selection.to);
-          result = await formatEngine.formatSelection(
-            originalCode,
-            selection.from,
-            selection.to,
-            prettierOptions
-          );
+          result = await formatEngine.formatSelection(originalCode, selection.from, selection.to, prettierOptions);
         } else {
           // Format entire document
           result = await formatEngine.formatCode(originalCode, prettierOptions);
@@ -299,33 +293,33 @@ const formatCommand = {
           hideLoadingIndicator(loadingIndicator);
         }
       }
-      
+
       if (result.success && result.formattedCode) {
         // Apply formatting
         const changes = {
           from: 0,
           to: state.doc.length,
-          insert: result.formattedCode
+          insert: result.formattedCode,
         };
-        
+
         view.dispatch({ changes });
-        
+
         // Preserve cursor position
         if (result.cursorOffset !== undefined) {
           view.dispatch({
-            selection: { anchor: result.cursorOffset, head: result.cursorOffset }
+            selection: { anchor: result.cursorOffset, head: result.cursorOffset },
           });
         } else {
           preserveCursorPosition(view, originalCode, result.formattedCode, originalCursor);
         }
-        
+
         showFormattingFeedback(view, true);
       } else {
         console.warn('[PrettierExtension] Formatting failed:', result.error);
         logFormattingError(new Error(result.error || 'Unknown error'), originalCode);
         showFormattingFeedback(view, false, result.error);
       }
-      
+
       return true;
     } catch (error) {
       console.error('[PrettierExtension] Format command error:', error);
@@ -333,7 +327,7 @@ const formatCommand = {
       showFormattingFeedback(view, false, error.message);
       return false;
     }
-  }
+  },
 };
 
 /**
@@ -342,8 +336,8 @@ const formatCommand = {
 export async function autoFormatOnSave(code, settings = null) {
   try {
     // Get settings if not provided
-    const currentSettings = settings || await getCurrentSettings();
-    
+    const currentSettings = settings || (await getCurrentSettings());
+
     // Check if auto-format on save is enabled
     if (!currentSettings.isPrettierEnabled || !currentSettings.prettierAutoFormatOnSave) {
       return { success: true, formattedCode: code };
@@ -351,9 +345,9 @@ export async function autoFormatOnSave(code, settings = null) {
 
     const { formatEngine, createPrettierOptions } = await getFormatEngine();
     const prettierOptions = createPrettierOptions(currentSettings);
-    
+
     const result = await formatEngine.formatCode(code, prettierOptions);
-    
+
     if (result.success && result.formattedCode) {
       return { success: true, formattedCode: result.formattedCode };
     } else {
@@ -381,10 +375,8 @@ export function prettierExtension(enabled = true) {
   if (!enabled) {
     return [];
   }
-  
-  return [
-    prettierKeymap()
-  ];
+
+  return [prettierKeymap()];
 }
 
 // Export the format command for external use

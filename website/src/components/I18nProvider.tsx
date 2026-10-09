@@ -13,7 +13,7 @@ export function I18nProvider({ children }: I18nProviderProps) {
     if (typeof document !== 'undefined') {
       document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
       document.documentElement.lang = currentLanguage;
-      
+
       // Add/remove RTL class for easier CSS targeting
       if (isRTL) {
         document.documentElement.classList.add('rtl');

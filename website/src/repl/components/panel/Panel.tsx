@@ -101,7 +101,7 @@ export function VerticalPanel({ context }: PanelProps) {
 
   const minWidth = 400;
   const maxWidth = Math.min(1200, typeof window !== 'undefined' ? window.innerWidth * 0.8 : 1200);
-  
+
   // Check if current language is RTL
   const isRTL = ['ar', 'he'].includes(i18n.language);
 
@@ -109,7 +109,7 @@ export function VerticalPanel({ context }: PanelProps) {
     setIsResizing(true);
     startX.current = e.clientX;
     startWidth.current = width;
-    
+
     // Prevent text selection during resize
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'col-resize';
@@ -118,13 +118,14 @@ export function VerticalPanel({ context }: PanelProps) {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
-      
+
       // For RTL: resize from right edge (add deltaX)
       // For LTR: resize from left edge (subtract deltaX)
       const deltaX = e.clientX - startX.current;
-      const newWidth = Math.max(minWidth, Math.min(maxWidth, 
-        isRTL ? startWidth.current + deltaX : startWidth.current - deltaX
-      ));
+      const newWidth = Math.max(
+        minWidth,
+        Math.min(maxWidth, isRTL ? startWidth.current + deltaX : startWidth.current - deltaX),
+      );
       setWidth(newWidth);
     };
 
@@ -149,9 +150,7 @@ export function VerticalPanel({ context }: PanelProps) {
     <ToastContext.Provider value={toastActions}>
       <PanelNav
         settings={settings}
-        className={cx(
-          'relative flex-shrink-0 overflow-hidden',
-        )}
+        className={cx('relative flex-shrink-0 overflow-hidden')}
         style={{
           width: isPanelOpen ? width : 48,
           transition: isResizing ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -165,11 +164,11 @@ export function VerticalPanel({ context }: PanelProps) {
               className={cx(
                 'absolute top-0 w-1 h-full cursor-col-resize hover:bg-blue-500 transition-colors z-10',
                 isRTL ? 'right-0' : 'left-0',
-                isResizing && 'bg-blue-500'
+                isResizing && 'bg-blue-500',
               )}
               onMouseDown={handleMouseDown}
             />
-            
+
             <div className={cx('flex flex-col h-full', isRTL ? 'pr-1' : 'pl-1')}>
               <div className="flex justify-between w-full ">
                 <Tabs setTab={setTab} tab={tab} />
@@ -192,10 +191,12 @@ export function VerticalPanel({ context }: PanelProps) {
               'transition-colors duration-200',
             )}
           >
-            <ChevronLeftIcon className={cx(
-              'text-foreground opacity-50 w-6 h-6 transition-transform duration-200 hover:scale-125',
-              isRTL && 'rotate-180'
-            )} />
+            <ChevronLeftIcon
+              className={cx(
+                'text-foreground opacity-50 w-6 h-6 transition-transform duration-200 hover:scale-125',
+                isRTL && 'rotate-180',
+              )}
+            />
           </button>
         )}
       </PanelNav>
@@ -214,11 +215,11 @@ const getTabNames = (t: (key: string) => string) => {
     console: t('console'),
     settings: t('settings'),
   };
-  
+
   if (TAURI) {
     tabs.files = t('files');
   }
-  
+
   return tabs;
 };
 
@@ -230,35 +231,37 @@ interface PanelNavProps {
   [key: string]: any;
 }
 
-const PanelNav = React.forwardRef<HTMLElement, PanelNavProps>(({ children, className, settings, style, ...props }, ref) => {
-  const isHoverBehavior = settings.togglePanelTrigger === 'hover';
-  return (
-    <nav
-      ref={ref}
-      onClick={() => {
-        if (!settings.isPanelOpen) {
-          setIsPanelOpened(true);
-        }
-      }}
-      onMouseEnter={() => {
-        if (isHoverBehavior && !settings.isPanelOpen) {
-          setIsPanelOpened(true);
-        }
-      }}
-      onMouseLeave={() => {
-        if (isHoverBehavior && !settings.isPanelPinned) {
-          setIsPanelOpened(false);
-        }
-      }}
-      aria-label="Menu Panel"
-      className={cx('bg-lineHighlight group overflow-x-auto', className)}
-      style={style}
-      {...props}
-    >
-      {children}
-    </nav>
-  );
-});
+const PanelNav = React.forwardRef<HTMLElement, PanelNavProps>(
+  ({ children, className, settings, style, ...props }, ref) => {
+    const isHoverBehavior = settings.togglePanelTrigger === 'hover';
+    return (
+      <nav
+        ref={ref}
+        onClick={() => {
+          if (!settings.isPanelOpen) {
+            setIsPanelOpened(true);
+          }
+        }}
+        onMouseEnter={() => {
+          if (isHoverBehavior && !settings.isPanelOpen) {
+            setIsPanelOpened(true);
+          }
+        }}
+        onMouseLeave={() => {
+          if (isHoverBehavior && !settings.isPanelPinned) {
+            setIsPanelOpened(false);
+          }
+        }}
+        aria-label="Menu Panel"
+        className={cx('bg-lineHighlight group overflow-x-auto', className)}
+        style={style}
+        {...props}
+      >
+        {children}
+      </nav>
+    );
+  },
+);
 
 interface PanelContentProps {
   context: ReplContext;
@@ -273,13 +276,13 @@ function PanelContent({ context, tab }: PanelContentProps) {
   useEffect(() => {
     if (tab !== displayTab) {
       setIsTransitioning(true);
-      
+
       // Quick fade out, then change content, then fade in
       const timer = setTimeout(() => {
         setDisplayTab(tab);
         setIsTransitioning(false);
       }, 150);
-      
+
       return () => clearTimeout(timer);
     }
   }, [tab, displayTab]);
@@ -302,7 +305,13 @@ function PanelContent({ context, tab }: PanelContentProps) {
         return <FilesTab />;
       case 'settings':
       default:
-        return <SettingsTab started={context.started} mixer={context.mixer} smoothTransitionManager={context.smoothTransitionManager} />;
+        return (
+          <SettingsTab
+            started={context.started}
+            mixer={context.mixer}
+            smoothTransitionManager={context.smoothTransitionManager}
+          />
+        );
     }
   };
 
@@ -312,9 +321,7 @@ function PanelContent({ context, tab }: PanelContentProps) {
         className={cx(
           'w-full h-full',
           'transition-[opacity,transform] duration-200 ease-out',
-          isTransitioning
-            ? 'opacity-0 translate-y-1'
-            : 'opacity-100 translate-y-0',
+          isTransitioning ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0',
         )}
       >
         {renderTabContent(displayTab)}
@@ -361,7 +368,7 @@ interface TabsProps {
 function Tabs({ setTab, tab, className }: TabsProps) {
   const { t } = useTranslation('tabs');
   const tabNames = getTabNames(t);
-  
+
   return (
     <div className={cx('flex select-none max-w-full overflow-auto pb-2', className)}>
       {Object.entries(tabNames).map(([key, label]) => {

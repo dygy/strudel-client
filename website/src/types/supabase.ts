@@ -29,7 +29,7 @@ export function getUserMetadata(user: SupabaseUser): ExtendedUser['user_metadata
 // Helper function to get display name from user
 export function getUserDisplayName(user: SupabaseUser): string {
   const metadata = getUserMetadata(user);
-  
+
   // Try different name fields in order of preference
   if (metadata.full_name) return metadata.full_name;
   if (metadata.name) return metadata.name;
@@ -37,7 +37,7 @@ export function getUserDisplayName(user: SupabaseUser): string {
     return `${metadata.given_name} ${metadata.family_name}`;
   }
   if (metadata.given_name) return metadata.given_name;
-  
+
   // Fallback to email
   return user.email || 'User';
 }

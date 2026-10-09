@@ -1,9 +1,9 @@
 /**
  * ErrorNotification - Display mixer error notifications
- * 
+ *
  * Shows error messages with type-specific styling and dismiss functionality.
  * Automatically dismisses recoverable errors after 5 seconds.
- * 
+ *
  * @component
  * @example
  * ```tsx
@@ -16,7 +16,7 @@ import cx from '@src/cx';
 
 /**
  * Props for ErrorNotification component
- * 
+ *
  * @interface ErrorNotificationProps
  * @property {any} errorNotifier - ErrorNotifier instance from AudioMixer
  */
@@ -43,12 +43,12 @@ export function ErrorNotification({ errorNotifier }: ErrorNotificationProps) {
     }
 
     const handleError = (error: ErrorMessage) => {
-      setErrors(prev => [...prev, { ...error, timestamp: Date.now() }]);
+      setErrors((prev) => [...prev, { ...error, timestamp: Date.now() }]);
 
       // Auto-dismiss recoverable errors after 5 seconds
       if (error.recoverable) {
         setTimeout(() => {
-          setErrors(prev => prev.filter(e => e.timestamp !== error.timestamp));
+          setErrors((prev) => prev.filter((e) => e.timestamp !== error.timestamp));
         }, 5000);
       }
     };
@@ -63,7 +63,7 @@ export function ErrorNotification({ errorNotifier }: ErrorNotificationProps) {
   }, [errorNotifier]);
 
   const dismissError = (timestamp: number) => {
-    setErrors(prev => prev.filter(e => e.timestamp !== timestamp));
+    setErrors((prev) => prev.filter((e) => e.timestamp !== timestamp));
   };
 
   if (errors.length === 0) return null;
@@ -80,7 +80,7 @@ export function ErrorNotification({ errorNotifier }: ErrorNotificationProps) {
             error.type === 'resource-warning' && 'bg-yellow-900/90 border-yellow-500',
             error.type === 'resource-limit' && 'bg-red-900/90 border-red-500',
             !['device-error', 'evaluation-error', 'resource-warning', 'resource-limit'].includes(error.type) &&
-              'bg-gray-900/90 border-gray-500'
+              'bg-gray-900/90 border-gray-500',
           )}
         >
           <div className="flex items-start justify-between">
@@ -93,16 +93,15 @@ export function ErrorNotification({ errorNotifier }: ErrorNotificationProps) {
                   {error.type === 'resource-limit' && '🚨'}
                 </span>
                 <h4 className="font-semibold text-white text-sm">
-                  {error.type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                  {error.type
+                    .split('-')
+                    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                    .join(' ')}
                 </h4>
               </div>
               <p className="text-white text-sm mb-1">{error.message}</p>
-              {error.details && (
-                <p className="text-gray-300 text-xs mb-2">{error.details}</p>
-              )}
-              {error.action && (
-                <p className="text-blue-300 text-xs italic">💡 {error.action}</p>
-              )}
+              {error.details && <p className="text-gray-300 text-xs mb-2">{error.details}</p>}
+              {error.action && <p className="text-blue-300 text-xs italic">💡 {error.action}</p>}
             </div>
             <button
               onClick={() => dismissError(error.timestamp)}

@@ -44,7 +44,14 @@ import './Repl.css';
 import { setInterval, clearInterval } from 'worker-timers';
 import { getMetadata } from '../metadata_parser';
 import { TrackRouter } from '../routing';
-import { setEditorInstance, setPendingCode, getPendingCode, clearPendingCode, setActiveCode, getEditorInstance } from '../stores/editorStore';
+import {
+  setEditorInstance,
+  setPendingCode,
+  getPendingCode,
+  clearPendingCode,
+  setActiveCode,
+  getEditorInstance,
+} from '../stores/editorStore';
 import { useAudioRecorder } from './recording/useAudioRecorder';
 import { useScreenRecorder } from './recording/useScreenRecorder';
 
@@ -108,17 +115,17 @@ let audioReady: Promise<void> | undefined;
 // Canvas cleanup utility
 const cleanupCanvasElements = async () => {
   if (typeof window === 'undefined') return;
-  
+
   try {
     console.log('[canvas-cleanup] Starting comprehensive canvas cleanup');
-    
+
     // 1. Cancel global animation frame (from animate.mjs)
     if ((window as any).frame) {
       cancelAnimationFrame((window as any).frame);
       (window as any).frame = null;
       console.log('[canvas-cleanup] Cancelled global window.frame');
     }
-    
+
     // 2. Use the proper cleanupDraw function from @strudel/draw
     try {
       const drawModule = await import('@strudel/draw');
@@ -131,7 +138,7 @@ const cleanupCanvasElements = async () => {
     } catch (error) {
       console.warn('[canvas-cleanup] Could not use cleanupDraw:', error);
     }
-    
+
     // 3. Clear Hydra properly (this already works well)
     try {
       clearHydra();
@@ -139,13 +146,13 @@ const cleanupCanvasElements = async () => {
     } catch (error) {
       console.warn('[canvas-cleanup] Error clearing hydra:', error);
     }
-    
+
     // 4. Clear the main draw context if it exists
     if (clearCanvas) {
       clearCanvas();
       console.log('[canvas-cleanup] Cleared main draw context');
     }
-    
+
     // 5. Only remove duplicate or orphaned test-canvas elements, not the main one
     const testCanvases = document.querySelectorAll('canvas[id="test-canvas"]');
     if (testCanvases.length > 1) {
@@ -155,30 +162,29 @@ const cleanupCanvasElements = async () => {
         testCanvases[i].remove();
       }
     }
-    
+
     // 6. Remove any orphaned graphics canvases that don't have proper cleanup
     const orphanedSelectors = [
       'canvas[id*="graphics"]:not(#test-canvas):not(#hydra-canvas)',
       'canvas[id*="visual"]:not(#test-canvas):not(#hydra-canvas)',
-      'canvas[style*="position:fixed"]:not(#test-canvas):not(#hydra-canvas)'
+      'canvas[style*="position:fixed"]:not(#test-canvas):not(#hydra-canvas)',
     ];
-    
+
     let cleanedCount = 0;
-    orphanedSelectors.forEach(selector => {
+    orphanedSelectors.forEach((selector) => {
       const elements = document.querySelectorAll(selector);
-      elements.forEach(element => {
+      elements.forEach((element) => {
         console.log(`[canvas-cleanup] Removing orphaned canvas: ${element.id || element.className}`);
         element.remove();
         cleanedCount++;
       });
     });
-    
+
     if (cleanedCount > 0) {
       console.log(`[canvas-cleanup] Removed ${cleanedCount} orphaned canvas elements`);
     }
-    
+
     console.log('[canvas-cleanup] Comprehensive canvas cleanup completed');
-    
   } catch (error) {
     console.error('[canvas-cleanup] Error during canvas cleanup:', error);
   }
@@ -219,7 +225,6 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   const getTime = shouldUseWebaudio ? getAudioContextCurrentTime : getPerformanceTimeSeconds;
 
   const init = useCallback(() => {
-
     if (!containerRef.current) {
       console.error('[repl] init called but containerRef.current is null!');
       return;
@@ -249,20 +254,20 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         console.log('[canvas-cleanup] onToggle called, playing:', playing);
         if (!playing) {
           console.log('[canvas-cleanup] Pattern stopped, cleaning up canvas elements and resetting CPS');
-          
+
           // Reset CPS to default to prevent BPM from carrying over between tracks
           if (editor?.repl?.setCps) {
             editor.repl.setCps(0.5);
             console.log('[canvas-cleanup] Reset CPS to default 0.5');
           }
-          
+
           clearHydra();
-          
+
           // IMPORTANT: Don't clean up canvases during smooth transitions
           // The transition manager handles the lifecycle properly
           if (!isSmoothTransitioningRef.current) {
             // Clean up canvas elements when stopping
-            cleanupCanvasElements().catch(error => {
+            cleanupCanvasElements().catch((error) => {
               console.warn('[canvas-cleanup] Error during cleanup:', error);
             });
           } else {
@@ -356,7 +361,10 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
       }
       editor.setCode(code);
       setDocumentTitle(code);
-      logger(`Welcome to Strudel! ${msg} Press play or hit ctrl+enter to run it! New shortcuts: Ctrl+U (update), Ctrl+P (play/pause)`, 'highlight');
+      logger(
+        `Welcome to Strudel! ${msg} Press play or hit ctrl+enter to run it! New shortcuts: Ctrl+U (update), Ctrl+P (play/pause)`,
+        'highlight',
+      );
     });
 
     editorRef.current = editor;
@@ -410,7 +418,9 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
           if (stored) {
             await engine.setDevice(stored);
           }
-        } catch (e) { /* non-fatal */ }
+        } catch (e) {
+          /* non-fatal */
+        }
 
         mixerRef.current = engine;
         setMixer(engine);
@@ -477,15 +487,15 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
             cancelAnimationFrame((window as any).frame);
             (window as any).frame = null;
           }
-          
+
           // 2. Use cleanupDraw to stop animations and clear the test-canvas
           cleanupDraw(true);
-          
+
           // 3. Clear the main draw context if it exists
           if (clearCanvas) {
             clearCanvas();
           }
-          
+
           // 4. Remove duplicate test-canvas elements (keep the first one)
           const testCanvases = document.querySelectorAll('canvas[id="test-canvas"]');
           if (testCanvases.length > 1) {
@@ -494,33 +504,29 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
               testCanvases[i].remove();
             }
           }
-          
+
           // 5. Remove orphaned graphics canvases (but NOT hydra-canvas)
           const orphanedSelectors = [
             'canvas[id*="graphics"]:not(#test-canvas):not(#hydra-canvas)',
             'canvas[id*="visual"]:not(#test-canvas):not(#hydra-canvas)',
-            'canvas[style*="position:fixed"]:not(#test-canvas):not(#hydra-canvas)'
+            'canvas[style*="position:fixed"]:not(#test-canvas):not(#hydra-canvas)',
           ];
-          
-          orphanedSelectors.forEach(selector => {
+
+          orphanedSelectors.forEach((selector) => {
             const elements = document.querySelectorAll(selector);
-            elements.forEach(element => {
+            elements.forEach((element) => {
               console.log(`[SmoothTransition-cleanup] Removing orphaned canvas: ${element.id || element.className}`);
               element.remove();
             });
           });
-          
+
           console.log('[SmoothTransition-cleanup] Draw canvas cleanup complete');
         };
 
-        const manager = new SmoothTransitionManager(
-          audioContext,
-          editorRef.current.repl,
-          { 
-            destinationGain,
-            cleanupCanvases: cleanupDrawCanvases // Pass specialized cleanup function
-          }
-        );
+        const manager = new SmoothTransitionManager(audioContext, editorRef.current.repl, {
+          destinationGain,
+          cleanupCanvases: cleanupDrawCanvases, // Pass specialized cleanup function
+        });
 
         smoothTransitionManagerRef.current = manager;
         console.log('[SmoothTransitionManager] Initialized');
@@ -554,17 +560,15 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
             setActivePattern(trackId);
           }
         },
-        onNavigationStart: (trackId) => {
-        },
-        onNavigationComplete: (trackId) => {
-        },
+        onNavigationStart: (trackId) => {},
+        onNavigationComplete: (trackId) => {},
         onNavigationError: (error, trackId) => {
           console.error('TrackRouter - navigation error:', error, trackId);
         },
       });
 
       // Initialize the router
-      trackRouterRef.current.initialize().catch(error => {
+      trackRouterRef.current.initialize().catch((error) => {
         console.error('TrackRouter - initialization failed:', error);
       });
     }
@@ -632,7 +636,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     (await getModule('@strudel/tonal'))?.resetVoicings();
     resetDefaults();
     resetGlobalEffects();
-    
+
     // Use proper draw cleanup instead of just clearing canvas
     try {
       const drawModule = await import('@strudel/draw');
@@ -650,12 +654,12 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         clearCanvas(); // Fallback
       }
     }
-    
+
     clearHydra();
-    
+
     // Clean up any accumulated canvas elements (now uses proper cleanup)
     await cleanupCanvasElements();
-    
+
     resetLoadedSounds();
 
     // Only reset CPS if editor is initialized
@@ -666,51 +670,54 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     await prebake(); // declare default samples
   };
 
-  const handleUpdate = useCallback(async (patternData: Partial<PatternData> & { code: string }, reset = false): Promise<void> => {
-    const fullPatternData: PatternData = {
-      id: patternData.id || '',
-      code: patternData.code,
-      ...patternData,
-    };
-    setViewingPatternData(fullPatternData);
+  const handleUpdate = useCallback(
+    async (patternData: Partial<PatternData> & { code: string }, reset = false): Promise<void> => {
+      const fullPatternData: PatternData = {
+        id: patternData.id || '',
+        code: patternData.code,
+        ...patternData,
+      };
+      setViewingPatternData(fullPatternData);
 
-    console.log('[repl] handleUpdate called with code:', patternData.code.substring(0, 50) + '...');
+      console.log('[repl] handleUpdate called with code:', patternData.code.substring(0, 50) + '...');
 
-    // Store code in nano store as backup
-    setPendingCode(patternData.code);
-    setActiveCode(patternData.code);
+      // Store code in nano store as backup
+      setPendingCode(patternData.code);
+      setActiveCode(patternData.code);
 
-    // CRITICAL: Only update CodeMirror if the code is actually different
-    // This prevents unnecessary re-renders and editor destruction
-    const currentEditorCode = editorRef.current?.code || '';
-    if (currentEditorCode !== patternData.code) {
-      console.log('[repl] Setting code in editor via setCode');
+      // CRITICAL: Only update CodeMirror if the code is actually different
+      // This prevents unnecessary re-renders and editor destruction
+      const currentEditorCode = editorRef.current?.code || '';
+      if (currentEditorCode !== patternData.code) {
+        console.log('[repl] Setting code in editor via setCode');
 
-      // Method 1: Standard setCode
-      if (editorRef.current?.setCode) {
-        editorRef.current.setCode(patternData.code);
+        // Method 1: Standard setCode
+        if (editorRef.current?.setCode) {
+          editorRef.current.setCode(patternData.code);
+        }
+
+        // Method 2: Use stored editor instance as backup
+        const storedEditor = getEditorInstance();
+        if (storedEditor?.setCode) {
+          console.log('[repl] Setting code via stored editor instance');
+          storedEditor.setCode(patternData.code);
+        }
+      } else {
+        console.log('[repl] Skipping setCode, code is the same');
       }
 
-      // Method 2: Use stored editor instance as backup
-      const storedEditor = getEditorInstance();
-      if (storedEditor?.setCode) {
-        console.log('[repl] Setting code via stored editor instance');
-        storedEditor.setCode(patternData.code);
-      }
-    } else {
-      console.log('[repl] Skipping setCode, code is the same');
-    }
+      if (reset) {
+        // Clean up canvas elements before resetting
+        await cleanupCanvasElements();
 
-    if (reset) {
-      // Clean up canvas elements before resetting
-      await cleanupCanvasElements();
-      
-      if (editorRef.current?.repl) {
-        await resetEditor();
-        await evaluateNewTrack();
+        if (editorRef.current?.repl) {
+          await resetEditor();
+          await evaluateNewTrack();
+        }
       }
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Update / Ctrl+U on the CURRENT track: a pure hot-swap, exactly like Ctrl+Enter in the
   // editor. No fade, no canvas or Hydra cleanup, no stop — the pattern keeps its cycle
@@ -770,10 +777,10 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     logger(`[repl] ✨ loading random tune "${patternData.id}"`);
     setActivePattern(patternData.id);
     setViewingPatternData(patternData);
-    
+
     // Clean up canvas elements before loading new pattern
     await cleanupCanvasElements();
-    
+
     await resetEditor();
 
     // Only set code and evaluate if editor is initialized
@@ -827,11 +834,12 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     const handleKeyDown = (event: KeyboardEvent) => {
       // Check if we're in an input field or textarea to avoid interfering with typing
       const target = event.target as HTMLElement;
-      const isInputField = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true';
-      
+      const isInputField =
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true';
+
       // Only handle shortcuts when Ctrl (or Cmd on Mac) is pressed
       const isCtrlOrCmd = event.ctrlKey || event.metaKey;
-      
+
       if (!isCtrlOrCmd) return;
 
       switch (event.key.toLowerCase()) {
@@ -891,6 +899,6 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     handleScreenRecordToggle: screenRecorder.handleScreenRecordToggle,
     isScreenRecordingSupported: screenRecorder.isScreenRecordingSupported,
   };
-  
+
   return context;
 }

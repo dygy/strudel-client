@@ -27,9 +27,9 @@ describe('Debug Format Output', () => {
 
   it('should show actual output for arrange()', async () => {
     const code = `arrange([s("bd sd"), s("hh*4")], [s("bass:0 bass:1"), s("pad:2")])`;
-    
+
     const result = await formatEngine.formatCode(code, defaultOptions);
-    
+
     // Also test the formatCompositionFunctions directly
     const testFormatComposition = (input: string) => {
       const functionPattern = /(\b(arrange|stack)|\.stack)\s*\(/g;
@@ -40,13 +40,13 @@ describe('Debug Format Output', () => {
       }
       return matches;
     };
-    
+
     const matches = testFormatComposition(result.formattedCode || '');
-    
+
     const fs = await import('fs');
     const output = `=== INPUT ===\n${code}\n\n=== OUTPUT ===\n${result.formattedCode}\n\n=== LINES ===\n${JSON.stringify(result.formattedCode?.split('\n'), null, 2)}\n\n=== MATCHES ===\n${JSON.stringify(matches, null, 2)}`;
     fs.writeFileSync('/tmp/format-output.txt', output);
-    
+
     expect(result.success).toBe(true);
   });
 });

@@ -41,7 +41,7 @@ const mockRemoveEventListener = vi.fn((event: string, listener: EventListener) =
 // Helper to trigger popstate events
 const triggerPopstate = () => {
   const listeners = mockEventListeners['popstate'] || [];
-  listeners.forEach(listener => {
+  listeners.forEach((listener) => {
     listener(new PopStateEvent('popstate'));
   });
 };
@@ -58,26 +58,26 @@ beforeEach(() => {
     addEventListener: mockAddEventListener,
     removeEventListener: mockRemoveEventListener,
   });
-  
+
   vi.stubGlobal('document', mockDocument);
-  
+
   // Reset mocks
   mockHistory.pushState.mockClear();
   mockHistory.replaceState.mockClear();
   mockAddEventListener.mockClear();
   mockRemoveEventListener.mockClear();
-  
+
   // Reset location
   mockLocation.href = 'https://example.com/';
   mockLocation.pathname = '/';
   mockLocation.search = '';
   mockLocation.hash = '';
-  
+
   // Reset document
   mockDocument.title = 'Strudel';
-  
+
   // Clear event listeners
-  Object.keys(mockEventListeners).forEach(key => {
+  Object.keys(mockEventListeners).forEach((key) => {
     delete mockEventListeners[key];
   });
 });
@@ -97,9 +97,9 @@ describe('TrackRouter', () => {
     it('should navigate to track and update URL', async () => {
       const router = new TrackRouter();
       await router.initialize();
-      
+
       await router.navigateToTrack('test-track');
-      
+
       expect(mockHistory.pushState).toHaveBeenCalledTimes(1);
       expect(mockHistory.pushState).toHaveBeenCalledWith(null, '', '/repl/test-track');
       expect(mockHistory.replaceState).not.toHaveBeenCalled();
@@ -150,9 +150,9 @@ describe('TrackRouter', () => {
     it('should update page title when navigating', async () => {
       const router = new TrackRouter();
       await router.initialize();
-      
+
       await router.navigateToTrack('test-track');
-      
+
       expect(mockDocument.title).toBe('Strudel - Track test-track');
     });
   });
@@ -160,48 +160,43 @@ describe('TrackRouter', () => {
   describe('Property Tests', () => {
     /**
      * Feature: track-routing-navigation, Property 10: Browser history integration
-     * For any sequence of track navigation, the browser back/forward buttons should 
+     * For any sequence of track navigation, the browser back/forward buttons should
      * correctly navigate through the track history and update the page title
      */
     it('should maintain browser history integration consistency', async () => {
       await fc.assert(
-        fc.asyncProperty(
-          fc.array(slugArb, { minLength: 1, maxLength: 5 }),
-          async (trackIds) => {
-            // The spy is module-level and only cleared by vitest's beforeEach, i.e. once per
-            // `it`, not once per property run — clear it so earlier runs/shrinks can't satisfy
-            // (or pollute the failure output of) this run's assertions.
-            mockHistory.pushState.mockClear();
-            mockHistory.replaceState.mockClear();
+        fc.asyncProperty(fc.array(slugArb, { minLength: 1, maxLength: 5 }), async (trackIds) => {
+          // The spy is module-level and only cleared by vitest's beforeEach, i.e. once per
+          // `it`, not once per property run — clear it so earlier runs/shrinks can't satisfy
+          // (or pollute the failure output of) this run's assertions.
+          mockHistory.pushState.mockClear();
+          mockHistory.replaceState.mockClear();
 
-            const router = new TrackRouter();
-            await router.initialize();
-            
-            // Navigate through all tracks
-            for (const trackId of trackIds) {
-              await router.navigateToTrack(trackId);
-              
-              // Verify URL was updated to this track's path (and not to an earlier one)
-              expect(mockHistory.pushState).toHaveBeenLastCalledWith(null, '', `/repl/${trackId}`);
-              
-              // Verify page title was updated
-              expect(mockDocument.title).toBe(`Strudel - Track ${trackId}`);
-            }
-            
-            // One history entry per navigation, in order
-            expect(mockHistory.pushState.mock.calls.map((c) => c[2])).toEqual(
-              trackIds.map((id) => `/repl/${id}`),
-            );
-            expect(mockHistory.replaceState).not.toHaveBeenCalled();
+          const router = new TrackRouter();
+          await router.initialize();
 
-            // Verify navigation state
-            const state = router.getNavigationState();
-            expect(state.currentTrackId).toBe(trackIds[trackIds.length - 1]);
-            
-            router.destroy();
+          // Navigate through all tracks
+          for (const trackId of trackIds) {
+            await router.navigateToTrack(trackId);
+
+            // Verify URL was updated to this track's path (and not to an earlier one)
+            expect(mockHistory.pushState).toHaveBeenLastCalledWith(null, '', `/repl/${trackId}`);
+
+            // Verify page title was updated
+            expect(mockDocument.title).toBe(`Strudel - Track ${trackId}`);
           }
-        ),
-        { numRuns: 50 } // Reduced runs for async tests
+
+          // One history entry per navigation, in order
+          expect(mockHistory.pushState.mock.calls.map((c) => c[2])).toEqual(trackIds.map((id) => `/repl/${id}`));
+          expect(mockHistory.replaceState).not.toHaveBeenCalled();
+
+          // Verify navigation state
+          const state = router.getNavigationState();
+          expect(state.currentTrackId).toBe(trackIds[trackIds.length - 1]);
+
+          router.destroy();
+        }),
+        { numRuns: 50 }, // Reduced runs for async tests
       );
     });
 
@@ -211,38 +206,38 @@ describe('TrackRouter', () => {
     it('should maintain navigation state consistency', async () => {
       await fc.assert(
         fc.asyncProperty(
-          fc.string({ minLength: 1, maxLength: 20 }).filter(s => /^[a-zA-Z0-9_-]+$/.test(s)),
+          fc.string({ minLength: 1, maxLength: 20 }).filter((s) => /^[a-zA-Z0-9_-]+$/.test(s)),
           async (trackId) => {
             const router = new TrackRouter();
             await router.initialize();
-            
+
             // Initial state should be clean
             let state = router.getNavigationState();
             expect(state.currentTrackId).toBeNull();
             expect(state.isNavigating).toBe(false);
-            
+
             // Navigate to track
             await router.navigateToTrack(trackId);
-            
+
             // State should be updated
             state = router.getNavigationState();
             expect(state.currentTrackId).toBe(trackId);
             expect(state.viewingTrackId).toBe(trackId);
             expect(state.isNavigating).toBe(false);
-            
+
             // Clear track
             await router.clearCurrentTrack();
-            
+
             // State should be cleared
             state = router.getNavigationState();
             expect(state.currentTrackId).toBeNull();
             expect(state.viewingTrackId).toBeNull();
             expect(state.previousTrackId).toBe(trackId);
-            
+
             router.destroy();
-          }
+          },
         ),
-        { numRuns: 50 }
+        { numRuns: 50 },
       );
     });
 
@@ -252,7 +247,7 @@ describe('TrackRouter', () => {
     it('should restore track from URL on initialization', async () => {
       await fc.assert(
         fc.asyncProperty(
-          fc.string({ minLength: 1, maxLength: 20 }).filter(s => /^[a-zA-Z0-9_-]+$/.test(s)),
+          fc.string({ minLength: 1, maxLength: 20 }).filter((s) => /^[a-zA-Z0-9_-]+$/.test(s)),
           async (trackId) => {
             // Set up legacy URL with track parameter (still supported as a fallback)
             mockLocation.href = `https://example.com/?track=${trackId}`;
@@ -260,13 +255,13 @@ describe('TrackRouter', () => {
             mockLocation.search = `?track=${trackId}`;
             mockHistory.pushState.mockClear();
             mockHistory.replaceState.mockClear();
-            
+
             const onTrackChange = vi.fn();
             const router = new TrackRouter({ onTrackChange });
-            
+
             // Initialize should restore track from URL
             await router.initialize();
-            
+
             // Verify track was restored; the third argument is the (absent) step
             const state = router.getNavigationState();
             expect(state.currentTrackId).toBe(trackId);
@@ -275,11 +270,11 @@ describe('TrackRouter', () => {
             // Restoring must not rewrite the URL the user landed on
             expect(mockHistory.pushState).not.toHaveBeenCalled();
             expect(mockHistory.replaceState).not.toHaveBeenCalled();
-            
+
             router.destroy();
-          }
+          },
         ),
-        { numRuns: 50 }
+        { numRuns: 50 },
       );
     });
 
@@ -304,7 +299,7 @@ describe('TrackRouter', () => {
 
           router.destroy();
         }),
-        { numRuns: 50 }
+        { numRuns: 50 },
       );
     });
 
@@ -328,45 +323,45 @@ describe('TrackRouter', () => {
       await fc.assert(
         fc.asyncProperty(
           fc.array(
-            fc.string({ minLength: 1, maxLength: 20 }).filter(s => /^[a-zA-Z0-9_-]+$/.test(s)),
-            { minLength: 1, maxLength: 3 }
+            fc.string({ minLength: 1, maxLength: 20 }).filter((s) => /^[a-zA-Z0-9_-]+$/.test(s)),
+            { minLength: 1, maxLength: 3 },
           ),
           async (trackIds) => {
             const onTrackChange = vi.fn();
             const onNavigationStart = vi.fn();
             const onNavigationComplete = vi.fn();
-            
+
             const router = new TrackRouter({
               onTrackChange,
               onNavigationStart,
               onNavigationComplete,
             });
-            
+
             await router.initialize();
-            
+
             let previousTrackId: string | null = null;
-            
+
             for (const trackId of trackIds) {
               await router.navigateToTrack(trackId);
-              
+
               // Verify callbacks were called
               expect(onNavigationStart).toHaveBeenCalledWith(trackId);
               expect(onNavigationComplete).toHaveBeenCalledWith(trackId);
               // Third argument is the step; none was requested
               expect(onTrackChange).toHaveBeenLastCalledWith(trackId, previousTrackId, undefined);
-              
+
               previousTrackId = trackId;
             }
-            
+
             // Verify total call counts
             expect(onNavigationStart).toHaveBeenCalledTimes(trackIds.length);
             expect(onNavigationComplete).toHaveBeenCalledTimes(trackIds.length);
             expect(onTrackChange).toHaveBeenCalledTimes(trackIds.length);
-            
+
             router.destroy();
-          }
+          },
         ),
-        { numRuns: 30 }
+        { numRuns: 30 },
       );
     });
   });

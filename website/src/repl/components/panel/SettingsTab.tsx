@@ -22,26 +22,26 @@ export function Checkbox({ label, value, onChange, disabled = false }: CheckboxP
   return (
     <label className="flex items-center gap-3 cursor-pointer group">
       <div className="relative">
-        <input
-          disabled={disabled}
-          type="checkbox"
-          checked={value}
-          onChange={onChange}
-          className="sr-only"
-        />
-        <div className={`w-5 h-5 rounded-md border-2 transition-all duration-200 flex items-center justify-center ${
-          value 
-            ? 'bg-foreground border-foreground' 
-            : 'border-lineHighlight bg-transparent hover:border-foreground'
-        } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+        <input disabled={disabled} type="checkbox" checked={value} onChange={onChange} className="sr-only" />
+        <div
+          className={`w-5 h-5 rounded-md border-2 transition-all duration-200 flex items-center justify-center ${
+            value ? 'bg-foreground border-foreground' : 'border-lineHighlight bg-transparent hover:border-foreground'
+          } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
           {value && (
             <svg className="w-3 h-3 text-background" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              <path
+                fillRule="evenodd"
+                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                clipRule="evenodd"
+              />
             </svg>
           )}
         </div>
       </div>
-      <span className={`text-sm font-medium transition-colors ${disabled ? 'text-foreground opacity-50' : 'text-foreground group-hover:text-foreground'}`}>
+      <span
+        className={`text-sm font-medium transition-colors ${disabled ? 'text-foreground opacity-50' : 'text-foreground group-hover:text-foreground'}`}
+      >
         {label}
       </span>
     </label>
@@ -124,19 +124,9 @@ interface FormItemProps {
 function FormItem({ label, children, sublabel }: FormItemProps) {
   return (
     <div className="bg-background bg-opacity-40 backdrop-blur-sm rounded-xl p-6 border border-lineHighlight border-opacity-20 hover:border-opacity-40 transition-all duration-300 shadow-sm hover:shadow-md">
-      {label && (
-        <label className="block text-base font-semibold text-foreground mb-4">
-          {label}
-        </label>
-      )}
-      <div className="space-y-3">
-        {children}
-      </div>
-      {sublabel && (
-        <p className="text-sm text-foreground opacity-60 mt-3 leading-relaxed">
-          {sublabel}
-        </p>
-      )}
+      {label && <label className="block text-base font-semibold text-foreground mb-4">{label}</label>}
+      <div className="space-y-3">{children}</div>
+      {sublabel && <p className="text-sm text-foreground opacity-60 mt-3 leading-relaxed">{sublabel}</p>}
     </div>
   );
 }
@@ -315,9 +305,7 @@ export function SettingsTab({ started, mixer, smoothTransitionManager }: Setting
             {isAutosaveEnabled && (
               <div className="space-y-3 bg-opacity-20 rounded-lg">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    {t('autosaveInterval')}
-                  </label>
+                  <label className="block text-sm font-medium text-foreground mb-2">{t('autosaveInterval')}</label>
                   <NumberSlider
                     value={autosaveInterval / 1000}
                     onChange={(seconds) => settingsMap.setKey('autosaveInterval', seconds * 1000)}
@@ -332,14 +320,16 @@ export function SettingsTab({ started, mixer, smoothTransitionManager }: Setting
           </div>
         </FormItem>
 
-        <FormItem label={
-          <div className="flex items-center gap-2">
-            <span>{t('codeFormatting')}</span>
-            <span className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 rounded-md border border-yellow-500/30">
-              {t('experimental')}
-            </span>
-          </div>
-        }>
+        <FormItem
+          label={
+            <div className="flex items-center gap-2">
+              <span>{t('codeFormatting')}</span>
+              <span className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 rounded-md border border-yellow-500/30">
+                {t('experimental')}
+              </span>
+            </div>
+          }
+        >
           <div className="space-y-4">
             <Checkbox
               label={t('prettierEnabled')}
@@ -349,7 +339,7 @@ export function SettingsTab({ started, mixer, smoothTransitionManager }: Setting
               value={isPrettierEnabled}
             />
             <p className="text-xs text-foreground opacity-60">{t('prettierDescription')}</p>
-            
+
             {isPrettierEnabled && (
               <div className="space-y-4 p-4 bg-opacity-20 rounded-lg border border-lineHighlight border-opacity-20">
                 <Checkbox
@@ -359,12 +349,10 @@ export function SettingsTab({ started, mixer, smoothTransitionManager }: Setting
                   }}
                   value={prettierAutoFormatOnSave}
                 />
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {t('prettierTabWidth')}
-                    </label>
+                    <label className="block text-sm font-medium text-foreground mb-2">{t('prettierTabWidth')}</label>
                     <NumberSlider
                       value={prettierTabWidth}
                       onChange={(value) => settingsMap.setKey('prettierTabWidth', value)}
@@ -374,11 +362,9 @@ export function SettingsTab({ started, mixer, smoothTransitionManager }: Setting
                     />
                     <p className="text-xs text-foreground opacity-60 mt-1">{t('prettierTabWidthDescription')}</p>
                   </div>
-                  
+
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {t('prettierPrintWidth')}
-                    </label>
+                    <label className="block text-sm font-medium text-foreground mb-2">{t('prettierPrintWidth')}</label>
                     <NumberSlider
                       value={prettierPrintWidth}
                       onChange={(value) => settingsMap.setKey('prettierPrintWidth', value)}
@@ -398,7 +384,7 @@ export function SettingsTab({ started, mixer, smoothTransitionManager }: Setting
                     }}
                     value={prettierUseTabs}
                   />
-                  
+
                   <Checkbox
                     label={t('prettierSemi')}
                     onChange={(cbEvent) => {
@@ -406,7 +392,7 @@ export function SettingsTab({ started, mixer, smoothTransitionManager }: Setting
                     }}
                     value={prettierSemi}
                   />
-                  
+
                   <Checkbox
                     label={t('prettierSingleQuote')}
                     onChange={(cbEvent) => {
@@ -414,7 +400,7 @@ export function SettingsTab({ started, mixer, smoothTransitionManager }: Setting
                     }}
                     value={prettierSingleQuote}
                   />
-                  
+
                   <Checkbox
                     label={t('prettierBracketSpacing')}
                     onChange={(cbEvent) => {
@@ -426,43 +412,39 @@ export function SettingsTab({ started, mixer, smoothTransitionManager }: Setting
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {t('prettierQuoteProps')}
-                    </label>
+                    <label className="block text-sm font-medium text-foreground mb-2">{t('prettierQuoteProps')}</label>
                     <SelectInput
                       options={{
                         'as-needed': t('prettierQuotePropsAsNeeded'),
-                        'consistent': t('prettierQuotePropsConsistent'),
-                        'preserve': t('prettierQuotePropsPreserve')
+                        consistent: t('prettierQuotePropsConsistent'),
+                        preserve: t('prettierQuotePropsPreserve'),
                       }}
                       value={prettierQuoteProps}
                       onChange={(value) => settingsMap.setKey('prettierQuoteProps', value)}
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-2">
                       {t('prettierTrailingComma')}
                     </label>
                     <SelectInput
                       options={{
-                        'none': t('prettierTrailingCommaNone'),
-                        'es5': t('prettierTrailingCommaEs5'),
-                        'all': t('prettierTrailingCommaAll')
+                        none: t('prettierTrailingCommaNone'),
+                        es5: t('prettierTrailingCommaEs5'),
+                        all: t('prettierTrailingCommaAll'),
                       }}
                       value={prettierTrailingComma}
                       onChange={(value) => settingsMap.setKey('prettierTrailingComma', value)}
                     />
                   </div>
-                  
+
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      {t('prettierArrowParens')}
-                    </label>
+                    <label className="block text-sm font-medium text-foreground mb-2">{t('prettierArrowParens')}</label>
                     <SelectInput
                       options={{
-                        'avoid': t('prettierArrowParensAvoid'),
-                        'always': t('prettierArrowParensAlways')
+                        avoid: t('prettierArrowParensAvoid'),
+                        always: t('prettierArrowParensAlways'),
                       }}
                       value={prettierArrowParens}
                       onChange={(value) => settingsMap.setKey('prettierArrowParens', value)}
@@ -471,18 +453,14 @@ export function SettingsTab({ started, mixer, smoothTransitionManager }: Setting
                 </div>
 
                 <div className="mt-4 p-3 bg-gray-800/20 rounded-lg">
-                  <h4 className="text-sm font-semibold text-gray-300 mb-2">
-                    {t('prettierPreview')}
-                  </h4>
+                  <h4 className="text-sm font-semibold text-gray-300 mb-2">{t('prettierPreview')}</h4>
                   <pre className="text-xs text-gray-400 bg-gray-900/40 p-2 rounded overflow-x-auto">
-{`const example = {
+                    {`const example = {
   name: "test",
   value: 42
 };`}
                   </pre>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {t('prettierPreviewDescription')}
-                  </p>
+                  <p className="text-xs text-gray-500 mt-2">{t('prettierPreviewDescription')}</p>
                 </div>
               </div>
             )}

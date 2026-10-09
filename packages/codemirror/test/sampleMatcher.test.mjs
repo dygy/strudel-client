@@ -15,7 +15,7 @@ describe('CaseInsensitiveSampleMatcher', () => {
     it('should match exact names case-insensitively', () => {
       const samples = ['bd', 'hh', 'cp', 'RolandTR909'];
       const results = matcher.match(samples, 'roland');
-      
+
       expect(results.length).toBeGreaterThan(0);
       expect(results[0].name).toBe('RolandTR909');
       expect(results[0].matchType).toBe('prefix');
@@ -24,8 +24,8 @@ describe('CaseInsensitiveSampleMatcher', () => {
     it('should match prefixes case-insensitively', () => {
       const samples = ['bd', 'bass', 'bassline', 'RolandTR909'];
       const results = matcher.match(samples, 'bas');
-      
-      const names = results.map(r => r.name);
+
+      const names = results.map((r) => r.name);
       expect(names).toContain('bass');
       expect(names).toContain('bassline');
     });
@@ -33,7 +33,7 @@ describe('CaseInsensitiveSampleMatcher', () => {
     it('should match substrings case-insensitively', () => {
       const samples = ['bd', 'RolandTR909', 'gm_church_organ'];
       const results = matcher.match(samples, 'roland');
-      
+
       expect(results.length).toBeGreaterThan(0);
       expect(results[0].name).toBe('RolandTR909');
     });
@@ -41,14 +41,14 @@ describe('CaseInsensitiveSampleMatcher', () => {
     it('should preserve original capitalization', () => {
       const samples = ['RolandTR909', 'PULSE', 'gm_Church_Organ'];
       const results = matcher.match(samples, 'roland');
-      
+
       expect(results[0].name).toBe('RolandTR909'); // Original case preserved
     });
 
     it('should rank exact matches highest', () => {
       const samples = ['bd', 'bd_long', 'subd'];
       const results = matcher.match(samples, 'bd');
-      
+
       expect(results[0].name).toBe('bd'); // Exact match first
       expect(results[0].score).toBeGreaterThan(results[1].score);
     });
@@ -56,7 +56,7 @@ describe('CaseInsensitiveSampleMatcher', () => {
     it('should rank prefix matches over substring matches', () => {
       const samples = ['subd', 'bd', 'bd_long'];
       const results = matcher.match(samples, 'bd');
-      
+
       // 'bd' (exact) should be first, then 'bd_long' (prefix), then 'subd' (substring)
       expect(results[0].name).toBe('bd');
       expect(results[1].name).toBe('bd_long');
@@ -66,31 +66,31 @@ describe('CaseInsensitiveSampleMatcher', () => {
     it('should limit results to maxResults', () => {
       const samples = Array.from({ length: 200 }, (_, i) => `sample${i}`);
       const results = matcher.match(samples, 'sample', 50);
-      
+
       expect(results.length).toBeLessThanOrEqual(50);
     });
 
     it('should handle empty fragment by returning all samples', () => {
       const samples = ['bd', 'hh', 'cp'];
       const results = matcher.match(samples, '');
-      
+
       expect(results.length).toBe(3);
     });
 
     it('should handle no matches gracefully', () => {
       const samples = ['bd', 'hh', 'cp'];
       const results = matcher.match(samples, 'xyz');
-      
+
       expect(results.length).toBe(0);
     });
 
     it('should match case variations correctly', () => {
       const samples = ['RolandTR909', 'PULSE', 'gm_church_organ'];
-      
+
       const results1 = matcher.match(samples, 'ROLAND');
       const results2 = matcher.match(samples, 'roland');
       const results3 = matcher.match(samples, 'Roland');
-      
+
       expect(results1[0].name).toBe('RolandTR909');
       expect(results2[0].name).toBe('RolandTR909');
       expect(results3[0].name).toBe('RolandTR909');
@@ -106,19 +106,19 @@ describe('CaseInsensitiveSampleMatcher', () => {
           fc.string({ minLength: 1, maxLength: 10 }),
           (samples, fragment) => {
             const results = matcher.match(samples, fragment);
-            
+
             // All results must contain fragment (case-insensitive)
-            results.forEach(result => {
+            results.forEach((result) => {
               expect(result.name.toLowerCase()).toContain(fragment.toLowerCase());
             });
-            
+
             // Original capitalization must be preserved
-            results.forEach(result => {
+            results.forEach((result) => {
               expect(samples).toContain(result.name);
             });
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -129,14 +129,14 @@ describe('CaseInsensitiveSampleMatcher', () => {
           fc.string({ minLength: 1, maxLength: 10 }),
           (samples, fragment) => {
             const results = matcher.match(samples, fragment);
-            
+
             // Check that scores are in descending order
             for (let i = 0; i < results.length - 1; i++) {
               expect(results[i].score).toBeGreaterThanOrEqual(results[i + 1].score);
             }
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -149,9 +149,9 @@ describe('CaseInsensitiveSampleMatcher', () => {
           (samples, fragment, maxResults) => {
             const results = matcher.match(samples, fragment, maxResults);
             expect(results.length).toBeLessThanOrEqual(maxResults);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });

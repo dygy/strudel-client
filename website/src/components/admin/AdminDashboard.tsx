@@ -91,9 +91,11 @@ export function AdminDashboard({ initialData }: AdminDashboardProps) {
     if (sortField !== field) {
       return <ChevronUpDownIcon className="w-4 h-4 text-gray-500 ml-1 inline" />;
     }
-    return sortOrder === 'asc'
-      ? <ChevronUpIcon className="w-4 h-4 ml-1 inline" />
-      : <ChevronDownIcon className="w-4 h-4 ml-1 inline" />;
+    return sortOrder === 'asc' ? (
+      <ChevronUpIcon className="w-4 h-4 ml-1 inline" />
+    ) : (
+      <ChevronDownIcon className="w-4 h-4 ml-1 inline" />
+    );
   };
 
   // Use fixed format to avoid hydration mismatch (locale-independent)
@@ -125,10 +127,7 @@ export function AdminDashboard({ initialData }: AdminDashboardProps) {
       <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
         <p className="font-bold">Error</p>
         <p>{error}</p>
-        <button
-          onClick={fetchUsers}
-          className="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-        >
+        <button onClick={fetchUsers} className="mt-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
           Retry
         </button>
       </div>
@@ -139,9 +138,7 @@ export function AdminDashboard({ initialData }: AdminDashboardProps) {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
-        <p className="text-gray-400 mt-1">
-          {total} users total
-        </p>
+        <p className="text-gray-400 mt-1">{total} users total</p>
       </div>
 
       {/* Users Table */}
@@ -167,30 +164,19 @@ export function AdminDashboard({ initialData }: AdminDashboardProps) {
               >
                 Last Active <SortIcon field="last_active" />
               </th>
-              <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">
-                Actions
-              </th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-foreground">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700">
             {users.map((user) => (
               <tr key={user.user_id} className="hover:bg-gray-700/50">
+                <td className="px-4 py-3 text-sm text-foreground">{user.email}</td>
                 <td className="px-4 py-3 text-sm text-foreground">
-                  {user.email}
+                  <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs">{user.track_count}</span>
                 </td>
-                <td className="px-4 py-3 text-sm text-foreground">
-                  <span className="bg-blue-600 text-white px-2 py-1 rounded text-xs">
-                    {user.track_count}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-400">
-                  {formatDate(user.last_active)}
-                </td>
+                <td className="px-4 py-3 text-sm text-gray-400">{formatDate(user.last_active)}</td>
                 <td className="px-4 py-3 text-sm">
-                  <a
-                    href={`/${user.user_id}/repl`}
-                    className="text-blue-400 hover:text-blue-300 hover:underline"
-                  >
+                  <a href={`/${user.user_id}/repl`} className="text-blue-400 hover:text-blue-300 hover:underline">
                     View REPL
                   </a>
                 </td>
@@ -208,7 +194,7 @@ export function AdminDashboard({ initialData }: AdminDashboardProps) {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
               className="px-3 py-1 bg-gray-700 text-foreground rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600"
             >
@@ -231,9 +217,7 @@ export function AdminDashboard({ initialData }: AdminDashboardProps) {
                   key={pageNum}
                   onClick={() => setPage(pageNum)}
                   className={`px-3 py-1 rounded ${
-                    page === pageNum
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-foreground hover:bg-gray-600'
+                    page === pageNum ? 'bg-blue-600 text-white' : 'bg-gray-700 text-foreground hover:bg-gray-600'
                   }`}
                 >
                   {pageNum}
@@ -241,7 +225,7 @@ export function AdminDashboard({ initialData }: AdminDashboardProps) {
               );
             })}
             <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
               className="px-3 py-1 bg-gray-700 text-foreground rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-600"
             >

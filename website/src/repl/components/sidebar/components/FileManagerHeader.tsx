@@ -46,25 +46,12 @@ export function FileManagerHeader({
     <div className="p-3 border-b border-gray-600">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-sm font-semibold">{t('tabs:files')}</h3>
-        <BurgerMenuButton
-          items={getEmptySpaceContextItems()}
-          size="sm"
-        />
+        <BurgerMenuButton items={getEmptySpaceContextItems()} size="sm" />
       </div>
 
       {/* Hidden file inputs */}
-      <input
-        id="file-import-input"
-        type="file"
-        accept=".js,.txt,.zip"
-        className="hidden"
-      />
-      <input
-        id="library-import-input"
-        type="file"
-        accept=".zip"
-        className="hidden"
-      />
+      <input id="file-import-input" type="file" accept=".js,.txt,.zip" className="hidden" />
+      <input id="library-import-input" type="file" accept=".zip" className="hidden" />
 
       {/* New track input */}
       {isCreating && (

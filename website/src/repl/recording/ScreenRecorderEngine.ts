@@ -28,11 +28,7 @@ interface ScreenChunkStore {
 const TIMER_INTERVAL_MS = 250;
 
 /** Ordered MIME type fallback chain (Req 3.2). */
-const MIME_CANDIDATES = [
-  'video/webm;codecs=vp9,opus',
-  'video/webm;codecs=vp8,opus',
-  'video/webm',
-] as const;
+const MIME_CANDIDATES = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'] as const;
 
 export class ScreenRecorderEngine {
   private audioContext: AudioContext | null;

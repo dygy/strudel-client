@@ -29,7 +29,12 @@ interface AuthenticatedReplEditorProps extends React.HTMLAttributes<HTMLDivEleme
   readOnly?: boolean;
 }
 
-function AuthenticatedReplContent({ context: externalContext, ssrData, readOnly = false, ...editorProps }: AuthenticatedReplEditorProps) {
+function AuthenticatedReplContent({
+  context: externalContext,
+  ssrData,
+  readOnly = false,
+  ...editorProps
+}: AuthenticatedReplEditorProps) {
   const { isAuthenticated, loading } = useAuth();
 
   // Create standard REPL context with readOnly option
@@ -68,22 +73,30 @@ function AuthenticatedReplContent({ context: externalContext, ssrData, readOnly 
   return (
     <div className="h-full flex flex-col relative" {...editorProps}>
       {/* Sync Error Display */}
-      {supabaseFileManager && typeof supabaseFileManager === 'object' && supabaseFileManager.isAuthenticated && supabaseFileManager.syncError && (
-        <div className="absolute top-16 right-4 z-40 bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded-lg max-w-sm">
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-sm">Sync Error: {supabaseFileManager.syncError}</span>
-            <button
-              onClick={() => supabaseFileManager.loadDataFromSupabase && supabaseFileManager.loadDataFromSupabase()}
-              className="ml-2 text-xs underline hover:no-underline"
-            >
-              Retry
-            </button>
+      {supabaseFileManager &&
+        typeof supabaseFileManager === 'object' &&
+        supabaseFileManager.isAuthenticated &&
+        supabaseFileManager.syncError && (
+          <div className="absolute top-16 right-4 z-40 bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded-lg max-w-sm">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span className="text-sm">Sync Error: {supabaseFileManager.syncError}</span>
+              <button
+                onClick={() => supabaseFileManager.loadDataFromSupabase && supabaseFileManager.loadDataFromSupabase()}
+                className="ml-2 text-xs underline hover:no-underline"
+              >
+                Retry
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Main REPL Editor - always use Supabase FileManager for authenticated users */}
       <ReplEditor

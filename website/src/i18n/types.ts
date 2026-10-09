@@ -125,7 +125,7 @@ export interface FilesTranslations {
   allTracksAndFoldersDeleted: string;
   loadingTracks: string;
   loadingTracksDescription: string;
-  
+
   // Nested objects for better organization
   errors: {
     loadFailed: string;
@@ -138,7 +138,7 @@ export interface FilesTranslations {
     saveFailed: string;
     renameFailed: string;
   };
-  
+
   success: {
     folderCreated: string;
     itemMoved: string;
@@ -319,5 +319,5 @@ export type MultiNamespaceTranslationFunction<T extends Namespace[]> = (
         : `${First}:${keyof Resources[First] & string}`
       : never
     : never,
-  options?: any
+  options?: any,
 ) => string;

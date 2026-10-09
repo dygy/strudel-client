@@ -24,8 +24,9 @@ export class RadioWidget extends WidgetType {
     let wrap = document.createElement('span');
     wrap.setAttribute('aria-hidden', 'true');
     wrap.className = 'cm-radio';
-    wrap.style = 'display:inline-flex;gap:4px;margin:0 6px;align-items:center;vertical-align:middle;transform:translateY(-1px)';
-    
+    wrap.style =
+      'display:inline-flex;gap:4px;margin:0 6px;align-items:center;vertical-align:middle;transform:translateY(-1px)';
+
     // Create a button for each option
     this.options.forEach((option) => {
       let button = wrap.appendChild(document.createElement('button'));
@@ -37,51 +38,51 @@ export class RadioWidget extends WidgetType {
       button.from = this.from;
       button.originalFrom = this.originalFrom;
       button.to = this.to;
-      
+
       // Style based on whether this option is selected
       const isSelected = String(option) === String(this.value);
       const getButtonStyle = (selected, hover = false) => {
-        const bg = selected ? '#4a9eff' : (hover ? '#444' : '#2a2a2a');
+        const bg = selected ? '#4a9eff' : hover ? '#444' : '#2a2a2a';
         const border = selected ? '#4a9eff' : '#555';
         const shadow = selected ? '0 0 0 2px rgba(74, 158, 255, 0.2)' : 'none';
         return `padding:4px 10px;cursor:pointer;border:1px solid ${border};border-radius:6px;background:${bg};color:#fff;font-size:11px;font-family:monospace;transition:all 0.15s ease;box-shadow:${shadow};font-weight:${selected ? '600' : '400'};min-width:32px;text-align:center`;
       };
-      
+
       button.style = getButtonStyle(isSelected);
-      
+
       button.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         const selectedValue = button.optionValue;
         let insert = String(selectedValue);
         const to = button.from + String(button.originalValue).length;
         let change = { from: button.from, to, insert };
-        
+
         // Update all buttons in this group
         Array.from(wrap.children).forEach((btn) => {
           const btnIsSelected = String(btn.optionValue) === String(selectedValue);
           btn.style = getButtonStyle(btnIsSelected);
           btn.originalValue = selectedValue;
         });
-        
+
         this.view.dispatch({ changes: change });
-        
+
         const id = getRadioID(button.originalFrom);
         window.postMessage({ type: 'cm-radio', value: selectedValue, id });
       });
-      
+
       button.addEventListener('mouseenter', () => {
         const isSelected = String(button.optionValue) === String(button.originalValue);
         button.style = getButtonStyle(isSelected, !isSelected);
       });
-      
+
       button.addEventListener('mouseleave', () => {
         const isSelected = String(button.optionValue) === String(button.originalValue);
         button.style = getButtonStyle(isSelected, false);
       });
     });
-    
+
     return wrap;
   }
 

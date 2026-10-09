@@ -1,9 +1,9 @@
 /**
  * ErrorNotifier - Centralized error notification system for AudioMixer
- * 
+ *
  * Manages error notifications with listeners, history tracking,
  * and typed error interfaces.
- * 
+ *
  * @class ErrorNotifier
  * @license AGPL-3.0-or-later
  */
@@ -17,7 +17,7 @@ export class ErrorNotifier {
 
   /**
    * Notify all listeners of an error
-   * 
+   *
    * @param {ErrorNotification} error - Error details
    */
   notify(error) {
@@ -31,7 +31,7 @@ export class ErrorNotifier {
     console[logLevel](`[AudioMixer] ${error.type}:`, error.message, error.details || '');
 
     // Notify all listeners
-    this.listeners.forEach(listener => {
+    this.listeners.forEach((listener) => {
       try {
         listener(error);
       } catch (err) {
@@ -48,7 +48,7 @@ export class ErrorNotifier {
 
   /**
    * Subscribe to error notifications
-   * 
+   *
    * @param {Function} listener - Callback function to receive errors
    * @returns {Function} Unsubscribe function
    */
@@ -59,7 +59,7 @@ export class ErrorNotifier {
 
   /**
    * Get error history
-   * 
+   *
    * @param {number} limit - Maximum number of errors to return
    * @returns {Array<ErrorNotification>} Recent errors
    */
@@ -76,12 +76,12 @@ export class ErrorNotifier {
 
   /**
    * Get error count by type
-   * 
+   *
    * @returns {Object} Error counts by type
    */
   getErrorCounts() {
     const counts = {};
-    this.errorHistory.forEach(error => {
+    this.errorHistory.forEach((error) => {
       counts[error.type] = (counts[error.type] || 0) + 1;
     });
     return counts;

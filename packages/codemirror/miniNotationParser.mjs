@@ -6,7 +6,7 @@ This program is free software: you can redistribute it and/or modify it under th
 
 /**
  * Mini-notation context parser for intelligent autocomplete
- * 
+ *
  * Parses Strudel's mini-notation syntax to identify pattern elements,
  * separators, and the current cursor context for providing appropriate completions.
  */
@@ -20,32 +20,27 @@ export class MiniNotationContextParser {
   parseContext(stringContent, cursorOffset) {
     // Find all separators in the content
     const separators = this.findSeparators(stringContent);
-    
+
     // Analyze colon context
     const colonContext = this.analyzeColonContext(stringContent, cursorOffset);
-    
+
     // Find the current element boundaries
     const { elementStart, elementEnd } = this._findElementBoundaries(
       stringContent,
       cursorOffset,
       separators,
-      colonContext
+      colonContext,
     );
-    
+
     // Extract the fragment being typed
     const fragment = stringContent.slice(elementStart, cursorOffset);
-    
+
     // Determine context type based on position and syntax
-    const contextType = this._determineContextType(
-      stringContent,
-      cursorOffset,
-      colonContext,
-      elementStart
-    );
-    
+    const contextType = this._determineContextType(stringContent, cursorOffset, colonContext, elementStart);
+
     // Calculate nesting depth
     const nestingDepth = this._calculateNestingDepth(stringContent, cursorOffset);
-    
+
     return {
       elementStart,
       elementEnd,
@@ -54,10 +49,10 @@ export class MiniNotationContextParser {
       inColonSyntax: colonContext.inColonSyntax,
       colonPosition: colonContext.colonPosition,
       parameterIndex: colonContext.parameterIndex,
-      nestingDepth
+      nestingDepth,
     };
   }
-  
+
   /**
    * Identify pattern separators and boundaries
    * @param {string} content - String content to analyze
@@ -67,10 +62,10 @@ export class MiniNotationContextParser {
     const separators = [];
     let nestingDepth = 0;
     let inParens = false;
-    
+
     for (let i = 0; i < content.length; i++) {
       const char = content[i];
-      
+
       // Track nesting depth
       if (char === '[' || char === '<' || char === '{') {
         nestingDepth++;
@@ -81,23 +76,23 @@ export class MiniNotationContextParser {
       } else if (char === ')') {
         inParens = false;
       }
-      
+
       // Only consider separators at depth 0 and outside parentheses
       if (nestingDepth === 0 && !inParens) {
         if (char === ' ' || char === ',') {
           separators.push(i);
         }
       }
-      
+
       // Commas inside braces are polymeter separators (depth 1)
       if (nestingDepth === 1 && content[i - 1] === '{' && char === ',') {
         separators.push(i);
       }
     }
-    
+
     return separators;
   }
-  
+
   /**
    * Find all separators including those inside nested structures
    * @private
@@ -107,26 +102,26 @@ export class MiniNotationContextParser {
   _findAllSeparators(content) {
     const separators = [];
     let inParens = false;
-    
+
     for (let i = 0; i < content.length; i++) {
       const char = content[i];
-      
+
       // Track parentheses
       if (char === '(') {
         inParens = true;
       } else if (char === ')') {
         inParens = false;
       }
-      
+
       // Find all separators except those in parentheses
       if (!inParens && (char === ' ' || char === ',')) {
         separators.push(i);
       }
     }
-    
+
     return separators;
   }
-  
+
   /**
    * Determine if position is in colon syntax context
    * @param {string} content - String content
@@ -138,10 +133,10 @@ export class MiniNotationContextParser {
     let elementStart = 0;
     let nestingDepth = 0;
     let inParens = false;
-    
+
     for (let i = position - 1; i >= 0; i--) {
       const char = content[i];
-      
+
       // Track nesting (backwards)
       if (char === ']' || char === '>' || char === '}') {
         nestingDepth++;
@@ -152,17 +147,17 @@ export class MiniNotationContextParser {
       } else if (char === '(') {
         inParens = false;
       }
-      
+
       // Found a separator at depth 0
       if (nestingDepth === 0 && !inParens && (char === ' ' || char === ',')) {
         elementStart = i + 1;
         break;
       }
     }
-    
+
     // Extract the current element
     const element = content.slice(elementStart, position);
-    
+
     // Count colons in the element
     const colons = [];
     for (let i = 0; i < element.length; i++) {
@@ -170,29 +165,29 @@ export class MiniNotationContextParser {
         colons.push(elementStart + i);
       }
     }
-    
+
     if (colons.length === 0) {
       return {
         inColonSyntax: false,
         colonPosition: -1,
-        parameterIndex: 0
+        parameterIndex: 0,
       };
     }
-    
+
     // Determine parameter index based on colon count
     // Format: sample:n:gain
     // 0 colons = sample (index 0)
     // 1 colon = n (index 1)
     // 2+ colons = gain (index 2)
     const parameterIndex = Math.min(colons.length, 2);
-    
+
     return {
       inColonSyntax: true,
       colonPosition: colons[colons.length - 1],
-      parameterIndex
+      parameterIndex,
     };
   }
-  
+
   /**
    * Find element boundaries around cursor position
    * @private
@@ -200,7 +195,7 @@ export class MiniNotationContextParser {
   _findElementBoundaries(content, position, separators, colonContext) {
     // Use all separators (including nested ones) for element boundary detection
     const allSeparators = this._findAllSeparators(content);
-    
+
     // If in colon syntax, element continues across colons
     if (colonContext.inColonSyntax) {
       // Find element start (last separator before first colon)
@@ -211,7 +206,7 @@ export class MiniNotationContextParser {
           break;
         }
       }
-      
+
       // Find element end (next separator after position)
       let elementEnd = content.length;
       for (const sep of allSeparators) {
@@ -220,60 +215,60 @@ export class MiniNotationContextParser {
           break;
         }
       }
-      
+
       return { elementStart, elementEnd };
     }
-    
+
     // Not in colon syntax - find boundaries using separators and brackets
     let elementStart = position;
     let elementEnd = content.length;
-    
+
     // Work backwards to find element start
     // Priority: separators first, then opening brackets
     let foundSeparator = false;
     for (let i = position - 1; i >= 0; i--) {
       const char = content[i];
-      
+
       // Check if this position is a separator (highest priority)
       if (allSeparators.includes(i)) {
         elementStart = i + 1;
         foundSeparator = true;
         break;
       }
-      
+
       // Opening brackets mark boundaries only if no separator found yet
       if (!foundSeparator && (char === '[' || char === '<' || char === '{')) {
         elementStart = i + 1;
         break;
       }
-      
+
       // If we reach the start
       if (i === 0) {
         elementStart = 0;
         break;
       }
     }
-    
+
     // Work forwards to find element end
     for (let i = position; i < content.length; i++) {
       const char = content[i];
-      
+
       // Check if this position is a separator
       if (allSeparators.includes(i)) {
         elementEnd = i;
         break;
       }
-      
+
       // Closing brackets also mark element boundaries
       if (char === ']' || char === '>' || char === '}') {
         elementEnd = i;
         break;
       }
     }
-    
+
     return { elementStart, elementEnd };
   }
-  
+
   /**
    * Determine context type based on position
    * @private
@@ -288,7 +283,7 @@ export class MiniNotationContextParser {
     if (parenDepth > 0) {
       return 'euclidean_param';
     }
-    
+
     // Check if after @ (weight syntax)
     for (let i = position - 1; i >= elementStart; i--) {
       if (content[i] === '@') {
@@ -298,7 +293,7 @@ export class MiniNotationContextParser {
         break;
       }
     }
-    
+
     // Check colon syntax position
     if (colonContext.inColonSyntax) {
       if (colonContext.parameterIndex === 0) {
@@ -309,11 +304,11 @@ export class MiniNotationContextParser {
         return 'gain';
       }
     }
-    
+
     // Default: sample name context
     return 'sample_name';
   }
-  
+
   /**
    * Calculate nesting depth at position
    * @private

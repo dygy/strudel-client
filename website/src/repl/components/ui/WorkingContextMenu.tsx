@@ -32,7 +32,7 @@ export function WorkingContextMenu({ items, children }: WorkingContextMenuProps)
     event.stopPropagation();
 
     // Close all other open menus
-    openMenus.forEach(closeMenu => closeMenu());
+    openMenus.forEach((closeMenu) => closeMenu());
     openMenus.clear();
 
     // Calculate smart positioning based on viewport
@@ -104,11 +104,7 @@ export function WorkingContextMenu({ items, children }: WorkingContextMenuProps)
 
   return (
     <>
-      <div
-        className="h-full"
-        onContextMenu={showMenu}
-        style={{ position: 'relative' }}
-      >
+      <div className="h-full" onContextMenu={showMenu} style={{ position: 'relative' }}>
         {children}
       </div>
 
@@ -121,7 +117,7 @@ export function WorkingContextMenu({ items, children }: WorkingContextMenuProps)
             top: y,
             minWidth: '150px',
             pointerEvents: 'auto',
-            zIndex: 10000
+            zIndex: 10000,
           }}
         >
           {items.map((item, index) => (
@@ -131,8 +127,8 @@ export function WorkingContextMenu({ items, children }: WorkingContextMenuProps)
               ) : (
                 <button
                   className={`w-full text-left px-3 py-2 flex items-center gap-2 text-sm transition-colors ${
-                    item.disabled 
-                      ? 'text-foreground/50 cursor-not-allowed' 
+                    item.disabled
+                      ? 'text-foreground/50 cursor-not-allowed'
                       : 'text-foreground hover:bg-lineHighlight cursor-pointer'
                   } ${item.className || ''}`}
                   onClick={() => {

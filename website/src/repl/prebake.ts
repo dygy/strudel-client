@@ -190,9 +190,6 @@ const maxPan = noteToMidi('C8');
  */
 const panwidth = (pan: number, width: number): number => pan * width + (1 - width) / 2;
 
-
-
-
 (Pattern.prototype as any).piano = function () {
   return this.fmap((v: any) => ({ ...v, clip: v.clip ?? 1 })) // set clip if not already set..
     .s('piano')

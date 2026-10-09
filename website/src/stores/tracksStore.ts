@@ -134,7 +134,9 @@ export const tracksActions = {
       return acc;
     }, {});
 
-    console.log(`TracksStore - Initialized with ${Object.keys(tracksObj).length} tracks, ${Object.keys(foldersObj).length} folders`);
+    console.log(
+      `TracksStore - Initialized with ${Object.keys(tracksObj).length} tracks, ${Object.keys(foldersObj).length} folders`,
+    );
 
     tracksStore.set({
       tracks: tracksObj,
@@ -171,7 +173,9 @@ export const tracksActions = {
         return acc;
       }, {});
 
-      console.log(`TracksStore - Loaded ${Object.keys(tracksObj).length} tracks, ${Object.keys(foldersObj).length} folders from API`);
+      console.log(
+        `TracksStore - Loaded ${Object.keys(tracksObj).length} tracks, ${Object.keys(foldersObj).length} folders from API`,
+      );
 
       tracksStore.set({
         tracks: tracksObj,
@@ -333,9 +337,7 @@ export const tracksActions = {
     }
 
     // Smart criteria: prefer recently modified tracks, exclude empty tracks
-    const validTracks = tracks.filter(track =>
-      track.code && track.code.trim().length > 0
-    );
+    const validTracks = tracks.filter((track) => track.code && track.code.trim().length > 0);
 
     if (validTracks.length === 0) {
       // If no valid tracks, return any track
@@ -344,7 +346,7 @@ export const tracksActions = {
 
     // Weight by modification date (more recent = higher weight)
     const now = Date.now();
-    const tracksWithWeights = validTracks.map(track => {
+    const tracksWithWeights = validTracks.map((track) => {
       const modifiedTime = new Date(track.modified).getTime();
       const daysSinceModified = (now - modifiedTime) / (1000 * 60 * 60 * 24);
       // Higher weight for more recently modified tracks
@@ -405,18 +407,28 @@ export const tracksActions = {
 
         // Find track by slug and folder path
         const tracks = Object.values(updatedState.tracks);
-        targetTrack = tracks.find(track => {
-          const trackSlug = track.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-          const trackMatches = trackSlug === targetTrackSlug;
-          const folderMatches = (track.folder || null) === (targetFolderPath || null);
-          return trackMatches && folderMatches;
-        }) || null;
+        targetTrack =
+          tracks.find((track) => {
+            const trackSlug = track.name
+              .toLowerCase()
+              .trim()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-+|-+$/g, '');
+            const trackMatches = trackSlug === targetTrackSlug;
+            const folderMatches = (track.folder || null) === (targetFolderPath || null);
+            return trackMatches && folderMatches;
+          }) || null;
 
         if (targetTrack) {
           console.log('TracksStore: Loading specific track from path:', targetTrack.name, 'ID:', targetTrack.id);
           shouldSelectRandom = false;
         } else {
-          console.warn('TracksStore: Track from path not found in loaded tracks:', targetTrackSlug, 'folder:', targetFolderPath);
+          console.warn(
+            'TracksStore: Track from path not found in loaded tracks:',
+            targetTrackSlug,
+            'folder:',
+            targetFolderPath,
+          );
         }
       } else {
         console.log('TracksStore: No target track slug provided');

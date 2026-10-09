@@ -8,7 +8,7 @@ let cacheAPI: any = null;
 // Initialize cache API
 const initializeCacheAPI = async () => {
   try {
-    const webaudioModule = await import('@strudel/webaudio') as any;
+    const webaudioModule = (await import('@strudel/webaudio')) as any;
     if (webaudioModule.configureSampleCache) {
       cacheAPI = {
         configure: webaudioModule.configureSampleCache,
@@ -67,9 +67,9 @@ export function SampleCacheSettings() {
     const setupCacheAPI = async () => {
       const initialized = await initializeCacheAPI();
       if (!initialized) return;
-      
+
       setIsSupported(true);
-      
+
       // Load initial config and stats
       try {
         const initialConfig = cacheAPI.getConfig();
@@ -117,10 +117,10 @@ export function SampleCacheSettings() {
 
   const handleConfigChange = (key: keyof CacheConfig, value: any) => {
     if (!cacheAPI) return;
-    
+
     const newConfig = { ...config, [key]: value };
     setConfig(newConfig);
-    
+
     try {
       cacheAPI.configure(newConfig);
     } catch (error) {
@@ -130,7 +130,7 @@ export function SampleCacheSettings() {
 
   const handleClearCache = () => {
     if (!cacheAPI) return;
-    
+
     try {
       cacheAPI.clearCache();
       setStats({
@@ -159,9 +159,7 @@ export function SampleCacheSettings() {
     <div className="space-y-6 text-foreground">
       <div>
         <h3 className="text-lg font-medium mb-4 text-foreground">{t('sampleCache.title')}</h3>
-        <p className="text-sm text-foreground/70 mb-4">
-          {t('sampleCache.description')}
-        </p>
+        <p className="text-sm text-foreground/70 mb-4">{t('sampleCache.description')}</p>
       </div>
 
       {/* Cache Status */}
@@ -195,7 +193,7 @@ export function SampleCacheSettings() {
             <span className="ml-2 font-mono text-foreground">{stats.evictionCount}</span>
           </div>
         </div>
-        
+
         {/* Cache usage bar */}
         <div className="mt-3">
           <div className="flex justify-between text-xs text-foreground/70 mb-1">
@@ -214,7 +212,7 @@ export function SampleCacheSettings() {
       {/* Cache Settings */}
       <div className="space-y-4">
         <h4 className="font-medium text-foreground">{t('sampleCache.configuration')}</h4>
-        
+
         {/* Enable Cache */}
         <Checkbox
           label={t('sampleCache.enabled')}

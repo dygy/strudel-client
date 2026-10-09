@@ -30,7 +30,9 @@ export function FileManagerFooter({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1">
             <PencilIcon className="w-3 h-3" />
-            <span>{t('files:editing')}: {tracks[selectedTrack].name}</span>
+            <span>
+              {t('files:editing')}: {tracks[selectedTrack].name}
+            </span>
           </div>
           <button
             onClick={onSaveCurrentTrack}
@@ -55,13 +57,13 @@ export function FileManagerFooter({
       {activePattern && tracks[activePattern] && (
         <div className="flex items-center gap-1">
           <MusicalNoteIcon className="w-3 h-3" />
-          <span>{t('files:playing')}: {tracks[activePattern].name}</span>
+          <span>
+            {t('files:playing')}: {tracks[activePattern].name}
+          </span>
         </div>
       )}
       {saveStatus && (
-        <div className={`text-xs ${saveStatus === 'Saved!' ? 'text-green-400' : 'text-yellow-400'}`}>
-          {saveStatus}
-        </div>
+        <div className={`text-xs ${saveStatus === 'Saved!' ? 'text-green-400' : 'text-yellow-400'}`}>{saveStatus}</div>
       )}
     </div>
   );

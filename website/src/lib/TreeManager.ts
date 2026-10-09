@@ -1,4 +1,4 @@
- /**
+/**
  * TreeManager Service Layer
  * Bridges in-memory TreeEngine with Supabase database operations
  * Provides async database operations with authentication integration
@@ -7,7 +7,16 @@
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { TreeEngine, createFolderNode, createTrackNode } from './TreeSystem';
-import type { TreeNode, TrackNode, FolderNode, SearchQuery, SearchResult, ValidationResult, TreeStatistics, NodeStatistics } from './TreeSystem';
+import type {
+  TreeNode,
+  TrackNode,
+  FolderNode,
+  SearchQuery,
+  SearchResult,
+  ValidationResult,
+  TreeStatistics,
+  NodeStatistics,
+} from './TreeSystem';
 
 export interface TreeManagerConfig {
   userId: string;
@@ -79,14 +88,14 @@ export class TreeManager {
       // Fallback: try to create client from environment
       const supabaseUrl = process.env.PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
       const supabaseKey = process.env.PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-      
+
       if (!supabaseUrl || !supabaseKey) {
         throw new Error('Supabase client not provided and environment variables not found');
       }
-      
+
       this.supabase = createClient(supabaseUrl, supabaseKey);
     }
-    
+
     this.userId = config.userId;
     this.engine = new TreeEngine(config.userId);
   }
@@ -130,12 +139,7 @@ export class TreeManager {
     let node: TreeNode;
 
     if (request.type === 'folder') {
-      node = createFolderNode(
-        request.name,
-        this.userId,
-        request.parentId || null,
-        request.metadata || {}
-      );
+      node = createFolderNode(request.name, this.userId, request.parentId || null, request.metadata || {});
     } else {
       node = createTrackNode(
         request.name,
@@ -143,9 +147,9 @@ export class TreeManager {
         this.userId,
         request.parentId || null,
         request.isMultitrack || false,
-        request.metadata || {}
+        request.metadata || {},
       );
-      
+
       if (request.steps) {
         (node as TrackNode).steps = request.steps;
       }
@@ -165,11 +169,7 @@ export class TreeManager {
     try {
       // Insert into database
       const dbNode = this.treeNodeToDbNode(node);
-      const { error } = await this.supabase
-        .from('tree_nodes')
-        .insert([dbNode])
-        .select()
-        .single();
+      const { error } = await this.supabase.from('tree_nodes').insert([dbNode]).select().single();
 
       if (error) {
         throw new Error(`Failed to create node: ${error.message}`);
@@ -207,7 +207,7 @@ export class TreeManager {
     try {
       // Prepare database update
       const dbUpdates: Partial<DatabaseTreeNode> = {
-        modified: new Date().toISOString()
+        modified: new Date().toISOString(),
       };
 
       if (updates.name !== undefined) dbUpdates.name = updates.name;
@@ -281,11 +281,7 @@ export class TreeManager {
     try {
       if (cascade) {
         // Database cascade delete is handled by foreign key constraints
-        const { error } = await this.supabase
-          .from('tree_nodes')
-          .delete()
-          .eq('id', nodeId)
-          .eq('user_id', this.userId);
+        const { error } = await this.supabase.from('tree_nodes').delete().eq('id', nodeId).eq('user_id', this.userId);
 
         if (error) {
           throw new Error(`Failed to delete node: ${error.message}`);
@@ -301,11 +297,7 @@ export class TreeManager {
         }
 
         // Delete the node
-        const { error } = await this.supabase
-          .from('tree_nodes')
-          .delete()
-          .eq('id', nodeId)
-          .eq('user_id', this.userId);
+        const { error } = await this.supabase.from('tree_nodes').delete().eq('id', nodeId).eq('user_id', this.userId);
 
         if (error) {
           throw new Error(`Failed to delete node: ${error.message}`);
@@ -333,9 +325,9 @@ export class TreeManager {
     try {
       const { error } = await this.supabase
         .from('tree_nodes')
-        .update({ 
+        .update({
           parent_id: newParentId,
-          modified: new Date().toISOString()
+          modified: new Date().toISOString(),
         })
         .eq('id', nodeId)
         .eq('user_id', this.userId);
@@ -365,11 +357,11 @@ export class TreeManager {
    */
   async getChildren(parentId: string | null): Promise<TreeNode[]> {
     await this.ensureLoaded();
-    
+
     if (parentId === null) {
       return this.engine.getRootNodes();
     }
-    
+
     return this.engine.getChildren(parentId);
   }
 
@@ -394,12 +386,16 @@ export class TreeManager {
    */
   async getSubtree(rootId: string, maxDepth?: number): Promise<TreeNode[]> {
     await this.ensureLoaded();
-    
+
     const subtree: TreeNode[] = [];
-    this.engine.depthFirstTraversal(rootId, (node) => {
-      subtree.push(node);
-    }, { maxDepth });
-    
+    this.engine.depthFirstTraversal(
+      rootId,
+      (node) => {
+        subtree.push(node);
+      },
+      { maxDepth },
+    );
+
     return subtree;
   }
 
@@ -427,7 +423,7 @@ export class TreeManager {
     await this.ensureLoaded();
     const regex = new RegExp(pattern, 'i');
     const matches = this.engine.findPathsByPattern(regex);
-    return matches.map(match => this.engine.getNode(match.nodeId)!).filter(Boolean);
+    return matches.map((match) => this.engine.getNode(match.nodeId)!).filter(Boolean);
   }
 
   /**
@@ -445,13 +441,13 @@ export class TreeManager {
     await this.ensureLoaded();
     const allNodes = this.engine.getAllNodes();
     const cycles: string[] = [];
-    
+
     for (const node of allNodes) {
       if (this.engine.detectCycle(node.id)) {
         cycles.push(node.id);
       }
     }
-    
+
     return cycles;
   }
 
@@ -461,7 +457,7 @@ export class TreeManager {
   async findOrphans(): Promise<TreeNode[]> {
     await this.ensureLoaded();
     const orphanIds = this.engine.findOrphanedNodes();
-    return orphanIds.map(id => this.engine.getNode(id)!).filter(Boolean);
+    return orphanIds.map((id) => this.engine.getNode(id)!).filter(Boolean);
   }
 
   /**
@@ -469,10 +465,10 @@ export class TreeManager {
    */
   async repairOrphans(targetParentId: string | null = null): Promise<string[]> {
     await this.ensureLoaded();
-    
+
     const orphans = await this.findOrphans();
     const repairedNodeIds: string[] = [];
-    
+
     try {
       for (const orphan of orphans) {
         // Validate target parent if specified
@@ -485,12 +481,12 @@ export class TreeManager {
             throw new Error('Target parent must be a folder');
           }
         }
-        
+
         // Update the orphan's parent
         await this.updateNode(orphan.id, { parentId: targetParentId });
         repairedNodeIds.push(orphan.id);
       }
-      
+
       return repairedNodeIds;
     } catch (error) {
       console.error('TreeManager: Failed to repair orphans:', error);
@@ -518,8 +514,8 @@ export class TreeManager {
             metadata: {
               ...descendant.metadata,
               deleted: true,
-              deletedAt: new Date().toISOString()
-            }
+              deletedAt: new Date().toISOString(),
+            },
           });
         }
       } else {
@@ -528,8 +524,8 @@ export class TreeManager {
           metadata: {
             ...node.metadata,
             deleted: true,
-            deletedAt: new Date().toISOString()
-          }
+            deletedAt: new Date().toISOString(),
+          },
         });
       }
     } catch (error) {
@@ -557,9 +553,9 @@ export class TreeManager {
           const newMetadata = { ...descendant.metadata };
           delete newMetadata.deleted;
           delete newMetadata.deletedAt;
-          
+
           await this.updateNode(descendant.id, {
-            metadata: newMetadata
+            metadata: newMetadata,
           });
         }
       } else {
@@ -567,9 +563,9 @@ export class TreeManager {
         const newMetadata = { ...node.metadata };
         delete newMetadata.deleted;
         delete newMetadata.deletedAt;
-        
+
         await this.updateNode(nodeId, {
-          metadata: newMetadata
+          metadata: newMetadata,
         });
       }
     } catch (error) {
@@ -583,9 +579,9 @@ export class TreeManager {
    */
   async getSoftDeletedNodes(): Promise<TreeNode[]> {
     await this.ensureLoaded();
-    
+
     const allNodes = await this.getAllNodes();
-    return allNodes.filter(node => node.metadata.deleted === true);
+    return allNodes.filter((node) => node.metadata.deleted === true);
   }
 
   /**
@@ -593,27 +589,27 @@ export class TreeManager {
    */
   async purgeOldSoftDeletedNodes(olderThanDays: number = 30): Promise<string[]> {
     await this.ensureLoaded();
-    
+
     const softDeletedNodes = await this.getSoftDeletedNodes();
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
-    
-    const nodesToPurge = softDeletedNodes.filter(node => {
+
+    const nodesToPurge = softDeletedNodes.filter((node) => {
       const deletedAt = node.metadata.deletedAt;
       if (!deletedAt) return false;
-      
+
       const deletedDate = new Date(deletedAt);
       return deletedDate < cutoffDate;
     });
-    
+
     const purgedNodeIds: string[] = [];
-    
+
     try {
       for (const node of nodesToPurge) {
         await this.deleteNode(node.id, true); // Hard delete
         purgedNodeIds.push(node.id);
       }
-      
+
       return purgedNodeIds;
     } catch (error) {
       console.error('TreeManager: Failed to purge old soft-deleted nodes:', error);
@@ -626,21 +622,21 @@ export class TreeManager {
    */
   async getTreeStats(): Promise<TreeStatistics> {
     await this.ensureLoaded();
-    
+
     const allNodes = this.engine.getAllNodes();
-    const folders = allNodes.filter(n => n.type === 'folder');
-    const tracks = allNodes.filter(n => n.type === 'track');
-    
-    const depths = allNodes.map(n => this.engine.getNodeDepth(n.id));
+    const folders = allNodes.filter((n) => n.type === 'folder');
+    const tracks = allNodes.filter((n) => n.type === 'track');
+
+    const depths = allNodes.map((n) => this.engine.getNodeDepth(n.id));
     const maxDepth = Math.max(...depths, 0);
     const averageDepth = depths.length > 0 ? depths.reduce((a, b) => a + b, 0) / depths.length : 0;
-    
+
     // Calculate nodes per level
     const nodesPerLevel: number[] = [];
     for (let i = 0; i <= maxDepth; i++) {
-      nodesPerLevel[i] = depths.filter(d => d === i).length;
+      nodesPerLevel[i] = depths.filter((d) => d === i).length;
     }
-    
+
     // Find largest subtree
     let largestSubtree = { nodeId: '', size: 0 };
     for (const node of allNodes) {
@@ -649,10 +645,10 @@ export class TreeManager {
         largestSubtree = { nodeId: node.id, size: subtreeSize };
       }
     }
-    
+
     // Find duplicate names
     const duplicateNames = this.engine.findDuplicateNames();
-    
+
     return {
       totalNodes: allNodes.length,
       totalFolders: folders.length,
@@ -661,7 +657,7 @@ export class TreeManager {
       averageDepth,
       nodesPerLevel,
       largestSubtree,
-      duplicateNames
+      duplicateNames,
     };
   }
 
@@ -670,31 +666,31 @@ export class TreeManager {
    */
   async getNodeStats(nodeId: string): Promise<NodeStatistics> {
     await this.ensureLoaded();
-    
+
     const node = this.engine.getNode(nodeId);
     if (!node) {
       throw new Error(`Node ${nodeId} not found`);
     }
-    
+
     const subtreeSize = await this.getSubtreeSize(nodeId);
     const depth = this.engine.getNodeDepth(nodeId);
     const children = this.engine.getChildren(nodeId);
     const path = this.engine.computePath(nodeId);
-    
+
     // Count all descendants
     let descendantCount = 0;
     this.engine.depthFirstTraversal(nodeId, () => {
       descendantCount++;
     });
     descendantCount--; // Don't count the node itself
-    
+
     return {
       nodeId,
       subtreeSize,
       depth,
       childCount: children.length,
       descendantCount,
-      pathLength: path.length
+      pathLength: path.length,
     };
   }
 
@@ -703,17 +699,17 @@ export class TreeManager {
    */
   async batchOperations(operations: BatchOperation[]): Promise<void> {
     await this.ensureLoaded();
-    
+
     // Use Supabase transaction for atomicity
     const { error } = await this.supabase.rpc('execute_batch_operations', {
       operations: operations,
-      user_id: this.userId
+      user_id: this.userId,
     });
-    
+
     if (error) {
       throw new Error(`Batch operations failed: ${error.message}`);
     }
-    
+
     // Reload tree to sync with database changes
     this.isLoaded = false;
     await this.loadTree();
@@ -768,7 +764,7 @@ export class TreeManager {
       userId: dbNode.user_id,
       created: dbNode.created,
       modified: dbNode.modified,
-      metadata: dbNode.metadata || {}
+      metadata: dbNode.metadata || {},
     };
 
     if (dbNode.type === 'track') {
@@ -778,7 +774,7 @@ export class TreeManager {
         code: dbNode.code || '',
         isMultitrack: dbNode.is_multitrack || false,
         steps: dbNode.steps,
-        activeStep: dbNode.active_step || 0
+        activeStep: dbNode.active_step || 0,
       };
       return trackNode;
     }
@@ -786,7 +782,9 @@ export class TreeManager {
     return baseNode as FolderNode;
   }
 
-  private treeNodeToDbNode(treeNode: TreeNode): Omit<DatabaseTreeNode, 'path_array' | 'depth' | 'created_at' | 'updated_at'> {
+  private treeNodeToDbNode(
+    treeNode: TreeNode,
+  ): Omit<DatabaseTreeNode, 'path_array' | 'depth' | 'created_at' | 'updated_at'> {
     const dbNode: Omit<DatabaseTreeNode, 'path_array' | 'depth' | 'created_at' | 'updated_at'> = {
       id: treeNode.id,
       user_id: treeNode.userId,
@@ -795,7 +793,7 @@ export class TreeManager {
       parent_id: treeNode.parentId,
       created: treeNode.created,
       modified: treeNode.modified,
-      metadata: treeNode.metadata
+      metadata: treeNode.metadata,
     };
 
     if (treeNode.type === 'track') {

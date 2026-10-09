@@ -408,9 +408,7 @@ describe('Bank Autocomplete Preservation Tests', () => {
           });
 
           // Case-insensitive prefix matching: the original bank should be in results
-          const hasMatch = result.options.some(
-            (opt) => opt.label.toLowerCase().startsWith(fragment.toLowerCase()),
-          );
+          const hasMatch = result.options.some((opt) => opt.label.toLowerCase().startsWith(fragment.toLowerCase()));
           expect(hasMatch).toBe(true);
         }),
         { numRuns: 50 },

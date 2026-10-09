@@ -37,11 +37,15 @@ declare global {
     interface IntrinsicElements {
       [elemName: string]: DetailedHTMLProps<HTMLAttributes<HTMLElement>, HTMLElement>;
     }
-    interface Element extends React.ReactElement<any, any> { }
+    interface Element extends React.ReactElement<any, any> {}
     interface ElementClass extends React.Component<any> {
       render(): React.ReactNode;
     }
-    interface ElementAttributesProperty { props: {}; }
-    interface ElementChildrenAttribute { children: {}; }
+    interface ElementAttributesProperty {
+      props: {};
+    }
+    interface ElementChildrenAttribute {
+      children: {};
+    }
   }
 }

@@ -5,15 +5,7 @@ import { logger } from '@strudel/core';
 import { WorkingContextMenu } from '../ui/WorkingContextMenu';
 import { InfoModal } from '../ui/InfoModal';
 import { toastActions } from '@src/stores/toastStore';
-import { 
-  PlayIcon, 
-  CopyIcon, 
-  FolderIcon, 
-  FileIcon, 
-  CodeIcon, 
-  InfoIcon,
-  DownloadIcon 
-} from '../ui/FileIcons';
+import { PlayIcon, CopyIcon, FolderIcon, FileIcon, CodeIcon, InfoIcon, DownloadIcon } from '../ui/FileIcons';
 import { useTranslation } from '@src/i18n';
 import { BurgerMenuButton } from '../ui/BurgerMenuButton';
 
@@ -30,9 +22,11 @@ interface PathEntry {
 export function FilesTab() {
   const [path, setPath] = useState<PathEntry[]>([]);
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [infoModalData, setInfoModalData] = useState<{ title: string; items: Array<{ label: string; value: string }> }>({ title: '', items: [] });
+  const [infoModalData, setInfoModalData] = useState<{ title: string; items: Array<{ label: string; value: string }> }>(
+    { title: '', items: [] },
+  );
   const { t } = useTranslation('files');
-  
+
   useEffect(() => {
     let init = false;
     readDir('', { dir, recursive: true })
@@ -47,7 +41,7 @@ export function FilesTab() {
   }, []);
 
   const current = useMemo(() => path[path.length - 1], [path]);
-  
+
   const subpath = useMemo(
     () =>
       path
@@ -56,27 +50,30 @@ export function FilesTab() {
         .join('/'),
     [path],
   );
-  
+
   const folders = useMemo(() => current?.children.filter((e) => !!e.children), [current]);
   const files = useMemo(() => current?.children.filter((e) => !e.children && isAudioFile(e.name)), [current]);
-  
+
   const select = (e: FileEntry) => setPath((p) => p.concat([e as PathEntry]));
 
   // Helper functions for context menu actions
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toastActions.success(t('pathCopied'));
-      logger(`Copied "${text}" to clipboard`, 'success');
-    }).catch(() => {
-      toastActions.error(t('copyFailed'));
-      logger('Failed to copy to clipboard', 'error');
-    });
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        toastActions.success(t('pathCopied'));
+        logger(`Copied "${text}" to clipboard`, 'success');
+      })
+      .catch(() => {
+        toastActions.error(t('copyFailed'));
+        logger('Failed to copy to clipboard', 'error');
+      });
   };
 
   const getFileInfo = (fileName: string, isFolder: boolean) => {
     const fullPath = subpath ? `${subpath}/${fileName}` : fileName;
-    
-    const items = isFolder 
+
+    const items = isFolder
       ? [
           { label: t('type'), value: t('folder') },
           { label: t('name'), value: fileName },
@@ -91,7 +88,7 @@ export function FilesTab() {
 
     setInfoModalData({
       title: `${isFolder ? t('folderProperties') : t('fileProperties')}`,
-      items
+      items,
     });
     setShowInfoModal(true);
   };
@@ -150,7 +147,7 @@ export function FilesTab() {
       onClick: () => getFileInfo(file.name, false),
     },
   ];
-  
+
   return (
     <div className="px-4 flex flex-col h-full">
       <div className="flex justify-between font-mono pb-1">
@@ -178,14 +175,12 @@ export function FilesTab() {
         </div>
       </div>
       <div className="overflow-auto">
-        {!folders?.length && !files?.length && (
-          <span className="text-foreground/50">{t('empty')}</span>
-        )}
-        
+        {!folders?.length && !files?.length && <span className="text-foreground/50">{t('empty')}</span>}
+
         {/* Folders with context menu */}
         {folders?.map((folder, i) => (
           <WorkingContextMenu key={`folder-${i}`} items={getFolderContextItems(folder)}>
-            <div 
+            <div
               className="group cursor-pointer hover:bg-lineHighlight px-2 py-1 rounded flex items-center justify-between transition-colors"
               onClick={() => select(folder)}
             >
@@ -194,15 +189,12 @@ export function FilesTab() {
                 <span>{folder.name}</span>
               </div>
               <div className="ml-2">
-                <BurgerMenuButton
-                  items={getFolderContextItems(folder)}
-                  size="sm"
-                />
+                <BurgerMenuButton items={getFolderContextItems(folder)} size="sm" />
               </div>
             </div>
           </WorkingContextMenu>
         ))}
-        
+
         {/* Files with context menu */}
         {files?.map((file, i) => (
           <WorkingContextMenu key={`file-${i}`} items={getFileContextItems(file)}>
@@ -215,16 +207,13 @@ export function FilesTab() {
                 <span>{file.name}</span>
               </div>
               <div className="ml-2">
-                <BurgerMenuButton
-                  items={getFileContextItems(file)}
-                  size="sm"
-                />
+                <BurgerMenuButton items={getFileContextItems(file)} size="sm" />
               </div>
             </div>
           </WorkingContextMenu>
         ))}
       </div>
-      
+
       {/* Help text */}
       <div className="mt-2 pt-2 border-t border-lineHighlight text-xs text-foreground/50">
         <p>{t('helpText')}</p>

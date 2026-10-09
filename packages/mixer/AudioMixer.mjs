@@ -44,11 +44,7 @@ export class AudioMixer {
       this.previewStream = new AudioStream('preview', this.audioContext);
       await this.previewStream.initialize();
 
-      this.transitionMixer = new TransitionMixer(
-        this.audioContext,
-        this.liveStream,
-        this.previewStream,
-      );
+      this.transitionMixer = new TransitionMixer(this.audioContext, this.liveStream, this.previewStream);
 
       this.isInitialized = true;
 

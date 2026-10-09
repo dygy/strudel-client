@@ -62,7 +62,7 @@ describe('MiniNotationContextParser', () => {
       expect(context).toEqual({
         inColonSyntax: false,
         colonPosition: -1,
-        parameterIndex: 0
+        parameterIndex: 0,
       });
     });
 

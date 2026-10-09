@@ -2,7 +2,7 @@
 
 /**
  * Discover VCSL Samples Script
- * 
+ *
  * This script dynamically discovers all audio files in the VCSL repository
  * and downloads them locally, creating the proper JSON mapping
  */
@@ -24,21 +24,21 @@ function httpRequest(url, options = {}) {
       ...options,
       headers: {
         'User-Agent': 'Strudel-VCSL-Discover/1.0',
-        ...options.headers
-      }
+        ...options.headers,
+      },
     };
-    
+
     const req = https.request(url, requestOptions, (res) => {
       let data = '';
-      res.on('data', chunk => data += chunk);
+      res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
         resolve({
           statusCode: res.statusCode,
-          data: data
+          data: data,
         });
       });
     });
-    
+
     req.on('error', reject);
     req.setTimeout(30000, () => {
       req.destroy();
@@ -53,7 +53,7 @@ function httpRequest(url, options = {}) {
  */
 async function getDirectoryContents(repoPath = '') {
   const url = `https://api.github.com/repos/${ORIGINAL_REPO}/contents/${encodeURIComponent(repoPath)}`;
-  
+
   try {
     const response = await httpRequest(url);
     if (response.statusCode === 200) {
@@ -77,12 +77,12 @@ async function discoverAudioFiles(currentPath = '', depth = 0) {
     console.warn(`⚠️  Max depth reached for ${currentPath}`);
     return [];
   }
-  
+
   console.log(`${'  '.repeat(depth)}🔍 Exploring: ${currentPath || 'root'}`);
-  
+
   const contents = await getDirectoryContents(currentPath);
   const audioFiles = [];
-  
+
   for (const item of contents) {
     if (item.type === 'file') {
       // Check if it's an audio file
@@ -93,7 +93,7 @@ async function discoverAudioFiles(currentPath = '', depth = 0) {
           name: item.name,
           path: fullPath,
           size: item.size,
-          downloadUrl: item.download_url
+          downloadUrl: item.download_url,
         });
         console.log(`${'  '.repeat(depth + 1)}🎵 Found: ${item.name} (${(item.size / 1024).toFixed(1)} KB)`);
       }
@@ -102,12 +102,12 @@ async function discoverAudioFiles(currentPath = '', depth = 0) {
       const subPath = currentPath ? `${currentPath}/${item.name}` : item.name;
       const subFiles = await discoverAudioFiles(subPath, depth + 1);
       audioFiles.push(...subFiles);
-      
+
       // Small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
-  
+
   return audioFiles;
 }
 
@@ -116,49 +116,52 @@ async function discoverAudioFiles(currentPath = '', depth = 0) {
  */
 function createCategoryMapping(audioFiles) {
   const categories = {};
-  
+
   for (const file of audioFiles) {
     // Extract category from path structure
     const pathParts = file.path.split('/');
-    
+
     // Create category name from path
     let categoryName = '';
-    
+
     if (pathParts.length >= 2) {
       // Use the instrument/category structure
       const mainCategory = pathParts[0]; // e.g., "Membranophones"
       const subCategory = pathParts[1]; // e.g., "Struck Membranophones"
-      
+
       if (pathParts.length >= 3) {
         const instrument = pathParts[2]; // e.g., "Bass Drum 1"
-        categoryName = instrument.toLowerCase()
+        categoryName = instrument
+          .toLowerCase()
           .replace(/[^a-z0-9]+/g, '_')
           .replace(/^_+|_+$/g, '');
       } else {
-        categoryName = subCategory.toLowerCase()
+        categoryName = subCategory
+          .toLowerCase()
           .replace(/[^a-z0-9]+/g, '_')
           .replace(/^_+|_+$/g, '');
       }
     } else {
       // Fallback to filename-based category
-      categoryName = path.basename(file.name, path.extname(file.name))
+      categoryName = path
+        .basename(file.name, path.extname(file.name))
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '_')
         .replace(/^_+|_+$/g, '');
     }
-    
+
     // Ensure category name is valid
     if (!categoryName || categoryName === '_') {
       categoryName = 'misc';
     }
-    
+
     if (!categories[categoryName]) {
       categories[categoryName] = [];
     }
-    
+
     categories[categoryName].push(`samples/vcsl/${file.path}`);
   }
-  
+
   return categories;
 }
 
@@ -170,48 +173,47 @@ async function downloadFile(url, localPath, fileName) {
     // Not an async executor (no-async-promise-executor): run the async body in an IIFE;
     // every error still reaches reject via the catch below.
     (async () => {
-    try {
-      const response = await httpRequest(url);
-      
-      if (response.statusCode !== 200) {
-        reject(new Error(`HTTP ${response.statusCode}`));
-        return;
-      }
-      
-      // Ensure directory exists
-      const dir = path.dirname(localPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      
-      // Download file using direct HTTPS request
-      const fileReq = https.request(url, (res) => {
-        if (res.statusCode !== 200) {
-          reject(new Error(`HTTP ${res.statusCode}`));
+      try {
+        const response = await httpRequest(url);
+
+        if (response.statusCode !== 200) {
+          reject(new Error(`HTTP ${response.statusCode}`));
           return;
         }
-        
-        const fileStream = fs.createWriteStream(localPath);
-        res.pipe(fileStream);
-        
-        fileStream.on('finish', () => {
-          fileStream.close();
-          resolve();
+
+        // Ensure directory exists
+        const dir = path.dirname(localPath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+
+        // Download file using direct HTTPS request
+        const fileReq = https.request(url, (res) => {
+          if (res.statusCode !== 200) {
+            reject(new Error(`HTTP ${res.statusCode}`));
+            return;
+          }
+
+          const fileStream = fs.createWriteStream(localPath);
+          res.pipe(fileStream);
+
+          fileStream.on('finish', () => {
+            fileStream.close();
+            resolve();
+          });
+
+          fileStream.on('error', reject);
         });
-        
-        fileStream.on('error', reject);
-      });
-      
-      fileReq.on('error', reject);
-      fileReq.setTimeout(60000, () => {
-        fileReq.destroy();
-        reject(new Error('Download timeout'));
-      });
-      fileReq.end();
-      
-    } catch (error) {
-      reject(error);
-    }
+
+        fileReq.on('error', reject);
+        fileReq.setTimeout(60000, () => {
+          fileReq.destroy();
+          reject(new Error('Download timeout'));
+        });
+        fileReq.end();
+      } catch (error) {
+        reject(error);
+      }
     })();
   });
 }
@@ -221,19 +223,19 @@ async function downloadFile(url, localPath, fileName) {
  */
 async function downloadAllFiles(audioFiles, limit = null) {
   const filesToDownload = limit ? audioFiles.slice(0, limit) : audioFiles;
-  
+
   console.log(`\n📥 Downloading ${filesToDownload.length} audio files...\n`);
-  
+
   let downloaded = 0;
   let failed = 0;
   let skipped = 0;
-  
+
   for (let i = 0; i < filesToDownload.length; i++) {
     const file = filesToDownload[i];
     const localPath = path.join(SAMPLES_DIR, file.path);
-    
+
     process.stdout.write(`[${i + 1}/${filesToDownload.length}] ${file.name}... `);
-    
+
     try {
       // Check if file already exists
       if (fs.existsSync(localPath)) {
@@ -241,28 +243,27 @@ async function downloadAllFiles(audioFiles, limit = null) {
         skipped++;
         continue;
       }
-      
+
       await downloadFile(file.downloadUrl, localPath, file.name);
       console.log('✅ OK');
       downloaded++;
-      
+
       // Small delay to avoid rate limiting
       if (i % 5 === 0 && i > 0) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
-      
     } catch (error) {
       console.log(`❌ FAILED (${error.message})`);
       failed++;
     }
   }
-  
+
   console.log(`\n📊 Download Results:`);
   console.log(`   ✅ Downloaded: ${downloaded}`);
   console.log(`   ⏭️  Skipped: ${skipped}`);
   console.log(`   ❌ Failed: ${failed}`);
   console.log(`   📈 Success rate: ${((downloaded / (downloaded + failed)) * 100).toFixed(1)}%`);
-  
+
   return { downloaded, failed, skipped, total: filesToDownload.length };
 }
 
@@ -271,45 +272,45 @@ async function downloadAllFiles(audioFiles, limit = null) {
  */
 async function discoverAndDownload(downloadFiles = false, limit = null) {
   console.log('🔍 Discovering VCSL repository structure...\n');
-  
+
   const audioFiles = await discoverAudioFiles();
-  
+
   console.log(`\n📊 Discovery Results:`);
   console.log(`   🎵 Total audio files found: ${audioFiles.length}`);
-  
+
   // Calculate total size
   const totalSize = audioFiles.reduce((sum, file) => sum + file.size, 0);
   console.log(`   📄 Total size: ${(totalSize / (1024 * 1024)).toFixed(1)} MB`);
-  
+
   // Show file type breakdown
   const extensions = {};
-  audioFiles.forEach(file => {
+  audioFiles.forEach((file) => {
     const ext = path.extname(file.name).toLowerCase();
     extensions[ext] = (extensions[ext] || 0) + 1;
   });
-  
+
   console.log(`   📁 File types:`);
   Object.entries(extensions).forEach(([ext, count]) => {
     console.log(`      ${ext}: ${count} files`);
   });
-  
+
   // Create category mapping
   const categories = createCategoryMapping(audioFiles);
   console.log(`   🏷️  Categories: ${Object.keys(categories).length}`);
-  
+
   // Show some example categories
   const categoryNames = Object.keys(categories).slice(0, 10);
   console.log(`   📝 Examples: ${categoryNames.join(', ')}${Object.keys(categories).length > 10 ? '...' : ''}`);
-  
+
   // Save category mapping to JSON
   fs.writeFileSync(VCSL_JSON_PATH, JSON.stringify(categories, null, 2));
   console.log(`\n✅ Created vcsl.json with ${Object.keys(categories).length} categories`);
-  
+
   if (downloadFiles) {
     const result = await downloadAllFiles(audioFiles, limit);
     return { audioFiles, categories, downloadResult: result };
   }
-  
+
   return { audioFiles, categories };
 }
 
@@ -319,18 +320,18 @@ async function discoverAndDownload(downloadFiles = false, limit = null) {
 async function main() {
   const command = process.argv[2] || 'help';
   const arg = process.argv[3];
-  
+
   switch (command) {
     case 'discover':
       await discoverAndDownload(false);
       break;
-      
+
     case 'download': {
       const limit = arg ? parseInt(arg) : null;
       await discoverAndDownload(true, limit);
       break;
     }
-      
+
     case 'help':
     default:
       console.log('🎵 VCSL Dynamic Discovery Script\n');
@@ -349,7 +350,7 @@ async function main() {
 
 // Run the script
 if (require.main === module) {
-  main().catch(error => {
+  main().catch((error) => {
     console.error('❌ Script error:', error.message);
     process.exit(1);
   });
@@ -358,5 +359,5 @@ if (require.main === module) {
 module.exports = {
   discoverAudioFiles,
   createCategoryMapping,
-  discoverAndDownload
+  discoverAndDownload,
 };

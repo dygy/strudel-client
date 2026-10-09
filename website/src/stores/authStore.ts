@@ -63,49 +63,48 @@ export const authActions = {
         const data = await response.json();
         if (data.user) {
           this.setUser(data.user);
-          
+
           if (data.sessionExpiresAt) {
             const expiresAt = new Date(data.sessionExpiresAt);
             // Show warning if expiring within 15 minutes (more buffer)
             const fifteenMinutesFromNow = new Date(Date.now() + 15 * 60 * 1000);
             this.setSessionInfo(expiresAt, expiresAt < fifteenMinutesFromNow);
           }
-          
+
           return true;
         } else {
           // API returned 200 but no user - user is not authenticated
           this.setUser(null);
           this.setSessionInfo(null, false);
-          
+
           // Redirect to login if not already on login page
           if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
             window.location.href = '/login';
           }
-          
+
           return false;
         }
       }
-      
+
       // Only clear user on explicit 401/403, not on network errors
       if (response.status === 401 || response.status === 403) {
         this.setUser(null);
         this.setSessionInfo(null, false);
-        
+
         // Redirect to login on 401
         if (response.status === 401 && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
           window.location.href = '/login';
         }
-        
+
         return false;
       }
-      
+
       // For other status codes, don't clear user - might be temporary server issue
       console.warn('Auth check returned non-OK status:', response.status, 'keeping current auth state');
       return !!this.getUser();
-      
     } catch (error) {
       console.error('Auth check failed:', error);
-      
+
       // Don't clear user on network errors - keep current state
       // Only log the error and return current auth status
       const currentUser = this.getUser();
@@ -113,7 +112,7 @@ export const authActions = {
         console.log('Network error during auth check, keeping user logged in');
         return true;
       }
-      
+
       // If no current user and network error, stop loading but don't redirect
       this.setLoading(false);
       return false;
@@ -127,17 +126,17 @@ export const authActions = {
   async signInWithGoogle() {
     try {
       this.setLoading(true);
-      
+
       // Import supabase dynamically to avoid SSR issues
       const { supabase } = await import('../lib/supabase');
-      
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
-        }
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
-      
+
       if (error) {
         console.error('Error signing in with Google:', error);
         this.setLoading(false);
@@ -153,10 +152,10 @@ export const authActions = {
   async signOut() {
     try {
       this.setLoading(true);
-      
+
       // Import supabase dynamically to avoid SSR issues
       const { supabase } = await import('../lib/supabase');
-      
+
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Error signing out:', error);
@@ -190,7 +189,7 @@ export const authActions = {
     }
 
     console.log('AuthStore - Starting periodic session check (every 60 seconds)');
-    
+
     sessionCheckInterval = setInterval(async () => {
       const currentState = authStore.get();
       if (currentState.user) {
@@ -217,18 +216,18 @@ export const authActions = {
 
   async initialize() {
     console.log('AuthStore - Initializing authentication...');
-    
+
     try {
       // Initialize Supabase auth listener first
       const { initializeAuthListener, cleanupAuthListener } = await import('../lib/authListener');
       initializeAuthListener();
-      
+
       const isAuthenticated = await this.checkAuth();
-      
+
       if (isAuthenticated) {
         this.startPeriodicCheck();
       }
-      
+
       // Listen for auth changes from other tabs
       if (typeof window !== 'undefined') {
         const handleStorageChange = (e: StorageEvent) => {
@@ -236,9 +235,9 @@ export const authActions = {
             this.checkAuth();
           }
         };
-        
+
         window.addEventListener('storage', handleStorageChange);
-        
+
         // Return cleanup function
         return () => {
           window.removeEventListener('storage', handleStorageChange);

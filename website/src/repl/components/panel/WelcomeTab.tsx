@@ -22,7 +22,7 @@ interface WelcomeTabProps {
 export function WelcomeTab({ context }: WelcomeTabProps) {
   const { fontFamily } = useSettings();
   const { t } = useTranslation('welcome');
-  
+
   return (
     <div className="prose dark:prose-invert min-w-full pt-2 font-sans pb-8 px-4 " style={{ fontFamily }}>
       <h3>꩜ {t('title')}</h3>

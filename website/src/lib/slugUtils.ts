@@ -6,17 +6,19 @@
  * Convert a track name to a URL-safe slug
  */
 export function trackNameToSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    // Replace spaces and special characters with hyphens
-    .replace(/[^a-z0-9]+/g, '-')
-    // Remove leading/trailing hyphens
-    .replace(/^-+|-+$/g, '')
-    // Collapse multiple hyphens
-    .replace(/-+/g, '-')
+  return (
+    name
+      .toLowerCase()
+      .trim()
+      // Replace spaces and special characters with hyphens
+      .replace(/[^a-z0-9]+/g, '-')
+      // Remove leading/trailing hyphens
+      .replace(/^-+|-+$/g, '')
+      // Collapse multiple hyphens
+      .replace(/-+/g, '-') ||
     // Ensure it's not empty
-    || 'untitled';
+    'untitled'
+  );
 }
 
 /**
@@ -27,8 +29,8 @@ export function folderPathToSlug(folderPath: string | null | undefined): string 
 
   return folderPath
     .split('/')
-    .map(segment => trackNameToSlug(segment))
-    .filter(segment => segment && segment !== 'untitled')
+    .map((segment) => trackNameToSlug(segment))
+    .filter((segment) => segment && segment !== 'untitled')
     .join('/');
 }
 
@@ -42,7 +44,7 @@ export function folderPathToSlug(folderPath: string | null | undefined): string 
 export function generateTrackUrlPath(
   trackName: string,
   folderPathOrId?: string | null,
-  foldersMap?: Record<string, { id: string; path: string; name: string }>
+  foldersMap?: Record<string, { id: string; path: string; name: string }>,
 ): string {
   const trackSlug = trackNameToSlug(trackName);
 
@@ -91,7 +93,7 @@ export function parseTrackUrlPath(urlPath: string): { folderPath: string | null;
 
   return {
     folderPath,
-    trackSlug: trackSlug || ''
+    trackSlug: trackSlug || '',
   };
 }
 
@@ -114,9 +116,7 @@ export function extractStepFromUrl(urlPath: string): string | null {
 export function findStepIndexByName(track: { steps?: Array<{ name: string }> }, stepName: string): number | null {
   if (!track.steps || track.steps.length === 0) return null;
 
-  const index = track.steps.findIndex(step =>
-    trackNameToSlug(step.name) === trackNameToSlug(stepName)
-  );
+  const index = track.steps.findIndex((step) => trackNameToSlug(step.name) === trackNameToSlug(stepName));
 
   return index >= 0 ? index : null;
 }
@@ -133,22 +133,20 @@ export function getStepSlug(stepName: string): string {
  * This is a best-effort conversion since the original name might have been modified
  */
 export function slugToDisplayName(slug: string): string {
-  return slug
-    .replace(/-/g, ' ')
-    .replace(/\b\w/g, l => l.toUpperCase());
+  return slug.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
 /**
  * Find a track by folder path and track slug
  */
 export function findTrackByFolderAndSlug(
-  tracks: Array<{id: string, name: string, folder?: string | null}>,
+  tracks: Array<{ id: string; name: string; folder?: string | null }>,
   folderPath: string | null,
-  trackSlug: string
-): {id: string, name: string, folder?: string | null} | null {
+  trackSlug: string,
+): { id: string; name: string; folder?: string | null } | null {
   console.log('findTrackByFolderAndSlug: Looking for track:', { folderPath, trackSlug });
 
-  const candidates = tracks.filter(track => {
+  const candidates = tracks.filter((track) => {
     const trackMatches = trackNameToSlug(track.name) === trackSlug;
     const folderMatches = (track.folder || null) === folderPath;
 
@@ -158,7 +156,10 @@ export function findTrackByFolderAndSlug(
   if (candidates.length === 1) {
     return candidates[0];
   } else if (candidates.length > 1) {
-    console.warn('findTrackByFolderAndSlug: Multiple matches found, returning first:', candidates.map(t => t.name));
+    console.warn(
+      'findTrackByFolderAndSlug: Multiple matches found, returning first:',
+      candidates.map((t) => t.name),
+    );
     return candidates[0];
   }
 
@@ -169,16 +170,22 @@ export function findTrackByFolderAndSlug(
 /**
  * Find a track by slug (legacy function for backward compatibility)
  */
-export function findTrackBySlug(tracks: Array<{id: string, name: string}>, slug: string): {id: string, name: string} | null {
+export function findTrackBySlug(
+  tracks: Array<{ id: string; name: string }>,
+  slug: string,
+): { id: string; name: string } | null {
   console.log('findTrackBySlug: Looking for slug:', slug);
-  console.log('findTrackBySlug: Available tracks:', tracks.map(t => ({
-    name: t.name,
-    slug: trackNameToSlug(t.name),
-    matches: trackNameToSlug(t.name) === slug
-  })));
+  console.log(
+    'findTrackBySlug: Available tracks:',
+    tracks.map((t) => ({
+      name: t.name,
+      slug: trackNameToSlug(t.name),
+      matches: trackNameToSlug(t.name) === slug,
+    })),
+  );
 
   // First, try exact slug match
-  const exactMatch = tracks.find(track => {
+  const exactMatch = tracks.find((track) => {
     const trackSlug = trackNameToSlug(track.name);
     const matches = trackSlug === slug;
     console.log(`findTrackBySlug: Comparing "${trackSlug}" === "${slug}" = ${matches}`);
@@ -199,19 +206,16 @@ export function findTrackBySlug(tracks: Array<{id: string, name: string}>, slug:
  */
 export function generateUniqueSlug(
   name: string,
-  existingTracks: Array<{id: string, name: string, folder?: string | null}>,
+  existingTracks: Array<{ id: string; name: string; folder?: string | null }>,
   folderPath: string | null = null,
-  excludeTrackId?: string
+  excludeTrackId?: string,
 ): string {
   const baseSlug = trackNameToSlug(name);
 
   // Get existing slugs in the same folder
   const existingSlugs = existingTracks
-    .filter(track =>
-      track.id !== excludeTrackId &&
-      (track.folder || null) === folderPath
-    )
-    .map(track => trackNameToSlug(track.name));
+    .filter((track) => track.id !== excludeTrackId && (track.folder || null) === folderPath)
+    .map((track) => trackNameToSlug(track.name));
 
   if (!existingSlugs.includes(baseSlug)) {
     return baseSlug;

@@ -72,21 +72,24 @@ export function useStrictAutosaveIntegration(options: StrictAutosaveIntegrationO
   /**
    * Enhanced save function with validation
    */
-  const enhancedSave = useCallback(async (showToast: boolean = true) => {
-    if (!fileManagerHook?.selectedTrack) {
-      console.warn('StrictAutosaveIntegration: No track selected for save');
+  const enhancedSave = useCallback(
+    async (showToast: boolean = true) => {
+      if (!fileManagerHook?.selectedTrack) {
+        console.warn('StrictAutosaveIntegration: No track selected for save');
+        return false;
+      }
+
+      // Use the file manager's save function if it has strict autosave
+      if (fileManagerHook.saveCurrentTrack) {
+        return await fileManagerHook.saveCurrentTrack(showToast);
+      }
+
+      // Fallback to basic save
+      console.warn('StrictAutosaveIntegration: Using fallback save method');
       return false;
-    }
-
-    // Use the file manager's save function if it has strict autosave
-    if (fileManagerHook.saveCurrentTrack) {
-      return await fileManagerHook.saveCurrentTrack(showToast);
-    }
-
-    // Fallback to basic save
-    console.warn('StrictAutosaveIntegration: Using fallback save method');
-    return false;
-  }, [fileManagerHook]);
+    },
+    [fileManagerHook],
+  );
 
   /**
    * Get debug information
@@ -101,8 +104,8 @@ export function useStrictAutosaveIntegration(options: StrictAutosaveIntegrationO
         autosaveInterval,
         selectedTrack: fileManagerHook?.selectedTrack,
         hasStrictAutosave: !!fileManagerHook?.scheduleTrackAutosave,
-        lastCodeLength: lastCodeRef.current.length
-      }
+        lastCodeLength: lastCodeRef.current.length,
+      },
     };
   }, [fileManagerHook, isAutosaveEnabled, autosaveInterval]);
 
@@ -142,7 +145,7 @@ export function useStrictAutosaveIntegration(options: StrictAutosaveIntegrationO
         isStrictAutosaveActive: isStrictAutosaveActive(),
         isAutosaveEnabled,
         selectedTrack: fileManagerHook?.selectedTrack,
-        hasFileManager: !!fileManagerHook
+        hasFileManager: !!fileManagerHook,
       });
     }
   }, [enableDebugMode, isStrictAutosaveActive, isAutosaveEnabled, fileManagerHook]);

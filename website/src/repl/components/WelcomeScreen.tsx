@@ -18,22 +18,14 @@ export function WelcomeScreen({ onCreateTrack, onImportTracks }: WelcomeScreenPr
           <div className="w-16 h-16 mx-auto mb-4 bg-purple-600 rounded-full flex items-center justify-center">
             <DocumentIcon className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">
-            {t('welcome:fileManager.welcomeTitle')}
-          </h1>
-          <p className="text-gray-400 text-sm">
-            {t('welcome:fileManager.subtitle')}
-          </p>
+          <h1 className="text-2xl font-bold text-foreground mb-2">{t('welcome:fileManager.welcomeTitle')}</h1>
+          <p className="text-gray-400 text-sm">{t('welcome:fileManager.subtitle')}</p>
         </div>
 
         {/* Welcome Message */}
         <div className="mb-8">
-          <h2 className="text-lg font-semibold text-foreground mb-3">
-            {t('welcome:fileManager.getStartedTitle')}
-          </h2>
-          <p className="text-gray-300 text-sm leading-relaxed">
-            {t('welcome:fileManager.getStartedDescription')}
-          </p>
+          <h2 className="text-lg font-semibold text-foreground mb-3">{t('welcome:fileManager.getStartedTitle')}</h2>
+          <p className="text-gray-300 text-sm leading-relaxed">{t('welcome:fileManager.getStartedDescription')}</p>
         </div>
 
         {/* Action Buttons */}
@@ -45,7 +37,7 @@ export function WelcomeScreen({ onCreateTrack, onImportTracks }: WelcomeScreenPr
             <PlusIcon className="w-5 h-5" />
             {t('welcome:fileManager.createNewTrack')}
           </button>
-          
+
           <button
             onClick={onImportTracks}
             className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gray-700 hover:bg-gray-600 hover:scale-[1.02] active:scale-[0.98] text-white rounded-lg transition-all duration-200 font-medium"
@@ -57,9 +49,7 @@ export function WelcomeScreen({ onCreateTrack, onImportTracks }: WelcomeScreenPr
 
         {/* Quick Tips */}
         <div className="mt-8 pt-6 border-t border-gray-700">
-          <h3 className="text-sm font-semibold text-foreground mb-3">
-            {t('welcome:fileManager.quickTipsTitle')}
-          </h3>
+          <h3 className="text-sm font-semibold text-foreground mb-3">{t('welcome:fileManager.quickTipsTitle')}</h3>
           <div className="text-xs text-gray-400 space-y-2 text-left">
             <div className="flex items-start gap-2">
               <span className="text-purple-400 font-mono">•</span>

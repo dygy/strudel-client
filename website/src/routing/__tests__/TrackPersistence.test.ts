@@ -42,22 +42,22 @@ beforeEach(() => {
     location: mockLocation,
     history: mockHistory,
   };
-  
+
   vi.stubGlobal('localStorage', mockLocalStorage);
   vi.stubGlobal('window', mockWindow);
   vi.stubGlobal('document', mockDocument);
-  
+
   // Reset mocks
   mockLocalStorage.clear();
   mockHistory.pushState.mockClear();
   mockHistory.replaceState.mockClear();
-  
+
   // Reset location
   mockLocation.href = 'https://example.com/';
   mockLocation.pathname = '/';
   mockLocation.search = '';
   mockLocation.hash = '';
-  
+
   // Reset document
   mockDocument.title = 'Strudel';
 });
@@ -76,8 +76,8 @@ describe('TrackPersistence', () => {
     it('should check track existence in localStorage', () => {
       // Setup mock tracks data
       mockLocalStorage.data['strudel_tracks'] = JSON.stringify({
-        'track1': { name: 'Track 1', code: 'test' },
-        'track2': { name: 'Track 2', code: 'test2' },
+        track1: { name: 'Track 1', code: 'test' },
+        track2: { name: 'Track 2', code: 'test2' },
       });
 
       expect(TrackPersistence.trackExists('track1')).toBe(true);
@@ -94,7 +94,7 @@ describe('TrackPersistence', () => {
 
       const result = TrackPersistence.getTrackData('test-track');
       expect(result).toEqual(trackData);
-      
+
       const nonExistent = TrackPersistence.getTrackData('nonexistent');
       expect(nonExistent).toBeNull();
     });
@@ -103,50 +103,47 @@ describe('TrackPersistence', () => {
   describe('Property Tests', () => {
     /**
      * Feature: track-routing-navigation, Property 3: Invalid track ID handling
-     * For any invalid or malformed track ID in the URL, the system should gracefully 
+     * For any invalid or malformed track ID in the URL, the system should gracefully
      * handle the error and show an appropriate default state
      */
     it('should handle invalid track IDs gracefully', () => {
       fc.assert(
-        fc.property(
-          fc.string({ minLength: 1, maxLength: 50 }),
-          (invalidTrackId) => {
-            // Setup some valid tracks in localStorage
-            mockLocalStorage.data['strudel_tracks'] = JSON.stringify({
-              'valid-track-1': { 
-                name: 'Valid Track 1', 
-                code: 'test', 
-                created: '2023-01-01T00:00:00.000Z',
-                modified: '2023-01-01T00:00:00.000Z'
-              },
-              'valid-track-2': { 
-                name: 'Valid Track 2', 
-                code: 'test2', 
-                created: '2023-01-02T00:00:00.000Z',
-                modified: '2023-01-02T00:00:00.000Z'
-              },
-            });
+        fc.property(fc.string({ minLength: 1, maxLength: 50 }), (invalidTrackId) => {
+          // Setup some valid tracks in localStorage
+          mockLocalStorage.data['strudel_tracks'] = JSON.stringify({
+            'valid-track-1': {
+              name: 'Valid Track 1',
+              code: 'test',
+              created: '2023-01-01T00:00:00.000Z',
+              modified: '2023-01-01T00:00:00.000Z',
+            },
+            'valid-track-2': {
+              name: 'Valid Track 2',
+              code: 'test2',
+              created: '2023-01-02T00:00:00.000Z',
+              modified: '2023-01-02T00:00:00.000Z',
+            },
+          });
 
-            const result = TrackPersistence.handleInvalidTrackId(invalidTrackId);
-            
-            // Result should have a valid action
-            expect(['redirect', 'create', 'ignore']).toContain(result.action);
-            
-            if (result.action === 'redirect') {
-              // Should provide a fallback track ID
-              expect(result.fallbackTrackId).toBeDefined();
-              expect(typeof result.fallbackTrackId).toBe('string');
-              expect(result.message).toBeDefined();
-            }
-            
-            if (result.action === 'create') {
-              // Should provide a helpful message
-              expect(result.message).toBeDefined();
-              expect(result.message).toContain(invalidTrackId);
-            }
+          const result = TrackPersistence.handleInvalidTrackId(invalidTrackId);
+
+          // Result should have a valid action
+          expect(['redirect', 'create', 'ignore']).toContain(result.action);
+
+          if (result.action === 'redirect') {
+            // Should provide a fallback track ID
+            expect(result.fallbackTrackId).toBeDefined();
+            expect(typeof result.fallbackTrackId).toBe('string');
+            expect(result.message).toBeDefined();
           }
-        ),
-        { numRuns: 50 }
+
+          if (result.action === 'create') {
+            // Should provide a helpful message
+            expect(result.message).toBeDefined();
+            expect(result.message).toContain(invalidTrackId);
+          }
+        }),
+        { numRuns: 50 },
       );
     });
 
@@ -157,7 +154,7 @@ describe('TrackPersistence', () => {
       fc.assert(
         fc.property(
           fc.record({
-            trackId: fc.string({ minLength: 1, maxLength: 20 }).filter(s => /^[a-zA-Z0-9_-]+$/.test(s)),
+            trackId: fc.string({ minLength: 1, maxLength: 20 }).filter((s) => /^[a-zA-Z0-9_-]+$/.test(s)),
             trackName: fc.option(fc.string({ minLength: 1, maxLength: 50 })),
           }),
           ({ trackId, trackName }) => {
@@ -169,16 +166,16 @@ describe('TrackPersistence', () => {
 
             // Update page title
             TrackPersistence.updatePageTitle(trackId);
-            
+
             // Verify title was updated correctly
             if (trackName) {
               expect(mockDocument.title).toBe(`${trackName} - Strudel`);
             } else {
               expect(mockDocument.title).toBe(`Track ${trackId} - Strudel`);
             }
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -195,18 +192,18 @@ describe('TrackPersistence', () => {
           }),
           (state) => {
             const result = TrackPersistence.persistToURL(state);
-            
+
             // If persistence succeeded, URL should be within limits
             if (result) {
               const currentUrl = `${mockLocation.pathname}${mockLocation.search}${mockLocation.hash}`;
               expect(currentUrl.length).toBeLessThanOrEqual(2000);
             }
-            
+
             // Result should be boolean
             expect(typeof result).toBe('boolean');
-          }
+          },
         ),
-        { numRuns: 50 }
+        { numRuns: 50 },
       );
     });
   });

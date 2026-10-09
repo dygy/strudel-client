@@ -39,7 +39,5 @@ export function Repl({ embedded = false, ssrData = null, readOnly = false }: Rep
     Editor = AuthenticatedReplEditor;
   }
 
-  return (
-    <Editor context={context} style={{ fontFamily }} ssrData={ssrData} readOnly={readOnly} />
-  );
+  return <Editor context={context} style={{ fontFamily }} ssrData={ssrData} readOnly={readOnly} />;
 }

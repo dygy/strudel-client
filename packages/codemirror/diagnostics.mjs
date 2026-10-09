@@ -5,7 +5,7 @@ import { parse } from 'acorn';
 function checkJavaScriptSyntax(doc) {
   const diagnostics = [];
   const code = doc.toString();
-  
+
   try {
     parse(code, {
       ecmaVersion: 2022,
@@ -23,7 +23,7 @@ function checkJavaScriptSyntax(doc) {
       });
     }
   }
-  
+
   return diagnostics;
 }
 
@@ -31,15 +31,15 @@ function checkJavaScriptSyntax(doc) {
 function checkStrudelPatterns(doc) {
   const diagnostics = [];
   const code = doc.toString();
-  
+
   // Check for unmatched brackets in mini-notation strings
   const stringRegex = /["']([^"']*?)["']/g;
   let match;
-  
+
   while ((match = stringRegex.exec(code)) !== null) {
     const content = match[1];
     const start = match.index + 1; // After opening quote
-    
+
     // Check bracket balance
     let bracketStack = [];
     for (let i = 0; i < content.length; i++) {
@@ -49,7 +49,7 @@ function checkStrudelPatterns(doc) {
       } else if (char === ']' || char === '>' || char === '}') {
         const expected = char === ']' ? '[' : char === '>' ? '<' : '{';
         const last = bracketStack[bracketStack.length - 1];
-        
+
         if (!last || last.char !== expected) {
           diagnostics.push({
             from: start + i,
@@ -62,7 +62,7 @@ function checkStrudelPatterns(doc) {
         }
       }
     }
-    
+
     // Report unclosed brackets
     for (const unclosed of bracketStack) {
       diagnostics.push({
@@ -73,7 +73,7 @@ function checkStrudelPatterns(doc) {
       });
     }
   }
-  
+
   return diagnostics;
 }
 
@@ -81,7 +81,7 @@ function checkStrudelPatterns(doc) {
 function checkWarnings(doc) {
   const diagnostics = [];
   const code = doc.toString();
-  
+
   // Warn about very long lines (potential performance issue)
   const lines = code.split('\n');
   let pos = 0;
@@ -97,7 +97,7 @@ function checkWarnings(doc) {
     }
     pos += line.length + 1; // +1 for newline
   }
-  
+
   // Warn about deprecated functions (example)
   const deprecatedFunctions = ['samples', 'setcps'];
   for (const func of deprecatedFunctions) {
@@ -112,26 +112,29 @@ function checkWarnings(doc) {
       });
     }
   }
-  
+
   return diagnostics;
 }
 
 // Main linter function
-const strudelLinter = linter((view) => {
-  const diagnostics = [];
-  
-  // Check JavaScript syntax
-  diagnostics.push(...checkJavaScriptSyntax(view.state.doc));
-  
-  // Check Strudel-specific patterns
-  diagnostics.push(...checkStrudelPatterns(view.state.doc));
-  
-  // Check for warnings
-  diagnostics.push(...checkWarnings(view.state.doc));
-  
-  return diagnostics;
-}, {
-  delay: 500, // Debounce for 500ms
-});
+const strudelLinter = linter(
+  (view) => {
+    const diagnostics = [];
+
+    // Check JavaScript syntax
+    diagnostics.push(...checkJavaScriptSyntax(view.state.doc));
+
+    // Check Strudel-specific patterns
+    diagnostics.push(...checkStrudelPatterns(view.state.doc));
+
+    // Check for warnings
+    diagnostics.push(...checkWarnings(view.state.doc));
+
+    return diagnostics;
+  },
+  {
+    delay: 500, // Debounce for 500ms
+  },
+);
 
 export const isLinterEnabled = (on) => (on ? strudelLinter : []);

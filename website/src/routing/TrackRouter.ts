@@ -61,7 +61,7 @@ export class TrackRouter {
       skipUrlUpdate?: boolean;
       skipPlaybackChange?: boolean;
       step?: number;
-    } = {}
+    } = {},
   ): Promise<void> {
     const { replace = false, skipUrlUpdate = false, skipPlaybackChange = false, step } = options;
 
@@ -178,7 +178,11 @@ export class TrackRouter {
         const stepChanged = step !== null; // If step is in URL, we need to handle it
 
         if (trackChanged || stepChanged) {
-          console.log('TrackRouter: Browser navigation detected, navigating to:', trackId, step !== null ? `step ${step}` : '');
+          console.log(
+            'TrackRouter: Browser navigation detected, navigating to:',
+            trackId,
+            step !== null ? `step ${step}` : '',
+          );
 
           if (trackId) {
             await this.navigateToTrack(trackId, { skipUrlUpdate: true, step: step || undefined });

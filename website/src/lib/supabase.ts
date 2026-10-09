@@ -6,9 +6,10 @@ const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || 'https://placeholder.
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 
 // Only create client if we have real values (not placeholders)
-const hasRealConfig = supabaseUrl !== 'https://placeholder.supabase.co' &&
-                     supabaseAnonKey !== 'placeholder-key' &&
-                     supabaseUrl.includes('.supabase.co');
+const hasRealConfig =
+  supabaseUrl !== 'https://placeholder.supabase.co' &&
+  supabaseAnonKey !== 'placeholder-key' &&
+  supabaseUrl.includes('.supabase.co');
 
 // Create Supabase client with proper OAuth configuration
 // Always enable session persistence in production
@@ -107,7 +108,10 @@ export const db = {
     // Get all tracks for current user
     getAll: async () => {
       // First check session and refresh if needed
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
       if (sessionError) {
         console.error('db.tracks.getAll - Session error:', sessionError);
@@ -124,7 +128,8 @@ export const db = {
       const expiresAt = session.expires_at || 0;
       const timeUntilExpiry = expiresAt - now;
 
-      if (timeUntilExpiry < 600) { // Less than 10 minutes
+      if (timeUntilExpiry < 600) {
+        // Less than 10 minutes
         console.log('db.tracks.getAll - Session expiring soon, attempting refresh...');
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
         if (refreshError) {
@@ -137,7 +142,10 @@ export const db = {
         console.log('db.tracks.getAll - Session refreshed successfully');
       }
 
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
       if (!user) {
         console.error('db.tracks.getAll - No authenticated user found');
@@ -162,7 +170,9 @@ export const db = {
 
     // Get single track
     get: async (id: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
@@ -180,7 +190,9 @@ export const db = {
 
     // Create track
     create: async (track: Omit<Track, 'user_id'>) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       // Convert UI format to database format
@@ -200,7 +212,9 @@ export const db = {
 
     // Update track
     update: async (id: string, updates: Partial<Omit<Track, 'id' | 'user_id'>>) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       // Convert UI format to database format
@@ -222,30 +236,27 @@ export const db = {
 
     // Delete track
     delete: async (id: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
-        .from(TABLES.TRACKS)
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
+      const { data, error } = await supabase.from(TABLES.TRACKS).delete().eq('id', id).eq('user_id', user.id);
 
       return { data, error };
     },
 
     // Bulk insert tracks (for migration)
     bulkInsert: async (tracks: Omit<Track, 'user_id'>[]) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       // Convert UI format to database format
-      const dbTracks = tracks.map(track => convertTrackToDB({ ...track, user_id: user.id }));
+      const dbTracks = tracks.map((track) => convertTrackToDB({ ...track, user_id: user.id }));
 
-      const { data, error } = await supabase
-        .from(TABLES.TRACKS)
-        .insert(dbTracks)
-        .select();
+      const { data, error } = await supabase.from(TABLES.TRACKS).insert(dbTracks).select();
 
       // Convert database format back to UI format
       const convertedData = data?.map(convertTrackFromDB) || null;
@@ -258,21 +269,21 @@ export const db = {
   folders: {
     // Get all folders for current user
     getAll: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
-        .from(TABLES.FOLDERS)
-        .select('*')
-        .eq('user_id', user.id)
-        .order('name');
+      const { data, error } = await supabase.from(TABLES.FOLDERS).select('*').eq('user_id', user.id).order('name');
 
       return { data, error };
     },
 
     // Create folder
     create: async (folder: Omit<Folder, 'user_id'>) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
@@ -286,7 +297,9 @@ export const db = {
 
     // Update folder
     update: async (id: string, updates: Partial<Omit<Folder, 'id' | 'user_id'>>) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
@@ -302,29 +315,26 @@ export const db = {
 
     // Delete folder
     delete: async (id: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
-        .from(TABLES.FOLDERS)
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
+      const { data, error } = await supabase.from(TABLES.FOLDERS).delete().eq('id', id).eq('user_id', user.id);
 
       return { data, error };
     },
 
     // Bulk insert folders (for migration)
     bulkInsert: async (folders: Omit<Folder, 'user_id'>[]) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const foldersWithUserId = folders.map(folder => ({ ...folder, user_id: user.id }));
+      const foldersWithUserId = folders.map((folder) => ({ ...folder, user_id: user.id }));
 
-      const { data, error } = await supabase
-        .from(TABLES.FOLDERS)
-        .insert(foldersWithUserId)
-        .select();
+      const { data, error } = await supabase.from(TABLES.FOLDERS).insert(foldersWithUserId).select();
 
       return { data, error };
     },
@@ -334,21 +344,21 @@ export const db = {
   profiles: {
     // Get current user profile
     get: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
-        .from(TABLES.PROFILES)
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle(); // Use maybeSingle() instead of single() to handle 0 rows
+      const { data, error } = await supabase.from(TABLES.PROFILES).select('*').eq('id', user.id).maybeSingle(); // Use maybeSingle() instead of single() to handle 0 rows
 
       return { data, error };
     },
 
     // Update user profile
     update: async (updates: Partial<Omit<UserProfile, 'id' | 'created_at'>>) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase

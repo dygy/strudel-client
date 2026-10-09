@@ -24,30 +24,29 @@ export function isTrackNameAvailable(
   name: string,
   folder: string | null | undefined,
   tracks: Record<string, Track>,
-  excludeTrackId?: string
+  excludeTrackId?: string,
 ): boolean {
   const normalizedFolder = folder || null;
   const trimmedName = name.trim();
-  
+
   if (!trimmedName) {
     return false;
   }
-  
+
   // Check if any track in the same folder has the same name
-  const duplicate = Object.values(tracks).find(track => {
+  const duplicate = Object.values(tracks).find((track) => {
     // Skip the track being renamed
     if (excludeTrackId && track.id === excludeTrackId) {
       return false;
     }
-    
+
     // Normalize folder values for comparison
     const trackFolder = track.folder || null;
-    
+
     // Check if same folder and same name (case-insensitive)
-    return trackFolder === normalizedFolder && 
-           track.name.trim().toLowerCase() === trimmedName.toLowerCase();
+    return trackFolder === normalizedFolder && track.name.trim().toLowerCase() === trimmedName.toLowerCase();
   });
-  
+
   return !duplicate;
 }
 
@@ -61,23 +60,23 @@ export function isTrackNameAvailable(
 export function generateUniqueTrackName(
   baseName: string,
   folder: string | null | undefined,
-  tracks: Record<string, Track>
+  tracks: Record<string, Track>,
 ): string {
   const trimmedBase = baseName.trim();
-  
+
   if (isTrackNameAvailable(trimmedBase, folder, tracks)) {
     return trimmedBase;
   }
-  
+
   // Find a unique name by appending a number
   let counter = 2;
   let uniqueName = `${trimmedBase} ${counter}`;
-  
+
   while (!isTrackNameAvailable(uniqueName, folder, tracks)) {
     counter++;
     uniqueName = `${trimmedBase} ${counter}`;
   }
-  
+
   return uniqueName;
 }
 
@@ -93,28 +92,28 @@ export function validateTrackName(
   name: string,
   folder: string | null | undefined,
   tracks: Record<string, Track>,
-  excludeTrackId?: string
+  excludeTrackId?: string,
 ): string | null {
   const trimmedName = name.trim();
-  
+
   if (!trimmedName) {
     return 'Track name cannot be empty';
   }
-  
+
   if (trimmedName.length > 100) {
     return 'Track name is too long (max 100 characters)';
   }
-  
+
   // Check for invalid characters that might cause URL issues
   const invalidChars = /[<>:"|?*]/;
   if (invalidChars.test(trimmedName)) {
     return 'Track name contains invalid characters';
   }
-  
+
   if (!isTrackNameAvailable(trimmedName, folder, tracks, excludeTrackId)) {
     const folderName = folder || 'root folder';
     return `A track named "${trimmedName}" already exists in ${folderName}`;
   }
-  
+
   return null;
 }

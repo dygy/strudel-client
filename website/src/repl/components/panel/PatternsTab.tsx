@@ -19,12 +19,12 @@ import { useState } from 'react';
 import { useDebounce } from '../usedebounce';
 import cx from '@src/cx';
 import { BurgerMenuButton } from '../ui/BurgerMenuButton';
-import { 
-  DocumentIcon, 
-  PencilIcon, 
-  TrashIcon, 
+import {
+  DocumentIcon,
+  PencilIcon,
+  TrashIcon,
   DocumentDuplicateIcon,
-  ArrowDownTrayIcon 
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 
 interface Pattern {
@@ -82,20 +82,27 @@ type ContextMenuItem = {
   icon?: React.ReactNode;
   onClick: () => void;
   disabled?: boolean;
-}
+};
 type Separator = {
   separator: true;
   label: string;
   onClick: () => void;
-}
-function PatternButton({ showOutline, onClick, pattern, showHiglight, isUserPattern = false, context }: PatternButtonProps) {
+};
+function PatternButton({
+  showOutline,
+  onClick,
+  pattern,
+  showHiglight,
+  isUserPattern = false,
+  context,
+}: PatternButtonProps) {
   const getPatternContextItems = () => {
     const items: (ContextMenuItem | Separator)[] = [
       {
         label: 'Load',
         icon: <DocumentIcon className="w-4 h-4" />,
         onClick: () => onClick(),
-      }
+      },
     ];
 
     if (isUserPattern) {
@@ -133,7 +140,7 @@ function PatternButton({ showOutline, onClick, pattern, showHiglight, isUserPatt
               updateCodeWindow(context, { ...data, collection: userPattern.collection });
             }
           },
-        }
+        },
       );
     }
 
@@ -153,10 +160,7 @@ function PatternButton({ showOutline, onClick, pattern, showHiglight, isUserPatt
       </div>
       {isUserPattern && (
         <div className="ml-2">
-          <BurgerMenuButton
-            items={getPatternContextItems()}
-            size="sm"
-          />
+          <BurgerMenuButton items={getPatternContextItems()} size="sm" />
         </div>
       )}
     </div>
@@ -172,11 +176,18 @@ interface PatternButtonsProps {
   context?: ReplContext;
 }
 
-function PatternButtons({ patterns, activePattern, onClick, started, isUserPatterns = false, context }: PatternButtonsProps) {
+function PatternButtons({
+  patterns,
+  activePattern,
+  onClick,
+  started,
+  isUserPatterns = false,
+  context,
+}: PatternButtonsProps) {
   const viewingPatternStore = useViewingPatternData();
   const viewingPatternData = parseJSON(viewingPatternStore);
   const viewingPatternID = viewingPatternData?.id;
-  
+
   return (
     <div className="">
       {Object.values(patterns)
@@ -215,7 +226,7 @@ function UserPatterns({ context }: UserPatternsProps) {
   const viewingPatternData = parseJSON(viewingPatternStore);
   const { userPatterns, patternFilter } = useSettings();
   const viewingPatternID = viewingPatternData?.id;
-  
+
   return (
     <div className="flex flex-col gap-2 flex-grow overflow-hidden h-full pb-2 ">
       <div className="pr-4 space-x-4  flex max-w-full overflow-x-auto">
@@ -289,12 +300,12 @@ interface PatternPageWithPaginationProps {
   initialPage: number;
 }
 
-function PatternPageWithPagination({ 
-  patterns, 
-  patternOnClick, 
-  context, 
-  paginationOnChange, 
-  initialPage 
+function PatternPageWithPagination({
+  patterns,
+  patternOnClick,
+  context,
+  paginationOnChange,
+  initialPage,
 }: PatternPageWithPaginationProps) {
   const [page, setPage] = useState(initialPage);
   const debouncedPageChange = useDebounce(() => {
@@ -337,7 +348,7 @@ function FeaturedPatterns({ context }: FeaturedPatternsProps) {
   const examplePatterns = useExamplePatterns();
   const collections = examplePatterns.collections;
   const patterns = collections.get(patternFilterName.featured);
-  
+
   return (
     <PatternPageWithPagination
       patterns={patterns}
@@ -368,7 +379,7 @@ function LatestPatterns({ context }: LatestPatternsProps) {
   const examplePatterns = useExamplePatterns();
   const collections = examplePatterns.collections;
   const patterns = collections.get(patternFilterName.public);
-  
+
   return (
     <PatternPageWithPagination
       patterns={patterns}

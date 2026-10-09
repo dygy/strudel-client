@@ -18,7 +18,7 @@ export function Udels() {
   const hashes = getHashesFromUrl();
 
   const [numWindows, setNumWindows] = useState(hashes?.length ?? 1);
-  
+
   const numWindowsOnChange = (num: number) => {
     setNumWindows(num);
     const hashes = getHashesFromUrl();

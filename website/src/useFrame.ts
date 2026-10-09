@@ -8,7 +8,7 @@ import { useEffect, useRef } from 'react';
  */
 function useFrame(
   callback: (time: number, deltaTime: number) => void,
-  autostart: boolean = false
+  autostart: boolean = false,
 ): {
   start: () => void;
   stop: () => void;

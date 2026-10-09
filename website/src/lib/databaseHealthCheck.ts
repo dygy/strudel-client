@@ -31,8 +31,11 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealthCheck> {
 
   try {
     // Check authentication
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
     if (userError) {
       result.issues.push(`Authentication error: ${userError.message}`);
       result.isHealthy = false;
@@ -55,7 +58,7 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealthCheck> {
     for (const check of tableChecks) {
       try {
         const { error } = await check.query;
-        
+
         if (error) {
           if (error.code === 'PGRST205') {
             result.issues.push(`Table '${check.name}' does not exist`);
@@ -71,7 +74,9 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealthCheck> {
           result.tables[check.name as keyof typeof result.tables] = true;
         }
       } catch (err) {
-        result.issues.push(`Failed to check table '${check.name}': ${err instanceof Error ? err.message : 'Unknown error'}`);
+        result.issues.push(
+          `Failed to check table '${check.name}': ${err instanceof Error ? err.message : 'Unknown error'}`,
+        );
         result.isHealthy = false;
       }
     }
@@ -79,11 +84,8 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealthCheck> {
     // If user is authenticated, try a simple operation
     if (result.authentication.hasUser && result.tables.tracks) {
       try {
-        const { error } = await supabase
-          .from('tracks')
-          .select('id')
-          .limit(1);
-        
+        const { error } = await supabase.from('tracks').select('id').limit(1);
+
         if (error && error.code !== '42501') {
           result.issues.push(`Database access error: ${error.message}`);
           result.isHealthy = false;
@@ -93,7 +95,6 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealthCheck> {
         result.isHealthy = false;
       }
     }
-
   } catch (err) {
     result.issues.push(`Health check failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     result.isHealthy = false;
@@ -105,7 +106,7 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealthCheck> {
 export function logDatabaseHealth(health: DatabaseHealthCheck) {
   console.log('=== DATABASE HEALTH CHECK ===');
   console.log('Overall Health:', health.isHealthy ? '✅ HEALTHY' : '❌ UNHEALTHY');
-  
+
   console.log('\nAuthentication:');
   console.log('- Has User:', health.authentication.hasUser ? '✅' : '❌');
   if (health.authentication.userId) {
@@ -114,19 +115,19 @@ export function logDatabaseHealth(health: DatabaseHealthCheck) {
   if (health.authentication.userEmail) {
     console.log('- User Email:', health.authentication.userEmail);
   }
-  
+
   console.log('\nTables:');
   console.log('- Profiles:', health.tables.profiles ? '✅' : '❌');
   console.log('- Tracks:', health.tables.tracks ? '✅' : '❌');
   console.log('- Folders:', health.tables.folders ? '✅' : '❌');
-  
+
   if (health.issues.length > 0) {
     console.log('\nIssues:');
     health.issues.forEach((issue, index) => {
       console.log(`${index + 1}. ${issue}`);
     });
   }
-  
+
   if (!health.isHealthy) {
     console.log('\n🔧 SOLUTION:');
     console.log('Run the supabase_schema.sql file in your Supabase SQL Editor');
@@ -136,6 +137,6 @@ export function logDatabaseHealth(health: DatabaseHealthCheck) {
     console.log('4. Create new query and paste supabase_schema.sql contents');
     console.log('5. Run the query to create all tables and policies');
   }
-  
+
   console.log('==============================');
 }

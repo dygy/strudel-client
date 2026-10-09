@@ -25,7 +25,7 @@ export const stockPatterns: PatternCollection = Object.fromEntries(
 export const useExamplePatterns = (): UseExamplePatternsReturn => {
   const featuredPatterns = useStore($featuredPatterns);
   const publicPatterns = useStore($publicPatterns);
-  
+
   const collections = useMemo(() => {
     const pats = new Map<string, PatternCollection>();
     pats.set(patternFilterName.featured, featuredPatterns);

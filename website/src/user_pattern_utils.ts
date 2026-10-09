@@ -66,12 +66,15 @@ const sessionAtom = <T>(name: string, initial: T = undefined as T) => {
   return store;
 };
 
-export let $viewingPatternData = sessionAtom('viewingPatternData', JSON.stringify({
-  id: '',
-  code: '',
-  collection: patternFilterName.user,
-  created_at: Date.now(),
-}));
+export let $viewingPatternData = sessionAtom(
+  'viewingPatternData',
+  JSON.stringify({
+    id: '',
+    code: '',
+    collection: patternFilterName.user,
+    created_at: Date.now(),
+  }),
+);
 
 export const getViewingPatternData = (): PatternData => {
   return parseJSON($viewingPatternData.get());
@@ -175,9 +178,11 @@ export function setActivePattern(key: string | null): void {
 
     // Dispatch event to trigger FileManager synchronization
     setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('strudel-active-pattern-changed', {
-        detail: { newPattern: key, oldPattern }
-      }));
+      window.dispatchEvent(
+        new CustomEvent('strudel-active-pattern-changed', {
+          detail: { newPattern: key, oldPattern },
+        }),
+      );
     }, 50);
   }
 }
@@ -223,7 +228,7 @@ export const userPattern: UserPatternMethods = {
       code,
       created_at: Date.now(),
       id: newID,
-      collection: this.collection
+      collection: this.collection,
     };
     return { id: newID, data };
   },
@@ -237,18 +242,20 @@ export const userPattern: UserPatternMethods = {
     const userPatterns = this.getAll();
     const isNewPattern = !userPatterns[id];
     const updatedData: PatternData = {
-      ...data as PatternData,
+      ...(data as PatternData),
       id,
-      collection: this.collection
+      collection: this.collection,
     };
     setUserPatterns({ ...userPatterns, [id]: updatedData });
 
     // Dispatch event for new patterns to notify FileManager
     if (isNewPattern && typeof window !== 'undefined') {
       console.log('userPattern.update - dispatching user pattern created event for:', id);
-      window.dispatchEvent(new CustomEvent('strudel-user-pattern-created', {
-        detail: { patternId: id, patternData: updatedData }
-      }));
+      window.dispatchEvent(
+        new CustomEvent('strudel-user-pattern-created', {
+          detail: { patternId: id, patternData: updatedData },
+        }),
+      );
     }
 
     return { id, data: updatedData };
@@ -296,8 +303,8 @@ export const userPattern: UserPatternMethods = {
           id: '',
           code: DEFAULT_TRACK_CODE,
           collection: this.collection,
-          created_at: Date.now()
-        }
+          created_at: Date.now(),
+        },
       };
     }
 

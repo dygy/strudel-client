@@ -10,11 +10,11 @@ export function generateLogFrequencies(min, max, count) {
   const minLog = Math.log10(min);
   const maxLog = Math.log10(max);
   const step = (maxLog - minLog) / (count - 1);
-  
+
   for (let i = 0; i < count; i++) {
-    frequencies[i] = Math.pow(10, minLog + (step * i));
+    frequencies[i] = Math.pow(10, minLog + step * i);
   }
-  
+
   return frequencies;
 }
 
@@ -41,7 +41,7 @@ export function frequencyToX(freq, width) {
 export function gainToY(gain, height) {
   // -12 dB to +12 dB
   const normalized = (gain + 12) / 24; // 0 to 1
-  return height - (normalized * height);
+  return height - normalized * height;
 }
 
 /**

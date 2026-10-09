@@ -16,7 +16,7 @@ export function useAuth() {
     signInWithGoogle: authActions.signInWithGoogle.bind(authActions),
     signOut: authActions.signOut.bind(authActions),
     checkAuth: authActions.checkAuth.bind(authActions),
-    
+
     // Selectors (for convenience)
     ...authSelectors,
   };

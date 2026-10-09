@@ -6,7 +6,7 @@ This program is free software: you can redistribute it and/or modify it under th
 
 /**
  * Pattern position detector for determining completion context
- * 
+ *
  * Identifies the exact position within a mini-notation pattern to determine
  * what type of completions are appropriate (sample names, numbers, etc.)
  */
@@ -22,17 +22,17 @@ export class PatternPositionDetector {
     if (this._isInsideParentheses(content, position)) {
       return 'euclidean_param';
     }
-    
+
     // Get element boundaries without recursion
     const elementBounds = this._getElementBounds(content, position);
     const elementText = content.slice(elementBounds.start, elementBounds.end);
     const relativePosition = position - elementBounds.start;
-    
+
     // Check if after @ (weight syntax)
     if (this._isAfterWeight(elementText, relativePosition)) {
       return 'weight';
     }
-    
+
     // Check colon syntax position
     const colonInfo = this._analyzeColonPosition(elementText, relativePosition);
     if (colonInfo.inColonSyntax) {
@@ -44,11 +44,11 @@ export class PatternPositionDetector {
         return 'gain';
       }
     }
-    
+
     // Default: sample name context
     return 'sample_name';
   }
-  
+
   /**
    * Find the current pattern element at position
    * @param {string} content - String content
@@ -59,10 +59,10 @@ export class PatternPositionDetector {
     const bounds = this._getElementBounds(content, position);
     const text = content.slice(bounds.start, bounds.end);
     const type = this.detectPositionType(content, position);
-    
+
     return { start: bounds.start, end: bounds.end, text, type };
   }
-  
+
   /**
    * Get element boundaries without type detection (avoids recursion)
    * @private
@@ -70,23 +70,23 @@ export class PatternPositionDetector {
   _getElementBounds(content, position) {
     let start = 0;
     let end = content.length;
-    
+
     // Calculate parentheses depth at current position
     let initialParenDepth = 0;
     for (let i = 0; i < position; i++) {
       if (content[i] === '(') initialParenDepth++;
       if (content[i] === ')') initialParenDepth--;
     }
-    
+
     // Find element start by working backwards
     let parenDepth = initialParenDepth;
     for (let i = position - 1; i >= 0; i--) {
       const char = content[i];
-      
+
       // Track parentheses (backwards)
       if (char === ')') parenDepth++;
       if (char === '(') parenDepth--;
-      
+
       // Only consider separators outside parentheses
       if (parenDepth === 0) {
         // Separators mark element boundaries
@@ -94,7 +94,7 @@ export class PatternPositionDetector {
           start = i + 1;
           break;
         }
-        
+
         // Opening brackets mark boundaries
         if (char === '[' || char === '<' || char === '{') {
           start = i + 1;
@@ -102,16 +102,16 @@ export class PatternPositionDetector {
         }
       }
     }
-    
+
     // Find element end by working forwards
     parenDepth = initialParenDepth;
     for (let i = position; i < content.length; i++) {
       const char = content[i];
-      
+
       // Track parentheses (forwards)
       if (char === '(') parenDepth++;
       if (char === ')') parenDepth--;
-      
+
       // Only consider separators outside parentheses
       if (parenDepth === 0) {
         // Separators mark element boundaries
@@ -119,7 +119,7 @@ export class PatternPositionDetector {
           end = i;
           break;
         }
-        
+
         // Closing brackets mark boundaries
         if (char === ']' || char === '>' || char === '}') {
           end = i;
@@ -127,10 +127,10 @@ export class PatternPositionDetector {
         }
       }
     }
-    
+
     return { start, end };
   }
-  
+
   /**
    * Check if position is after a pattern separator
    * @param {string} content - String content
@@ -139,12 +139,11 @@ export class PatternPositionDetector {
    */
   isAfterSeparator(content, position) {
     if (position === 0) return true;
-    
+
     const prevChar = content[position - 1];
-    return this._isSeparator(prevChar) || 
-           prevChar === '[' || prevChar === '<' || prevChar === '{';
+    return this._isSeparator(prevChar) || prevChar === '[' || prevChar === '<' || prevChar === '{';
   }
-  
+
   /**
    * Check if character is a separator
    * @private
@@ -152,7 +151,7 @@ export class PatternPositionDetector {
   _isSeparator(char) {
     return char === ' ' || char === ',';
   }
-  
+
   /**
    * Check if position is inside nested structure
    * @private
@@ -169,14 +168,14 @@ export class PatternPositionDetector {
     }
     return depth > 0;
   }
-  
+
   /**
    * Check if position is inside parentheses
    * @private
    */
   _isInsideParentheses(content, position) {
     let parenDepth = 0;
-    
+
     // Work through the string up to (but not including) position
     // This way, being AT a closing paren still counts as inside
     for (let i = 0; i < position; i++) {
@@ -186,15 +185,15 @@ export class PatternPositionDetector {
         parenDepth--;
       }
     }
-    
+
     // Check if current position is an opening paren - if so, we're inside
     if (content[position] === '(') {
       parenDepth++;
     }
-    
+
     return parenDepth > 0;
   }
-  
+
   /**
    * Check if position is after @ (weight syntax)
    * @private
@@ -212,7 +211,7 @@ export class PatternPositionDetector {
     }
     return false;
   }
-  
+
   /**
    * Analyze colon syntax position
    * @private
@@ -225,24 +224,24 @@ export class PatternPositionDetector {
         colons.push(i);
       }
     }
-    
+
     if (colons.length === 0) {
       return {
         inColonSyntax: false,
-        parameterIndex: 0
+        parameterIndex: 0,
       };
     }
-    
+
     // Determine parameter index based on colon count
     // Format: sample:n:gain
     // 0 colons = sample (index 0)
     // 1 colon = n (index 1)
     // 2+ colons = gain (index 2)
     const parameterIndex = Math.min(colons.length, 2);
-    
+
     return {
       inColonSyntax: true,
-      parameterIndex
+      parameterIndex,
     };
   }
 }

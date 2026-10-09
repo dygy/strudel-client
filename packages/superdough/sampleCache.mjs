@@ -48,10 +48,10 @@ const cacheListeners = new Set();
 export function configureSampleCache(config = {}) {
   cacheConfig = { ...cacheConfig, ...config };
   logger(`[sampleCache] configured: ${JSON.stringify(cacheConfig)}`);
-  
+
   // Notify listeners of config change
   notifyCacheListeners('config', cacheConfig);
-  
+
   // If cache is disabled, clear everything
   if (!cacheConfig.enabled) {
     clearCache();
@@ -69,13 +69,14 @@ export function getCacheConfig() {
  * Get current cache statistics
  */
 export function getCacheStats() {
-  return { 
+  return {
     ...cacheStats,
     maxSizeMB: cacheConfig.maxSizeMB,
     currentSizeMB: Math.round((cacheStats.totalSize / BYTES_PER_MB) * 100) / 100,
-    hitRate: cacheStats.hitCount + cacheStats.missCount > 0 
-      ? Math.round((cacheStats.hitCount / (cacheStats.hitCount + cacheStats.missCount)) * 100) 
-      : 0,
+    hitRate:
+      cacheStats.hitCount + cacheStats.missCount > 0
+        ? Math.round((cacheStats.hitCount / (cacheStats.hitCount + cacheStats.missCount)) * 100)
+        : 0,
   };
 }
 
@@ -101,7 +102,7 @@ export function removeCacheListener(listener) {
  * @param {*} data - Event data
  */
 function notifyCacheListeners(event, data) {
-  cacheListeners.forEach(listener => {
+  cacheListeners.forEach((listener) => {
     try {
       listener(event, data);
     } catch (error) {
@@ -117,10 +118,10 @@ function notifyCacheListeners(event, data) {
  */
 function updateCacheMetadata(url, buffer = null) {
   if (!cacheConfig.enabled) return;
-  
+
   const existing = cacheMetadata.get(url);
   const now = Date.now();
-  
+
   if (existing) {
     existing.lastAccessed = now;
     cacheStats.hitCount++;
@@ -134,7 +135,7 @@ function updateCacheMetadata(url, buffer = null) {
     });
     cacheStats.totalSize += size;
     cacheStats.missCount++;
-    
+
     // Check if we need to evict samples
     enforCacheSizeLimit();
   }
@@ -145,25 +146,24 @@ function updateCacheMetadata(url, buffer = null) {
  */
 function enforCacheSizeLimit() {
   const maxSize = cacheConfig.maxSizeMB * BYTES_PER_MB;
-  
+
   if (cacheStats.totalSize <= maxSize) return;
-  
+
   // Sort by last accessed time (oldest first)
-  const entries = Array.from(cacheMetadata.entries())
-    .sort(([,a], [,b]) => a.lastAccessed - b.lastAccessed);
-  
+  const entries = Array.from(cacheMetadata.entries()).sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
+
   for (const [url, metadata] of entries) {
     if (cacheStats.totalSize <= maxSize) break;
-    
+
     // Remove from cache
     const cachedBuffer = getCachedBuffer(url);
     if (cachedBuffer) {
-      // Note: We can't actually delete from the original cache here, 
+      // Note: We can't actually delete from the original cache here,
       // but we track the eviction in our metadata
       cacheStats.totalSize -= metadata.size;
       cacheStats.evictionCount++;
       cacheMetadata.delete(url);
-      
+
       logger(`[sampleCache] evicted ${url} (${Math.round(metadata.size / 1024)}KB)`);
       notifyCacheListeners('evict', { url, size: metadata.size });
     }
@@ -177,13 +177,13 @@ function enforCacheSizeLimit() {
  */
 function extractSampleUrls(code) {
   const urls = new Set();
-  
+
   // Match samples() calls with URL objects - more comprehensive regex
   const samplesRegex = /samples\s*\(\s*\{[^}]*\}/gs;
   const matches = code.match(samplesRegex);
-  
+
   if (matches) {
-    matches.forEach(match => {
+    matches.forEach((match) => {
       // Extract URLs from the samples object - look for any URL-like strings
       const urlRegex = /["']([^"']*(?:https?|ftp|file|data|blob):\/\/[^"']+)["']/g;
       let urlMatch;
@@ -192,14 +192,14 @@ function extractSampleUrls(code) {
       }
     });
   }
-  
+
   // Also look for direct URL usage in s() calls
   const directUrlRegex = /s\s*\(\s*["']([^"']*(?:https?|ftp|file|data|blob):\/\/[^"']+)["']/g;
   let directMatch;
   while ((directMatch = directUrlRegex.exec(code)) !== null) {
     urls.add(directMatch[1]);
   }
-  
+
   return urls;
 }
 
@@ -210,21 +210,21 @@ function extractSampleUrls(code) {
  */
 export async function preloadTrackSamples(code, trackName = 'unknown') {
   if (!cacheConfig.enabled || !cacheConfig.preloadEnabled) return;
-  
+
   const urls = extractSampleUrls(code);
-  
+
   if (urls.size === 0) return;
-  
+
   logger(`[sampleCache] found ${urls.size} sample URLs in track "${trackName}"`);
-  
+
   // Add to preload queue
-  urls.forEach(url => preloadQueue.add(url));
-  
+  urls.forEach((url) => preloadQueue.add(url));
+
   // Start preload worker if not running
   if (!preloadWorker) {
     startPreloadWorker();
   }
-  
+
   notifyCacheListeners('preload-queued', { trackName, urls: Array.from(urls) });
 }
 
@@ -233,7 +233,7 @@ export async function preloadTrackSamples(code, trackName = 'unknown') {
  */
 function startPreloadWorker() {
   if (preloadWorker) return;
-  
+
   preloadWorker = setInterval(async () => {
     if (preloadQueue.size === 0) {
       // Stop worker when queue is empty
@@ -241,32 +241,31 @@ function startPreloadWorker() {
       preloadWorker = null;
       return;
     }
-    
+
     // Get next URL from queue
     const url = preloadQueue.values().next().value;
     preloadQueue.delete(url);
-    
+
     try {
       // Check if already cached
       if (getCachedBuffer(url)) {
         updateCacheMetadata(url);
         return;
       }
-      
+
       // Preload the sample
       const ac = getAudioContext();
       const buffer = await loadBuffer(url, ac, 'preload');
-      
+
       // Update metadata
       const metadata = cacheMetadata.get(url);
       if (metadata) {
         metadata.preloaded = true;
       }
-      
+
       cacheStats.preloadCount++;
       logger(`[sampleCache] preloaded ${url}`);
       notifyCacheListeners('preload-complete', { url });
-      
     } catch (error) {
       logger(`[sampleCache] failed to preload ${url}: ${error.message}`, 'warning');
       notifyCacheListeners('preload-error', { url, error: error.message });
@@ -280,9 +279,9 @@ function startPreloadWorker() {
  */
 export async function preloadSamples(urls) {
   if (!cacheConfig.enabled || !cacheConfig.preloadEnabled) return;
-  
-  urls.forEach(url => preloadQueue.add(url));
-  
+
+  urls.forEach((url) => preloadQueue.add(url));
+
   if (!preloadWorker) {
     startPreloadWorker();
   }
@@ -306,7 +305,7 @@ export function getSampleCacheStatus(url) {
   const cached = isSampleCached(url);
   const metadata = cacheMetadata.get(url);
   const queued = preloadQueue.has(url);
-  
+
   return {
     cached,
     queued,
@@ -322,12 +321,12 @@ export function getSampleCacheStatus(url) {
 export function clearCache() {
   cacheMetadata.clear();
   preloadQueue.clear();
-  
+
   if (preloadWorker) {
     clearInterval(preloadWorker);
     preloadWorker = null;
   }
-  
+
   cacheStats = {
     totalSize: 0,
     hitCount: 0,
@@ -335,7 +334,7 @@ export function clearCache() {
     preloadCount: 0,
     evictionCount: 0,
   };
-  
+
   logger('[sampleCache] cache cleared');
   notifyCacheListeners('clear', {});
 }
@@ -346,7 +345,7 @@ export function clearCache() {
  */
 export async function warmUpCache(commonUrls = []) {
   if (!cacheConfig.enabled) return;
-  
+
   logger(`[sampleCache] warming up cache with ${commonUrls.length} samples`);
   await preloadSamples(commonUrls);
 }

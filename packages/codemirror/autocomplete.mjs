@@ -142,20 +142,26 @@ export const hydraFunctionDocs = {
   osc: 'Oscillator source - generates wave patterns. Parameters: frequency (default 60), sync (default 0.1), offset (default 0). Example: osc(10, 0.1, 0)',
   solid: 'Solid color source. Parameters: r, g, b, a (all 0-1). Example: solid(1, 0, 0, 1) for red',
   gradient: 'Gradient source. Parameters: speed (default 0). Example: gradient(1)',
-  noise: 'Noise source - generates random patterns. Parameters: scale (default 10), offset (default 0.1). Example: noise(3, 0.1)',
-  voronoi: 'Voronoi pattern source. Parameters: scale (default 5), speed (default 0.3), blending (default 0.3). Example: voronoi(5, 0.3, 0.3)',
-  shape: 'Geometric shape source. Parameters: sides (default 3), radius (default 0.3), smoothing (default 0.01). Example: shape(4, 0.5, 0.01) for square',
+  noise:
+    'Noise source - generates random patterns. Parameters: scale (default 10), offset (default 0.1). Example: noise(3, 0.1)',
+  voronoi:
+    'Voronoi pattern source. Parameters: scale (default 5), speed (default 0.3), blending (default 0.3). Example: voronoi(5, 0.3, 0.3)',
+  shape:
+    'Geometric shape source. Parameters: sides (default 3), radius (default 0.3), smoothing (default 0.01). Example: shape(4, 0.5, 0.01) for square',
   src: 'Use external source or output buffer. Parameters: source (o0, o1, o2, o3, or s0). Example: src(o0) for feedback',
 
   // Transforms
   rotate: 'Rotate the visual. Parameters: angle (radians), speed (default 0). Example: rotate(0.5, 0.1)',
-  scale: 'Scale the visual. Parameters: amount (default 1.5), xMult (default 1), yMult (default 1). Example: scale(2, 1, 1)',
+  scale:
+    'Scale the visual. Parameters: amount (default 1.5), xMult (default 1), yMult (default 1). Example: scale(2, 1, 1)',
   pixelate: 'Pixelate effect. Parameters: x (default 20), y (default 20). Example: pixelate(10, 10)',
-  repeat: 'Repeat/tile the visual. Parameters: repeatX (default 3), repeatY (default 3), offsetX (default 0), offsetY (default 0). Example: repeat(4, 4)',
+  repeat:
+    'Repeat/tile the visual. Parameters: repeatX (default 3), repeatY (default 3), offsetX (default 0), offsetY (default 0). Example: repeat(4, 4)',
   repeatX: 'Repeat horizontally. Parameters: reps (default 3), offset (default 0). Example: repeatX(4, 0)',
   repeatY: 'Repeat vertically. Parameters: reps (default 3), offset (default 0). Example: repeatY(4, 0)',
   kaleid: 'Kaleidoscope effect. Parameters: nSides (default 4). Example: kaleid(6) for 6-sided kaleidoscope',
-  scroll: 'Scroll the visual. Parameters: scrollX (default 0.5), scrollY (default 0.5), speedX (default 0), speedY (default 0). Example: scroll(0.5, 0.5)',
+  scroll:
+    'Scroll the visual. Parameters: scrollX (default 0.5), scrollY (default 0.5), speedX (default 0), speedY (default 0). Example: scroll(0.5, 0.5)',
   scrollX: 'Scroll horizontally. Parameters: scrollX (default 0.5), speed (default 0). Example: scrollX(0.5, 0.1)',
   scrollY: 'Scroll vertically. Parameters: scrollY (default 0.5), speed (default 0). Example: scrollY(0.5, 0.1)',
 
@@ -165,24 +171,37 @@ export const hydraFunctionDocs = {
   brightness: 'Adjust brightness. Parameters: amount (default 0.4). Example: brightness(0.5)',
   luma: 'Luminance threshold - creates black/white based on brightness. Parameters: threshold (default 0.5), tolerance (default 0.1). Example: luma(0.5, 0.1)',
   thresh: 'Threshold effect. Parameters: threshold (default 0.5), tolerance (default 0.04). Example: thresh(0.5, 0.1)',
-  color: 'Colorize with RGB values. Parameters: r (default 1), g (default 1), b (default 1), a (default 1). Example: color(1, 0.5, 0.8)',
+  color:
+    'Colorize with RGB values. Parameters: r (default 1), g (default 1), b (default 1), a (default 1). Example: color(1, 0.5, 0.8)',
   saturate: 'Adjust saturation. Parameters: amount (default 2). Example: saturate(1.5)',
   hue: 'Adjust hue. Parameters: amount (default 0.4). Example: hue(0.5)',
   colorama: 'Color shift effect - cycles through colors. Parameters: amount (default 0.005). Example: colorama(0.01)',
-  posterize: 'Posterize colors - reduce color palette. Parameters: bins (default 3), gamma (default 0.6). Example: posterize(5, 0.6)',
-  shift: 'Shift colors in RGB space. Parameters: r (default 0.5), g (default 0.5), b (default 0.5), a (default 0.5). Example: shift(0.1, 0.2, 0.3)',
+  posterize:
+    'Posterize colors - reduce color palette. Parameters: bins (default 3), gamma (default 0.6). Example: posterize(5, 0.6)',
+  shift:
+    'Shift colors in RGB space. Parameters: r (default 0.5), g (default 0.5), b (default 0.5), a (default 0.5). Example: shift(0.1, 0.2, 0.3)',
 
   // Modulation
-  modulate: 'Modulate position with another source. Parameters: source, amount (default 0.1). Example: modulate(noise(3), 0.1)',
-  modulateRotate: 'Modulate rotation with another source. Parameters: source, multiple (default 1), offset (default 0). Example: modulateRotate(osc(1), 0.5)',
-  modulateScale: 'Modulate scale with another source. Parameters: source, multiple (default 1), offset (default 1). Example: modulateScale(noise(3), 0.5)',
-  modulatePixelate: 'Modulate pixelation with another source. Parameters: source, multiple (default 10), offset (default 3). Example: modulatePixelate(noise(3), 10)',
-  modulateRepeat: 'Modulate repetition with another source. Parameters: source, repeatX (default 3), repeatY (default 3), offsetX (default 0.5), offsetY (default 0.5). Example: modulateRepeat(osc(1), 3, 3)',
-  modulateRepeatX: 'Modulate horizontal repetition. Parameters: source, reps (default 3), offset (default 0.5). Example: modulateRepeatX(osc(1), 3)',
-  modulateRepeatY: 'Modulate vertical repetition. Parameters: source, reps (default 3), offset (default 0.5). Example: modulateRepeatY(osc(1), 3)',
-  modulateKaleid: 'Modulate kaleidoscope with another source. Parameters: source, nSides (default 4). Example: modulateKaleid(osc(1), 4)',
-  modulateScrollX: 'Modulate horizontal scroll. Parameters: source, scrollX (default 0.5), speed (default 0). Example: modulateScrollX(osc(1), 0.5)',
-  modulateScrollY: 'Modulate vertical scroll. Parameters: source, scrollY (default 0.5), speed (default 0). Example: modulateScrollY(osc(1), 0.5)',
+  modulate:
+    'Modulate position with another source. Parameters: source, amount (default 0.1). Example: modulate(noise(3), 0.1)',
+  modulateRotate:
+    'Modulate rotation with another source. Parameters: source, multiple (default 1), offset (default 0). Example: modulateRotate(osc(1), 0.5)',
+  modulateScale:
+    'Modulate scale with another source. Parameters: source, multiple (default 1), offset (default 1). Example: modulateScale(noise(3), 0.5)',
+  modulatePixelate:
+    'Modulate pixelation with another source. Parameters: source, multiple (default 10), offset (default 3). Example: modulatePixelate(noise(3), 10)',
+  modulateRepeat:
+    'Modulate repetition with another source. Parameters: source, repeatX (default 3), repeatY (default 3), offsetX (default 0.5), offsetY (default 0.5). Example: modulateRepeat(osc(1), 3, 3)',
+  modulateRepeatX:
+    'Modulate horizontal repetition. Parameters: source, reps (default 3), offset (default 0.5). Example: modulateRepeatX(osc(1), 3)',
+  modulateRepeatY:
+    'Modulate vertical repetition. Parameters: source, reps (default 3), offset (default 0.5). Example: modulateRepeatY(osc(1), 3)',
+  modulateKaleid:
+    'Modulate kaleidoscope with another source. Parameters: source, nSides (default 4). Example: modulateKaleid(osc(1), 4)',
+  modulateScrollX:
+    'Modulate horizontal scroll. Parameters: source, scrollX (default 0.5), speed (default 0). Example: modulateScrollX(osc(1), 0.5)',
+  modulateScrollY:
+    'Modulate vertical scroll. Parameters: source, scrollY (default 0.5), speed (default 0). Example: modulateScrollY(osc(1), 0.5)',
 
   // Blending
   add: 'Add/blend two sources together. Parameters: source, amount (default 0.5). Example: add(osc(10), 0.5)',
@@ -200,7 +219,8 @@ export const hydraFunctionDocs = {
   bpm: 'Set beats per minute for time-based animations. Parameters: bpm (default 30). Example: bpm(120)',
 
   // Hydra-specific
-  initHydra: 'Initialize Hydra video synth. Call with await at the top of your code. Options: {detectAudio: true} for audio reactivity, {feedStrudel: 1} to process Strudel visuals. Example: await initHydra({detectAudio: true})',
+  initHydra:
+    'Initialize Hydra video synth. Call with await at the top of your code. Options: {detectAudio: true} for audio reactivity, {feedStrudel: 1} to process Strudel visuals. Example: await initHydra({detectAudio: true})',
   H: 'Convert Strudel pattern to Hydra value. Use to drive Hydra parameters with patterns. Example: osc(H("10 20 30"), 0.1, 0)',
 };
 
@@ -215,14 +235,14 @@ export const parseHydraDoc = (name, docString) => {
   if (paramsMatch) {
     const paramsStr = paramsMatch[1];
     const paramParts = paramsStr.split(', ');
-    paramParts.forEach(part => {
+    paramParts.forEach((part) => {
       const match = part.match(/(\w+)\s*\(default\s+([^)]+)\)/);
       if (match) {
         params.push({
           name: match[1],
           type: 'number',
           default: match[2],
-          description: `${match[1]} parameter`
+          description: `${match[1]} parameter`,
         });
       }
     });
@@ -236,11 +256,11 @@ export const parseHydraDoc = (name, docString) => {
     name,
     description,
     params,
-    examples
+    examples,
   };
 };
 
-const hydraFunctions = Object.keys(hydraFunctionDocs).map(name => ({
+const hydraFunctions = Object.keys(hydraFunctionDocs).map((name) => ({
   label: name,
   type: 'function',
   detail: ` ${hydraFunctionDocs[name].split('.')[0]}...`, // Show first sentence only
@@ -250,10 +270,33 @@ const hydraCompletions = hydraFunctions;
 
 // Math object methods for global autocomplete
 const mathCompletions = [
-  'abs', 'ceil', 'floor', 'round', 'max', 'min', 'pow', 'sqrt', 'random',
-  'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'exp', 'log', 'log10',
-  'log2', 'sign', 'trunc', 'cbrt', 'hypot', 'PI', 'E'
-].map(name => ({
+  'abs',
+  'ceil',
+  'floor',
+  'round',
+  'max',
+  'min',
+  'pow',
+  'sqrt',
+  'random',
+  'sin',
+  'cos',
+  'tan',
+  'asin',
+  'acos',
+  'atan',
+  'atan2',
+  'exp',
+  'log',
+  'log10',
+  'log2',
+  'sign',
+  'trunc',
+  'cbrt',
+  'hypot',
+  'PI',
+  'E',
+].map((name) => ({
   label: `Math.${name}`,
   type: 'property',
   info: `Math.${name}`,
@@ -454,12 +497,12 @@ function bankHandler(context) {
   const quoteIdx = Math.max(text.lastIndexOf('"'), text.lastIndexOf("'"));
   if (quoteIdx === -1) return null;
   const inside = text.slice(quoteIdx + 1);
-  
+
   // Extract the current word fragment, handling mini-notation separators
   // e.g. "<r EmuSP12>" -> after "<" and space, fragment is current word
   const fragMatch = inside.match(BANK_FRAGMENT_MATCH_REGEX);
   const fragment = fragMatch ? fragMatch[1] : inside;
-  
+
   let banks = bankCompletions();
   // Case-insensitive filtering
   const filteredBanks = banks.filter((b) => b.label.toLowerCase().startsWith(fragment.toLowerCase()));
@@ -583,26 +626,77 @@ function chordHandler(context) {
 
 // Standard JavaScript methods for common types
 const jsArrayMethods = [
-  'map', 'filter', 'reduce', 'forEach', 'find', 'findIndex', 'some', 'every',
-  'push', 'pop', 'shift', 'unshift', 'slice', 'splice', 'concat', 'join',
-  'reverse', 'sort', 'includes', 'indexOf', 'lastIndexOf', 'flat', 'flatMap',
-  'fill', 'copyWithin', 'entries', 'keys', 'values', 'at', 'length'
-].map(name => ({ label: name, type: 'method', info: `Array method: ${name}` }));
+  'map',
+  'filter',
+  'reduce',
+  'forEach',
+  'find',
+  'findIndex',
+  'some',
+  'every',
+  'push',
+  'pop',
+  'shift',
+  'unshift',
+  'slice',
+  'splice',
+  'concat',
+  'join',
+  'reverse',
+  'sort',
+  'includes',
+  'indexOf',
+  'lastIndexOf',
+  'flat',
+  'flatMap',
+  'fill',
+  'copyWithin',
+  'entries',
+  'keys',
+  'values',
+  'at',
+  'length',
+].map((name) => ({ label: name, type: 'method', info: `Array method: ${name}` }));
 
 const jsStringMethods = [
-  'charAt', 'charCodeAt', 'concat', 'includes', 'indexOf', 'lastIndexOf',
-  'match', 'matchAll', 'replace', 'replaceAll', 'search', 'slice', 'split',
-  'substring', 'toLowerCase', 'toUpperCase', 'trim', 'trimStart', 'trimEnd',
-  'padStart', 'padEnd', 'repeat', 'startsWith', 'endsWith', 'length'
-].map(name => ({ label: name, type: 'method', info: `String method: ${name}` }));
+  'charAt',
+  'charCodeAt',
+  'concat',
+  'includes',
+  'indexOf',
+  'lastIndexOf',
+  'match',
+  'matchAll',
+  'replace',
+  'replaceAll',
+  'search',
+  'slice',
+  'split',
+  'substring',
+  'toLowerCase',
+  'toUpperCase',
+  'trim',
+  'trimStart',
+  'trimEnd',
+  'padStart',
+  'padEnd',
+  'repeat',
+  'startsWith',
+  'endsWith',
+  'length',
+].map((name) => ({ label: name, type: 'method', info: `String method: ${name}` }));
 
-const jsNumberMethods = [
-  'toFixed', 'toExponential', 'toPrecision', 'toString', 'valueOf'
-].map(name => ({ label: name, type: 'method', info: `Number method: ${name}` }));
+const jsNumberMethods = ['toFixed', 'toExponential', 'toPrecision', 'toString', 'valueOf'].map((name) => ({
+  label: name,
+  type: 'method',
+  info: `Number method: ${name}`,
+}));
 
-const jsObjectMethods = [
-  'hasOwnProperty', 'toString', 'valueOf', 'constructor'
-].map(name => ({ label: name, type: 'method', info: `Object method: ${name}` }));
+const jsObjectMethods = ['hasOwnProperty', 'toString', 'valueOf', 'constructor'].map((name) => ({
+  label: name,
+  type: 'method',
+  info: `Object method: ${name}`,
+}));
 
 const allJsMethods = [...jsArrayMethods, ...jsStringMethods, ...jsNumberMethods, ...jsObjectMethods];
 
@@ -616,30 +710,132 @@ function methodHandler(context) {
   if (afterDot) {
     const word = afterDot.text.slice(1); // Remove the dot
     // Filter to only show pattern methods (functions that are typically chained)
-    const patternMethods = jsdocCompletions.filter(completion => {
-      const doc = jsdoc.docs.find(d => getDocLabel(d) === completion.label);
+    const patternMethods = jsdocCompletions.filter((completion) => {
+      const doc = jsdoc.docs.find((d) => getDocLabel(d) === completion.label);
       // Include if it's a common pattern method or has @memberof Pattern
-      return doc && (
-        doc.memberof === 'Pattern' ||
-        doc.tags?.some(t => t.originalTitle === 'patternMethod') ||
-        // Common pattern methods
-        ['gain', 'speed', 'note', 'sound', 's', 'n', 'slow', 'fast', 'rev', 'jux',
-         'every', 'off', 'layer', 'stack', 'cat', 'seq', 'add', 'sub', 'mul', 'div',
-         'lpf', 'hpf', 'vowel', 'room', 'delay', 'delaytime', 'delayfeedback',
-         'cutoff', 'resonance', 'crush', 'coarse', 'shape', 'pan', 'orbit',
-         'sometimes', 'often', 'rarely', 'almostNever', 'almostAlways', 'never',
-         'degradeBy', 'ply', 'echo', 'echoWith', 'stut', 'chop', 'slice', 'splice',
-         'loopAt', 'fit', 'chunk', 'unchunk', 'inside', 'outside', 'when', 'mask',
-         'struct', 'euclidLegato', 'euclid', 'press', 'pressBy', 'range', 'rangex',
-         'scale', 'scaleWithOctave', 'chord', 'voicing', 'mode', 'transpose',
-         'superimpose', 'arp', 'arpeggiate', 'striate', 'scramble', 'shuffle',
-         'rot', 'iter', 'palindrome', 'swing', 'swingBy', 'hurry', 'compress',
-         'zoom', 'fastGap', 'densityGap', 'sparsity', 'linger', 'segment',
-         'timecat', 'timeCat', 'append', 'firstOf', 'lastOf', 'repeatCycles',
-         'fastcat', 'slowcat', 'fastCat', 'slowCat', 'overlay', 'sine', 'saw',
-         'square', 'tri', 'cosine', 'rand', 'irand', 'perlin', 'sine2', 'saw2',
-         'square2', 'tri2', 'cosine2', 'smooth', 'segment', 'fit', 'quantize'
-        ].includes(completion.label)
+      return (
+        doc &&
+        (doc.memberof === 'Pattern' ||
+          doc.tags?.some((t) => t.originalTitle === 'patternMethod') ||
+          // Common pattern methods
+          [
+            'gain',
+            'speed',
+            'note',
+            'sound',
+            's',
+            'n',
+            'slow',
+            'fast',
+            'rev',
+            'jux',
+            'every',
+            'off',
+            'layer',
+            'stack',
+            'cat',
+            'seq',
+            'add',
+            'sub',
+            'mul',
+            'div',
+            'lpf',
+            'hpf',
+            'vowel',
+            'room',
+            'delay',
+            'delaytime',
+            'delayfeedback',
+            'cutoff',
+            'resonance',
+            'crush',
+            'coarse',
+            'shape',
+            'pan',
+            'orbit',
+            'sometimes',
+            'often',
+            'rarely',
+            'almostNever',
+            'almostAlways',
+            'never',
+            'degradeBy',
+            'ply',
+            'echo',
+            'echoWith',
+            'stut',
+            'chop',
+            'slice',
+            'splice',
+            'loopAt',
+            'fit',
+            'chunk',
+            'unchunk',
+            'inside',
+            'outside',
+            'when',
+            'mask',
+            'struct',
+            'euclidLegato',
+            'euclid',
+            'press',
+            'pressBy',
+            'range',
+            'rangex',
+            'scale',
+            'scaleWithOctave',
+            'chord',
+            'voicing',
+            'mode',
+            'transpose',
+            'superimpose',
+            'arp',
+            'arpeggiate',
+            'striate',
+            'scramble',
+            'shuffle',
+            'rot',
+            'iter',
+            'palindrome',
+            'swing',
+            'swingBy',
+            'hurry',
+            'compress',
+            'zoom',
+            'fastGap',
+            'densityGap',
+            'sparsity',
+            'linger',
+            'segment',
+            'timecat',
+            'timeCat',
+            'append',
+            'firstOf',
+            'lastOf',
+            'repeatCycles',
+            'fastcat',
+            'slowcat',
+            'fastCat',
+            'slowCat',
+            'overlay',
+            'sine',
+            'saw',
+            'square',
+            'tri',
+            'cosine',
+            'rand',
+            'irand',
+            'perlin',
+            'sine2',
+            'saw2',
+            'square2',
+            'tri2',
+            'cosine2',
+            'smooth',
+            'segment',
+            'fit',
+            'quantize',
+          ].includes(completion.label))
       );
     });
 
@@ -648,7 +844,7 @@ function methodHandler(context) {
 
     return {
       from: afterDot.from + 1, // Start after the dot
-      options: allMethods.filter(m => m.label.startsWith(word)),
+      options: allMethods.filter((m) => m.label.startsWith(word)),
     };
   }
   return null;
@@ -695,12 +891,14 @@ export const strudelAutocomplete = (context) => {
 
 export const isAutoCompletionEnabled = (enabled) => {
   if (enabled) {
-    return [autocompletion({
-      override: [strudelAutocomplete],
-      closeOnBlur: false,
-      activateOnTyping: true,
-      maxRenderedOptions: 100,
-    })];
+    return [
+      autocompletion({
+        override: [strudelAutocomplete],
+        closeOnBlur: false,
+        activateOnTyping: true,
+        maxRenderedOptions: 100,
+      }),
+    ];
   }
   return [];
 };

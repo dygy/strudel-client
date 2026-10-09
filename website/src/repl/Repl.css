@@ -75,7 +75,9 @@
   padding: 0 !important;
   border: 1px solid rgba(79, 195, 247, 0.3) !important;
   border-radius: 12px !important;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(79, 195, 247, 0.1) !important;
+  box-shadow:
+    0 12px 48px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(79, 195, 247, 0.1) !important;
   max-width: 550px !important;
   min-width: 320px !important;
   max-height: 450px !important;
@@ -294,7 +296,7 @@
   background: linear-gradient(135deg, rgba(25, 25, 35, 0.98), rgba(30, 30, 40, 0.98)) !important;
   border: 1px solid rgba(79, 195, 247, 0.4) !important;
   border-radius: 12px !important;
-  box-shadow: 
+  box-shadow:
     0 12px 48px rgba(0, 0, 0, 0.8),
     0 0 0 1px rgba(79, 195, 247, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
@@ -389,7 +391,7 @@
   background: linear-gradient(135deg, rgba(79, 195, 247, 0.15), rgba(129, 199, 132, 0.12)) !important;
   color: var(--foreground, #ffffff) !important;
   transform: translateX(6px) !important;
-  box-shadow: 
+  box-shadow:
     0 4px 16px rgba(79, 195, 247, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
@@ -468,7 +470,9 @@
   background: rgba(30, 30, 30, 0.98) !important;
   border: 1px solid rgba(79, 195, 247, 0.3) !important;
   border-radius: 8px !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.05) !important;
   backdrop-filter: blur(10px) !important;
   max-width: 650px !important;
   max-height: 500px !important;
@@ -484,8 +488,13 @@
 
 /* Recording pulse animation for the record button */
 @keyframes recordingPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 .recording-pulse {
@@ -542,13 +551,18 @@
 
 /* Backdrop fade-in */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Glow pulse for active elements */
 @keyframes glowPulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
   }
   50% {

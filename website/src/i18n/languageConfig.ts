@@ -42,11 +42,11 @@ export const LANGUAGE_METADATA: Record<string, LanguageMetadata> = {
 function detectAvailableLanguages(): Record<string, LanguageMetadata> {
   // Use Vite's import.meta.glob to get all locale directories at build time
   const localeFiles = import.meta.glob('./locales/*/common.json', { eager: false });
-  
+
   const availableLanguages: Record<string, LanguageMetadata> = {};
-  
+
   // Extract language codes from the file paths
-  Object.keys(localeFiles).forEach(path => {
+  Object.keys(localeFiles).forEach((path) => {
     const match = path.match(/\.\/locales\/([^/]+)\/common\.json$/);
     if (match) {
       const langCode = match[1];
@@ -59,17 +59,17 @@ function detectAvailableLanguages(): Record<string, LanguageMetadata> {
         availableLanguages[langCode] = {
           name: langCode.toUpperCase(),
           nativeName: langCode.toUpperCase(),
-          rtl: false
+          rtl: false,
         };
       }
     }
   });
-  
+
   // Ensure English is always available as fallback
   if (!availableLanguages.en && LANGUAGE_METADATA.en) {
     availableLanguages.en = LANGUAGE_METADATA.en;
   }
-  
+
   return availableLanguages;
 }
 

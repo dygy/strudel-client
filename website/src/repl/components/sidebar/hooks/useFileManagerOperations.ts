@@ -37,7 +37,7 @@ interface UseFileManagerOperationsProps {
   setShowDeleteModal: (show: boolean) => void;
   setFolderToDelete: (folderPath: string | null) => void;
   setShowDeleteFolderModal: (show: boolean) => void;
-  setFolderContents: (contents: {subfolders: string[], tracks: string[]}) => void;
+  setFolderContents: (contents: { subfolders: string[]; tracks: string[] }) => void;
   setRenamingTrack: (trackId: string | null) => void;
   setRenamingFolder: (folderPath: string | null) => void;
   setRenamingStep: (step: { trackId: string; stepIndex: number } | null) => void;
@@ -97,183 +97,210 @@ export function useFileManagerOperations({
   deleteTrack: deleteTrackAPI,
   readOnly = false,
 }: UseFileManagerOperationsProps) {
+  const createNewTrack = useCallback(
+    (parentPath?: string) => {
+      if (!newTrackName.trim()) return;
 
-  const createNewTrack = useCallback((parentPath?: string) => {
-    if (!newTrackName.trim()) return;
+      const targetFolder = parentPath || newItemParentPath || undefined;
 
-    const targetFolder = parentPath || newItemParentPath || undefined;
-    
-    // Validate track name
-    const validationError = validateTrackName(newTrackName, targetFolder, tracks);
-    if (validationError) {
-      toastActions.error(validationError);
-      return;
-    }
-
-    const trackId = nanoid();
-    const newTrack: Track = {
-      id: trackId,
-      name: newTrackName.trim(),
-      code: DEFAULT_TRACK_CODE,
-      created: new Date().toISOString(),
-      modified: new Date().toISOString(),
-      folder: targetFolder,
-    };
-
-    setTracks(prev => ({ ...prev, [trackId]: newTrack }));
-    setNewTrackName('');
-    setNewItemParentPath('');
-    setIsCreating(false);
-    loadTrack(newTrack);
-  }, [newTrackName, newItemParentPath, tracks, setTracks, setNewTrackName, setNewItemParentPath, setIsCreating, loadTrack]);
-
-  const createNewFolder = useCallback((parentPath?: string) => {
-    if (!newFolderName.trim()) return;
-
-    const folderId = nanoid();
-    const targetParent = parentPath || newItemParentPath;
-    const folderPath = targetParent ? `${targetParent}/${newFolderName.trim()}` : newFolderName.trim();
-
-    const newFolder: Folder = {
-      id: folderId,
-      name: newFolderName.trim(),
-      path: folderPath,
-      parent: targetParent || undefined,
-      created: new Date().toISOString(),
-    };
-
-    setFolders(prev => ({ ...prev, [folderPath]: newFolder }));
-    setNewFolderName('');
-    setNewItemParentPath('');
-    setIsCreatingFolder(false);
-  }, [newFolderName, newItemParentPath, setFolders, setNewFolderName, setNewItemParentPath, setIsCreatingFolder]);
-
-  const handleTrackSelect = useCallback(async (track: Track) => {
-    console.log('FileManager - handleTrackSelect called for:', track.name);
-    
-    // Clear step selection when selecting a regular track
-    setSelectedStepTrack(null);
-    
-    // Save current track before switching if autosave is enabled
-    if (selectedTrack && selectedTrack !== track.id) {
-      console.log('FileManager - force saving current track before switching:', tracks[selectedTrack]?.name);
-      await saveCurrentTrack(false);
-    }
-    
-    // Generate the track URL path (pass folders map to convert UUIDs to paths)
-    let trackUrl = generateTrackUrlPath(track.name, track.folder, folders);
-    
-    // For multitrack tracks, handle step parameter
-    if (track.isMultitrack && track.steps && track.steps.length > 0) {
-      // Check if there's already a step parameter in the current URL
-      const currentUrl = typeof window !== 'undefined' ? window.location.search : '';
-      const hasStepParam = currentUrl.includes('step=');
-      
-      if (hasStepParam) {
-        // Preserve the existing step parameter (user is navigating between steps)
-        trackUrl = `${trackUrl}${currentUrl}`;
-        console.log('FileManager - preserving existing step parameter:', currentUrl);
-      } else {
-        // Add the first step parameter (user is opening a multitrack for the first time)
-        const firstStepName = track.steps[0].name;
-        const firstStepSlug = trackNameToSlug(firstStepName);
-        trackUrl = `${trackUrl}?step=${firstStepSlug}`;
-        console.log('FileManager - multitrack detected, adding first step to URL:', firstStepSlug);
+      // Validate track name
+      const validationError = validateTrackName(newTrackName, targetFolder, tracks);
+      if (validationError) {
+        toastActions.error(validationError);
+        return;
       }
-    }
-    // For regular tracks, don't add any step parameter (even if one exists in current URL)
-    
-    console.log('FileManager - smooth navigation to track:', track.name, 'URL:', trackUrl, 'readOnly:', readOnly);
 
-    // In read-only mode (admin viewing other users' repls), use admin URL format
-    if (readOnly) {
-      // Extract userId from current URL (format: /{userId}/repl/...)
-      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-      const adminMatch = currentPath.match(/^\/([a-f0-9-]{36})\/repl/);
+      const trackId = nanoid();
+      const newTrack: Track = {
+        id: trackId,
+        name: newTrackName.trim(),
+        code: DEFAULT_TRACK_CODE,
+        created: new Date().toISOString(),
+        modified: new Date().toISOString(),
+        folder: targetFolder,
+      };
 
-      if (adminMatch) {
-        const userId = adminMatch[1];
-        // Convert /repl/... to /{userId}/repl/...
-        const adminUrl = trackUrl.replace('/repl/', `/${userId}/repl/`);
+      setTracks((prev) => ({ ...prev, [trackId]: newTrack }));
+      setNewTrackName('');
+      setNewItemParentPath('');
+      setIsCreating(false);
+      loadTrack(newTrack);
+    },
+    [
+      newTrackName,
+      newItemParentPath,
+      tracks,
+      setTracks,
+      setNewTrackName,
+      setNewItemParentPath,
+      setIsCreating,
+      loadTrack,
+    ],
+  );
 
-        console.log('FileManager - admin view URL update:', adminUrl);
+  const createNewFolder = useCallback(
+    (parentPath?: string) => {
+      if (!newFolderName.trim()) return;
 
-        // Update browser URL without affecting app state
-        window.history.pushState({ trackId: track.id, trackName: track.name, adminView: true }, '', adminUrl);
+      const folderId = nanoid();
+      const targetParent = parentPath || newItemParentPath;
+      const folderPath = targetParent ? `${targetParent}/${newFolderName.trim()}` : newFolderName.trim();
 
-        // Update document title with admin prefix
-        document.title = `Admin View - ${track.name}`;
+      const newFolder: Folder = {
+        id: folderId,
+        name: newFolderName.trim(),
+        path: folderPath,
+        parent: targetParent || undefined,
+        created: new Date().toISOString(),
+      };
+
+      setFolders((prev) => ({ ...prev, [folderPath]: newFolder }));
+      setNewFolderName('');
+      setNewItemParentPath('');
+      setIsCreatingFolder(false);
+    },
+    [newFolderName, newItemParentPath, setFolders, setNewFolderName, setNewItemParentPath, setIsCreatingFolder],
+  );
+
+  const handleTrackSelect = useCallback(
+    async (track: Track) => {
+      console.log('FileManager - handleTrackSelect called for:', track.name);
+
+      // Clear step selection when selecting a regular track
+      setSelectedStepTrack(null);
+
+      // Save current track before switching if autosave is enabled
+      if (selectedTrack && selectedTrack !== track.id) {
+        console.log('FileManager - force saving current track before switching:', tracks[selectedTrack]?.name);
+        await saveCurrentTrack(false);
       }
-    } else {
-      // Normal mode - update URL and app state
-      // CRITICAL: Update activePattern (strip /repl/ prefix)
-      const trackPath = trackUrl.replace('/repl/', '');
-      setActivePattern(trackPath);
 
-      // Use history API for smooth navigation without page reload
-      window.history.pushState({ trackId: track.id, trackName: track.name }, '', trackUrl);
+      // Generate the track URL path (pass folders map to convert UUIDs to paths)
+      let trackUrl = generateTrackUrlPath(track.name, track.folder, folders);
 
-      // Update document title
+      // For multitrack tracks, handle step parameter
       if (track.isMultitrack && track.steps && track.steps.length > 0) {
-        // Try to get step name from URL if present
-        const stepMatch = trackUrl.match(/step=([^&]+)/);
-        const stepSlug = stepMatch ? stepMatch[1] : null;
-        if (stepSlug) {
-          const step = track.steps.find(s => trackNameToSlug(s.name) === stepSlug);
-          if (step) {
-            document.title = `Strudel REPL - ${track.name} (${step.name})`;
+        // Check if there's already a step parameter in the current URL
+        const currentUrl = typeof window !== 'undefined' ? window.location.search : '';
+        const hasStepParam = currentUrl.includes('step=');
+
+        if (hasStepParam) {
+          // Preserve the existing step parameter (user is navigating between steps)
+          trackUrl = `${trackUrl}${currentUrl}`;
+          console.log('FileManager - preserving existing step parameter:', currentUrl);
+        } else {
+          // Add the first step parameter (user is opening a multitrack for the first time)
+          const firstStepName = track.steps[0].name;
+          const firstStepSlug = trackNameToSlug(firstStepName);
+          trackUrl = `${trackUrl}?step=${firstStepSlug}`;
+          console.log('FileManager - multitrack detected, adding first step to URL:', firstStepSlug);
+        }
+      }
+      // For regular tracks, don't add any step parameter (even if one exists in current URL)
+
+      console.log('FileManager - smooth navigation to track:', track.name, 'URL:', trackUrl, 'readOnly:', readOnly);
+
+      // In read-only mode (admin viewing other users' repls), use admin URL format
+      if (readOnly) {
+        // Extract userId from current URL (format: /{userId}/repl/...)
+        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+        const adminMatch = currentPath.match(/^\/([a-f0-9-]{36})\/repl/);
+
+        if (adminMatch) {
+          const userId = adminMatch[1];
+          // Convert /repl/... to /{userId}/repl/...
+          const adminUrl = trackUrl.replace('/repl/', `/${userId}/repl/`);
+
+          console.log('FileManager - admin view URL update:', adminUrl);
+
+          // Update browser URL without affecting app state
+          window.history.pushState({ trackId: track.id, trackName: track.name, adminView: true }, '', adminUrl);
+
+          // Update document title with admin prefix
+          document.title = `Admin View - ${track.name}`;
+        }
+      } else {
+        // Normal mode - update URL and app state
+        // CRITICAL: Update activePattern (strip /repl/ prefix)
+        const trackPath = trackUrl.replace('/repl/', '');
+        setActivePattern(trackPath);
+
+        // Use history API for smooth navigation without page reload
+        window.history.pushState({ trackId: track.id, trackName: track.name }, '', trackUrl);
+
+        // Update document title
+        if (track.isMultitrack && track.steps && track.steps.length > 0) {
+          // Try to get step name from URL if present
+          const stepMatch = trackUrl.match(/step=([^&]+)/);
+          const stepSlug = stepMatch ? stepMatch[1] : null;
+          if (stepSlug) {
+            const step = track.steps.find((s) => trackNameToSlug(s.name) === stepSlug);
+            if (step) {
+              document.title = `Strudel REPL - ${track.name} (${step.name})`;
+            } else {
+              document.title = `Strudel REPL - ${track.name} (${track.steps[0].name})`;
+            }
           } else {
             document.title = `Strudel REPL - ${track.name} (${track.steps[0].name})`;
           }
         } else {
-          document.title = `Strudel REPL - ${track.name} (${track.steps[0].name})`;
+          document.title = `Strudel REPL - ${track.name}`;
         }
-      } else {
-        document.title = `Strudel REPL - ${track.name}`;
+
+        // Dispatch custom event to update the page content
+        window.dispatchEvent(
+          new CustomEvent('strudel-navigate-track', {
+            detail: { track, url: trackUrl },
+          }),
+        );
       }
 
-      // Dispatch custom event to update the page content
-      window.dispatchEvent(new CustomEvent('strudel-navigate-track', {
-        detail: { track, url: trackUrl }
-      }));
-    }
+      // Load the track immediately (always needed, even in read-only mode)
+      loadTrack(track);
+    },
+    [selectedTrack, tracks, saveCurrentTrack, loadTrack, setSelectedStepTrack, folders, readOnly],
+  );
 
-    // Load the track immediately (always needed, even in read-only mode)
-    loadTrack(track);
-  }, [selectedTrack, tracks, saveCurrentTrack, loadTrack, setSelectedStepTrack, folders, readOnly]);
+  const duplicateTrack = useCallback(
+    (track: Track) => {
+      const trackId = nanoid();
 
-  const duplicateTrack = useCallback((track: Track) => {
-    const trackId = nanoid();
-    
-    // Generate a unique name for the duplicate
-    const baseName = `${track.name} (copy)`;
-    const uniqueName = generateUniqueTrackName(baseName, track.folder, tracks);
-    
-    const duplicatedTrack: Track = {
-      ...track,
-      id: trackId,
-      name: uniqueName,
-      created: new Date().toISOString(),
-      modified: new Date().toISOString(),
-      folder: track.folder,
-      steps: track.steps ? track.steps.map(step => ({
-        ...step,
-        id: `${trackId}-${step.id}`,
-      })) : undefined,
-    };
+      // Generate a unique name for the duplicate
+      const baseName = `${track.name} (copy)`;
+      const uniqueName = generateUniqueTrackName(baseName, track.folder, tracks);
 
-    setTracks(prev => ({ ...prev, [trackId]: duplicatedTrack }));
-    toastActions.success(t('files:trackDuplicated'));
-  }, [tracks, setTracks, t]);
+      const duplicatedTrack: Track = {
+        ...track,
+        id: trackId,
+        name: uniqueName,
+        created: new Date().toISOString(),
+        modified: new Date().toISOString(),
+        folder: track.folder,
+        steps: track.steps
+          ? track.steps.map((step) => ({
+              ...step,
+              id: `${trackId}-${step.id}`,
+            }))
+          : undefined,
+      };
 
-  const deleteTrack = useCallback((trackId: string) => {
-    setTrackToDelete(trackId);
-    setShowDeleteModal(true);
-  }, [setTrackToDelete, setShowDeleteModal]);
+      setTracks((prev) => ({ ...prev, [trackId]: duplicatedTrack }));
+      toastActions.success(t('files:trackDuplicated'));
+    },
+    [tracks, setTracks, t],
+  );
+
+  const deleteTrack = useCallback(
+    (trackId: string) => {
+      setTrackToDelete(trackId);
+      setShowDeleteModal(true);
+    },
+    [setTrackToDelete, setShowDeleteModal],
+  );
 
   const confirmDelete = useCallback(async () => {
     if (!tracks || !setTracks || !trackToDeleteId) return;
-    
+
     const trackToDelete = tracks[trackToDeleteId];
     if (!trackToDelete || isDeletingTrackRef.current) {
       console.log('FileManager - confirmDelete called but already deleting or no track to delete');
@@ -281,23 +308,23 @@ export function useFileManagerOperations({
     }
 
     isDeletingTrackRef.current = true;
-    
+
     const trackName = trackToDelete.name;
-    
+
     // Check if we're deleting the currently viewed track (from URL)
     const currentPath = window.location.pathname;
     const trackUrl = generateTrackUrlPath(trackToDelete.name, trackToDelete.folder, folders);
     const isDeletingCurrentUrlTrack = currentPath === trackUrl;
-    
+
     console.log('FileManager - STARTING deletion process for track:', trackName, 'ID:', trackToDelete.id);
     console.log('FileManager - Current URL:', currentPath);
     console.log('FileManager - Track being deleted URL:', trackUrl);
     console.log('FileManager - URLs match (deleting current track):', isDeletingCurrentUrlTrack);
     console.log('FileManager - Track folder:', trackToDelete.folder);
-    
+
     const performDeletion = async () => {
       console.log('FileManager - PERFORMING actual deletion of track:', trackToDelete.id);
-      
+
       // Call the API to delete from database if available
       if (deleteTrackAPI) {
         try {
@@ -316,74 +343,76 @@ export function useFileManagerOperations({
           return;
         }
       }
-      
+
       // Update local state
-      setTracks(prev => {
+      setTracks((prev) => {
         const newTracks = { ...prev };
         const wasDeleted = delete newTracks[trackToDelete.id];
         console.log('FileManager - local state deletion successful:', wasDeleted);
         return newTracks;
       });
-      
+
       // CRITICAL: Also update the global tracks store so ReplEditor can see the change
       tracksActions.removeTrack(trackToDelete.id);
       console.log('FileManager - global store updated, track removed:', trackToDelete.id);
-      
+
       setTrackToDelete(null);
       isDeletingTrackRef.current = false;
       toastActions.success(t('files:trackDeleted'));
     };
-    
+
     if (isDeletingCurrentUrlTrack) {
-      const remainingTrackIds = Object.keys(tracks).filter(id => id !== trackToDelete.id);
-      
+      const remainingTrackIds = Object.keys(tracks).filter((id) => id !== trackToDelete.id);
+
       if (remainingTrackIds.length > 0) {
         const nextTrackId = remainingTrackIds[0];
         const nextTrack = tracks[nextTrackId];
         console.log('FileManager - switching to next track before deletion:', nextTrack.name, 'ID:', nextTrackId);
-        
+
         // Use smooth client-side navigation (no page reload)
         const trackUrl = generateTrackUrlPath(nextTrack.name, nextTrack.folder, folders);
         console.log('FileManager - smooth navigation to next track:', nextTrack.name, 'URL:', trackUrl);
-        
+
         // CRITICAL: Update activePattern (strip /repl/ prefix)
         const trackPath = trackUrl.replace('/repl/', '');
         setActivePattern(trackPath);
-        
+
         // Use history API for smooth navigation
         window.history.pushState({ trackId: nextTrack.id, trackName: nextTrack.name }, '', trackUrl);
-        
+
         // Update document title
         document.title = `Strudel REPL - ${nextTrack.name}`;
-        
+
         // Dispatch custom event to update the page content
-        window.dispatchEvent(new CustomEvent('strudel-navigate-track', {
-          detail: { track: nextTrack, url: trackUrl }
-        }));
-        
+        window.dispatchEvent(
+          new CustomEvent('strudel-navigate-track', {
+            detail: { track: nextTrack, url: trackUrl },
+          }),
+        );
+
         // Load the next track
         loadTrack(nextTrack);
-        
+
         // Perform deletion after navigation
         setTimeout(async () => {
           await performDeletion();
         }, 100);
       } else {
         console.log('FileManager - no tracks left, navigating to main repl');
-        
+
         // Use smooth navigation to main repl
         window.history.pushState({}, '', '/repl');
         document.title = 'Strudel REPL';
-        
+
         // Clear editor
         setSelectedTrack(null);
         if (context.editorRef?.current?.setCode) {
           context.editorRef.current.setCode('');
         }
-        
+
         // Perform deletion
         await performDeletion();
-        
+
         // Dispatch event
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('strudel-all-tracks-deleted'));
@@ -393,7 +422,19 @@ export function useFileManagerOperations({
       console.log('FileManager - deleting non-current track, no navigation needed');
       await performDeletion();
     }
-  }, [tracks, setTracks, trackToDeleteId, isDeletingTrackRef, setTrackToDelete, loadTrack, setSelectedTrack, context, t, deleteTrackAPI, folders]);
+  }, [
+    tracks,
+    setTracks,
+    trackToDeleteId,
+    isDeletingTrackRef,
+    setTrackToDelete,
+    loadTrack,
+    setSelectedTrack,
+    context,
+    t,
+    deleteTrackAPI,
+    folders,
+  ]);
 
   const cancelCreate = useCallback(() => {
     setIsCreating(false);
@@ -409,53 +450,68 @@ export function useFileManagerOperations({
     setSelectedStepTrack(null);
   }, [setIsCreatingStep, setNewStepName, setSelectedStepTrack]);
 
-  const handleTrackCreate = useCallback((parentPath?: string) => {
-    setNewItemParentPath(parentPath || '');
-    setIsCreating(true);
-  }, [setNewItemParentPath, setIsCreating]);
+  const handleTrackCreate = useCallback(
+    (parentPath?: string) => {
+      setNewItemParentPath(parentPath || '');
+      setIsCreating(true);
+    },
+    [setNewItemParentPath, setIsCreating],
+  );
 
-  const handleFolderCreate = useCallback((parentPath?: string) => {
-    setNewItemParentPath(parentPath || '');
-    setIsCreatingFolder(true);
-  }, [setNewItemParentPath, setIsCreatingFolder]);
+  const handleFolderCreate = useCallback(
+    (parentPath?: string) => {
+      setNewItemParentPath(parentPath || '');
+      setIsCreatingFolder(true);
+    },
+    [setNewItemParentPath, setIsCreatingFolder],
+  );
 
-  const handleTrackRename = useCallback((trackId: string) => {
-    setRenamingTrack(trackId);
-    setRenameValue(tracks[trackId]?.name || '');
-  }, [setRenamingTrack, setRenameValue, tracks]);
+  const handleTrackRename = useCallback(
+    (trackId: string) => {
+      setRenamingTrack(trackId);
+      setRenameValue(tracks[trackId]?.name || '');
+    },
+    [setRenamingTrack, setRenameValue, tracks],
+  );
 
-  const handleFolderRename = useCallback((folderPath: string) => {
-    setRenamingFolder(folderPath);
-    setRenameValue(folders[folderPath]?.name || '');
-  }, [setRenamingFolder, setRenameValue, folders]);
+  const handleFolderRename = useCallback(
+    (folderPath: string) => {
+      setRenamingFolder(folderPath);
+      setRenameValue(folders[folderPath]?.name || '');
+    },
+    [setRenamingFolder, setRenameValue, folders],
+  );
 
-  const addStep = useCallback((trackId: string) => {
-    const track = tracks[trackId];
-    if (!track || !track.isMultitrack) return;
+  const addStep = useCallback(
+    (trackId: string) => {
+      const track = tracks[trackId];
+      if (!track || !track.isMultitrack) return;
 
-    const stepNumber = (track.steps?.length || 0) + 1;
-    const newStep: TrackStep = {
-      id: `${trackId}-step-${stepNumber}`,
-      name: newStepName.trim() || `Step ${stepNumber}`,
-      code: '// New step\n',
-      created: new Date().toISOString(),
-      modified: new Date().toISOString(),
-    };
-
-    setTracks(prev => ({
-      ...prev,
-      [trackId]: {
-        ...prev[trackId],
-        steps: [...(prev[trackId].steps || []), newStep],
+      const stepNumber = (track.steps?.length || 0) + 1;
+      const newStep: TrackStep = {
+        id: `${trackId}-step-${stepNumber}`,
+        name: newStepName.trim() || `Step ${stepNumber}`,
+        code: '// New step\n',
+        created: new Date().toISOString(),
         modified: new Date().toISOString(),
-      }
-    }));
+      };
 
-    setNewStepName('');
-    setIsCreatingStep(false);
-    setSelectedStepTrack(null);
-    toastActions.success(t('files:stepAdded'));
-  }, [tracks, newStepName, setTracks, setNewStepName, setIsCreatingStep, setSelectedStepTrack, t]);
+      setTracks((prev) => ({
+        ...prev,
+        [trackId]: {
+          ...prev[trackId],
+          steps: [...(prev[trackId].steps || []), newStep],
+          modified: new Date().toISOString(),
+        },
+      }));
+
+      setNewStepName('');
+      setIsCreatingStep(false);
+      setSelectedStepTrack(null);
+      toastActions.success(t('files:stepAdded'));
+    },
+    [tracks, newStepName, setTracks, setNewStepName, setIsCreatingStep, setSelectedStepTrack, t],
+  );
 
   const cancelRename = useCallback(() => {
     setRenamingTrack(null);
@@ -478,13 +534,13 @@ export function useFileManagerOperations({
           return;
         }
 
-        setTracks(prev => ({
+        setTracks((prev) => ({
           ...prev,
           [renamingTrack]: {
             ...prev[renamingTrack],
             name: newName,
-            modified: new Date().toISOString()
-          }
+            modified: new Date().toISOString(),
+          },
         }));
 
         toastActions.success(t('files:trackRenamed'));
@@ -501,7 +557,7 @@ export function useFileManagerOperations({
         const newPath = folder.parent ? `${folder.parent}/${renameValue.trim()}` : renameValue.trim();
 
         const updatedFolder = { ...folder, name: renameValue.trim(), path: newPath };
-        setFolders(prev => {
+        setFolders((prev) => {
           const newFolders = { ...prev };
           delete newFolders[renamingFolder];
           newFolders[newPath] = updatedFolder;
@@ -515,348 +571,356 @@ export function useFileManagerOperations({
     setRenameValue('');
   }, [renamingFolder, renameValue, folders, setFolders, setRenamingFolder, setRenameValue, t]);
 
-  const handleMoveItem = useCallback(async (itemId: string, itemType: 'track' | 'folder', targetId: string) => {
-    console.log('handleMoveItem called:', { 
-      itemId, 
-      itemType, 
-      targetId, 
-      availableFolders: Object.keys(folders),
-      foldersData: Object.entries(folders).map(([key, folder]) => ({ 
-        key, 
-        id: folder.id, 
-        name: folder.name, 
-        path: typeof folder.path === 'string' ? folder.path : '[CORRUPTED]'
-      }))
-    });
-    
-    if (itemType === 'track') {
-      // Store original folder for potential revert
-      const originalTrack = tracks[itemId];
-      const originalFolder = originalTrack?.folder;
-      
-      // Convert targetId to folder path for local state (UI expects paths)
-      let targetPath: string | undefined;
-      if (targetId) {
-        // Find the target folder by UUID and get its path
-        const targetFolder = folders[targetId] || Object.values(folders).find(f => f.id === targetId);
-        if (targetFolder) {
-          targetPath = targetFolder.path;
-          console.log(`handleMoveItem - Found target folder UUID "${targetId}" with path: ${targetPath}`);
-        } else {
-          console.warn(`handleMoveItem - Target folder not found for UUID: ${targetId}`);
-          // If we can't find the folder by UUID, assume targetId is already a path
-          targetPath = targetId;
-        }
-      }
-      
-      // Update local state immediately for responsive UI
-      setTracks(prev => ({
-        ...prev,
-        [itemId]: {
-          ...prev[itemId],
-          folder: targetPath || undefined,
-          modified: new Date().toISOString(),
-        }
-      }));
-      
-      // Update the database using the corrected legacy update endpoint
-      try {
-        console.log(`handleMoveItem - Updating database: trackId=${itemId}, folder=${targetId || null}`);
+  const handleMoveItem = useCallback(
+    async (itemId: string, itemType: 'track' | 'folder', targetId: string) => {
+      console.log('handleMoveItem called:', {
+        itemId,
+        itemType,
+        targetId,
+        availableFolders: Object.keys(folders),
+        foldersData: Object.entries(folders).map(([key, folder]) => ({
+          key,
+          id: folder.id,
+          name: folder.name,
+          path: typeof folder.path === 'string' ? folder.path : '[CORRUPTED]',
+        })),
+      });
 
-        const updateResponse = await fetch('/api/tracks/update', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            trackId: itemId,
-            updates: {
-              folder: targetId || null, // Use UUID directly for database storage
-              modified: new Date().toISOString()
-            }
-          }),
-        });
+      if (itemType === 'track') {
+        // Store original folder for potential revert
+        const originalTrack = tracks[itemId];
+        const originalFolder = originalTrack?.folder;
 
-        if (!updateResponse.ok) {
-          const errorText = await updateResponse.text();
-          let errorData;
-          try {
-            errorData = JSON.parse(errorText);
-          } catch {
-            errorData = { error: errorText };
+        // Convert targetId to folder path for local state (UI expects paths)
+        let targetPath: string | undefined;
+        if (targetId) {
+          // Find the target folder by UUID and get its path
+          const targetFolder = folders[targetId] || Object.values(folders).find((f) => f.id === targetId);
+          if (targetFolder) {
+            targetPath = targetFolder.path;
+            console.log(`handleMoveItem - Found target folder UUID "${targetId}" with path: ${targetPath}`);
+          } else {
+            console.warn(`handleMoveItem - Target folder not found for UUID: ${targetId}`);
+            // If we can't find the folder by UUID, assume targetId is already a path
+            targetPath = targetId;
           }
-          console.error('handleMoveItem - Failed to update track in database:', {
-            status: updateResponse.status,
-            statusText: updateResponse.statusText,
-            error: errorData
+        }
+
+        // Update local state immediately for responsive UI
+        setTracks((prev) => ({
+          ...prev,
+          [itemId]: {
+            ...prev[itemId],
+            folder: targetPath || undefined,
+            modified: new Date().toISOString(),
+          },
+        }));
+
+        // Update the database using the corrected legacy update endpoint
+        try {
+          console.log(`handleMoveItem - Updating database: trackId=${itemId}, folder=${targetId || null}`);
+
+          const updateResponse = await fetch('/api/tracks/update', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              trackId: itemId,
+              updates: {
+                folder: targetId || null, // Use UUID directly for database storage
+                modified: new Date().toISOString(),
+              },
+            }),
           });
-          
-          // Revert local state on database error
-          setTracks(prev => ({
+
+          if (!updateResponse.ok) {
+            const errorText = await updateResponse.text();
+            let errorData;
+            try {
+              errorData = JSON.parse(errorText);
+            } catch {
+              errorData = { error: errorText };
+            }
+            console.error('handleMoveItem - Failed to update track in database:', {
+              status: updateResponse.status,
+              statusText: updateResponse.statusText,
+              error: errorData,
+            });
+
+            // Revert local state on database error
+            setTracks((prev) => ({
+              ...prev,
+              [itemId]: {
+                ...prev[itemId],
+                folder: originalFolder, // Revert to original folder
+              },
+            }));
+
+            toastActions.error('Failed to move track. Please try again.');
+            return;
+          }
+
+          const result = await updateResponse.json();
+          console.log('handleMoveItem - Track updated successfully in database:', result);
+          toastActions.success(t('files:trackMoved'));
+        } catch (error) {
+          console.error('handleMoveItem - Error updating track in database:', error);
+
+          // Revert local state on error
+          setTracks((prev) => ({
             ...prev,
             [itemId]: {
               ...prev[itemId],
               folder: originalFolder, // Revert to original folder
-            }
+            },
           }));
-          
+
           toastActions.error('Failed to move track. Please try again.');
           return;
         }
+      } else if (itemType === 'folder') {
+        // Handle folder moving
+        const originalFolder = folders[itemId];
+        if (!originalFolder) {
+          console.error('handleMoveItem - Source folder not found:', itemId);
+          toastActions.error('Source folder not found');
+          return;
+        }
 
-        const result = await updateResponse.json();
-        console.log('handleMoveItem - Track updated successfully in database:', result);
-        toastActions.success(t('files:trackMoved'));
-      } catch (error) {
-        console.error('handleMoveItem - Error updating track in database:', error);
-        
-        // Revert local state on error
-        setTracks(prev => ({
+        // Prevent moving folder into itself or its descendants
+        if (targetId === itemId) {
+          console.error('handleMoveItem - Cannot move folder into itself');
+          toastActions.error('Cannot move folder into itself');
+          return;
+        }
+
+        // Check for circular dependency
+        let currentParent = targetId;
+        while (currentParent) {
+          if (currentParent === itemId) {
+            console.error('handleMoveItem - Circular dependency detected');
+            toastActions.error('Cannot move folder into its own subfolder');
+            return;
+          }
+          const parentFolder = folders[currentParent] || Object.values(folders).find((f) => f.id === currentParent);
+          currentParent = parentFolder?.parent;
+        }
+
+        // Update local state immediately for responsive UI
+        const originalParent = originalFolder.parent;
+        setFolders((prev) => ({
           ...prev,
           [itemId]: {
             ...prev[itemId],
-            folder: originalFolder, // Revert to original folder
-          }
-        }));
-        
-        toastActions.error('Failed to move track. Please try again.');
-        return;
-      }
-    } else if (itemType === 'folder') {
-      // Handle folder moving
-      const originalFolder = folders[itemId];
-      if (!originalFolder) {
-        console.error('handleMoveItem - Source folder not found:', itemId);
-        toastActions.error('Source folder not found');
-        return;
-      }
-
-      // Prevent moving folder into itself or its descendants
-      if (targetId === itemId) {
-        console.error('handleMoveItem - Cannot move folder into itself');
-        toastActions.error('Cannot move folder into itself');
-        return;
-      }
-
-      // Check for circular dependency
-      let currentParent = targetId;
-      while (currentParent) {
-        if (currentParent === itemId) {
-          console.error('handleMoveItem - Circular dependency detected');
-          toastActions.error('Cannot move folder into its own subfolder');
-          return;
-        }
-        const parentFolder = folders[currentParent] || Object.values(folders).find(f => f.id === currentParent);
-        currentParent = parentFolder?.parent;
-      }
-
-      // Update local state immediately for responsive UI
-      const originalParent = originalFolder.parent;
-      setFolders(prev => ({
-        ...prev,
-        [itemId]: {
-          ...prev[itemId],
-          parent: targetId || null,
-        }
-      }));
-
-      // Update the database
-      try {
-        console.log(`handleMoveItem - Updating folder in database: folderId=${itemId}, parent=${targetId || null}`);
-
-        const updateResponse = await fetch('/api/folders/update', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
+            parent: targetId || null,
           },
-          credentials: 'include',
-          body: JSON.stringify({
-            folderId: itemId,
-            updates: {
-              parent: targetId || null,
-            }
-          }),
-        });
+        }));
 
-        if (!updateResponse.ok) {
-          const errorText = await updateResponse.text();
-          let errorData;
-          try {
-            errorData = JSON.parse(errorText);
-          } catch {
-            errorData = { error: errorText };
-          }
-          console.error('handleMoveItem - Failed to update folder in database:', {
-            status: updateResponse.status,
-            statusText: updateResponse.statusText,
-            error: errorData
+        // Update the database
+        try {
+          console.log(`handleMoveItem - Updating folder in database: folderId=${itemId}, parent=${targetId || null}`);
+
+          const updateResponse = await fetch('/api/folders/update', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              folderId: itemId,
+              updates: {
+                parent: targetId || null,
+              },
+            }),
           });
-          
-          // Revert local state on database error
-          setFolders(prev => ({
+
+          if (!updateResponse.ok) {
+            const errorText = await updateResponse.text();
+            let errorData;
+            try {
+              errorData = JSON.parse(errorText);
+            } catch {
+              errorData = { error: errorText };
+            }
+            console.error('handleMoveItem - Failed to update folder in database:', {
+              status: updateResponse.status,
+              statusText: updateResponse.statusText,
+              error: errorData,
+            });
+
+            // Revert local state on database error
+            setFolders((prev) => ({
+              ...prev,
+              [itemId]: {
+                ...prev[itemId],
+                parent: originalParent,
+              },
+            }));
+
+            toastActions.error('Failed to move folder. Please try again.');
+            return;
+          }
+
+          const result = await updateResponse.json();
+          console.log('handleMoveItem - Folder updated successfully in database:', result);
+          toastActions.success('Folder moved successfully');
+        } catch (error) {
+          console.error('handleMoveItem - Error updating folder in database:', error);
+
+          // Revert local state on error
+          setFolders((prev) => ({
             ...prev,
             [itemId]: {
               ...prev[itemId],
               parent: originalParent,
-            }
+            },
           }));
-          
+
           toastActions.error('Failed to move folder. Please try again.');
           return;
         }
-
-        const result = await updateResponse.json();
-        console.log('handleMoveItem - Folder updated successfully in database:', result);
-        toastActions.success('Folder moved successfully');
-      } catch (error) {
-        console.error('handleMoveItem - Error updating folder in database:', error);
-        
-        // Revert local state on error
-        setFolders(prev => ({
-          ...prev,
-          [itemId]: {
-            ...prev[itemId],
-            parent: originalParent,
-          }
-        }));
-        
-        toastActions.error('Failed to move folder. Please try again.');
-        return;
       }
-    }
-    // Implementation complete - removed TODO comment
-  }, [setTracks, setFolders, folders, tracks, t, toastActions]);
+      // Implementation complete - removed TODO comment
+    },
+    [setTracks, setFolders, folders, tracks, t, toastActions],
+  );
 
-  const convertToMultitrack = useCallback((track: Track) => {
-    const updatedTrack: Track = {
-      ...track,
-      isMultitrack: true,
-      steps: [
-        {
-          id: `${track.id}-step-1`,
-          name: 'Step 1',
-          code: track.code,
-          created: new Date().toISOString(),
-          modified: new Date().toISOString(),
-        }
-      ],
-      activeStep: 0,
-      modified: new Date().toISOString(),
-    };
-
-    setTracks(prev => ({ ...prev, [track.id]: updatedTrack }));
-    toastActions.success(t('files:convertedToMultitrack'));
-  }, [setTracks, t]);
-
-  const switchToStep = useCallback(async (trackId: string, stepIndex: number) => {
-    const track = tracks[trackId];
-    if (!track || !track.isMultitrack || !track.steps) return;
-
-    console.log('FileManager - switchToStep called for track:', track.name, 'step:', stepIndex);
-
-    // Set step selection state when switching to a step
-    setSelectedStepTrack(trackId);
-
-    // Save current code to active step if this track is currently selected
-    if (selectedTrack === trackId && track.activeStep !== undefined) {
-      const currentCode = context.editorRef?.current?.code || context.activeCode || '';
-      const updatedSteps = [...track.steps];
-      updatedSteps[track.activeStep] = {
-        ...updatedSteps[track.activeStep],
-        code: currentCode,
+  const convertToMultitrack = useCallback(
+    (track: Track) => {
+      const updatedTrack: Track = {
+        ...track,
+        isMultitrack: true,
+        steps: [
+          {
+            id: `${track.id}-step-1`,
+            name: 'Step 1',
+            code: track.code,
+            created: new Date().toISOString(),
+            modified: new Date().toISOString(),
+          },
+        ],
+        activeStep: 0,
         modified: new Date().toISOString(),
       };
 
-      setTracks(prev => ({
-        ...prev,
-        [trackId]: {
-          ...prev[trackId],
-          steps: updatedSteps,
-          activeStep: stepIndex,
-          code: updatedSteps[stepIndex].code,
+      setTracks((prev) => ({ ...prev, [track.id]: updatedTrack }));
+      toastActions.success(t('files:convertedToMultitrack'));
+    },
+    [setTracks, t],
+  );
+
+  const switchToStep = useCallback(
+    async (trackId: string, stepIndex: number) => {
+      const track = tracks[trackId];
+      if (!track || !track.isMultitrack || !track.steps) return;
+
+      console.log('FileManager - switchToStep called for track:', track.name, 'step:', stepIndex);
+
+      // Set step selection state when switching to a step
+      setSelectedStepTrack(trackId);
+
+      // Save current code to active step if this track is currently selected
+      if (selectedTrack === trackId && track.activeStep !== undefined) {
+        const currentCode = context.editorRef?.current?.code || context.activeCode || '';
+        const updatedSteps = [...track.steps];
+        updatedSteps[track.activeStep] = {
+          ...updatedSteps[track.activeStep],
+          code: currentCode,
           modified: new Date().toISOString(),
-        }
-      }));
-    } else {
-      setTracks(prev => ({
-        ...prev,
-        [trackId]: {
-          ...prev[trackId],
-          activeStep: stepIndex,
-          code: track.steps![stepIndex].code,
-          modified: new Date().toISOString(),
-        }
-      }));
-    }
+        };
 
-    // Load the new step immediately
-    const updatedTrack = {
-      ...track,
-      activeStep: stepIndex,
-      code: track.steps[stepIndex].code,
-    };
-    
-    console.log('FileManager - loading step code:', track.steps[stepIndex].code.substring(0, 50) + '...');
-    loadTrack(updatedTrack);
-    
-    // Update URL with step information using step name
-    if (selectedTrack === trackId) {
-      try {
-        console.log('FileManager - updating URL for step:', stepIndex);
-
-        // Generate track URL with step name parameter
-        const trackUrl = generateTrackUrlPath(track.name, track.folder, folders);
-        const stepName = track.steps[stepIndex].name;
-        const stepSlug = trackNameToSlug(stepName);
-        let stepUrl = `${trackUrl}?step=${stepSlug}`;
-
-        if (readOnly) {
-          // In read-only mode, use admin URL format
-          const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
-          const adminMatch = currentPath.match(/^\/([a-f0-9-]{36})\/repl/);
-
-          if (adminMatch) {
-            const userId = adminMatch[1];
-            stepUrl = stepUrl.replace('/repl/', `/${userId}/repl/`);
-            console.log('FileManager - admin view step URL:', stepUrl);
-
-            window.history.replaceState(
-              { trackId: track.id, trackName: track.name, step: stepSlug, adminView: true },
-              '',
-              stepUrl
-            );
-
-            document.title = `Admin View - ${track.name} (${stepName})`;
-          }
-        } else {
-          // Normal mode
-          const stepPath = stepUrl.replace('/repl/', '');
-          setActivePattern(stepPath);
-
-          window.history.replaceState(
-            { trackId: track.id, trackName: track.name, step: stepSlug },
-            '',
-            stepUrl
-          );
-
-          document.title = `Strudel REPL - ${track.name} (${stepName})`;
-        }
-
-        console.log('FileManager - step URL updated to:', stepUrl);
-      } catch (error) {
-        console.error('FileManager - Failed to update URL for step:', error);
+        setTracks((prev) => ({
+          ...prev,
+          [trackId]: {
+            ...prev[trackId],
+            steps: updatedSteps,
+            activeStep: stepIndex,
+            code: updatedSteps[stepIndex].code,
+            modified: new Date().toISOString(),
+          },
+        }));
+      } else {
+        setTracks((prev) => ({
+          ...prev,
+          [trackId]: {
+            ...prev[trackId],
+            activeStep: stepIndex,
+            code: track.steps![stepIndex].code,
+            modified: new Date().toISOString(),
+          },
+        }));
       }
-    }
-  }, [tracks, selectedTrack, context, setTracks, loadTrack, setSelectedStepTrack, folders, readOnly]);
 
-  const startRenameStep = useCallback((trackId: string, stepIndex: number) => {
-    const track = tracks[trackId];
-    if (!track || !track.isMultitrack || !track.steps) return;
+      // Load the new step immediately
+      const updatedTrack = {
+        ...track,
+        activeStep: stepIndex,
+        code: track.steps[stepIndex].code,
+      };
 
-    setRenamingStep({ trackId, stepIndex });
-    setRenameValue(track.steps[stepIndex].name);
-  }, [tracks, setRenamingStep, setRenameValue]);
+      console.log('FileManager - loading step code:', track.steps[stepIndex].code.substring(0, 50) + '...');
+      loadTrack(updatedTrack);
+
+      // Update URL with step information using step name
+      if (selectedTrack === trackId) {
+        try {
+          console.log('FileManager - updating URL for step:', stepIndex);
+
+          // Generate track URL with step name parameter
+          const trackUrl = generateTrackUrlPath(track.name, track.folder, folders);
+          const stepName = track.steps[stepIndex].name;
+          const stepSlug = trackNameToSlug(stepName);
+          let stepUrl = `${trackUrl}?step=${stepSlug}`;
+
+          if (readOnly) {
+            // In read-only mode, use admin URL format
+            const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+            const adminMatch = currentPath.match(/^\/([a-f0-9-]{36})\/repl/);
+
+            if (adminMatch) {
+              const userId = adminMatch[1];
+              stepUrl = stepUrl.replace('/repl/', `/${userId}/repl/`);
+              console.log('FileManager - admin view step URL:', stepUrl);
+
+              window.history.replaceState(
+                { trackId: track.id, trackName: track.name, step: stepSlug, adminView: true },
+                '',
+                stepUrl,
+              );
+
+              document.title = `Admin View - ${track.name} (${stepName})`;
+            }
+          } else {
+            // Normal mode
+            const stepPath = stepUrl.replace('/repl/', '');
+            setActivePattern(stepPath);
+
+            window.history.replaceState({ trackId: track.id, trackName: track.name, step: stepSlug }, '', stepUrl);
+
+            document.title = `Strudel REPL - ${track.name} (${stepName})`;
+          }
+
+          console.log('FileManager - step URL updated to:', stepUrl);
+        } catch (error) {
+          console.error('FileManager - Failed to update URL for step:', error);
+        }
+      }
+    },
+    [tracks, selectedTrack, context, setTracks, loadTrack, setSelectedStepTrack, folders, readOnly],
+  );
+
+  const startRenameStep = useCallback(
+    (trackId: string, stepIndex: number) => {
+      const track = tracks[trackId];
+      if (!track || !track.isMultitrack || !track.steps) return;
+
+      setRenamingStep({ trackId, stepIndex });
+      setRenameValue(track.steps[stepIndex].name);
+    },
+    [tracks, setRenamingStep, setRenameValue],
+  );
 
   const finishRenameStep = useCallback(() => {
     if (renamingStep && renameValue.trim()) {
@@ -873,13 +937,13 @@ export function useFileManagerOperations({
           modified: new Date().toISOString(),
         };
 
-        setTracks(prev => ({
+        setTracks((prev) => ({
           ...prev,
           [trackId]: {
             ...prev[trackId],
             steps: updatedSteps,
             modified: new Date().toISOString(),
-          }
+          },
         }));
 
         toastActions.success(t('files:stepRenamed'));
@@ -889,274 +953,308 @@ export function useFileManagerOperations({
     setRenameValue('');
   }, [renamingStep, renameValue, tracks, setTracks, setRenamingStep, setRenameValue, t]);
 
-  const deleteStep = useCallback((trackId: string, stepIndex: number) => {
-    const track = tracks[trackId];
-    if (!track || !track.isMultitrack || !track.steps || track.steps.length <= 1) {
-      toastActions.error(t('files:cannotDeleteLastStep'));
-      return;
-    }
-
-    const updatedSteps = track.steps.filter((_, index) => index !== stepIndex);
-    const newActiveStep = track.activeStep === stepIndex ? 0 :
-                         track.activeStep! > stepIndex ? track.activeStep! - 1 : track.activeStep;
-
-    setTracks(prev => ({
-      ...prev,
-      [trackId]: {
-        ...prev[trackId],
-        steps: updatedSteps,
-        activeStep: newActiveStep,
-        code: updatedSteps[newActiveStep!].code,
-        modified: new Date().toISOString(),
-      }
-    }));
-
-    toastActions.success(t('files:stepDeleted'));
-  }, [tracks, setTracks, t]);
-
-  const downloadTrack = useCallback(async (track: Track) => {
-    if (track.isMultitrack && track.steps) {
-      // Download as ZIP for multitrack
-      const JSZip = (await import('jszip')).default;
-      const zip = new JSZip();
-
-      // Add each step as a separate file
-      track.steps.forEach((step) => {
-        const fileName = `${step.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
-        zip.file(fileName, step.code);
-      });
-
-      // Add metadata file
-      const metadata = {
-        trackName: track.name,
-        isMultitrack: true,
-        steps: track.steps.map(step => ({
-          name: step.name,
-          created: step.created,
-          modified: step.modified,
-        })),
-        created: track.created,
-        modified: track.modified,
-      };
-      zip.file('metadata.json', JSON.stringify(metadata, null, 2));
-
-      const content = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(content);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${track.name}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toastActions.success(t('files:multitrackDownloaded'));
-    } else {
-      // Regular single file download
-      const blob = new Blob([track.code], { type: 'text/javascript' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${track.name}.js`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toastActions.success(t('files:trackDownloaded'));
-    }
-  }, [t]);
-
-  const downloadFolder = useCallback(async (folderPath: string) => {
-    try {
-      const JSZip = (await import('jszip')).default;
-      const zip = new JSZip();
-
-      // Get all tracks in this folder and its subfolders, or all tracks if folderPath is empty
-      const folderTracks = folderPath === '' 
-        ? Object.values(tracks) // Export all tracks
-        : Object.values(tracks).filter(track =>
-            track.folder === folderPath || track.folder?.startsWith(`${folderPath}/`)
-          );
-
-      if (folderTracks.length === 0) {
-        toastActions.error(folderPath === '' ? t('files:noTracksToExport') : t('files:emptyFolder'));
+  const deleteStep = useCallback(
+    (trackId: string, stepIndex: number) => {
+      const track = tracks[trackId];
+      if (!track || !track.isMultitrack || !track.steps || track.steps.length <= 1) {
+        toastActions.error(t('files:cannotDeleteLastStep'));
         return;
       }
 
-      // Add each track to the ZIP
-      folderTracks.forEach((track) => {
-        const relativePath = folderPath === '' 
-          ? (track.folder || '') // Keep full folder structure for export all
-          : (track.folder ? track.folder.replace(folderPath, '').replace(/^\//, '') : '');
-        const trackPath = relativePath ? `${relativePath}/` : '';
+      const updatedSteps = track.steps.filter((_, index) => index !== stepIndex);
+      const newActiveStep =
+        track.activeStep === stepIndex ? 0 : track.activeStep! > stepIndex ? track.activeStep! - 1 : track.activeStep;
 
-        if (track.isMultitrack && track.steps) {
-          // Create multitrack folder
-          const multitrackFolder = zip.folder(`${trackPath}${track.name}`);
+      setTracks((prev) => ({
+        ...prev,
+        [trackId]: {
+          ...prev[trackId],
+          steps: updatedSteps,
+          activeStep: newActiveStep,
+          code: updatedSteps[newActiveStep!].code,
+          modified: new Date().toISOString(),
+        },
+      }));
 
-          // Add each step
-          track.steps.forEach((step) => {
-            const fileName = `${step.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
-            multitrackFolder?.file(fileName, step.code);
-          });
+      toastActions.success(t('files:stepDeleted'));
+    },
+    [tracks, setTracks, t],
+  );
 
-          // Add multitrack metadata
-          const metadata = {
-            name: track.name,
-            isMultitrack: true,
-            activeStep: track.activeStep || 0,
-            created: track.created,
-            modified: track.modified,
-            steps: track.steps.map(step => ({
-              id: step.id,
-              name: step.name,
-              created: step.created,
-              modified: step.modified
-            }))
-          };
-          multitrackFolder?.file('metadata.json', JSON.stringify(metadata, null, 2));
-        } else {
-          // Regular track
-          const fileName = `${trackPath}${track.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
-          zip.file(fileName, track.code);
-        }
-      });
+  const downloadTrack = useCallback(
+    async (track: Track) => {
+      if (track.isMultitrack && track.steps) {
+        // Download as ZIP for multitrack
+        const JSZip = (await import('jszip')).default;
+        const zip = new JSZip();
 
-      // Generate and download ZIP
-      const content = await zip.generateAsync({ type: 'blob' });
-      const url = URL.createObjectURL(content);
-      const a = document.createElement('a');
-      a.href = url;
-      const folderName = folderPath === '' ? 'strudel-library' : (folderPath.split('/').pop() || 'folder');
-      a.download = `${folderName}-${new Date().toISOString().split('T')[0]}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toastActions.success(folderPath === '' ? t('files:libraryExported') : t('files:folderDownloaded'));
-    } catch (error) {
-      console.error('Folder download failed:', error);
-      toastActions.error('Folder download failed');
-    }
-  }, [tracks, t]);
-
-  const deleteFolder = useCallback((folderPath: string) => {
-    console.log('FileManager - deleteFolder called for:', folderPath);
-    
-    // Get folder contents
-    const subfolders = Object.values(folders).filter(f => 
-      f.parent === folderPath || f.path.startsWith(folderPath + '/')
-    ).map(f => f.name);
-    
-    const folderTracks = Object.values(tracks).filter(t => 
-      t.folder === folderPath || (t.folder && t.folder.startsWith(folderPath + '/'))
-    ).map(t => t.name);
-
-    if (subfolders.length > 0 || folderTracks.length > 0) {
-      setFolderToDelete(folderPath);
-      setFolderContents({ subfolders, tracks: folderTracks });
-      setShowDeleteFolderModal(true);
-      return;
-    }
-
-    // Empty folder - delete immediately
-    performFolderDeletion(folderPath);
-  }, [folders, tracks, setFolderToDelete, setFolderContents, setShowDeleteFolderModal]);
-
-  const performFolderDeletion = useCallback((folderPath: string) => {
-    // Prevent multiple deletions of the same folder
-    if (isDeletingFolderRef.current.has(folderPath)) {
-      console.log('FileManager - folder deletion already in progress for:', folderPath);
-      return;
-    }
-    
-    isDeletingFolderRef.current.add(folderPath);
-    
-    console.log('FileManager - STARTING folder deletion for path:', folderPath);
-    
-    // Get all items that will be deleted
-    const foldersToDelete = Object.entries(folders).filter(([key, folder]) => {
-      return key === folderPath || 
-             folder.path === folderPath || 
-             folder.path.startsWith(folderPath + '/') ||
-             key.startsWith(folderPath + '/');
-    }).map(([key]) => key);
-    
-    const tracksToDelete = Object.values(tracks).filter(track => 
-      track.folder === folderPath || (track.folder && track.folder.startsWith(folderPath + '/'))
-    );
-
-    // Check if the currently selected track will be deleted
-    const selectedTrackWillBeDeleted = selectedTrack && tracksToDelete.some(track => track.id === selectedTrack);
-    
-    if (selectedTrackWillBeDeleted) {
-      console.log('FileManager - selected track will be deleted, switching to another track');
-      
-      const remainingTracks = Object.values(tracks).filter(track => 
-        !tracksToDelete.some(deletedTrack => deletedTrack.id === track.id)
-      );
-      
-      if (remainingTracks.length > 0) {
-        const nextTrack = remainingTracks[0];
-        console.log('FileManager - switching to safe track before folder deletion:', nextTrack.name);
-        loadTrack(nextTrack);
-      } else {
-        console.log('FileManager - no tracks left after folder deletion, clearing selection');
-        setSelectedTrack(null);
-        
-        if (context.editorRef?.current?.setCode) {
-          context.editorRef.current.setCode('');
-        }
-        
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('strudel-all-tracks-deleted'));
-        }, 100);
-      }
-    }
-
-    // Update folders state
-    setFolders(prev => {
-      const newFolders = { ...prev };
-      foldersToDelete.forEach(key => {
-        delete newFolders[key];
-      });
-      return newFolders;
-    });
-
-    // Update tracks state
-    if (tracksToDelete.length > 0) {
-      setTracks(prev => {
-        const newTracks = { ...prev };
-        tracksToDelete.forEach(track => {
-          delete newTracks[track.id];
+        // Add each step as a separate file
+        track.steps.forEach((step) => {
+          const fileName = `${step.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
+          zip.file(fileName, step.code);
         });
-        return newTracks;
-      });
-    }
 
-    toastActions.success(t('files:folderDeleted'));
-    
-    // Clean up the deletion tracking after a short delay
-    setTimeout(() => {
-      isDeletingFolderRef.current.delete(folderPath);
-    }, 1000);
-  }, [folders, tracks, selectedTrack, isDeletingFolderRef, setFolders, setTracks, setSelectedTrack, loadTrack, context, t]);
+        // Add metadata file
+        const metadata = {
+          trackName: track.name,
+          isMultitrack: true,
+          steps: track.steps.map((step) => ({
+            name: step.name,
+            created: step.created,
+            modified: step.modified,
+          })),
+          created: track.created,
+          modified: track.modified,
+        };
+        zip.file('metadata.json', JSON.stringify(metadata, null, 2));
+
+        const content = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${track.name}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toastActions.success(t('files:multitrackDownloaded'));
+      } else {
+        // Regular single file download
+        const blob = new Blob([track.code], { type: 'text/javascript' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${track.name}.js`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toastActions.success(t('files:trackDownloaded'));
+      }
+    },
+    [t],
+  );
+
+  const downloadFolder = useCallback(
+    async (folderPath: string) => {
+      try {
+        const JSZip = (await import('jszip')).default;
+        const zip = new JSZip();
+
+        // Get all tracks in this folder and its subfolders, or all tracks if folderPath is empty
+        const folderTracks =
+          folderPath === ''
+            ? Object.values(tracks) // Export all tracks
+            : Object.values(tracks).filter(
+                (track) => track.folder === folderPath || track.folder?.startsWith(`${folderPath}/`),
+              );
+
+        if (folderTracks.length === 0) {
+          toastActions.error(folderPath === '' ? t('files:noTracksToExport') : t('files:emptyFolder'));
+          return;
+        }
+
+        // Add each track to the ZIP
+        folderTracks.forEach((track) => {
+          const relativePath =
+            folderPath === ''
+              ? track.folder || '' // Keep full folder structure for export all
+              : track.folder
+                ? track.folder.replace(folderPath, '').replace(/^\//, '')
+                : '';
+          const trackPath = relativePath ? `${relativePath}/` : '';
+
+          if (track.isMultitrack && track.steps) {
+            // Create multitrack folder
+            const multitrackFolder = zip.folder(`${trackPath}${track.name}`);
+
+            // Add each step
+            track.steps.forEach((step) => {
+              const fileName = `${step.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
+              multitrackFolder?.file(fileName, step.code);
+            });
+
+            // Add multitrack metadata
+            const metadata = {
+              name: track.name,
+              isMultitrack: true,
+              activeStep: track.activeStep || 0,
+              created: track.created,
+              modified: track.modified,
+              steps: track.steps.map((step) => ({
+                id: step.id,
+                name: step.name,
+                created: step.created,
+                modified: step.modified,
+              })),
+            };
+            multitrackFolder?.file('metadata.json', JSON.stringify(metadata, null, 2));
+          } else {
+            // Regular track
+            const fileName = `${trackPath}${track.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
+            zip.file(fileName, track.code);
+          }
+        });
+
+        // Generate and download ZIP
+        const content = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = url;
+        const folderName = folderPath === '' ? 'strudel-library' : folderPath.split('/').pop() || 'folder';
+        a.download = `${folderName}-${new Date().toISOString().split('T')[0]}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toastActions.success(folderPath === '' ? t('files:libraryExported') : t('files:folderDownloaded'));
+      } catch (error) {
+        console.error('Folder download failed:', error);
+        toastActions.error('Folder download failed');
+      }
+    },
+    [tracks, t],
+  );
+
+  const deleteFolder = useCallback(
+    (folderPath: string) => {
+      console.log('FileManager - deleteFolder called for:', folderPath);
+
+      // Get folder contents
+      const subfolders = Object.values(folders)
+        .filter((f) => f.parent === folderPath || f.path.startsWith(folderPath + '/'))
+        .map((f) => f.name);
+
+      const folderTracks = Object.values(tracks)
+        .filter((t) => t.folder === folderPath || (t.folder && t.folder.startsWith(folderPath + '/')))
+        .map((t) => t.name);
+
+      if (subfolders.length > 0 || folderTracks.length > 0) {
+        setFolderToDelete(folderPath);
+        setFolderContents({ subfolders, tracks: folderTracks });
+        setShowDeleteFolderModal(true);
+        return;
+      }
+
+      // Empty folder - delete immediately
+      performFolderDeletion(folderPath);
+    },
+    [folders, tracks, setFolderToDelete, setFolderContents, setShowDeleteFolderModal],
+  );
+
+  const performFolderDeletion = useCallback(
+    (folderPath: string) => {
+      // Prevent multiple deletions of the same folder
+      if (isDeletingFolderRef.current.has(folderPath)) {
+        console.log('FileManager - folder deletion already in progress for:', folderPath);
+        return;
+      }
+
+      isDeletingFolderRef.current.add(folderPath);
+
+      console.log('FileManager - STARTING folder deletion for path:', folderPath);
+
+      // Get all items that will be deleted
+      const foldersToDelete = Object.entries(folders)
+        .filter(([key, folder]) => {
+          return (
+            key === folderPath ||
+            folder.path === folderPath ||
+            folder.path.startsWith(folderPath + '/') ||
+            key.startsWith(folderPath + '/')
+          );
+        })
+        .map(([key]) => key);
+
+      const tracksToDelete = Object.values(tracks).filter(
+        (track) => track.folder === folderPath || (track.folder && track.folder.startsWith(folderPath + '/')),
+      );
+
+      // Check if the currently selected track will be deleted
+      const selectedTrackWillBeDeleted = selectedTrack && tracksToDelete.some((track) => track.id === selectedTrack);
+
+      if (selectedTrackWillBeDeleted) {
+        console.log('FileManager - selected track will be deleted, switching to another track');
+
+        const remainingTracks = Object.values(tracks).filter(
+          (track) => !tracksToDelete.some((deletedTrack) => deletedTrack.id === track.id),
+        );
+
+        if (remainingTracks.length > 0) {
+          const nextTrack = remainingTracks[0];
+          console.log('FileManager - switching to safe track before folder deletion:', nextTrack.name);
+          loadTrack(nextTrack);
+        } else {
+          console.log('FileManager - no tracks left after folder deletion, clearing selection');
+          setSelectedTrack(null);
+
+          if (context.editorRef?.current?.setCode) {
+            context.editorRef.current.setCode('');
+          }
+
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('strudel-all-tracks-deleted'));
+          }, 100);
+        }
+      }
+
+      // Update folders state
+      setFolders((prev) => {
+        const newFolders = { ...prev };
+        foldersToDelete.forEach((key) => {
+          delete newFolders[key];
+        });
+        return newFolders;
+      });
+
+      // Update tracks state
+      if (tracksToDelete.length > 0) {
+        setTracks((prev) => {
+          const newTracks = { ...prev };
+          tracksToDelete.forEach((track) => {
+            delete newTracks[track.id];
+          });
+          return newTracks;
+        });
+      }
+
+      toastActions.success(t('files:folderDeleted'));
+
+      // Clean up the deletion tracking after a short delay
+      setTimeout(() => {
+        isDeletingFolderRef.current.delete(folderPath);
+      }, 1000);
+    },
+    [
+      folders,
+      tracks,
+      selectedTrack,
+      isDeletingFolderRef,
+      setFolders,
+      setTracks,
+      setSelectedTrack,
+      loadTrack,
+      context,
+      t,
+    ],
+  );
 
   const confirmFolderDelete = useCallback(() => {
     if (folderToDelete) {
       performFolderDeletion(folderToDelete);
       setShowDeleteFolderModal(false);
       setFolderToDelete(null);
-      setFolderContents({subfolders: [], tracks: []});
+      setFolderContents({ subfolders: [], tracks: [] });
     }
   }, [folderToDelete, performFolderDeletion, setShowDeleteFolderModal, setFolderToDelete, setFolderContents]);
 
   const deleteAllTracks = useCallback(() => {
     const trackIds = Object.keys(tracks);
     const folderIds = Object.keys(folders);
-    
+
     if (trackIds.length === 0 && folderIds.length === 0) return;
 
     // Clear all tracks from localStorage
@@ -1164,30 +1262,31 @@ export function useFileManagerOperations({
       localStorage.removeItem('strudel_tracks');
       setTracks({});
     }
-    
+
     // Clear all folders from localStorage
     if (folderIds.length > 0) {
       localStorage.removeItem('strudel_folders');
       setFolders({});
     }
-    
+
     // Clear selected track
     setSelectedTrack(null);
-    
+
     // Clear editor
     if (context.editorRef?.current?.setCode) {
       context.editorRef.current.setCode('');
     }
-    
+
     // Update success message to reflect both tracks and folders
-    const message = trackIds.length > 0 && folderIds.length > 0 
-      ? t('files:allTracksAndFoldersDeleted')
-      : trackIds.length > 0 
-        ? t('files:allTracksDeleted')
-        : t('files:allFoldersDeleted');
-    
+    const message =
+      trackIds.length > 0 && folderIds.length > 0
+        ? t('files:allTracksAndFoldersDeleted')
+        : trackIds.length > 0
+          ? t('files:allTracksDeleted')
+          : t('files:allFoldersDeleted');
+
     toastActions.success(message);
-    
+
     // Dispatch event for other components
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('strudel-all-tracks-deleted'));

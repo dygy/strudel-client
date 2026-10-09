@@ -45,7 +45,7 @@ export function Incrementor({
 }: IncrementorProps) {
   const numValue = parseInt(String(value));
   const displayValue = isNaN(numValue) ? '' : numValue;
-  
+
   return (
     <div className={cx('w-fit bg-background relative flex items-center rounded-md', className)}>
       <Textbox

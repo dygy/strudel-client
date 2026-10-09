@@ -1,9 +1,9 @@
 /**
  * KeyboardShortcutManager - Manages keyboard shortcuts for mixer operations
- * 
+ *
  * Provides a flexible system for registering, handling, and customizing
  * keyboard shortcuts with conflict detection.
- * 
+ *
  * @class KeyboardShortcutManager
  * @license AGPL-3.0-or-later
  */
@@ -20,7 +20,7 @@ export class KeyboardShortcutManager {
 
   /**
    * Register a keyboard shortcut
-   * 
+   *
    * @param {string} id - Unique identifier for the shortcut
    * @param {Object} config - Shortcut configuration
    * @param {string} config.key - Key code (e.g., 'KeyM', 'KeyI', 'KeyX')
@@ -57,7 +57,7 @@ export class KeyboardShortcutManager {
 
   /**
    * Unregister a keyboard shortcut
-   * 
+   *
    * @param {string} id - Shortcut identifier
    */
   unregister(id) {
@@ -67,7 +67,7 @@ export class KeyboardShortcutManager {
 
   /**
    * Find conflicting shortcut
-   * 
+   *
    * @param {string} key - Key code
    * @param {boolean} ctrl - Ctrl key required
    * @param {boolean} shift - Shift key required
@@ -76,12 +76,7 @@ export class KeyboardShortcutManager {
    */
   findConflict(key, ctrl, shift, alt) {
     for (const [id, config] of this.shortcuts.entries()) {
-      if (
-        config.key === key &&
-        config.ctrl === ctrl &&
-        config.shift === shift &&
-        config.alt === alt
-      ) {
+      if (config.key === key && config.ctrl === ctrl && config.shift === shift && config.alt === alt) {
         return id;
       }
     }
@@ -90,7 +85,7 @@ export class KeyboardShortcutManager {
 
   /**
    * Format shortcut for display
-   * 
+   *
    * @param {Object} config - Shortcut configuration
    * @returns {string} Formatted shortcut string
    */
@@ -105,7 +100,7 @@ export class KeyboardShortcutManager {
 
   /**
    * Handle keydown event
-   * 
+   *
    * @param {KeyboardEvent} event - Keyboard event
    */
   handleKeyDown(event) {
@@ -113,11 +108,7 @@ export class KeyboardShortcutManager {
 
     // Don't trigger shortcuts when typing in input fields
     const target = event.target;
-    if (
-      target.tagName === 'INPUT' ||
-      target.tagName === 'TEXTAREA' ||
-      target.isContentEditable
-    ) {
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
       return;
     }
 
@@ -168,7 +159,7 @@ export class KeyboardShortcutManager {
 
   /**
    * Get all registered shortcuts
-   * 
+   *
    * @returns {Array} Array of shortcut info objects
    */
   getShortcuts() {
@@ -185,7 +176,7 @@ export class KeyboardShortcutManager {
 
   /**
    * Load custom shortcuts from localStorage
-   * 
+   *
    * @param {string} storageKey - localStorage key
    */
   loadCustomShortcuts(storageKey = 'strudel-mixer-shortcuts') {
@@ -193,7 +184,7 @@ export class KeyboardShortcutManager {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
         const customShortcuts = JSON.parse(stored);
-        
+
         for (const [id, config] of Object.entries(customShortcuts)) {
           if (this.shortcuts.has(id)) {
             // Update existing shortcut
@@ -204,7 +195,7 @@ export class KeyboardShortcutManager {
             });
           }
         }
-        
+
         console.log('Custom shortcuts loaded');
       }
     } catch (err) {
@@ -214,13 +205,13 @@ export class KeyboardShortcutManager {
 
   /**
    * Save custom shortcuts to localStorage
-   * 
+   *
    * @param {string} storageKey - localStorage key
    */
   saveCustomShortcuts(storageKey = 'strudel-mixer-shortcuts') {
     try {
       const customShortcuts = {};
-      
+
       for (const [id, config] of this.shortcuts.entries()) {
         customShortcuts[id] = {
           key: config.key,
@@ -229,7 +220,7 @@ export class KeyboardShortcutManager {
           alt: config.alt,
         };
       }
-      
+
       localStorage.setItem(storageKey, JSON.stringify(customShortcuts));
       console.log('Custom shortcuts saved');
     } catch (err) {

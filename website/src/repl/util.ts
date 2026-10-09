@@ -88,7 +88,7 @@ export function loadModules(): Promise<any> {
     import('@strudel/midi'),
     import('@strudel/osc'),
   ];
-  
+
   // For now, always use web modules since desktopbridge is not published to npm
   // TODO: In a proper Tauri build, conditionally load desktop bridge modules
   // if (isTauri()) {

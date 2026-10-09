@@ -1,6 +1,6 @@
 /**
  * Strict File Manager with Bulletproof Autosave
- * 
+ *
  * This file manager ensures that autosave operations are completely isolated
  * per track and cannot accidentally save code from one track to another.
  */
@@ -48,23 +48,23 @@ const FOLDERS_STORAGE_KEY = 'strudel-folders';
 
 export function useStrictFileManager(options: StrictFileManagerOptions) {
   const { context, storageBackend, supabaseOperations } = options;
-  
+
   // State
   const [tracks, setTracks] = useState<Record<string, Track>>({});
   const [folders, setFolders] = useState<Record<string, Folder>>({});
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string>('');
-  
+
   // Refs for stable references
   const selectedTrackRef = useRef<string | null>(null);
   const tracksRef = useRef<Record<string, Track>>({});
-  
+
   // Keep refs in sync
   useEffect(() => {
     selectedTrackRef.current = selectedTrack;
   }, [selectedTrack]);
-  
+
   useEffect(() => {
     tracksRef.current = tracks;
   }, [tracks]);
@@ -76,44 +76,47 @@ export function useStrictFileManager(options: StrictFileManagerOptions) {
   /**
    * Save track to storage backend
    */
-  const saveTrackToBackend = useCallback(async (trackId: string, code: string): Promise<boolean> => {
-    try {
-      console.log('StrictFileManager: Saving track to backend', { trackId, backend: storageBackend });
-      
-      if (storageBackend === 'supabase' && supabaseOperations) {
-        return await supabaseOperations.saveTrack(trackId, code);
-      } else {
-        // localStorage backend
-        const currentTracks = tracksRef.current;
-        if (!currentTracks[trackId]) {
-          console.error('StrictFileManager: Track not found for save', trackId);
-          return false;
+  const saveTrackToBackend = useCallback(
+    async (trackId: string, code: string): Promise<boolean> => {
+      try {
+        console.log('StrictFileManager: Saving track to backend', { trackId, backend: storageBackend });
+
+        if (storageBackend === 'supabase' && supabaseOperations) {
+          return await supabaseOperations.saveTrack(trackId, code);
+        } else {
+          // localStorage backend
+          const currentTracks = tracksRef.current;
+          if (!currentTracks[trackId]) {
+            console.error('StrictFileManager: Track not found for save', trackId);
+            return false;
+          }
+
+          const updatedTrack = {
+            ...currentTracks[trackId],
+            code,
+            modified: new Date().toISOString(),
+          };
+
+          const updatedTracks = {
+            ...currentTracks,
+            [trackId]: updatedTrack,
+          };
+
+          // Save to localStorage
+          localStorage.setItem(TRACKS_STORAGE_KEY, JSON.stringify(updatedTracks));
+
+          // Update state
+          setTracks(updatedTracks);
+
+          return true;
         }
-
-        const updatedTrack = {
-          ...currentTracks[trackId],
-          code,
-          modified: new Date().toISOString()
-        };
-
-        const updatedTracks = {
-          ...currentTracks,
-          [trackId]: updatedTrack
-        };
-
-        // Save to localStorage
-        localStorage.setItem(TRACKS_STORAGE_KEY, JSON.stringify(updatedTracks));
-        
-        // Update state
-        setTracks(updatedTracks);
-        
-        return true;
+      } catch (error) {
+        console.error('StrictFileManager: Save failed', error);
+        return false;
       }
-    } catch (error) {
-      console.error('StrictFileManager: Save failed', error);
-      return false;
-    }
-  }, [storageBackend, supabaseOperations]);
+    },
+    [storageBackend, supabaseOperations],
+  );
 
   /**
    * Get current active track ID from URL (source of truth)
@@ -121,13 +124,13 @@ export function useStrictFileManager(options: StrictFileManagerOptions) {
   const getActiveTrackId = useCallback((): string | null => {
     // Use URL as source of truth instead of state
     if (typeof window === 'undefined') return null;
-    
+
     // Extract track ID from current URL path
     const pathMatch = window.location.pathname.match(/^\/repl\/([^\/]+)$/);
     if (pathMatch) {
       return pathMatch[1];
     }
-    
+
     // Fallback to query parameter for backward compatibility
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('track') || null;
@@ -160,106 +163,118 @@ export function useStrictFileManager(options: StrictFileManagerOptions) {
     getActiveTrackId,
     getActiveCode,
     isEnabled: isAutosaveEnabledCallback,
-    getInterval: getAutosaveInterval
+    getInterval: getAutosaveInterval,
   });
 
   /**
    * Load track and initialize autosave context
    */
-  const loadTrack = useCallback(async (track: Track) => {
-    console.log('StrictFileManager: Loading track', { id: track.id, name: track.name });
-    
-    // Update selected track
-    setSelectedTrack(track.id);
-    
-    // Initialize strict autosave context for this track
-    await strictAutosave.initializeTrack(track.id, track.code);
-    
-    // Update editor
-    if (context.editorRef?.current?.setCode) {
-      context.editorRef.current.setCode(track.code);
-    }
-    
-    // Trigger context update
-    context.handleUpdate({ id: track.id, code: track.code }, true);
-    
-    console.log('StrictFileManager: Track loaded successfully', track.id);
-  }, [context, strictAutosave]);
+  const loadTrack = useCallback(
+    async (track: Track) => {
+      console.log('StrictFileManager: Loading track', { id: track.id, name: track.name });
+
+      // Update selected track
+      setSelectedTrack(track.id);
+
+      // Initialize strict autosave context for this track
+      await strictAutosave.initializeTrack(track.id, track.code);
+
+      // Update editor
+      if (context.editorRef?.current?.setCode) {
+        context.editorRef.current.setCode(track.code);
+      }
+
+      // Trigger context update
+      context.handleUpdate({ id: track.id, code: track.code }, true);
+
+      console.log('StrictFileManager: Track loaded successfully', track.id);
+    },
+    [context, strictAutosave],
+  );
 
   /**
    * Create new track
    */
-  const createTrack = useCallback(async (name: string, folder: string | null = null): Promise<Track> => {
-    const newTrack: Track = {
-      id: `track_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name,
-      code: '// New track\n',
-      created: new Date().toISOString(),
-      modified: new Date().toISOString(),
-      folder,
-      isMultitrack: false,
-      steps: [],
-      activeStep: 0
-    };
+  const createTrack = useCallback(
+    async (name: string, folder: string | null = null): Promise<Track> => {
+      const newTrack: Track = {
+        id: `track_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name,
+        code: '// New track\n',
+        created: new Date().toISOString(),
+        modified: new Date().toISOString(),
+        folder,
+        isMultitrack: false,
+        steps: [],
+        activeStep: 0,
+      };
 
-    console.log('StrictFileManager: Creating new track', newTrack.id);
+      console.log('StrictFileManager: Creating new track', newTrack.id);
 
-    // Update tracks state
-    const updatedTracks = { ...tracks, [newTrack.id]: newTrack };
-    setTracks(updatedTracks);
+      // Update tracks state
+      const updatedTracks = { ...tracks, [newTrack.id]: newTrack };
+      setTracks(updatedTracks);
 
-    // Save to backend
-    if (storageBackend === 'localStorage') {
-      localStorage.setItem(TRACKS_STORAGE_KEY, JSON.stringify(updatedTracks));
-    }
+      // Save to backend
+      if (storageBackend === 'localStorage') {
+        localStorage.setItem(TRACKS_STORAGE_KEY, JSON.stringify(updatedTracks));
+      }
 
-    // Load the new track
-    await loadTrack(newTrack);
+      // Load the new track
+      await loadTrack(newTrack);
 
-    return newTrack;
-  }, [tracks, storageBackend, loadTrack]);
+      return newTrack;
+    },
+    [tracks, storageBackend, loadTrack],
+  );
 
   /**
    * Delete track and cleanup autosave context
    */
-  const deleteTrack = useCallback(async (trackId: string) => {
-    console.log('StrictFileManager: Deleting track', trackId);
-    
-    // Cleanup autosave context
-    strictAutosave.cleanupTrack(trackId);
-    
-    // Remove from state
-    const updatedTracks = { ...tracks };
-    delete updatedTracks[trackId];
-    setTracks(updatedTracks);
-    
-    // Save to backend
-    if (storageBackend === 'localStorage') {
-      localStorage.setItem(TRACKS_STORAGE_KEY, JSON.stringify(updatedTracks));
-    }
-    
-    // If this was the selected track, clear selection
-    if (selectedTrack === trackId) {
-      setSelectedTrack(null);
-    }
-  }, [tracks, selectedTrack, storageBackend, strictAutosave]);
+  const deleteTrack = useCallback(
+    async (trackId: string) => {
+      console.log('StrictFileManager: Deleting track', trackId);
+
+      // Cleanup autosave context
+      strictAutosave.cleanupTrack(trackId);
+
+      // Remove from state
+      const updatedTracks = { ...tracks };
+      delete updatedTracks[trackId];
+      setTracks(updatedTracks);
+
+      // Save to backend
+      if (storageBackend === 'localStorage') {
+        localStorage.setItem(TRACKS_STORAGE_KEY, JSON.stringify(updatedTracks));
+      }
+
+      // If this was the selected track, clear selection
+      if (selectedTrack === trackId) {
+        setSelectedTrack(null);
+      }
+    },
+    [tracks, selectedTrack, storageBackend, strictAutosave],
+  );
 
   /**
    * Force save current track
    */
-  const saveCurrentTrack = useCallback(async (showToast: boolean = true): Promise<boolean> => {
-    const success = await strictAutosave.forceSave();
-    
-    if (success && showToast) {
-      toastActions.success(t('files:trackSaved'));
-      setSaveStatus('Saved!');
-      setTimeout(() => setSaveStatus(''), 2000);
-    } else if (!success && showToast) {
-      toastActions.error(t('files:errors.saveFailed'));
-    }
-    
-    return success;
-  }, [strictAutosave, t]);
+  const saveCurrentTrack = useCallback(
+    async (showToast: boolean = true): Promise<boolean> => {
+      const success = await strictAutosave.forceSave();
+
+      if (success && showToast) {
+        toastActions.success(t('files:trackSaved'));
+        setSaveStatus('Saved!');
+        setTimeout(() => setSaveStatus(''), 2000);
+      } else if (!success && showToast) {
+        toastActions.error(t('files:errors.saveFailed'));
+      }
+
+      return success;
+    },
+    [strictAutosave, t],
+  );
 
   /**
    * Handle code changes to schedule autosave
@@ -274,12 +289,12 @@ export function useStrictFileManager(options: StrictFileManagerOptions) {
   const getDebugInfo = useCallback(() => {
     const currentTrackId = getActiveTrackId();
     if (!currentTrackId) return null;
-    
+
     return {
       trackId: currentTrackId,
       trackName: tracks[currentTrackId]?.name,
       autosave: strictAutosave.getTrackDebugInfo(currentTrackId),
-      codeLength: getActiveCode().length
+      codeLength: getActiveCode().length,
     };
   }, [getActiveTrackId, tracks, strictAutosave, getActiveCode]);
 
@@ -287,7 +302,7 @@ export function useStrictFileManager(options: StrictFileManagerOptions) {
   useEffect(() => {
     const loadInitialData = async () => {
       setIsLoading(true);
-      
+
       try {
         if (storageBackend === 'supabase' && supabaseOperations) {
           const loadedTracks = await supabaseOperations.loadTracks();
@@ -296,11 +311,11 @@ export function useStrictFileManager(options: StrictFileManagerOptions) {
           // Load from localStorage
           const savedTracks = localStorage.getItem(TRACKS_STORAGE_KEY);
           const savedFolders = localStorage.getItem(FOLDERS_STORAGE_KEY);
-          
+
           if (savedTracks) {
             setTracks(JSON.parse(savedTracks));
           }
-          
+
           if (savedFolders) {
             setFolders(JSON.parse(savedFolders));
           }
@@ -332,15 +347,15 @@ export function useStrictFileManager(options: StrictFileManagerOptions) {
     selectedTrack,
     isLoading,
     saveStatus,
-    
+
     // Actions
     loadTrack,
     createTrack,
     deleteTrack,
     saveCurrentTrack,
     handleCodeChange,
-    
+
     // Debug
-    getDebugInfo
+    getDebugInfo,
   };
 }

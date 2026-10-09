@@ -1,9 +1,9 @@
 /**
  * AudioStream - Represents a single audio output stream (Live or Preview)
- * 
+ *
  * Uses MediaStreamDestination + HTMLAudioElement.setSinkId() to route
  * audio from the shared AudioContext to a specific output device.
- * 
+ *
  * @class AudioStream
  * @license AGPL-3.0-or-later
  */
@@ -18,13 +18,13 @@ export class AudioStream {
   constructor(name, audioContext) {
     this.name = name;
     this.audioContext = audioContext;
-    
+
     // Audio routing: inputGain → equalizer → mediaStreamDest → audioElement
     this.inputGain = null;
     this.equalizer = null;
     this.mediaStreamDest = null;
     this.audioElement = null;
-    
+
     this.deviceId = null;
     this.isInitialized = false;
     this.isActive = false;
@@ -90,7 +90,7 @@ export class AudioStream {
     }
 
     const normalizedId = deviceId || '';
-    
+
     if (normalizedId === (this.deviceId || '')) return;
 
     if (!this.audioElement.setSinkId) {

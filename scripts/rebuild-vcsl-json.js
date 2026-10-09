@@ -2,7 +2,7 @@
 
 /**
  * Rebuild VCSL JSON from Local Files
- * 
+ *
  * This script scans the local VCSL samples directory and creates
  * a vcsl.json file based on what actually exists locally.
  */
@@ -27,14 +27,14 @@ function isAudioFile(filename) {
  */
 function createCategoryName(relativePath) {
   // Remove the file extension and get directory parts
-  const pathParts = relativePath.split('/').filter(part => part.length > 0);
-  
+  const pathParts = relativePath.split('/').filter((part) => part.length > 0);
+
   // Remove the filename, keep directory structure
   const relevantParts = pathParts.slice(0, -1); // Remove filename only
-  
+
   // Create category name from the path structure
   let categoryName = '';
-  
+
   if (relevantParts.length >= 2) {
     // Use the last 2 directory levels for category name
     const lastTwo = relevantParts.slice(-2);
@@ -44,7 +44,7 @@ function createCategoryName(relativePath) {
   } else {
     categoryName = 'misc';
   }
-  
+
   // Clean up the category name
   return categoryName
     .toLowerCase()
@@ -67,13 +67,13 @@ function scanDirectory(dirPath, basePath, samples = {}) {
     console.log(`⚠️  Directory not found: ${dirPath}`);
     return samples;
   }
-  
+
   const items = fs.readdirSync(dirPath);
-  
+
   for (const item of items) {
     const fullPath = path.join(dirPath, item);
     const relativePath = path.relative(basePath, fullPath);
-    
+
     if (fs.statSync(fullPath).isDirectory()) {
       // Recursively scan subdirectories
       scanDirectory(fullPath, basePath, samples);
@@ -83,16 +83,16 @@ function scanDirectory(dirPath, basePath, samples = {}) {
       // Remove the 'vcsl' prefix from relativePath since we're already in the vcsl directory
       const cleanPath = relativePath.replace(/^vcsl\//, '');
       const samplePath = `samples/vcsl/${cleanPath.replace(/\\/g, '/')}`;
-      
+
       if (!samples[categoryName]) {
         samples[categoryName] = [];
       }
-      
+
       samples[categoryName].push(samplePath);
       console.log(`🎵 ${categoryName}: ${item}`);
     }
   }
-  
+
   return samples;
 }
 
@@ -101,47 +101,45 @@ function scanDirectory(dirPath, basePath, samples = {}) {
  */
 function rebuildVcslJson() {
   console.log('🔄 Rebuilding vcsl.json from local files...\n');
-  
+
   if (!fs.existsSync(SAMPLES_DIR)) {
     console.log('❌ VCSL samples directory not found:', SAMPLES_DIR);
     console.log('💡 Please ensure VCSL samples are downloaded first.');
     return;
   }
-  
+
   // Scan all local samples
   const samples = scanDirectory(SAMPLES_DIR, SAMPLES_DIR);
-  
+
   // Sort categories and samples
   const sortedSamples = {};
   const sortedCategories = Object.keys(samples).sort();
-  
+
   for (const category of sortedCategories) {
     if (samples[category].length > 0) {
       sortedSamples[category] = samples[category].sort();
     }
   }
-  
+
   // Apply URL encoding fix (double-encode spaces)
   const fixedSamples = {};
   for (const [category, sampleList] of Object.entries(sortedSamples)) {
-    fixedSamples[category] = sampleList.map(samplePath => 
-      samplePath.replace(/%20/g, '%2520')
-    );
+    fixedSamples[category] = sampleList.map((samplePath) => samplePath.replace(/%20/g, '%2520'));
   }
-  
+
   // Write the JSON file
   fs.writeFileSync(VCSL_JSON_PATH, JSON.stringify(fixedSamples, null, 2));
-  
+
   // Calculate statistics
   const totalSamples = Object.values(fixedSamples).reduce((sum, samples) => sum + samples.length, 0);
   const categories = Object.keys(fixedSamples);
-  
+
   console.log(`\n📊 Rebuild Results:`);
   console.log(`   🎵 Total samples: ${totalSamples}`);
   console.log(`   🏷️  Categories: ${categories.length}`);
   console.log(`   📁 Categories: ${categories.join(', ')}`);
   console.log(`✅ Rebuilt vcsl.json with ${categories.length} categories`);
-  
+
   return { categories: categories.length, samples: totalSamples };
 }
 
@@ -150,12 +148,12 @@ function rebuildVcslJson() {
  */
 function main() {
   const command = process.argv[2] || 'rebuild';
-  
+
   switch (command) {
     case 'rebuild':
       rebuildVcslJson();
       break;
-      
+
     case 'help':
     default:
       console.log('🔄 Rebuild VCSL JSON from Local Files\n');

@@ -33,7 +33,9 @@ function useCachedAvatar(remoteUrl: string | undefined) {
         setLocalUrl(cachedBlob);
         return;
       }
-    } catch { /* sessionStorage unavailable */ }
+    } catch {
+      /* sessionStorage unavailable */
+    }
 
     let cancelled = false;
 
@@ -56,7 +58,9 @@ function useCachedAvatar(remoteUrl: string | undefined) {
             }
           };
           reader.readAsDataURL(blob);
-        } catch { /* non-fatal */ }
+        } catch {
+          /* non-fatal */
+        }
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -69,7 +73,6 @@ function useCachedAvatar(remoteUrl: string | undefined) {
 
   return { avatarUrl: localUrl, avatarFailed: failed || !remoteUrl };
 }
-
 
 export function AuthButton({ className = '', showProfile = true }: AuthButtonProps) {
   const { user, signInWithGoogle, signOut, loading } = useAuth();
@@ -130,9 +133,8 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
       initials = `${firstName[0]}${lastName[0]}`.toUpperCase();
     } else if (displayName) {
       const parts = displayName.split(' ');
-      initials = parts.length >= 2
-        ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
-        : displayName[0].toUpperCase();
+      initials =
+        parts.length >= 2 ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase() : displayName[0].toUpperCase();
     }
 
     return { displayName, email, avatarUrl, initials };
@@ -171,15 +173,25 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
           <div className="w-4 h-4 border-2 border-lineHighlight border-t-blue-400 rounded-full animate-spin" />
         ) : (
           <svg className="w-4 h-4" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+            <path
+              fill="#4285F4"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+            />
           </svg>
         )}
-        <span className="font-medium">
-          {isSigningIn ? t('auth:signingIn') : 'Sign in'}
-        </span>
+        <span className="font-medium">{isSigningIn ? t('auth:signingIn') : 'Sign in'}</span>
       </button>
     );
   }
@@ -203,7 +215,9 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
 
   /* Avatar circle — reused in trigger and dropdown */
   const Avatar = ({ size = 'w-7 h-7' }: { size?: string }) => (
-    <div className={`${size} rounded-full overflow-hidden border border-lineHighlight bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0`}>
+    <div
+      className={`${size} rounded-full overflow-hidden border border-lineHighlight bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-semibold flex-shrink-0`}
+    >
       {cachedAvatar && !avatarFailed ? (
         <img src={cachedAvatar} alt="" className="w-full h-full object-cover" />
       ) : (
@@ -233,12 +247,8 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
             <div className="flex items-center gap-3">
               <Avatar size="w-10 h-10" />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-foreground truncate">
-                  {userInfo.displayName}
-                </div>
-                <div className="text-xs text-foreground opacity-70 truncate">
-                  {userInfo.email}
-                </div>
+                <div className="text-sm font-semibold text-foreground truncate">{userInfo.displayName}</div>
+                <div className="text-xs text-foreground opacity-70 truncate">{userInfo.email}</div>
               </div>
             </div>
           </div>
@@ -251,8 +261,18 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
                 onClick={() => setShowDropdown(false)}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
                 </svg>
                 Admin Dashboard
               </a>
@@ -263,7 +283,12 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
               className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-900 hover:bg-opacity-20 rounded-md transition-colors duration-200 flex items-center gap-2 cursor-pointer"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
               </svg>
               {t('auth:signOut')}
             </button>

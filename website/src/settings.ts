@@ -32,8 +32,7 @@ export interface UserPattern {
  * @returns Parsed boolean value
  */
 export const parseBoolean = (booleanlike: boolean | string | undefined): boolean =>
-    [true, 'true'].includes(booleanlike as boolean | string);
-
+  [true, 'true'].includes(booleanlike as boolean | string);
 
 export interface UserPatterns {
   [key: string]: UserPattern;
@@ -226,18 +225,19 @@ const instance = parseInt(search?.get('instance') ?? '0');
 const settings_key = `strudel-settings${instance > 0 ? instance : ''}`;
 
 // Create settingsMap conditionally to avoid SSR issues
-export const settingsMap = typeof window !== 'undefined'
-  ? persistentMap(settings_key, defaultSettings as any)
-  : {
-      get: () => defaultSettings,
-      set: () => {},
-      setKey: () => {},
-      subscribe: () => () => {},
-      // Add any other methods that might be called
-      listen: () => () => {},
-      off: () => {},
-      destroy: () => {}
-    } as any;
+export const settingsMap =
+  typeof window !== 'undefined'
+    ? persistentMap(settings_key, defaultSettings as any)
+    : ({
+        get: () => defaultSettings,
+        set: () => {},
+        setKey: () => {},
+        subscribe: () => () => {},
+        // Add any other methods that might be called
+        listen: () => () => {},
+        off: () => {},
+        destroy: () => {},
+      } as any);
 
 // One-time migration: add new IDE feature settings for existing users
 if (typeof window !== 'undefined') {
@@ -254,13 +254,30 @@ if (typeof window !== 'undefined') {
       // Add missing settings with defaults - ensure they're booleans not strings
       const updated = {
         ...currentSettings,
-        isAutoCompletionEnabled: currentSettings.isAutoCompletionEnabled === undefined ? true : parseBoolean(currentSettings.isAutoCompletionEnabled),
-        isTooltipEnabled: currentSettings.isTooltipEnabled === undefined ? true : parseBoolean(currentSettings.isTooltipEnabled),
-        isSignatureHelpEnabled: currentSettings.isSignatureHelpEnabled === undefined ? true : parseBoolean(currentSettings.isSignatureHelpEnabled),
-        isLinterEnabled: currentSettings.isLinterEnabled === undefined ? true : parseBoolean(currentSettings.isLinterEnabled),
-        isBracketMatchingEnabled: currentSettings.isBracketMatchingEnabled === undefined ? true : parseBoolean(currentSettings.isBracketMatchingEnabled),
-        isTabIndentationEnabled: currentSettings.isTabIndentationEnabled === undefined ? true : parseBoolean(currentSettings.isTabIndentationEnabled),
-        isMultiCursorEnabled: currentSettings.isMultiCursorEnabled === undefined ? true : parseBoolean(currentSettings.isMultiCursorEnabled),
+        isAutoCompletionEnabled:
+          currentSettings.isAutoCompletionEnabled === undefined
+            ? true
+            : parseBoolean(currentSettings.isAutoCompletionEnabled),
+        isTooltipEnabled:
+          currentSettings.isTooltipEnabled === undefined ? true : parseBoolean(currentSettings.isTooltipEnabled),
+        isSignatureHelpEnabled:
+          currentSettings.isSignatureHelpEnabled === undefined
+            ? true
+            : parseBoolean(currentSettings.isSignatureHelpEnabled),
+        isLinterEnabled:
+          currentSettings.isLinterEnabled === undefined ? true : parseBoolean(currentSettings.isLinterEnabled),
+        isBracketMatchingEnabled:
+          currentSettings.isBracketMatchingEnabled === undefined
+            ? true
+            : parseBoolean(currentSettings.isBracketMatchingEnabled),
+        isTabIndentationEnabled:
+          currentSettings.isTabIndentationEnabled === undefined
+            ? true
+            : parseBoolean(currentSettings.isTabIndentationEnabled),
+        isMultiCursorEnabled:
+          currentSettings.isMultiCursorEnabled === undefined
+            ? true
+            : parseBoolean(currentSettings.isMultiCursorEnabled),
       };
 
       settingsMap.set(updated);
@@ -276,17 +293,27 @@ if (typeof window !== 'undefined') {
       const currentSettings = settingsMap.get();
       const updated = {
         ...currentSettings,
-        isPrettierEnabled: currentSettings.isPrettierEnabled === undefined ? false : parseBoolean(currentSettings.isPrettierEnabled),
-        prettierAutoFormatOnSave: currentSettings.prettierAutoFormatOnSave === undefined ? false : parseBoolean(currentSettings.prettierAutoFormatOnSave),
+        isPrettierEnabled:
+          currentSettings.isPrettierEnabled === undefined ? false : parseBoolean(currentSettings.isPrettierEnabled),
+        prettierAutoFormatOnSave:
+          currentSettings.prettierAutoFormatOnSave === undefined
+            ? false
+            : parseBoolean(currentSettings.prettierAutoFormatOnSave),
         prettierTabWidth: currentSettings.prettierTabWidth === undefined ? 2 : Number(currentSettings.prettierTabWidth),
-        prettierUseTabs: currentSettings.prettierUseTabs === undefined ? false : parseBoolean(currentSettings.prettierUseTabs),
+        prettierUseTabs:
+          currentSettings.prettierUseTabs === undefined ? false : parseBoolean(currentSettings.prettierUseTabs),
         prettierSemi: currentSettings.prettierSemi === undefined ? true : parseBoolean(currentSettings.prettierSemi),
-        prettierSingleQuote: currentSettings.prettierSingleQuote === undefined ? false : parseBoolean(currentSettings.prettierSingleQuote),
+        prettierSingleQuote:
+          currentSettings.prettierSingleQuote === undefined ? false : parseBoolean(currentSettings.prettierSingleQuote),
         prettierQuoteProps: currentSettings.prettierQuoteProps || 'as-needed',
         prettierTrailingComma: currentSettings.prettierTrailingComma || 'es5',
-        prettierBracketSpacing: currentSettings.prettierBracketSpacing === undefined ? true : parseBoolean(currentSettings.prettierBracketSpacing),
+        prettierBracketSpacing:
+          currentSettings.prettierBracketSpacing === undefined
+            ? true
+            : parseBoolean(currentSettings.prettierBracketSpacing),
         prettierArrowParens: currentSettings.prettierArrowParens || 'always',
-        prettierPrintWidth: currentSettings.prettierPrintWidth === undefined ? 80 : Number(currentSettings.prettierPrintWidth),
+        prettierPrintWidth:
+          currentSettings.prettierPrintWidth === undefined ? 80 : Number(currentSettings.prettierPrintWidth),
       };
 
       settingsMap.set(updated);
@@ -303,7 +330,7 @@ if (typeof window !== 'undefined') {
   const syncLanguageFromI18n = () => {
     const i18nLanguage = localStorage.getItem('strudel-language');
     const currentSettings = settingsMap.get();
-    
+
     if (i18nLanguage && i18nLanguage !== currentSettings.language) {
       console.log('[settings] syncing language from i18next:', i18nLanguage);
       settingsMap.setKey('language', i18nLanguage);
@@ -330,13 +357,12 @@ if (typeof window !== 'undefined') {
     if (settings.language && settings.language !== i18nLanguage) {
       console.log('[settings] syncing language to i18next:', settings.language);
       localStorage.setItem('strudel-language', settings.language);
-      
+
       // Also update i18next
       i18n.changeLanguage(settings.language);
     }
   });
 }
-
 
 /**
  * Custom hook to get processed settings with proper types

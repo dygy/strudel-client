@@ -62,10 +62,10 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
     if (ssrData && !tracks.isInitialized) {
       console.log('🔥 ReplEditor: Initializing tracks store with SSR data and coordination');
 
-      const hierarchicalData = (ssrData as any).hierarchical 
-        ? { 
-            ...ssrData, 
-            children: (ssrData as any).hierarchical.children 
+      const hierarchicalData = (ssrData as any).hierarchical
+        ? {
+            ...ssrData,
+            children: (ssrData as any).hierarchical.children,
           }
         : ssrData;
 
@@ -82,8 +82,8 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
                   detail: {
                     trackId: selectedTrack.id,
                     folderPath: selectedTrack.folder,
-                    trackName: selectedTrack.name
-                  }
+                    trackName: selectedTrack.name,
+                  },
                 });
                 window.dispatchEvent(expandEvent);
               }, 100);
@@ -93,7 +93,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
           // Set code immediately
           if (selectedTrack.code) {
             setPendingCode(selectedTrack.code);
-            
+
             if (context.editorRef?.current?.setCode) {
               context.editorRef.current.setCode(selectedTrack.code);
             }
@@ -137,7 +137,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
       console.log('🔥 ReplEditor: Tracks imported, refreshing store');
       if (fileManagerHook?.isAuthenticated) {
         await tracks.loadFromAPI();
-        
+
         // After loading, auto-select the first track if none is selected
         setTimeout(() => {
           const tracksArray = Object.values(fileManagerHook.tracks || {});
@@ -222,7 +222,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
           undefined, // folder
           false, // isMultitrack
           undefined, // steps
-          undefined // activeStep
+          undefined, // activeStep
         );
 
         if (newTrack) {
@@ -286,7 +286,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
   // Use refs to prevent unnecessary re-registrations
   const fileManagerRef = useRef(fileManagerHook);
   const contextRef = useRef(context);
-  
+
   useEffect(() => {
     fileManagerRef.current = fileManagerHook;
     contextRef.current = context;
@@ -309,7 +309,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
     const handleSmoothNavigation = (event: CustomEvent) => {
       const { track, url } = event.detail;
       console.log('ReplEditor: Smooth navigation to track:', track.name, 'URL:', url);
-      
+
       // Note: Track is already loaded by handleTrackSelect, no need to load again
       // Just update the document title
       if (!document.title.includes(track.name)) {
@@ -323,27 +323,27 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
     // Handle browser back/forward buttons with smooth navigation
     const handlePopState = () => {
       console.log('ReplEditor: Browser navigation detected, URL:', window.location.pathname);
-      
+
       // Parse the current URL to find the track
       const currentPath = window.location.pathname;
-      
+
       if (currentPath === '/repl') {
         // Navigated to main repl page
         console.log('ReplEditor: Navigated to main repl page');
         document.title = 'Strudel REPL';
-        
+
         // Clear selection if needed
         if (fileManagerHook && typeof fileManagerHook === 'object' && fileManagerHook.setSelectedTrack) {
           fileManagerHook.setSelectedTrack(null);
         }
-        
+
         return;
       }
-      
+
       // Try to find the track from the URL path
       if (fileManagerHook && typeof fileManagerHook === 'object' && fileManagerHook.tracks) {
         const tracks = Object.values(fileManagerHook.tracks);
-        
+
         // Parse the URL path to extract folder and track info
         const pathMatch = currentPath.match(/^\/repl\/(.+)$/);
         if (pathMatch) {
@@ -351,14 +351,19 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
           const segments = fullPath.split('/');
           const trackSlug = segments.pop();
           const folderPath = segments.length > 0 ? segments.join('/') : null;
-          
+
           // Find the track by folder and slug
           const track = tracks.find((t: any) => {
-            const trackMatches = t.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') === trackSlug;
+            const trackMatches =
+              t.name
+                .toLowerCase()
+                .trim()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '') === trackSlug;
             const folderMatches = (t.folder || null) === folderPath;
             return trackMatches && folderMatches;
           });
-          
+
           if (track) {
             console.log('ReplEditor: Found track for browser navigation:', (track as any).name);
             fileManagerHook.loadTrack(track);
@@ -367,7 +372,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
           }
         }
       }
-      
+
       // If we can't find the track, stay on current page
       console.log('ReplEditor: Could not find track for URL, staying on current page');
     };
@@ -392,7 +397,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
     <div className="h-full flex flex-col relative" {...editorProps}>
       <Loader active={pending} />
       <Header context={context} />
-      
+
       <div className="grow flex relative overflow-hidden">
         {!isZen && (
           <div
@@ -408,10 +413,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
           </div>
         )}
         {shouldShowWelcome ? (
-          <WelcomeScreen
-            onCreateTrack={handleCreateTrack}
-            onImportTracks={handleImportTracks}
-          />
+          <WelcomeScreen onCreateTrack={handleCreateTrack} onImportTracks={handleImportTracks} />
         ) : (
           <div className="flex-1 relative transition-all duration-200 flex flex-col overflow-hidden">
             <Code key={codeComponentKey} containerRef={containerRef} editorRef={editorRef} init={init} />

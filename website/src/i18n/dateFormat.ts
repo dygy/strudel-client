@@ -5,10 +5,10 @@ export function formatDateTime(date: Date, locale: string = 'en'): string {
   const year = date.getFullYear();
   const hours = date.getHours().toString().padStart(2, '0');
   const minutes = date.getMinutes().toString().padStart(2, '0');
-  
+
   // Get month name in the current locale
   const monthName = date.toLocaleDateString(locale, { month: 'long' });
-  
+
   return `${day} ${monthName} ${year} ${hours}:${minutes}`;
 }
 
@@ -22,7 +22,7 @@ export function formatDateTimeIntl(date: Date, locale: string = 'en'): string {
     minute: '2-digit',
     hour12: false, // Use 24-hour format
   });
-  
+
   return formatter.format(date);
 }
 

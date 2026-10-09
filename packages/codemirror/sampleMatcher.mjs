@@ -6,7 +6,7 @@ This program is free software: you can redistribute it and/or modify it under th
 
 /**
  * Case-insensitive sample matcher with intelligent scoring
- * 
+ *
  * Performs efficient case-insensitive matching of sample names with substring support.
  * Results are ranked by match quality: exact matches first, then prefix matches, then substring matches.
  */
@@ -21,10 +21,10 @@ export class CaseInsensitiveSampleMatcher {
   match(samples, fragment, maxResults = 100) {
     if (!fragment) {
       // No fragment - return all samples up to max
-      return samples.slice(0, maxResults).map(name => ({
+      return samples.slice(0, maxResults).map((name) => ({
         name,
         score: 0,
-        matchType: 'all'
+        matchType: 'all',
       }));
     }
 
@@ -33,16 +33,16 @@ export class CaseInsensitiveSampleMatcher {
 
     for (const sample of samples) {
       const sampleLower = sample.toLowerCase();
-      
+
       // Check if fragment appears in sample (case-insensitive)
       if (sampleLower.includes(fragmentLower)) {
         const score = this.calculateScore(sample, fragment, sampleLower, fragmentLower);
         const matchType = this._getMatchType(sampleLower, fragmentLower);
-        
+
         results.push({
           name: sample, // Preserve original capitalization
           score,
-          matchType
+          matchType,
         });
 
         // Early termination for performance

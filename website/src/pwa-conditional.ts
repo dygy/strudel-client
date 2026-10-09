@@ -6,19 +6,21 @@ const PWA_DISABLED_MODES = ['static', 'cloudflare'];
 if (!PWA_DISABLED_MODES.includes(import.meta.env.MODE)) {
   try {
     // @ts-ignore
-    import('virtual:pwa-register').then(({ registerSW }) => {
-      registerSW({
-        immediate: true,
-        onRegisteredSW(swScriptUrl) {
-          // console.log('SW registered: ', swScriptUrl)
-        },
-        onOfflineReady() {
-          // console.log('PWA application ready to work offline')
-        },
+    import('virtual:pwa-register')
+      .then(({ registerSW }) => {
+        registerSW({
+          immediate: true,
+          onRegisteredSW(swScriptUrl) {
+            // console.log('SW registered: ', swScriptUrl)
+          },
+          onOfflineReady() {
+            // console.log('PWA application ready to work offline')
+          },
+        });
+      })
+      .catch(() => {
+        // PWA not available, silently ignore
       });
-    }).catch(() => {
-      // PWA not available, silently ignore
-    });
   } catch {
     // PWA not available, silently ignore
   }

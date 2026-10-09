@@ -13,12 +13,12 @@ export function AudioEngineTargetSelector({ target, onChange, isDisabled }: Audi
   const onTargetChange = (target: string) => {
     onChange(target);
   };
-  
+
   const options = new Map([
     [audioEngineTargets.webaudio, audioEngineTargets.webaudio],
     [audioEngineTargets.osc, audioEngineTargets.osc],
   ]);
-  
+
   return (
     <div className=" flex flex-col gap-1">
       <SelectInput isDisabled={!!isDisabled} options={options} value={target} onChange={onTargetChange} />

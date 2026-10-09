@@ -66,7 +66,6 @@ export function initializeAuthListener() {
         console.log('Unhandled auth event:', event);
     }
   });
-
 }
 
 /**

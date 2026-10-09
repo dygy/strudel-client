@@ -10,16 +10,19 @@ export interface DatabaseInitResult {
 export async function initializeDatabase(): Promise<DatabaseInitResult> {
   try {
     console.log('🔍 Checking database initialization...');
-    
+
     // Check if user is authenticated
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
     if (userError || !user) {
       return {
         success: false,
         tablesExist: false,
         error: 'User not authenticated',
-        needsManualSetup: false
+        needsManualSetup: false,
       };
     }
 
@@ -27,16 +30,13 @@ export async function initializeDatabase(): Promise<DatabaseInitResult> {
     const tableChecks = [
       { name: 'profiles', exists: false },
       { name: 'tracks', exists: false },
-      { name: 'folders', exists: false }
+      { name: 'folders', exists: false },
     ];
 
     for (const table of tableChecks) {
       try {
-        const { error } = await supabase
-          .from(table.name)
-          .select('id')
-          .limit(1);
-        
+        const { error } = await supabase.from(table.name).select('id').limit(1);
+
         if (!error) {
           table.exists = true;
         } else if (error.code === '42501') {
@@ -52,13 +52,13 @@ export async function initializeDatabase(): Promise<DatabaseInitResult> {
       }
     }
 
-    const allTablesExist = tableChecks.every(table => table.exists);
-    const existingTables = tableChecks.filter(table => table.exists).map(table => table.name);
-    
+    const allTablesExist = tableChecks.every((table) => table.exists);
+    const existingTables = tableChecks.filter((table) => table.exists).map((table) => table.name);
+
     console.log('📊 Database status:', {
       allTablesExist,
       existingTables,
-      missingTables: tableChecks.filter(table => !table.exists).map(table => table.name)
+      missingTables: tableChecks.filter((table) => !table.exists).map((table) => table.name),
     });
 
     if (allTablesExist) {
@@ -66,7 +66,7 @@ export async function initializeDatabase(): Promise<DatabaseInitResult> {
       return {
         success: true,
         tablesExist: true,
-        needsManualSetup: false
+        needsManualSetup: false,
       };
     } else {
       console.log('❌ Database needs manual setup');
@@ -74,17 +74,16 @@ export async function initializeDatabase(): Promise<DatabaseInitResult> {
         success: false,
         tablesExist: false,
         error: 'Database tables not found',
-        needsManualSetup: true
+        needsManualSetup: true,
       };
     }
-
   } catch (error) {
     console.error('❌ Database initialization check failed:', error);
     return {
       success: false,
       tablesExist: false,
       error: error instanceof Error ? error.message : 'Unknown error',
-      needsManualSetup: true
+      needsManualSetup: true,
     };
   }
 }

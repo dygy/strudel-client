@@ -33,9 +33,9 @@ export class NavigationStateManager {
   setState(updates: Partial<NavigationState>): void {
     const previousState = { ...this.state };
     this.state = { ...this.state, ...updates };
-    
+
     // Notify listeners of state change
-    this.listeners.forEach(listener => {
+    this.listeners.forEach((listener) => {
       try {
         listener(this.getState());
       } catch (error) {
@@ -49,7 +49,7 @@ export class NavigationStateManager {
    */
   subscribe(listener: (state: NavigationState) => void): () => void {
     this.listeners.push(listener);
-    
+
     // Return unsubscribe function
     return () => {
       const index = this.listeners.indexOf(listener);

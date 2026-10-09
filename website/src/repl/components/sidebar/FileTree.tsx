@@ -17,13 +17,17 @@ import { BurgerMenuButton } from '../ui/BurgerMenuButton';
 import { tooltipActions } from '@src/stores/tooltipStore';
 
 interface ContextMenuItem {
-  label: string
-  icon?: JSX.Element
-  onClick: () => void
-  separator?: false
+  label: string;
+  icon?: JSX.Element;
+  onClick: () => void;
+  separator?: false;
 }
 
-interface Separator  { separator: true, label: string, onClick: () => void }
+interface Separator {
+  separator: true;
+  label: string;
+  onClick: () => void;
+}
 
 interface Track {
   id: string;
@@ -159,7 +163,7 @@ export function FileTree({
     };
 
     window.addEventListener('strudel-expand-folder', handleExpandFolder as EventListener);
-    
+
     return () => {
       window.removeEventListener('strudel-expand-folder', handleExpandFolder as EventListener);
     };
@@ -171,7 +175,7 @@ export function FileTree({
 
     // Find folder by path and get its UUID chain
     const findFolderByPath = (path: string) => {
-      return Object.values(folders).find(f => f.path === path);
+      return Object.values(folders).find((f) => f.path === path);
     };
 
     const folder = findFolderByPath(folderPath);
@@ -191,9 +195,9 @@ export function FileTree({
     pathsToExpand.add('root');
 
     // Update expanded folders state
-    setExpandedFolders(prev => {
+    setExpandedFolders((prev) => {
       const newSet = new Set(prev);
-      pathsToExpand.forEach(id => newSet.add(id));
+      pathsToExpand.forEach((id) => newSet.add(id));
       return newSet;
     });
   };
@@ -204,7 +208,7 @@ export function FileTree({
     const folderNodesById: Record<string, TreeNode> = {};
 
     // Step 1: Create all folder nodes and index them by UUID only
-    Object.values(folders).forEach(folder => {
+    Object.values(folders).forEach((folder) => {
       // CRITICAL: Validate folder data to prevent corruption
       let folderPath: string;
       if (typeof folder.path === 'string' && folder.path.trim()) {
@@ -219,7 +223,7 @@ export function FileTree({
           corruptedPath: folder.path,
           pathType: typeof folder.path,
           corruptedName: folder.name,
-          nameType: typeof folder.name
+          nameType: typeof folder.name,
         });
       }
 
@@ -231,7 +235,7 @@ export function FileTree({
         children: [],
         data: {
           ...folder,
-          path: folderPath // Ensure the data object has clean path
+          path: folderPath, // Ensure the data object has clean path
         },
       };
 
@@ -239,7 +243,7 @@ export function FileTree({
     });
 
     // Step 2: Build folder hierarchy using UUIDs for parent-child relationships
-    Object.values(folders).forEach(folder => {
+    Object.values(folders).forEach((folder) => {
       const node = folderNodesById[folder.id];
 
       if (folder.parent) {
@@ -248,12 +252,14 @@ export function FileTree({
 
         if (!parentNode) {
           // Fallback: try to find parent by path (for backward compatibility)
-          parentNode = Object.values(folderNodesById).find(f => f.path === folder.parent);
+          parentNode = Object.values(folderNodesById).find((f) => f.path === folder.parent);
 
           if (parentNode) {
             // Found parent by path fallback
           } else {
-            console.warn(`FileTree - buildTree: Parent not found for folder "${folder.name}" (${folder.id}), parent reference: "${folder.parent}"`);
+            console.warn(
+              `FileTree - buildTree: Parent not found for folder "${folder.name}" (${folder.id}), parent reference: "${folder.parent}"`,
+            );
           }
         }
 
@@ -271,7 +277,7 @@ export function FileTree({
     });
 
     // Step 3: Add tracks to their folders using UUIDs first, then paths as fallback
-    Object.values(tracks).forEach(track => {
+    Object.values(tracks).forEach((track) => {
       const trackNode: TreeNode = {
         id: track.id,
         name: track.name,
@@ -285,7 +291,7 @@ export function FileTree({
       if (!targetFolder && track.folder) {
         // Fallback: find folder by path (for backward compatibility)
         // CRITICAL FIX: Find the most specific path match, prioritizing root-level folders
-        const candidateFolders = Object.values(folderNodesById).filter(f => f.path === track.folder);
+        const candidateFolders = Object.values(folderNodesById).filter((f) => f.path === track.folder);
 
         if (candidateFolders.length === 1) {
           // Only one match - use it
@@ -298,7 +304,11 @@ export function FileTree({
             return currentDepth < bestDepth ? current : best;
           });
 
-          console.warn(`FileTree - buildTree: Multiple folders found for path "${track.folder}", using root-level folder:`, targetFolder.id, targetFolder.path);
+          console.warn(
+            `FileTree - buildTree: Multiple folders found for path "${track.folder}", using root-level folder:`,
+            targetFolder.id,
+            targetFolder.path,
+          );
         }
       }
 
@@ -310,7 +320,9 @@ export function FileTree({
         tree.push(trackNode);
 
         if (track.folder) {
-          console.warn(`FileTree - buildTree: Folder not found for track "${track.name}", folder reference: "${track.folder}", placing in root`);
+          console.warn(
+            `FileTree - buildTree: Folder not found for track "${track.name}", folder reference: "${track.folder}", placing in root`,
+          );
         }
       }
     });
@@ -324,7 +336,7 @@ export function FileTree({
         return a.name.localeCompare(b.name);
       });
 
-      nodes.forEach(node => {
+      nodes.forEach((node) => {
         if (node.children && node.children.length > 0) {
           sortTree(node.children);
         }
@@ -336,7 +348,7 @@ export function FileTree({
   };
 
   const toggleFolder = (folderId: string) => {
-    setExpandedFolders(prev => {
+    setExpandedFolders((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(folderId)) {
         newSet.delete(folderId);
@@ -396,8 +408,9 @@ export function FileTree({
       const track = targetNode.data as Track;
       if (track.folder) {
         // Try to find the folder by path first, then by UUID
-        const targetFolder = Object.values(folders).find(f => f.path === track.folder) ||
-                             Object.values(folders).find(f => f.id === track.folder);
+        const targetFolder =
+          Object.values(folders).find((f) => f.path === track.folder) ||
+          Object.values(folders).find((f) => f.id === track.folder);
         targetId = targetFolder?.id || '';
         console.log('handleDrop: Dropping onto track', { trackFolder: track.folder, targetFolder, targetId });
       } else {
@@ -410,7 +423,7 @@ export function FileTree({
       draggedItemId: draggedItem.id,
       draggedItemType: draggedItem.type,
       targetId,
-      availableFolders: Object.keys(folders)
+      availableFolders: Object.keys(folders),
     });
 
     onMoveItem(draggedItem.id, draggedItem.type, targetId);
@@ -438,7 +451,7 @@ export function FileTree({
           label: t('files:duplicate'),
           icon: <DocumentIcon className="w-4 h-4" />,
           onClick: () => onTrackDuplicate?.(track),
-        }
+        },
       );
 
       // Add multitrack-specific options
@@ -449,7 +462,7 @@ export function FileTree({
             label: t('files:addStep'),
             icon: <PlusIcon className="w-4 h-4" />,
             onClick: () => onAddStep?.(track.id),
-          }
+          },
         );
       } else {
         baseItems.push(
@@ -458,7 +471,7 @@ export function FileTree({
             label: t('files:convertToMultitrack'),
             icon: <DocumentIcon className="w-4 h-4" />,
             onClick: () => onConvertToMultitrack?.(track),
-          }
+          },
         );
       }
     }
@@ -474,7 +487,7 @@ export function FileTree({
         label: t('files:info'),
         icon: <InformationCircleIcon className="w-4 h-4" />,
         onClick: () => onTrackInfo(track),
-      }
+      },
     );
 
     // Only add delete option if not in read-only mode
@@ -485,7 +498,7 @@ export function FileTree({
           label: t('files:delete'),
           icon: <TrashIcon className="w-4 h-4" />,
           onClick: () => onTrackDelete?.(track.id),
-        }
+        },
       );
     }
 
@@ -504,7 +517,7 @@ export function FileTree({
         folderId: folder.id,
         folderName: folder.name,
         corruptedPath: folder.path,
-        pathType: typeof folder.path
+        pathType: typeof folder.path,
       });
     } else {
       // Both path and name are corrupted - use folder ID as last resort
@@ -512,7 +525,7 @@ export function FileTree({
       console.error('FileTree - both folder.path and folder.name are corrupted, using folder.id:', {
         folderId: folder.id,
         corruptedPath: folder.path,
-        corruptedName: folder.name
+        corruptedName: folder.name,
       });
     }
 
@@ -531,7 +544,7 @@ export function FileTree({
           icon: <FolderIcon className="w-4 h-4" />,
           onClick: () => onFolderCreate?.(folderPath),
         },
-        { separator: true, label: '', onClick: () => {} }
+        { separator: true, label: '', onClick: () => {} },
       );
     }
 
@@ -553,7 +566,7 @@ export function FileTree({
           label: t('files:delete'),
           icon: <TrashIcon className="w-4 h-4" />,
           onClick: () => onFolderDelete?.(folderPath),
-        }
+        },
       );
     }
 
@@ -582,7 +595,7 @@ export function FileTree({
           label: t('files:delete'),
           icon: <TrashIcon className="w-4 h-4" />,
           onClick: () => onDeleteStep?.(trackId, stepIndex),
-        }
+        },
       );
     }
 
@@ -592,12 +605,16 @@ export function FileTree({
   const renderNode = (node: TreeNode, depth: number = 0): React.ReactNode => {
     const isExpanded = expandedFolders.has(node.id); // Use node ID for expansion state
     const hasChildren = node.children && node.children.length > 0;
-    const hasSteps = node.type === 'track' && (node.data as Track).isMultitrack && (node.data as Track).steps && (node.data as Track).steps!.length > 0;
+    const hasSteps =
+      node.type === 'track' &&
+      (node.data as Track).isMultitrack &&
+      (node.data as Track).steps &&
+      (node.data as Track).steps!.length > 0;
     const isSelected = node.type === 'track' && selectedTrack === node.id; // Opened for editing
     const isPlaying = node.type === 'track' && activePattern === node.id; // Currently playing
 
-    const isRenaming = (node.type === 'track' && renamingTrack === node.id) ||
-                      (node.type === 'folder' && renamingFolder === node.path);
+    const isRenaming =
+      (node.type === 'track' && renamingTrack === node.id) || (node.type === 'folder' && renamingFolder === node.path);
 
     // Create tooltip props manually for tracks without using hooks
     const getTooltipProps = () => {
@@ -611,11 +628,16 @@ export function FileTree({
           const rect = event.currentTarget.getBoundingClientRect();
           tooltipActions.show({
             id: `track-${track.id}`,
-            content: React.createElement('div', null,
+            content: React.createElement(
+              'div',
+              null,
               React.createElement('div', { className: 'font-medium' }, track.name),
-              track.modified && React.createElement('div', { className: 'text-xs opacity-75 mt-1' },
-                `Modified: ${new Date(track.modified).toLocaleDateString()}`
-              )
+              track.modified &&
+                React.createElement(
+                  'div',
+                  { className: 'text-xs opacity-75 mt-1' },
+                  `Modified: ${new Date(track.modified).toLocaleDateString()}`,
+                ),
             ),
             position: {
               x: rect.left + rect.width / 2,
@@ -634,16 +656,19 @@ export function FileTree({
     return (
       <div key={node.id}>
         <WorkingContextMenu
-          items={node.type === 'track'
-            ? getTrackContextItems(node.data as Track)
-            : getFolderContextItems(node.data as Folder)
+          items={
+            node.type === 'track'
+              ? getTrackContextItems(node.data as Track)
+              : getFolderContextItems(node.data as Folder)
           }
         >
           <div
             className={`group flex items-center py-1 px-2 cursor-pointer ${
-              isSelected ? 'bg-selection' : // Opened for editing (blue background)
-              isPlaying ? 'bg-green-600/30 border-l-2 border-green-500' : // Currently playing (green accent)
-              'hover:bg-gray-600' // Default hover
+              isSelected
+                ? 'bg-selection' // Opened for editing (blue background)
+                : isPlaying
+                  ? 'bg-green-600/30 border-l-2 border-green-500' // Currently playing (green accent)
+                  : 'hover:bg-gray-600' // Default hover
             } ${draggedItem?.id === node.id ? 'opacity-50' : ''} ${
               dragOverTarget === node.id ? 'bg-blue-600/30 border-2 border-blue-400 border-dashed' : ''
             }`}
@@ -657,7 +682,7 @@ export function FileTree({
             onClick={(e) => {
               // Don't handle click if it's a right-click (context menu)
               if (e.button === 2) return;
-              
+
               if (node.type === 'folder') {
                 toggleFolder(node.id); // Use node ID instead of path
               } else if (node.type === 'track' && !isRenaming) {
@@ -677,7 +702,7 @@ export function FileTree({
             {/* Expand/collapse icon for folders and multitrack */}
             {(node.type === 'folder' || (node.type === 'track' && hasSteps)) && (
               <div className="w-4 h-4 me-1 flex items-center justify-center ">
-                {(hasChildren || hasSteps) ? (
+                {hasChildren || hasSteps ? (
                   isExpanded ? (
                     <ChevronDownIcon className="w-3 h-3" />
                   ) : (
@@ -734,17 +759,16 @@ export function FileTree({
                   <div className="flex items-center space-x-2 flex-1 min-w-0">
                     <span className="text-sm truncate">{node.name}</span>
                     {node.type === 'track' && (node.data as Track).isMultitrack && (
-                      <span className="text-xs bg-purple-600 text-white px-1 rounded">
-                        M
-                      </span>
+                      <span className="text-xs bg-purple-600 text-white px-1 rounded">M</span>
                     )}
                   </div>
                   {/* Burger menu button */}
                   <div className="ml-2">
                     <BurgerMenuButton
-                      items={node.type === 'track'
-                        ? getTrackContextItems(node.data as Track)
-                        : getFolderContextItems(node.data as Folder)
+                      items={
+                        node.type === 'track'
+                          ? getTrackContextItems(node.data as Track)
+                          : getFolderContextItems(node.data as Folder)
                       }
                       size="sm"
                     />
@@ -762,10 +786,7 @@ export function FileTree({
               const isRenamingThisStep = renamingStep?.trackId === node.id && renamingStep?.stepIndex === stepIndex;
 
               return (
-                <WorkingContextMenu
-                  key={step.id}
-                  items={getStepContextItems(node.id, stepIndex, step)}
-                >
+                <WorkingContextMenu key={step.id} items={getStepContextItems(node.id, stepIndex, step)}>
                   <div
                     className={`group flex items-center py-1 px-2 hover:bg-gray-600 cursor-pointer ${
                       (node.data as Track).activeStep === stepIndex ? 'bg-purple-700/30' : ''
@@ -815,10 +836,7 @@ export function FileTree({
                             )}
                             {/* Burger menu button for steps */}
                             <div className="ml-1">
-                              <BurgerMenuButton
-                                items={getStepContextItems(node.id, stepIndex, step)}
-                                size="sm"
-                              />
+                              <BurgerMenuButton items={getStepContextItems(node.id, stepIndex, step)} size="sm" />
                             </div>
                           </div>
                         </div>
@@ -833,9 +851,7 @@ export function FileTree({
 
         {/* Render children */}
         {node.type === 'folder' && isExpanded && node.children && (
-          <div>
-            {node.children.map(child => renderNode(child, depth + 1))}
-          </div>
+          <div>{node.children.map((child) => renderNode(child, depth + 1))}</div>
         )}
       </div>
     );
@@ -843,7 +859,7 @@ export function FileTree({
 
   const tree = buildTree();
   const hasAnyData = Object.keys(tracks).length > 0 || Object.keys(folders).length > 0;
-  
+
   // Only show empty state message when NOT loading and tree is truly empty
   const showEmptyState = !isLoading && tree.length === 0 && !hasAnyData;
 
@@ -855,17 +871,13 @@ export function FileTree({
         ) : showEmptyState ? (
           <div className="p-4 text-center text-gray-400 text-sm h-full flex flex-col justify-center">
             {t('files:noTracksYet')}
-            <div className="mt-2 text-xs">
-              {t('files:rightClickToCreate')}
-            </div>
+            <div className="mt-2 text-xs">{t('files:rightClickToCreate')}</div>
           </div>
         ) : tree.length === 0 ? (
           <div className="h-full" />
         ) : (
           <div className="py-2 min-h-full flex flex-col">
-            <div>
-              {tree.map(node => renderNode(node))}
-            </div>
+            <div>{tree.map((node) => renderNode(node))}</div>
             {/* Flexible empty space for drag & drop that fills remaining height */}
             <div
               className={`flex-1 ${

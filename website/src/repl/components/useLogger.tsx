@@ -28,18 +28,18 @@ interface LogEvent {
 
 export const $strudel_log_history = atom<LogEntry[]>([]);
 
-  function useLoggerEvent(onTrigger: (event: LogEvent) => void) {
-    useEvent(logger.key, onTrigger as any);
-  }
+function useLoggerEvent(onTrigger: (event: LogEvent) => void) {
+  useEvent(logger.key, onTrigger as any);
+}
 
 function getUpdatedLog(log: LogEntry[], event: LogEvent): LogEntry[] {
   const { message, type, data } = event.detail;
   const lastLog = log.length ? log[log.length - 1] : undefined;
   const id = nanoid(12);
-  
+
   if (type === 'loaded-sample') {
-    const loadIndex = log.findIndex(({ data: logData, type: logType }) => 
-      logType === 'load-sample' && logData?.url === data?.url
+    const loadIndex = log.findIndex(
+      ({ data: logData, type: logType }) => logType === 'load-sample' && logData?.url === data?.url,
     );
     if (loadIndex !== -1) {
       log[loadIndex] = { message, type, id, data };
@@ -49,7 +49,7 @@ function getUpdatedLog(log: LogEntry[], event: LogEvent): LogEntry[] {
   } else {
     log = log.concat([{ message, type, id, data }]);
   }
-  
+
   return log.slice(-20);
 }
 

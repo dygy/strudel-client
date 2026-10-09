@@ -22,7 +22,7 @@ export function ConfirmModal({
   message,
   confirmText,
   cancelText,
-  variant = 'danger'
+  variant = 'danger',
 }: ConfirmModalProps) {
   const { t } = useTranslation('common');
 
@@ -47,9 +47,7 @@ export function ConfirmModal({
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
       <div className="flex items-start space-x-3">
         <div className="flex-shrink-0">
-          <ExclamationTriangleIcon
-            className={`w-6 h-6 ${iconStyles[variant]}`}
-          />
+          <ExclamationTriangleIcon className={`w-6 h-6 ${iconStyles[variant]}`} />
         </div>
         <div className="flex-1">
           <div className="text-foreground dark:text-foreground/90 leading-relaxed">{message}</div>

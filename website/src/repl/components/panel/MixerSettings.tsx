@@ -16,7 +16,7 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
   const [devices, setDevices] = useState<Map<string, string>>(new Map());
   const [previewDeviceId, setPreviewDeviceId] = useState<string>('');
   const [devicesLoaded, setDevicesLoaded] = useState(false);
-  
+
   // Smooth transition settings
   const [smoothTransitionsEnabled, setSmoothTransitionsEnabled] = useState(false);
   const [transitionDuration, setTransitionDuration] = useState(2.0);
@@ -42,7 +42,11 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
         if (!ids.has(previewDeviceId)) {
           console.log('[MixerSettings] Preview device removed, resetting to default');
           setPreviewDeviceId('');
-          try { localStorage.removeItem(PREVIEW_DEVICE_KEY); } catch (e) { /* ok */ }
+          try {
+            localStorage.removeItem(PREVIEW_DEVICE_KEY);
+          } catch (e) {
+            /* ok */
+          }
           mixer?.setDevice?.('').catch(() => {});
         }
       }
@@ -68,7 +72,9 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
     try {
       const stored = localStorage.getItem(PREVIEW_DEVICE_KEY);
       if (stored) setPreviewDeviceId(stored);
-    } catch (e) { /* ok */ }
+    } catch (e) {
+      /* ok */
+    }
   }, []);
 
   const handleDropdownClick = () => {
@@ -83,7 +89,9 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
       } else {
         localStorage.removeItem(PREVIEW_DEVICE_KEY);
       }
-    } catch (e) { /* ok */ }
+    } catch (e) {
+      /* ok */
+    }
 
     if (mixer?.setDevice) {
       try {
@@ -113,7 +121,12 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
       <div className="p-4 bg-lineHighlight rounded-lg">
         <div className="flex items-center gap-2 text-foreground opacity-70">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
           </svg>
           <span className="text-sm">{t('mixerNotAvailable')}</span>
         </div>
@@ -143,9 +156,7 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
         <div className="p-4 bg-background border border-lineHighlight rounded-lg space-y-4">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-foreground">
-                {t('smoothTransitions')}
-              </label>
+              <label className="text-sm font-medium text-foreground">{t('smoothTransitions')}</label>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
@@ -157,20 +168,14 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
                 <div className="w-11 h-6 bg-lineHighlight peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-foreground rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-foreground peer-checked:after:bg-background peer-checked:after:border-background"></div>
               </label>
             </div>
-            <p className="text-xs text-foreground opacity-70">
-              {t('smoothTransitionsDescription')}
-            </p>
+            <p className="text-xs text-foreground opacity-70">{t('smoothTransitionsDescription')}</p>
           </div>
 
           {smoothTransitionsEnabled && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-foreground">
-                  {t('transitionDuration')}
-                </label>
-                <span className="text-sm text-foreground opacity-70">
-                  {transitionDuration.toFixed(1)}s
-                </span>
+                <label className="text-sm font-medium text-foreground">{t('transitionDuration')}</label>
+                <span className="text-sm text-foreground opacity-70">{transitionDuration.toFixed(1)}s</span>
               </div>
               <input
                 type="range"
@@ -192,9 +197,7 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
       )}
 
       <div>
-        <label className="block text-sm font-medium text-foreground mb-2">
-          {t('mixerPreviewDevice')}
-        </label>
+        <label className="block text-sm font-medium text-foreground mb-2">{t('mixerPreviewDevice')}</label>
         <select
           className="w-full px-4 py-3 bg-background border border-lineHighlight rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-foreground focus:border-transparent transition-all duration-200 appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           value={previewDeviceId}

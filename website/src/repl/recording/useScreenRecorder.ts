@@ -116,9 +116,7 @@ export function useScreenRecorder(isAudioRecording: boolean): UseScreenRecorderR
           handleRecordingStopped(blob);
         })
         .catch((err) => {
-          setScreenRecordingError(
-            `Failed to stop recording: ${err instanceof Error ? err.message : String(err)}`,
-          );
+          setScreenRecordingError(`Failed to stop recording: ${err instanceof Error ? err.message : String(err)}`);
         });
     }
   }, [getOrCreateEngine, isAudioRecording, handleRecordingStopped]);

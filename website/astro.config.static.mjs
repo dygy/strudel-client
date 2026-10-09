@@ -70,7 +70,7 @@ export default defineConfig({
   vite: {
     plugins: [bundleAudioWorkletPlugin()],
     define: {
-      'import.meta.env.MODE': JSON.stringify('static')
+      'import.meta.env.MODE': JSON.stringify('static'),
     },
     build: {
       // Keep the static build lean
@@ -95,9 +95,9 @@ export default defineConfig({
             if (id.includes('@strudel/')) {
               return 'strudel';
             }
-          }
-        }
-      }
+          },
+        },
+      },
     },
   },
 });

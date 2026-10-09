@@ -50,7 +50,7 @@ function validateSyntax(code) {
     // Try to parse with Babel parser (supports both JS and TS)
     prettier.format(code, {
       parser: 'babel',
-      plugins: [parserBabel, parserTypeScript]
+      plugins: [parserBabel, parserTypeScript],
     });
     return true;
   } catch (error) {
@@ -58,7 +58,7 @@ function validateSyntax(code) {
     try {
       prettier.format(code, {
         parser: 'typescript',
-        plugins: [parserTypeScript]
+        plugins: [parserTypeScript],
       });
       return true;
     } catch (tsError) {
@@ -73,57 +73,57 @@ function validateSyntax(code) {
 function isStrudelCode(code) {
   // Check for common Strudel patterns
   const strudelPatterns = [
-    /\$:/,                           // Strudel pattern syntax
-    /\.s\(/,                         // .s() method
-    /\.sound\(/,                     // .sound() method
-    /\.note\(/,                      // .note() method
-    /\.scale\(/,                     // .scale() method
-    /\.euclidRot\(/,                 // .euclidRot() method
-    /\._pianoroll\(/,                // ._pianoroll() method
-    /setcps\(/,                      // setcps() function
-    /samples\(/,                     // samples() function
-    /initHydra\(/,                   // initHydra() function
-    /\.gain\(/,                      // .gain() method
-    /\.lpf\(/,                       // .lpf() method
-    /\.room\(/,                      // .room() method
-    /\.slow\(/,                      // .slow() method
-    /\.fast\(/,                      // .fast() method
-    /\.rev\(/,                       // .rev() method
-    /\.sometimes\(/,                 // .sometimes() method
-    /\.every\(/,                     // .every() method
-    /\.bank\(/,                      // .bank() method
-    /\.crush\(/,                     // .crush() method
-    /\.distort\(/,                   // .distort() method
-    /\.delay\(/,                     // .delay() method
-    /\.sustain\(/,                   // .sustain() method
-    /\.legato\(/,                    // .legato() method
-    /\.clip\(/,                      // .clip() method
-    /\.pan\(/,                       // .pan() method
-    /\.speed\(/,                     // .speed() method
-    /\.decay\(/,                     // .decay() method
-    /\.add\(/,                       // .add() method
-    /\.color\(/,                     // .color() method (Hydra)
-    /\.rotate\(/,                    // .rotate() method (Hydra)
-    /\.kaleid\(/,                    // .kaleid() method (Hydra)
-    /\.modulate\(/,                  // .modulate() method (Hydra)
-    /\.brightness\(/,                // .brightness() method (Hydra)
-    /\.blend\(/,                     // .blend() method (Hydra)
-    /\.out\(/,                       // .out() method (Hydra)
-    /shape\(/,                       // shape() function (Hydra)
-    /osc\(/,                         // osc() function (Hydra)
-    /src\(/,                         // src() function (Hydra)
-    /sine\.range\(/,                 // sine.range() (Strudel)
-    /perlin\.range\(/,               // perlin.range() (Strudel)
-    /<[^>]*>/,                       // Mini notation patterns like <0 1 2>
-    /\[[^\]]*\]/,                    // Array-like patterns [c5 e5 g5]
-    /@\d+/,                          // Duration patterns like @3
-    /!\d+/,                          // Repeat patterns like !4
-    /~+/,                            // Rest patterns
-    /gm_\w+/,                        // General MIDI sounds
-    /RolandTR\d+/,                   // Roland drum machine sounds
+    /\$:/, // Strudel pattern syntax
+    /\.s\(/, // .s() method
+    /\.sound\(/, // .sound() method
+    /\.note\(/, // .note() method
+    /\.scale\(/, // .scale() method
+    /\.euclidRot\(/, // .euclidRot() method
+    /\._pianoroll\(/, // ._pianoroll() method
+    /setcps\(/, // setcps() function
+    /samples\(/, // samples() function
+    /initHydra\(/, // initHydra() function
+    /\.gain\(/, // .gain() method
+    /\.lpf\(/, // .lpf() method
+    /\.room\(/, // .room() method
+    /\.slow\(/, // .slow() method
+    /\.fast\(/, // .fast() method
+    /\.rev\(/, // .rev() method
+    /\.sometimes\(/, // .sometimes() method
+    /\.every\(/, // .every() method
+    /\.bank\(/, // .bank() method
+    /\.crush\(/, // .crush() method
+    /\.distort\(/, // .distort() method
+    /\.delay\(/, // .delay() method
+    /\.sustain\(/, // .sustain() method
+    /\.legato\(/, // .legato() method
+    /\.clip\(/, // .clip() method
+    /\.pan\(/, // .pan() method
+    /\.speed\(/, // .speed() method
+    /\.decay\(/, // .decay() method
+    /\.add\(/, // .add() method
+    /\.color\(/, // .color() method (Hydra)
+    /\.rotate\(/, // .rotate() method (Hydra)
+    /\.kaleid\(/, // .kaleid() method (Hydra)
+    /\.modulate\(/, // .modulate() method (Hydra)
+    /\.brightness\(/, // .brightness() method (Hydra)
+    /\.blend\(/, // .blend() method (Hydra)
+    /\.out\(/, // .out() method (Hydra)
+    /shape\(/, // shape() function (Hydra)
+    /osc\(/, // osc() function (Hydra)
+    /src\(/, // src() function (Hydra)
+    /sine\.range\(/, // sine.range() (Strudel)
+    /perlin\.range\(/, // perlin.range() (Strudel)
+    /<[^>]*>/, // Mini notation patterns like <0 1 2>
+    /\[[^\]]*\]/, // Array-like patterns [c5 e5 g5]
+    /@\d+/, // Duration patterns like @3
+    /!\d+/, // Repeat patterns like !4
+    /~+/, // Rest patterns
+    /gm_\w+/, // General MIDI sounds
+    /RolandTR\d+/, // Roland drum machine sounds
   ];
 
-  return strudelPatterns.some(pattern => pattern.test(code));
+  return strudelPatterns.some((pattern) => pattern.test(code));
 }
 
 /**
@@ -215,15 +215,15 @@ function formatStrudelCode(code, options) {
 
     // Apply formatting to non-string parts only
     tempLine = tempLine
-      .replace(/([^=!<>+\-*/])=([^=>])/g, '$1 = $2')  // Add spaces around = (but not ==, !=, =>, +=, -=, *=, /=)
-      .replace(/([0-9])\s*([+\-*/])\s*([0-9])/g, '$1 $2 $3')  // Add spaces around math operators between numbers only
-      .replace(/,([^\s])/g, ', $1')              // Add space after commas
-      .replace(/\s+/g, ' ')                      // Normalize multiple spaces to single
-      .replace(/\s*;\s*/g, ';')                  // Normalize semicolons
-      .replace(/\(\s+/g, '(')                    // Remove space after opening parentheses
-      .replace(/\s+\)/g, ')')                    // Remove space before closing parentheses
-      .replace(/\{\s+/g, '{ ')                   // Normalize space after opening braces
-      .replace(/\s+\}/g, ' }');                  // Normalize space before closing braces
+      .replace(/([^=!<>+\-*/])=([^=>])/g, '$1 = $2') // Add spaces around = (but not ==, !=, =>, +=, -=, *=, /=)
+      .replace(/([0-9])\s*([+\-*/])\s*([0-9])/g, '$1 $2 $3') // Add spaces around math operators between numbers only
+      .replace(/,([^\s])/g, ', $1') // Add space after commas
+      .replace(/\s+/g, ' ') // Normalize multiple spaces to single
+      .replace(/\s*;\s*/g, ';') // Normalize semicolons
+      .replace(/\(\s+/g, '(') // Remove space after opening parentheses
+      .replace(/\s+\)/g, ')') // Remove space before closing parentheses
+      .replace(/\{\s+/g, '{ ') // Normalize space after opening braces
+      .replace(/\s+\}/g, ' }'); // Normalize space before closing braces
 
     // Restore strings (this preserves original content including URLs)
     for (let i = 0; i < stringParts.length; i++) {
@@ -275,7 +275,7 @@ async function formatCode(code, options) {
       const formattedCode = formatStrudelCode(code, options);
       return {
         success: true,
-        formattedCode: formattedCode
+        formattedCode: formattedCode,
       };
     }
 
@@ -283,7 +283,7 @@ async function formatCode(code, options) {
     if (!validateSyntax(code)) {
       return {
         success: false,
-        error: 'Invalid JavaScript/TypeScript syntax'
+        error: 'Invalid JavaScript/TypeScript syntax',
       };
     }
 
@@ -295,12 +295,12 @@ async function formatCode(code, options) {
 
     return {
       success: true,
-      formattedCode: formattedCode
+      formattedCode: formattedCode,
     };
   } catch (error) {
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
@@ -319,7 +319,7 @@ async function formatSelection(code, start, end, options) {
       const formattedCode = formatStrudelCode(code, options);
       return {
         success: true,
-        formattedCode: formattedCode
+        formattedCode: formattedCode,
       };
     }
 
@@ -338,18 +338,18 @@ async function formatSelection(code, start, end, options) {
     return {
       success: true,
       formattedCode: fullFormattedCode,
-      cursorOffset: start + formatResult.formattedCode.length
+      cursorOffset: start + formatResult.formattedCode.length,
     };
   } catch (error) {
     return {
       success: false,
-      error: error.message
+      error: error.message,
     };
   }
 }
 
 // Handle messages from main thread
-self.onmessage = async function(e) {
+self.onmessage = async function (e) {
   const { id, type, data } = e.data;
 
   try {
@@ -361,18 +361,13 @@ self.onmessage = async function(e) {
         break;
 
       case 'formatSelection':
-        result = await formatSelection(
-          data.code,
-          data.start,
-          data.end,
-          data.options
-        );
+        result = await formatSelection(data.code, data.start, data.end, data.options);
         break;
 
       case 'validate':
         result = {
           success: true,
-          isValid: validateSyntax(data.code)
+          isValid: validateSyntax(data.code),
         };
         break;
 
@@ -380,14 +375,14 @@ self.onmessage = async function(e) {
         configCache.clear();
         result = {
           success: true,
-          message: 'Cache cleared'
+          message: 'Cache cleared',
         };
         break;
 
       default:
         result = {
           success: false,
-          error: `Unknown operation: ${type}`
+          error: `Unknown operation: ${type}`,
         };
     }
 
@@ -395,15 +390,14 @@ self.onmessage = async function(e) {
     self.postMessage({
       id,
       success: true,
-      result
+      result,
     });
-
   } catch (error) {
     // Send error back to main thread
     self.postMessage({
       id,
       success: false,
-      error: error.message
+      error: error.message,
     });
   }
 };

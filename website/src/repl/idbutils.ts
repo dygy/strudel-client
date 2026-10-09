@@ -43,13 +43,10 @@ export function clearIDB(dbName: string): IDBOpenDBRequest {
  * @param config - Database configuration
  * @param onComplete - Callback function to run when complete
  */
-export function registerSamplesFromDB(
-  config: DBConfig = userSamplesDBConfig,
-  onComplete: () => void = () => {}
-): void {
+export function registerSamplesFromDB(config: DBConfig = userSamplesDBConfig, onComplete: () => void = () => {}): void {
   openDB(config, (objectStore) => {
     const query = objectStore.getAll();
-    
+
     query.onerror = (e) => {
       logger('User Samples failed to load ', 'error');
       onComplete();
@@ -62,7 +59,7 @@ export function registerSamplesFromDB(
         onComplete();
         return;
       }
-      
+
       const sounds = new Map<string, Map<string, string>>();
 
       Promise.all(
@@ -73,7 +70,7 @@ export function registerSamplesFromDB(
             if (!isAudioFile(title)) {
               return Promise.resolve();
             }
-            
+
             const splitRelativePath = soundFile.id.split('/');
             let parentDirectory =
               // Fallback to file name before period and separator if no parent directory
@@ -86,7 +83,7 @@ export function registerSamplesFromDB(
               sounds.set(parentDirectory, titlePathMap);
             });
           })
-          .filter(Boolean)
+          .filter(Boolean),
       )
         .then(() => {
           sounds.forEach((titlePathMap, key) => {
@@ -136,19 +133,19 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
  */
 function openDB(
   config: DBConfig,
-  onOpened: (objectStore: IDBObjectStore, db: IDBDatabase) => void
+  onOpened: (objectStore: IDBObjectStore, db: IDBDatabase) => void,
 ): IDBOpenDBRequest | undefined {
   const { dbName, version, table, columns } = config;
-  
+
   if (typeof window === 'undefined') {
     return;
   }
-  
+
   if (!('indexedDB' in window)) {
     logger('IndexedDB is not supported', 'warning');
     return;
   }
-  
+
   const dbOpen = indexedDB.open(dbName, version);
 
   dbOpen.onupgradeneeded = () => {
@@ -158,7 +155,7 @@ function openDB(
       objectStore.createIndex(column, column, { unique: false });
     });
   };
-  
+
   dbOpen.onerror = (err) => {
     logger('Something went wrong while trying to open the client DB', 'error');
     console.error(`indexedDB error: ${(err.target as IDBRequest)?.error}`);
@@ -172,7 +169,7 @@ function openDB(
     const objectStore = writeTransaction.objectStore(table);
     onOpened(objectStore, db);
   };
-  
+
   return dbOpen;
 }
 
@@ -183,35 +180,34 @@ function openDB(
  */
 async function processFilesForIDB(files: FileList): Promise<(ProcessedFile | undefined)[]> {
   return Promise.all(
-    Array.from(files)
-      .map((file) => {
-        const title = file.name;
+    Array.from(files).map((file) => {
+      const title = file.name;
 
-        if (!isAudioFile(title)) {
-          return Promise.resolve(undefined);
-        }
-        
-        // Create obscured URL to file system that can be fetched
-        const sUrl = URL.createObjectURL(file);
-        
-        // Fetch the sound and turn it into a blob
-        return fetch(sUrl).then((res) => {
-          return res.blob().then((blob) => {
-            const path = (file as any).webkitRelativePath as string | undefined;
-            const id = path?.length ? path : title;
-            
-            if (id == null || title == null || blob == null) {
-              return undefined;
-            }
-            
-            return {
-              title,
-              blob,
-              id,
-            };
-          });
+      if (!isAudioFile(title)) {
+        return Promise.resolve(undefined);
+      }
+
+      // Create obscured URL to file system that can be fetched
+      const sUrl = URL.createObjectURL(file);
+
+      // Fetch the sound and turn it into a blob
+      return fetch(sUrl).then((res) => {
+        return res.blob().then((blob) => {
+          const path = (file as any).webkitRelativePath as string | undefined;
+          const id = path?.length ? path : title;
+
+          if (id == null || title == null || blob == null) {
+            return undefined;
+          }
+
+          return {
+            title,
+            blob,
+            id,
+          };
         });
-      })
+      });
+    }),
   ).catch((error) => {
     logger('Something went wrong while processing uploaded files', 'error');
     console.error(error);
@@ -226,10 +222,10 @@ async function processFilesForIDB(files: FileList): Promise<(ProcessedFile | und
  */
 export async function uploadSamplesToDB(config: DBConfig, files: FileList): Promise<void> {
   logger('processing user samples...');
-  
+
   const processedFiles = await processFilesForIDB(files);
   logger('user samples processed... opening db');
-  
+
   const onOpened = (objectStore: IDBObjectStore) => {
     logger('index db opened... writing files to db');
     processedFiles.forEach((file) => {
@@ -239,6 +235,6 @@ export async function uploadSamplesToDB(config: DBConfig, files: FileList): Prom
     });
     logger('user samples written successfully');
   };
-  
+
   openDB(config, onOpened);
 }

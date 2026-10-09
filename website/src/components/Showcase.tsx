@@ -117,7 +117,7 @@ const _shuffled = shuffleArray(_videos);
 
 export function Showcase() {
   const [videos, setVideos] = useState<Video[]>(_shuffled);
-  
+
   return (
     <>
       <div className="flex space-x-2">

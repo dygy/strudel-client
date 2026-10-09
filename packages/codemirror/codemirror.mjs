@@ -175,7 +175,7 @@ export function initEditor({ initialCode = '', onChange, onEvaluate, onStop, roo
             run: (view) => {
               // Dispatch save event for FileManager
               const saveEvent = new CustomEvent('strudel-save', {
-                detail: { source: 'keyboard' }
+                detail: { source: 'keyboard' },
               });
               document.dispatchEvent(saveEvent);
               return true;
@@ -204,7 +204,6 @@ export function initEditor({ initialCode = '', onChange, onEvaluate, onStop, roo
 
 export class StrudelMirror {
   constructor(options) {
-
     const {
       root,
       id,

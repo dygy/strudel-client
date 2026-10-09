@@ -40,16 +40,16 @@ describe('AudioMixer', () => {
         transitionType: 'instant',
         transitionDuration: 1.0,
       });
-      
+
       expect(customMixer.config.transitionType).toBe('instant');
       expect(customMixer.config.transitionDuration).toBe(1.0);
-      
+
       customMixer.destroy();
     });
 
     it('initializes both live and preview streams', async () => {
       await mixer.initialize();
-      
+
       expect(mixer.isInitialized).toBe(true);
       expect(mixer.liveStream).toBeDefined();
       expect(mixer.previewStream).toBeDefined();
@@ -58,7 +58,7 @@ describe('AudioMixer', () => {
 
     it('creates streams with correct names', async () => {
       await mixer.initialize();
-      
+
       expect(mixer.liveStream.name).toBe('live');
       expect(mixer.previewStream.name).toBe('preview');
     });
@@ -102,7 +102,7 @@ describe('AudioMixer', () => {
 
     it('gets available audio devices', async () => {
       const devices = await mixer.getAvailableDevices();
-      
+
       expect(Array.isArray(devices)).toBe(true);
       expect(devices.map((d) => d.deviceId)).toEqual(['default', 'device1', 'device2']);
     });
@@ -116,7 +116,7 @@ describe('AudioMixer', () => {
 
     it('sets devices for both streams', async () => {
       await mixer.setDevices('device1', 'device2');
-      
+
       expect(mixer.config.liveDeviceId).toBe('device1');
       expect(mixer.config.previewDeviceId).toBe('device2');
       expect(mixer.liveStream.audioElement.sinkId).toBe('device1');
@@ -136,12 +136,12 @@ describe('AudioMixer', () => {
     it('persists configuration to localStorage', async () => {
       await mixer.initialize();
       await mixer.setDevices('device1', 'device2');
-      
+
       mixer.persistConfig();
-      
+
       const stored = localStorage.getItem('strudel-mixer-config');
       expect(stored).not.toBeNull();
-      
+
       const config = JSON.parse(stored);
       expect(config.liveDeviceId).toBe('device1');
       expect(config.previewDeviceId).toBe('device2');
@@ -154,16 +154,16 @@ describe('AudioMixer', () => {
         transitionType: 'instant',
         transitionDuration: 1.5,
       };
-      
+
       localStorage.setItem('strudel-mixer-config', JSON.stringify(testConfig));
-      
+
       const newMixer = new AudioMixer(audioContext);
       newMixer.restoreConfig();
-      
+
       expect(newMixer.config.liveDeviceId).toBe('test-live');
       expect(newMixer.config.previewDeviceId).toBe('test-preview');
       expect(newMixer.config.transitionType).toBe('instant');
-      
+
       newMixer.destroy();
     });
 
@@ -171,13 +171,13 @@ describe('AudioMixer', () => {
       await mixer.initialize();
       await mixer.setDevices('device1', 'device2');
       mixer.persistConfig();
-      
+
       mixer.reset();
-      
+
       expect(mixer.config.liveDeviceId).toBeNull();
       expect(mixer.config.previewDeviceId).toBeNull();
       expect(mixer.config.transitionType).toBe('crossfade');
-      
+
       const stored = localStorage.getItem('strudel-mixer-config');
       expect(stored).toBeNull();
     });
@@ -186,9 +186,9 @@ describe('AudioMixer', () => {
   describe('State Management', () => {
     it('returns current mixer state', async () => {
       await mixer.initialize();
-      
+
       const state = mixer.getState();
-      
+
       expect(state.isInitialized).toBe(true);
       expect(state.config).toBeDefined();
       expect(state.liveStream).toBeDefined();
@@ -200,9 +200,9 @@ describe('AudioMixer', () => {
   describe('Cleanup', () => {
     it('destroys mixer and cleans up resources', async () => {
       await mixer.initialize();
-      
+
       mixer.destroy();
-      
+
       expect(mixer.isInitialized).toBe(false);
       expect(mixer.liveStream).toBeNull();
       expect(mixer.previewStream).toBeNull();

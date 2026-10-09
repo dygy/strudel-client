@@ -1,9 +1,9 @@
 /**
  * SmoothTransitionManager - Manages smooth volume transitions for track updates
- * 
+ *
  * Provides configurable fade-down/fade-up transitions when users update their
  * live code, creating a Spotify-like listening experience during live coding.
- * 
+ *
  * @class SmoothTransitionManager
  * @license AGPL-3.0-or-later
  */
@@ -17,7 +17,7 @@ const MAX_DURATION = 10.0;
 export class SmoothTransitionManager {
   /**
    * Create a SmoothTransitionManager
-   * 
+   *
    * @param {AudioContext} audioContext - Web Audio API context
    * @param {Object} replInstance - StrudelMirror repl instance for pattern evaluation
    * @param {Object} options - Configuration options
@@ -31,17 +31,17 @@ export class SmoothTransitionManager {
     this.replInstance = replInstance;
     this.destinationGain = options.destinationGain;
     this.cleanupCanvases = options.cleanupCanvases || null;
-    
+
     // State
     this.enabled = DEFAULT_ENABLED;
     this.duration = DEFAULT_DURATION;
     this.isTransitioning = false;
     this.queuedCode = null;
     this.targetVolume = 1.0;
-    
+
     // Restore settings from localStorage
     this.restoreSettings();
-    
+
     // Apply any options passed to constructor (override restored settings)
     if (options.enabled !== undefined) {
       this.enabled = Boolean(options.enabled);
@@ -49,7 +49,7 @@ export class SmoothTransitionManager {
     if (options.duration !== undefined) {
       this.duration = this.validateDuration(options.duration);
     }
-    
+
     console.log('[SmoothTransitionManager] Initialized', {
       enabled: this.enabled,
       duration: this.duration,
@@ -65,15 +65,15 @@ export class SmoothTransitionManager {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const settings = JSON.parse(stored);
-        
+
         if (settings.enabled !== undefined) {
           this.enabled = Boolean(settings.enabled);
         }
-        
+
         if (settings.duration !== undefined) {
           this.duration = this.validateDuration(settings.duration);
         }
-        
+
         console.log('[SmoothTransitionManager] Settings restored from localStorage', {
           enabled: this.enabled,
           duration: this.duration,
@@ -127,13 +127,13 @@ export class SmoothTransitionManager {
     if (settings.enabled !== undefined) {
       this.enabled = Boolean(settings.enabled);
     }
-    
+
     if (settings.duration !== undefined) {
       this.duration = this.validateDuration(settings.duration);
     }
-    
+
     this.persistSettings();
-    
+
     console.log('[SmoothTransitionManager] Settings updated', {
       enabled: this.enabled,
       duration: this.duration,
@@ -164,17 +164,17 @@ export class SmoothTransitionManager {
       this.queueTransition(newCode);
       return;
     }
-    
+
     this.isTransitioning = true;
-    
+
     try {
       // Ensure audio context is running
       await this.ensureAudioContextRunning();
-      
+
       // Phase 1: Fade down current track
       console.log('[SmoothTransitionManager] Starting fade down');
       await this.fadeDown(this.duration);
-      
+
       // Do NOT stop the pattern here. Cyclist.stop() resets the clock, so the
       // evaluate below would restart from cycle 0 (and onToggle resets cps).
       // Like the instant path, evaluate hot-swaps at the current position.
@@ -190,10 +190,10 @@ export class SmoothTransitionManager {
           console.warn('[SmoothTransitionManager] Could not cleanup draw canvases:', error);
         }
       }
-      
+
       // Phase 3: Small delay to ensure cleanup completes
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       // Phase 4: Evaluate new code (hot-swap; this will create new canvases)
       if (this.replInstance && this.replInstance.evaluate) {
         console.log('[SmoothTransitionManager] Evaluating new code');
@@ -201,29 +201,29 @@ export class SmoothTransitionManager {
         // before it resolves would ramp the OLD pattern back up, then cut to the new one.
         await this.replInstance.evaluate(newCode);
       }
-      
+
       // Phase 5: Fade up new track
       console.log('[SmoothTransitionManager] Starting fade up');
       await this.fadeUp(this.duration, this.targetVolume);
-      
+
       console.log('[SmoothTransitionManager] Transition complete');
     } catch (error) {
       console.error('[SmoothTransitionManager] Transition failed:', error);
-      
+
       // Restore volume to prevent muted audio
       if (this.destinationGain) {
         const now = this.audioContext.currentTime;
         this.destinationGain.gain.cancelScheduledValues(now);
         this.destinationGain.gain.setValueAtTime(this.targetVolume, now);
       }
-      
+
       // Emit error event for UI notification
       this.emitEvent('transition-error', { error: error.message });
-      
+
       throw error;
     } finally {
       this.isTransitioning = false;
-      
+
       // Process any queued transitions
       await this.processQueue();
     }
@@ -249,7 +249,7 @@ export class SmoothTransitionManager {
     if (this.queuedCode !== null) {
       const code = this.queuedCode;
       this.queuedCode = null;
-      
+
       console.log('[SmoothTransitionManager] Processing queued transition');
       await this.executeTransition(code);
     }
@@ -266,9 +266,7 @@ export class SmoothTransitionManager {
       try {
         await Promise.race([
           this.audioContext.resume(),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('AudioContext resume timeout')), 5000)
-          )
+          new Promise((_, reject) => setTimeout(() => reject(new Error('AudioContext resume timeout')), 5000)),
         ]);
       } catch (error) {
         throw new Error('Failed to resume AudioContext: ' + error.message);
@@ -284,12 +282,14 @@ export class SmoothTransitionManager {
    */
   emitEvent(eventName, detail) {
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(`smooth-transition-${eventName}`, {
-        detail: {
-          ...detail,
-          timestamp: Date.now(),
-        },
-      }));
+      window.dispatchEvent(
+        new CustomEvent(`smooth-transition-${eventName}`, {
+          detail: {
+            ...detail,
+            timestamp: Date.now(),
+          },
+        }),
+      );
     }
   }
 
@@ -304,23 +304,20 @@ export class SmoothTransitionManager {
       console.warn('[SmoothTransitionManager] No destinationGain available for fade down');
       return;
     }
-    
+
     const now = this.audioContext.currentTime;
     const endTime = now + duration;
-    
+
     // Cancel any scheduled changes
     this.destinationGain.gain.cancelScheduledValues(now);
-    
+
     // Set current value and schedule fade to 0
-    this.destinationGain.gain.setValueAtTime(
-      this.destinationGain.gain.value,
-      now
-    );
+    this.destinationGain.gain.setValueAtTime(this.destinationGain.gain.value, now);
     this.destinationGain.gain.linearRampToValueAtTime(0, endTime);
-    
+
     // Wait for fade to complete
-    await new Promise(resolve => setTimeout(resolve, duration * 1000));
-    
+    await new Promise((resolve) => setTimeout(resolve, duration * 1000));
+
     console.log(`[SmoothTransitionManager] Fade down complete (${duration}s)`);
   }
 
@@ -336,20 +333,20 @@ export class SmoothTransitionManager {
       console.warn('[SmoothTransitionManager] No destinationGain available for fade up');
       return;
     }
-    
+
     const now = this.audioContext.currentTime;
     const endTime = now + duration;
-    
+
     // Cancel any scheduled changes
     this.destinationGain.gain.cancelScheduledValues(now);
-    
+
     // Start from 0 and fade to target volume
     this.destinationGain.gain.setValueAtTime(0, now);
     this.destinationGain.gain.linearRampToValueAtTime(targetVolume, endTime);
-    
+
     // Wait for fade to complete
-    await new Promise(resolve => setTimeout(resolve, duration * 1000));
-    
+    await new Promise((resolve) => setTimeout(resolve, duration * 1000));
+
     console.log(`[SmoothTransitionManager] Fade up complete (${duration}s, target: ${targetVolume})`);
   }
 
@@ -358,13 +355,13 @@ export class SmoothTransitionManager {
    */
   destroy() {
     console.log('[SmoothTransitionManager] Destroying');
-    
+
     // Clear any queued transitions
     this.queuedCode = null;
-    
+
     // Reset state
     this.isTransitioning = false;
-    
+
     // Clear references
     this.audioContext = null;
     this.replInstance = null;

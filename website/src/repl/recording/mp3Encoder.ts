@@ -56,9 +56,6 @@ export function encodeMP3(audioBuffer: AudioBuffer, bitrate = 192): Promise<Blob
       worker.terminate();
     };
 
-    worker.postMessage(
-      { left, right, sampleRate: audioBuffer.sampleRate, bitrate },
-      [left.buffer, right.buffer],
-    );
+    worker.postMessage({ left, right, sampleRate: audioBuffer.sampleRate, bitrate }, [left.buffer, right.buffer]);
   });
 }

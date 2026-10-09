@@ -39,7 +39,7 @@ function PatternList({ patterns }: PatternListProps) {
 export function Oven() {
   const [featuredPatterns, setFeaturedPatterns] = useState<Pattern[]>([]);
   const [publicPatterns, setPublicPatterns] = useState<Pattern[]>([]);
-  
+
   useEffect(() => {
     loadPublicPatterns().then(({ data: pats }: { data: Pattern[] }) => {
       logger(`Loaded ${pats.length} public patterns`, 'success');
@@ -50,7 +50,7 @@ export function Oven() {
       setFeaturedPatterns(pats);
     });
   }, []);
-  
+
   return (
     <div>
       <h2 id="featured">Featured Patterns</h2>

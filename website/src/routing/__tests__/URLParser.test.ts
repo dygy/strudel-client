@@ -21,11 +21,11 @@ beforeEach(() => {
     location: mockLocation,
     history: mockHistory,
   });
-  
+
   // Reset mocks
   mockHistory.pushState.mockClear();
   mockHistory.replaceState.mockClear();
-  
+
   // Reset location
   mockLocation.href = 'https://example.com/';
   mockLocation.pathname = '/';
@@ -73,11 +73,11 @@ describe('URLParser', () => {
     });
 
     it('should filter out null and undefined values', () => {
-      const result = URLParser.buildQueryString({ 
-        track: '123', 
-        mode: null, 
+      const result = URLParser.buildQueryString({
+        track: '123',
+        mode: null,
         other: undefined,
-        empty: ''
+        empty: '',
       });
       expect(result).toBe('?track=123');
     });
@@ -120,9 +120,9 @@ describe('URLParser', () => {
             // Test 4: the written path round-trips back to the same identifier
             mockLocation.pathname = mockHistory.pushState.mock.calls[0][2];
             expect(URLParser.getCurrentTrackIdentifier()).toBe(trackSlug);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -142,7 +142,7 @@ describe('URLParser', () => {
             expect(url).not.toContain('?track=');
           }
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -163,24 +163,21 @@ describe('URLParser', () => {
      */
     it('should handle special characters in track IDs', () => {
       fc.assert(
-        fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
-          (trackId) => {
-            // Encode the track ID for URL safety
-            const encodedTrackId = encodeURIComponent(trackId);
-            const urlWithTrack = `https://example.com/?track=${encodedTrackId}`;
-            
-            try {
-              const parsed = URLParser.parseQueryParams(urlWithTrack);
-              // The parsed value should be decoded back to original
-              expect(parsed.track).toBe(trackId);
-            } catch (error) {
-              // Some characters might cause URL parsing to fail, which is acceptable
-              expect(error).toBeInstanceOf(Error);
-            }
+        fc.property(fc.string({ minLength: 1, maxLength: 20 }), (trackId) => {
+          // Encode the track ID for URL safety
+          const encodedTrackId = encodeURIComponent(trackId);
+          const urlWithTrack = `https://example.com/?track=${encodedTrackId}`;
+
+          try {
+            const parsed = URLParser.parseQueryParams(urlWithTrack);
+            // The parsed value should be decoded back to original
+            expect(parsed.track).toBe(trackId);
+          } catch (error) {
+            // Some characters might cause URL parsing to fail, which is acceptable
+            expect(error).toBeInstanceOf(Error);
           }
-        ),
-        { numRuns: 100 }
+        }),
+        { numRuns: 100 },
       );
     });
 
@@ -197,29 +194,27 @@ describe('URLParser', () => {
           }),
           (params) => {
             // Filter out null values for building query string
-            const filteredParams = Object.fromEntries(
-              Object.entries(params).filter(([_, value]) => value !== null)
-            );
+            const filteredParams = Object.fromEntries(Object.entries(params).filter(([_, value]) => value !== null));
 
             // Build query string and parse it back
             const queryString = URLParser.buildQueryString(filteredParams);
-            
+
             if (Object.keys(filteredParams).length === 0) {
               expect(queryString).toBe('');
             } else {
               expect(queryString).toMatch(/^\?/);
-              
+
               const testUrl = `https://example.com/${queryString}`;
               const parsed = URLParser.parseQueryParams(testUrl);
-              
+
               // All non-null parameters should be preserved
               Object.entries(filteredParams).forEach(([key, value]) => {
                 expect(parsed[key]).toBe(value);
               });
             }
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });

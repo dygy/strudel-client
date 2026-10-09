@@ -1,13 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import PlayCircleIcon from '@heroicons/react/20/solid/PlayCircleIcon';
 import StopCircleIcon from '@heroicons/react/20/solid/StopCircleIcon';
-import {
-  Bars3Icon,
-  ArrowPathIcon,
-  EyeIcon,
-  MicrophoneIcon,
-  VideoCameraIcon,
-} from '@heroicons/react/24/outline';
+import { Bars3Icon, ArrowPathIcon, EyeIcon, MicrophoneIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 import cx from '@src/cx';
 import { useSettings, setIsFileManagerOpen } from '../../settings';
 import { AuthButton } from '../../components/auth/AuthButton';
@@ -88,7 +82,6 @@ function IconBtn({
   );
 }
 
-
 /* ------------------------------------------------------------------ */
 /*  Recording popover (audio / screen)                                */
 /* ------------------------------------------------------------------ */
@@ -144,16 +137,14 @@ function RecordPopover({
         className={cx(
           'w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground',
           'transition-all duration-150',
-          context.isScreenRecording
-            ? 'opacity-30 cursor-not-allowed'
-            : 'hover:bg-lineHighlight cursor-pointer',
+          context.isScreenRecording ? 'opacity-30 cursor-not-allowed' : 'hover:bg-lineHighlight cursor-pointer',
           context.isRecording && 'bg-red-500 bg-opacity-10',
         )}
       >
-        <MicrophoneIcon className={cx('w-4 h-4', context.isRecording ? 'text-red-400' : 'text-foreground opacity-70')} />
-        <span className="flex-1 text-left">
-          {context.isRecording ? 'Stop Audio' : 'Record Audio'}
-        </span>
+        <MicrophoneIcon
+          className={cx('w-4 h-4', context.isRecording ? 'text-red-400' : 'text-foreground opacity-70')}
+        />
+        <span className="flex-1 text-left">{context.isRecording ? 'Stop Audio' : 'Record Audio'}</span>
         {context.isRecording && (
           <span className="text-xs font-mono text-red-400 tabular-nums">
             {formatElapsedTime(context.recordingElapsedSeconds ?? 0)}
@@ -183,9 +174,7 @@ function RecordPopover({
         <VideoCameraIcon
           className={cx('w-4 h-4', context.isScreenRecording ? 'text-red-400' : 'text-foreground opacity-70')}
         />
-        <span className="flex-1 text-left">
-          {context.isScreenRecording ? 'Stop Screen' : 'Record Screen'}
-        </span>
+        <span className="flex-1 text-left">{context.isScreenRecording ? 'Stop Screen' : 'Record Screen'}</span>
         {context.isScreenRecording && (
           <span className="text-xs font-mono text-red-400 tabular-nums">
             {formatElapsedTime(context.screenRecordingElapsedSeconds ?? 0)}
@@ -195,7 +184,6 @@ function RecordPopover({
     </div>
   );
 }
-
 
 /* ------------------------------------------------------------------ */
 /*  Main Header                                                       */
@@ -207,8 +195,8 @@ export function Header({ context, embedded }: HeaderProps) {
 
   const isAnyRecording = context.isRecording || context.isScreenRecording;
   const recordingSeconds = context.isRecording
-    ? context.recordingElapsedSeconds ?? 0
-    : context.screenRecordingElapsedSeconds ?? 0;
+    ? (context.recordingElapsedSeconds ?? 0)
+    : (context.screenRecordingElapsedSeconds ?? 0);
 
   useEffect(() => {
     if (!isAnyRecording) setRecordPopoverOpen(false);

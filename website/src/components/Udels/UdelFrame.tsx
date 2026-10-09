@@ -8,7 +8,7 @@ interface UdelFrameProps {
 
 export function UdelFrame({ onEvaluate, hash, instance }: UdelFrameProps) {
   const ref = useRef<HTMLIFrameElement>(null);
-  
+
   window.addEventListener('message', (message) => {
     const childWindow = ref?.current?.contentWindow;
     if (message == null || message.source !== childWindow) {

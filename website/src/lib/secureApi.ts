@@ -56,51 +56,51 @@ class SecureApiClient {
     if (!sessionResult.success) {
       throw new Error(`Authentication failed: ${sessionResult.error}`);
     }
-    
+
     // Get the access token from the session to include in headers
     const accessToken = sessionResult.session?.access_token;
     if (!accessToken) {
       throw new Error('No access token found');
     }
-    
+
     const url = `${this.baseUrl}/api${endpoint}`;
-    
+
     const response = await fetch(url, {
       ...options,
       credentials: 'include', // Include cookies for authentication
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`, // Include access token in header
+        Authorization: `Bearer ${accessToken}`, // Include access token in header
         ...options.headers,
       },
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      
+
       // If it's an auth error, try to refresh session and retry once
       if (response.status === 401 && !options.headers?.['X-Retry-After-Refresh']) {
         console.log('Got 401, attempting session refresh and retry...');
-        
+
         const retrySessionResult = await ensureValidSession();
         if (retrySessionResult.success && retrySessionResult.session?.access_token) {
           // Wait a moment for cookies to update
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
           // Retry the request once with a flag to prevent infinite loops
           return this.request(endpoint, {
             ...options,
             headers: {
               ...options.headers,
-              'X-Retry-After-Refresh': 'true'
-            }
+              'X-Retry-After-Refresh': 'true',
+            },
           });
         } else {
           console.error('Session refresh failed or no access token after refresh');
           throw new Error('Session refresh failed');
         }
       }
-      
+
       throw new Error(errorData.error || `HTTP ${response.status}`);
     }
 
@@ -116,38 +116,38 @@ class SecureApiClient {
   async getTracks(): Promise<{ tracks: Track[]; folders: Folder[] }> {
     // API now returns hierarchical format, convert to flat for compatibility
     const hierarchicalData = await this.request('/tracks/list');
-    
+
     // Convert hierarchical data to flat format
     if (hierarchicalData && hierarchicalData.id === 'root' && hierarchicalData.children) {
       const tracks: Track[] = [];
       const folders: Folder[] = [];
-      
+
       const processItems = (items: any[], parentPath: string | null = null) => {
         for (const item of items) {
           if (item.type === 'track') {
             tracks.push({
               ...item,
-              folder: parentPath
+              folder: parentPath,
             });
           } else if (item.type === 'folder') {
             const folderPath = item.path || item.name;
             folders.push({
               ...item,
               path: folderPath,
-              parent: parentPath
+              parent: parentPath,
             });
-            
+
             if (item.children && item.children.length > 0) {
               processItems(item.children, folderPath);
             }
           }
         }
       };
-      
+
       processItems(hierarchicalData.children);
       return { tracks, folders };
     }
-    
+
     // Fallback for empty or invalid data
     return { tracks: [], folders: [] };
   }
@@ -191,10 +191,7 @@ class SecureApiClient {
     return this.request('/folders/list');
   }
 
-  async createFolder(data: {
-    name: string;
-    path: string;
-  }): Promise<{ folder: Folder }> {
+  async createFolder(data: { name: string; path: string }): Promise<{ folder: Folder }> {
     return this.request('/folders/create', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -226,14 +223,14 @@ class SecureApiClient {
   }
 
   // Batch operations
-  async batchImportLibrary(data: { tracks: any[], folders: any[] }): Promise<{ 
-    success: boolean, 
-    results: { 
-      tracksCreated: number, 
-      foldersCreated: number, 
-      totalCreated: number, 
-      errors: string[] 
-    } 
+  async batchImportLibrary(data: { tracks: any[]; folders: any[] }): Promise<{
+    success: boolean;
+    results: {
+      tracksCreated: number;
+      foldersCreated: number;
+      totalCreated: number;
+      errors: string[];
+    };
   }> {
     return this.request('/library/batch-import', {
       method: 'POST',
@@ -273,15 +270,18 @@ class SecureApiClient {
     });
   }
 
-  async updateTreeNode(nodeId: string, updates: {
-    name?: string;
-    parentId?: string | null;
-    code?: string;
-    isMultitrack?: boolean;
-    steps?: any;
-    activeStep?: number;
-    metadata?: Record<string, any>;
-  }): Promise<{ success: boolean; node: any }> {
+  async updateTreeNode(
+    nodeId: string,
+    updates: {
+      name?: string;
+      parentId?: string | null;
+      code?: string;
+      isMultitrack?: boolean;
+      steps?: any;
+      activeStep?: number;
+      metadata?: Record<string, any>;
+    },
+  ): Promise<{ success: boolean; node: any }> {
     return this.request('/tree/nodes', {
       method: 'PUT',
       body: JSON.stringify({ nodeId, ...updates }),
@@ -295,7 +295,10 @@ class SecureApiClient {
     });
   }
 
-  async moveTreeNode(nodeId: string, newParentId: string | null): Promise<{ success: boolean; node: any; message: string }> {
+  async moveTreeNode(
+    nodeId: string,
+    newParentId: string | null,
+  ): Promise<{ success: boolean; node: any; message: string }> {
     return this.request('/tree/move', {
       method: 'POST',
       body: JSON.stringify({ nodeId, newParentId }),
@@ -319,7 +322,7 @@ class SecureApiClient {
     if (query.pattern) params.set('pattern', query.pattern);
     if (query.maxDepth) params.set('maxDepth', query.maxDepth.toString());
     if (query.includeMetadata) params.set('includeMetadata', 'true');
-    
+
     return this.request(`/tree/search?${params.toString()}`);
   }
 
@@ -376,7 +379,7 @@ export const db = {
       } catch (error) {
         return { error };
       }
-    }
+    },
   },
   folders: {
     getAll: async () => {
@@ -406,20 +409,20 @@ export const db = {
       } catch (error) {
         return { error };
       }
-    }
-  }
+    },
+  },
 };
 
 // Batch operations helper
 export const batch = {
-  importLibrary: async (data: { tracks: any[], folders: any[] }) => {
+  importLibrary: async (data: { tracks: any[]; folders: any[] }) => {
     try {
       const result = await secureApi.batchImportLibrary(data);
       return { data: result, error: null };
     } catch (error) {
       return { data: null, error };
     }
-  }
+  },
 };
 
 // Migration helper
@@ -441,5 +444,5 @@ export const migration = {
       console.error('Error performing migration:', error);
       return { success: false, message: 'Migration failed' };
     }
-  }
+  },
 };

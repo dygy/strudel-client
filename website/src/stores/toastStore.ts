@@ -34,7 +34,7 @@ export const toastActions = {
       customId,
       title: toast.title,
       activeToastsCount: activeToasts.size,
-      recentToastsCount: recentToasts.size
+      recentToastsCount: recentToasts.size,
     });
 
     // Check for recent duplicates (within 3 seconds)
@@ -52,9 +52,8 @@ export const toastActions = {
 
     // Check for existing toasts with the same title and type in current toasts array
     const currentToasts = toastsStore.get();
-    const isDuplicate = currentToasts.some(existingToast =>
-      existingToast.title === toast.title &&
-      existingToast.type === toast.type
+    const isDuplicate = currentToasts.some(
+      (existingToast) => existingToast.title === toast.title && existingToast.type === toast.type,
     );
 
     if (isDuplicate) {
@@ -73,7 +72,7 @@ export const toastActions = {
         entriesToDelete.push(key);
       }
     });
-    entriesToDelete.forEach(key => recentToasts.delete(key));
+    entriesToDelete.forEach((key) => recentToasts.delete(key));
 
     const id = customId || `toast-${++toastId}`;
     const newToast: Toast = {
@@ -93,9 +92,8 @@ export const toastActions = {
   },
 
   removeToast: (id: string) => {
-
     const currentToasts = toastsStore.get();
-    const toastToRemove = currentToasts.find(t => t.id === id);
+    const toastToRemove = currentToasts.find((t) => t.id === id);
 
     if (toastToRemove) {
       // Clean up active toasts tracking
@@ -105,7 +103,7 @@ export const toastActions = {
     }
 
     // Update the store
-    toastsStore.set(currentToasts.filter(toast => toast.id !== id));
+    toastsStore.set(currentToasts.filter((toast) => toast.id !== id));
   },
 
   clearAllToasts: () => {

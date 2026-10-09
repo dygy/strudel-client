@@ -88,7 +88,7 @@ export default defineConfig({
       format: 'es',
     },
     define: {
-      'import.meta.env.MODE': JSON.stringify('cloudflare')
+      'import.meta.env.MODE': JSON.stringify('cloudflare'),
     },
     build: {
       chunkSizeWarningLimit: 10000,
@@ -99,8 +99,8 @@ export default defineConfig({
       sourcemap: false, // Disable source maps to save memory
       rollupOptions: {
         // Disable manual chunking to avoid complexity
-        output: {}
-      }
+        output: {},
+      },
     },
     // No `ssr.external` here: unlike Node on Heroku, the Worker has no
     // node_modules to resolve from at runtime, so anything reachable from the

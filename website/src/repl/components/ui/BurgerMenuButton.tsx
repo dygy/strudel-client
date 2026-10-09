@@ -24,22 +24,22 @@ export function BurgerMenuButton({ items, className = '', size = 'sm' }: BurgerM
 
   const sizeClasses = {
     sm: 'w-4 h-4',
-    md: 'w-5 h-5', 
-    lg: 'w-6 h-6'
+    md: 'w-5 h-5',
+    lg: 'w-6 h-6',
   };
 
   const showMenu = (event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       setPosition({
         x: rect.right - 150, // Align menu to right edge of button
-        y: rect.bottom + 4
+        y: rect.bottom + 4,
       });
     }
-    
+
     setVisible(true);
   };
 
@@ -49,23 +49,27 @@ export function BurgerMenuButton({ items, className = '', size = 'sm' }: BurgerM
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
-          buttonRef.current && !buttonRef.current.contains(e.target as Node)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(e.target as Node)
+      ) {
         hideMenu();
       }
     };
-    
+
     const handleScroll = () => hideMenu();
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') hideMenu();
     };
-    
+
     if (visible) {
       document.addEventListener('click', handleClick);
       document.addEventListener('scroll', handleScroll);
       document.addEventListener('keydown', handleEscape);
     }
-    
+
     return () => {
       document.removeEventListener('click', handleClick);
       document.removeEventListener('scroll', handleScroll);
@@ -86,7 +90,7 @@ export function BurgerMenuButton({ items, className = '', size = 'sm' }: BurgerM
       >
         <EllipsisVerticalIcon className={sizeClasses[size]} />
       </button>
-      
+
       {visible && (
         <div
           ref={menuRef}
@@ -100,8 +104,8 @@ export function BurgerMenuButton({ items, className = '', size = 'sm' }: BurgerM
               ) : (
                 <button
                   className={`w-full text-left px-3 py-2 flex items-center gap-2 text-sm transition-colors ${
-                    item.disabled 
-                      ? 'text-foreground/50 cursor-not-allowed' 
+                    item.disabled
+                      ? 'text-foreground/50 cursor-not-allowed'
                       : 'text-foreground hover:bg-lineHighlight cursor-pointer'
                   } ${item.className || ''}`}
                   onClick={() => {

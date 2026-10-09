@@ -22,7 +22,7 @@ export function SessionStatus({ className = '', showOnlyWhenIssues = false }: Se
 
     const checkSessionStatus = async () => {
       setSessionStatus('checking');
-      
+
       try {
         // Simple health check - just verify we can make an authenticated request
         const response = await fetch('/api/auth/user', {
@@ -116,9 +116,7 @@ export function SessionStatus({ className = '', showOnlyWhenIssues = false }: Se
       {getStatusIcon()}
       <span>{getStatusText()}</span>
       {lastCheck && sessionStatus === 'healthy' && (
-        <span className="text-gray-500">
-          ({lastCheck.toLocaleTimeString()})
-        </span>
+        <span className="text-gray-500">({lastCheck.toLocaleTimeString()})</span>
       )}
     </div>
   );

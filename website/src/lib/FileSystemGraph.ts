@@ -1,28 +1,28 @@
 /**
  * Graph-based File System Manager
- * 
+ *
  * This replaces the fragile string-based path system with a proper graph structure
  * using UUID-based node relationships.
  */
 
 export interface FileSystemNode {
-  id: string;           // UUID - unique identifier
-  name: string;         // Display name (can be duplicate)
+  id: string; // UUID - unique identifier
+  name: string; // Display name (can be duplicate)
   type: 'folder' | 'track';
-  parentId: string | null;  // Parent node ID (not path!)
-  userId: string;       // Owner
+  parentId: string | null; // Parent node ID (not path!)
+  userId: string; // Owner
   created: string;
   modified: string;
-  
+
   // Track-specific fields
   code?: string;
   isMultitrack?: boolean;
   steps?: TrackStep[];
   activeStep?: number;
-  
+
   // Computed properties
-  fullPath?: string;    // Generated from graph traversal
-  depth?: number;       // Distance from root
+  fullPath?: string; // Generated from graph traversal
+  depth?: number; // Distance from root
   children?: FileSystemNode[];
 }
 
@@ -88,7 +88,7 @@ export class FileSystemGraph {
     this.parent.clear();
 
     // First pass: add all nodes
-    nodes.forEach(node => {
+    nodes.forEach((node) => {
       this.nodes.set(node.id, node);
       if (!this.children.has(node.id)) {
         this.children.set(node.id, new Set());
@@ -96,14 +96,14 @@ export class FileSystemGraph {
     });
 
     // Second pass: build relationships
-    nodes.forEach(node => {
+    nodes.forEach((node) => {
       if (node.parentId) {
         // Add to parent's children
         if (!this.children.has(node.parentId)) {
           this.children.set(node.parentId, new Set());
         }
         this.children.get(node.parentId)!.add(node.id);
-        
+
         // Set parent relationship
         this.parent.set(node.id, node.parentId);
       }
@@ -113,11 +113,11 @@ export class FileSystemGraph {
   // Core operations
   addNode(node: FileSystemNode): void {
     this.nodes.set(node.id, node);
-    
+
     if (!this.children.has(node.id)) {
       this.children.set(node.id, new Set());
     }
-    
+
     if (node.parentId) {
       if (!this.children.has(node.parentId)) {
         this.children.set(node.parentId, new Set());
@@ -138,7 +138,7 @@ export class FileSystemGraph {
 
     // Remove all children (cascade delete)
     const childrenIds = Array.from(this.children.get(nodeId) || []);
-    childrenIds.forEach(childId => this.removeNode(childId));
+    childrenIds.forEach((childId) => this.removeNode(childId));
 
     // Remove the node itself
     this.nodes.delete(nodeId);
@@ -181,9 +181,7 @@ export class FileSystemGraph {
   // Traversal methods
   getChildren(nodeId: string): FileSystemNode[] {
     const childrenIds = Array.from(this.children.get(nodeId) || []);
-    return childrenIds
-      .map(id => this.nodes.get(id))
-      .filter(node => node !== undefined) as FileSystemNode[];
+    return childrenIds.map((id) => this.nodes.get(id)).filter((node) => node !== undefined) as FileSystemNode[];
   }
 
   getParent(nodeId: string): FileSystemNode | null {
@@ -192,7 +190,7 @@ export class FileSystemGraph {
   }
 
   getRootNodes(): FileSystemNode[] {
-    return Array.from(this.nodes.values()).filter(node => !node.parentId);
+    return Array.from(this.nodes.values()).filter((node) => !node.parentId);
   }
 
   getPath(nodeId: string): string {
@@ -235,12 +233,12 @@ export class FileSystemGraph {
 
   private isDescendant(potentialDescendant: string, ancestor: string): boolean {
     const children = this.getChildren(ancestor);
-    
+
     for (const child of children) {
       if (child.id === potentialDescendant) return true;
       if (this.isDescendant(potentialDescendant, child.id)) return true;
     }
-    
+
     return false;
   }
 
@@ -310,19 +308,19 @@ export class FileSystemGraph {
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 
   // Tree building for UI
   buildTree(): TreeNode[] {
     const rootNodes = this.getRootNodes();
-    return rootNodes.map(node => this.buildSubtree(node));
+    return rootNodes.map((node) => this.buildSubtree(node));
   }
 
   private buildSubtree(node: FileSystemNode): TreeNode {
     const children = this.getChildren(node.id);
-    
+
     // Sort children: folders first, then tracks, both alphabetically
     children.sort((a, b) => {
       if (a.type !== b.type) {
@@ -336,17 +334,16 @@ export class FileSystemGraph {
       name: node.name,
       type: node.type,
       data: node,
-      children: children.map(child => this.buildSubtree(child)),
+      children: children.map((child) => this.buildSubtree(child)),
       fullPath: this.getPath(node.id),
-      depth: this.getDepth(node.id)
+      depth: this.getDepth(node.id),
     };
   }
 
   // Search and query methods
   findByName(name: string, type?: 'folder' | 'track'): FileSystemNode[] {
-    return Array.from(this.nodes.values()).filter(node => 
-      node.name.toLowerCase().includes(name.toLowerCase()) &&
-      (!type || node.type === type)
+    return Array.from(this.nodes.values()).filter(
+      (node) => node.name.toLowerCase().includes(name.toLowerCase()) && (!type || node.type === type),
     );
   }
 
@@ -354,7 +351,7 @@ export class FileSystemGraph {
     const siblings = parentId ? this.getChildren(parentId) : this.getRootNodes();
     const nameCount = new Map<string, FileSystemNode[]>();
 
-    siblings.forEach(node => {
+    siblings.forEach((node) => {
       if (!nameCount.has(node.name)) {
         nameCount.set(node.name, []);
       }
@@ -376,11 +373,11 @@ export class FileSystemGraph {
     const nodes = Array.from(this.nodes.values());
     return {
       totalNodes: nodes.length,
-      folders: nodes.filter(n => n.type === 'folder').length,
-      tracks: nodes.filter(n => n.type === 'track').length,
-      multitracks: nodes.filter(n => n.type === 'track' && n.isMultitrack).length,
-      maxDepth: Math.max(...nodes.map(n => this.getDepth(n.id))),
-      rootNodes: this.getRootNodes().length
+      folders: nodes.filter((n) => n.type === 'folder').length,
+      tracks: nodes.filter((n) => n.type === 'track').length,
+      multitracks: nodes.filter((n) => n.type === 'track' && n.isMultitrack).length,
+      maxDepth: Math.max(...nodes.map((n) => this.getDepth(n.id))),
+      rootNodes: this.getRootNodes().length,
     };
   }
 }

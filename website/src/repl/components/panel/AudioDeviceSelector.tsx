@@ -23,19 +23,19 @@ export function AudioDeviceSelector({ audioDeviceName, onChange, isDisabled }: A
       setDevices(devices);
     });
   };
-  
+
   const onDeviceChange = (deviceName: string) => {
     if (!devicesInitialized) {
       return;
     }
     onChange(deviceName);
   };
-  
+
   const options = new Map<string, string>();
   Array.from(devices.keys()).forEach((deviceName) => {
     options.set(deviceName, deviceName);
   });
-  
+
   return (
     <SelectInput
       isDisabled={isDisabled}

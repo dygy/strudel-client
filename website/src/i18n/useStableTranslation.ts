@@ -4,13 +4,13 @@ import type { Namespace, Resources } from './types';
 
 /**
  * Stable translation hook that prevents infinite loops in useCallback dependencies
- * 
+ *
  * This hook provides translation functions that have stable references,
  * preventing them from causing infinite re-renders when used in useCallback dependencies.
  */
 export function useStableTranslation<T extends Namespace[]>(...namespaces: T) {
   const { t: originalT, i18n } = useTranslation(namespaces);
-  
+
   // Create stable translation functions that don't change on every render
   const stableTranslations = useMemo(() => {
     return {
@@ -18,23 +18,23 @@ export function useStableTranslation<T extends Namespace[]>(...namespaces: T) {
       files: {
         errors: {
           loadFailed: 'Failed to load files',
-          createTrackFailed: 'Failed to create track', 
+          createTrackFailed: 'Failed to create track',
           createFolderFailed: 'Failed to create folder',
           deleteFailed: 'Failed to delete item',
           moveFailed: 'Failed to move item',
           importFailed: 'Failed to import file',
           exportFailed: 'Failed to export file',
           saveFailed: 'Failed to save track',
-          renameFailed: 'Failed to rename item'
+          renameFailed: 'Failed to rename item',
         },
         success: {
           folderCreated: (name: string) => `Folder '${name}' created successfully`,
           trackCreated: (name: string) => `Track '${name}' created successfully`,
           itemMoved: 'Item moved successfully',
-          itemDeleted: (name: string) => `Item '${name}' deleted successfully`
-        }
+          itemDeleted: (name: string) => `Item '${name}' deleted successfully`,
+        },
       },
-      
+
       // Common translations
       common: {
         loading: 'Loading...',
@@ -43,38 +43,41 @@ export function useStableTranslation<T extends Namespace[]>(...namespaces: T) {
         cancel: 'Cancel',
         confirm: 'Confirm',
         save: 'Save',
-        delete: 'Delete'
-      }
+        delete: 'Delete',
+      },
     };
   }, []); // Empty dependency array - these are stable hardcoded values
 
   // Provide both stable translations and the original t function for other uses
-  const stableT = useCallback((key: string, options?: any) => {
-    // For callback-safe usage, return hardcoded values
-    // This prevents infinite loops while maintaining functionality
-    try {
-      return originalT(key, options);
-    } catch (error) {
-      console.warn(`Translation key not found: ${key}`);
-      return key; // Fallback to key name
-    }
-  }, [originalT]);
+  const stableT = useCallback(
+    (key: string, options?: any) => {
+      // For callback-safe usage, return hardcoded values
+      // This prevents infinite loops while maintaining functionality
+      try {
+        return originalT(key, options);
+      } catch (error) {
+        console.warn(`Translation key not found: ${key}`);
+        return key; // Fallback to key name
+      }
+    },
+    [originalT],
+  );
 
   return {
     // Stable translations for use in useCallback dependencies
     stable: stableTranslations,
-    
+
     // Original translation function for regular use (not in callbacks)
     t: stableT,
-    
+
     // i18n instance
     i18n,
-    
+
     // Type-safe translation functions
     files: {
       error: (key: keyof Resources['files']['errors']) => stableTranslations.files.errors[key],
-      success: stableTranslations.files.success
-    }
+      success: stableTranslations.files.success,
+    },
   };
 }
 
@@ -91,13 +94,13 @@ export const FileTranslationKeys = {
     importFailed: 'files:errors.importFailed',
     exportFailed: 'files:errors.exportFailed',
     saveFailed: 'files:errors.saveFailed',
-    renameFailed: 'files:errors.renameFailed'
+    renameFailed: 'files:errors.renameFailed',
   },
   success: {
     folderCreated: 'files:success.folderCreated',
-    itemMoved: 'files:success.itemMoved', 
-    itemDeleted: 'files:success.itemDeleted'
-  }
+    itemMoved: 'files:success.itemMoved',
+    itemDeleted: 'files:success.itemDeleted',
+  },
 } as const;
 
 /**
@@ -123,5 +126,5 @@ const _translationCheck: TranslationKeyCheck = {
   renameFailed: FileTranslationKeys.errors.renameFailed,
   folderCreated: FileTranslationKeys.success.folderCreated,
   itemMoved: FileTranslationKeys.success.itemMoved,
-  itemDeleted: FileTranslationKeys.success.itemDeleted
+  itemDeleted: FileTranslationKeys.success.itemDeleted,
 };

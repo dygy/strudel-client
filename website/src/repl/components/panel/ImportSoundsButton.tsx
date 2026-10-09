@@ -9,7 +9,7 @@ interface ImportSoundsButtonProps {
 export default function ImportSoundsButton({ onComplete }: ImportSoundsButtonProps) {
   const fileUploadRef = React.createRef<HTMLInputElement>();
   const [isUploading, setIsUploading] = useState(false);
-  
+
   const onChange = useCallback(async () => {
     if (!fileUploadRef.current?.files?.length) {
       return;

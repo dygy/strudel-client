@@ -13,14 +13,14 @@ while ((match = functionPattern.exec(code)) !== null) {
   const functionName = match[1];
   const startIndex = match.index;
   const openParenIndex = match.index + match[0].length - 1;
-  
+
   // Find closing paren
   let depth = 1;
   let closeParenIndex = -1;
-  
+
   for (let i = openParenIndex + 1; i < code.length; i++) {
     const char = code[i];
-    
+
     if (char === '"' || char === "'" || char === '`') {
       const quote = char;
       i++;
@@ -36,7 +36,7 @@ while ((match = functionPattern.exec(code)) !== null) {
       }
       continue;
     }
-    
+
     if (char === '(') depth++;
     else if (char === ')') {
       depth--;
@@ -46,23 +46,23 @@ while ((match = functionPattern.exec(code)) !== null) {
       }
     }
   }
-  
+
   console.log('closeParenIndex:', closeParenIndex);
-  
+
   const fullCall = code.substring(startIndex, closeParenIndex + 1);
   const argsContent = code.substring(openParenIndex + 1, closeParenIndex);
-  
+
   console.log('Full call:', fullCall);
   console.log('Args content:', argsContent);
-  
+
   // Count arguments
   let argCount = 0;
   let argDepth = 0;
   let hasNonWhitespace = false;
-  
+
   for (let i = 0; i < argsContent.length; i++) {
     const char = argsContent[i];
-    
+
     if (char === '"' || char === "'" || char === '`') {
       const quote = char;
       i++;
@@ -79,7 +79,7 @@ while ((match = functionPattern.exec(code)) !== null) {
       }
       continue;
     }
-    
+
     if (char === '(' || char === '[' || char === '{') {
       argDepth++;
       hasNonWhitespace = true;
@@ -92,23 +92,23 @@ while ((match = functionPattern.exec(code)) !== null) {
       hasNonWhitespace = true;
     }
   }
-  
+
   if (hasNonWhitespace) {
     argCount++;
   }
-  
+
   console.log('Argument count:', argCount);
   console.log('Full call length:', fullCall.length);
   console.log('Should format multi-line:', argCount > 1 || fullCall.length > options.printWidth);
-  
+
   // Split arguments
   const args = [];
   let currentArg = '';
   argDepth = 0;
-  
+
   for (let i = 0; i < argsContent.length; i++) {
     const char = argsContent[i];
-    
+
     if (char === '"' || char === "'" || char === '`') {
       const quote = char;
       currentArg += char;
@@ -130,7 +130,7 @@ while ((match = functionPattern.exec(code)) !== null) {
       }
       continue;
     }
-    
+
     if (char === '(' || char === '[' || char === '{') {
       argDepth++;
       currentArg += char;
@@ -144,18 +144,18 @@ while ((match = functionPattern.exec(code)) !== null) {
       currentArg += char;
     }
   }
-  
+
   if (currentArg.trim()) {
     args.push(currentArg.trim());
   }
-  
+
   console.log('Arguments:', args);
-  
+
   // Build formatted version
   const indentStr = '  ';
-  const formattedArgs = args.map(arg => `${indentStr}${arg}`).join(',\n');
+  const formattedArgs = args.map((arg) => `${indentStr}${arg}`).join(',\n');
   const formattedCall = `${functionName}(\n${formattedArgs}\n)`;
-  
+
   console.log('Formatted call:');
   console.log(formattedCall);
 }

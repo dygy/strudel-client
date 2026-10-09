@@ -1,18 +1,18 @@
 /**
  * MixerControls - React component for DJ-style audio mixer controls
- * 
+ *
  * Provides UI for:
  * - Mode toggle (Live/Preview)
  * - Device selection
  * - Transition controls
  * - Visual feedback
- * 
+ *
  * @component
  * @example
  * ```tsx
- * <MixerControls 
- *   mixer={audioMixer} 
- *   onModeChange={(mode) => console.log('Mode changed to:', mode)} 
+ * <MixerControls
+ *   mixer={audioMixer}
+ *   onModeChange={(mode) => console.log('Mode changed to:', mode)}
  * />
  * ```
  */
@@ -22,7 +22,7 @@ import type { AudioMixer } from '@strudel/mixer';
 
 /**
  * Props for MixerControls component
- * 
+ *
  * @interface MixerControlsProps
  * @property {AudioMixer | null} mixer - AudioMixer instance
  * @property {(mode: 'live' | 'preview') => void} [onModeChange] - Callback when mode changes
@@ -57,15 +57,15 @@ export function MixerControls({ mixer, onModeChange }: MixerControlsProps) {
     if (!mixer) return;
 
     // Load available devices
-    mixer.getAvailableDevices().then(devices => {
-      setState(prev => ({ ...prev, availableDevices: devices }));
+    mixer.getAvailableDevices().then((devices) => {
+      setState((prev) => ({ ...prev, availableDevices: devices }));
     });
 
     // Listen for stream state changes
     const handleStreamChange = (e: Event) => {
       const customEvent = e as CustomEvent;
       const { stream, active } = customEvent.detail;
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         [`${stream}Active`]: active,
       }));
@@ -75,7 +75,7 @@ export function MixerControls({ mixer, onModeChange }: MixerControlsProps) {
     const handleTransition = (e: Event) => {
       const customEvent = e as CustomEvent;
       const { state: transitionState } = customEvent.detail;
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         isTransitioning: transitionState === 'start',
       }));
@@ -92,23 +92,23 @@ export function MixerControls({ mixer, onModeChange }: MixerControlsProps) {
 
   const handleModeToggle = () => {
     const newMode = state.currentMode === 'live' ? 'preview' : 'live';
-    setState(prev => ({ ...prev, currentMode: newMode }));
+    setState((prev) => ({ ...prev, currentMode: newMode }));
     onModeChange?.(newMode);
   };
 
   const handleTransition = async (type: 'instant' | 'crossfade') => {
     if (!mixer) return;
 
-    setState(prev => ({ ...prev, isTransitioning: true }));
+    setState((prev) => ({ ...prev, isTransitioning: true }));
     try {
       await mixer.transition(type);
-      setState(prev => ({ ...prev, currentMode: 'live' }));
+      setState((prev) => ({ ...prev, currentMode: 'live' }));
       onModeChange?.('live');
     } catch (err) {
       console.error('Transition failed:', err);
       alert(`Transition failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
-      setState(prev => ({ ...prev, isTransitioning: false }));
+      setState((prev) => ({ ...prev, isTransitioning: false }));
     }
   };
 
@@ -118,10 +118,10 @@ export function MixerControls({ mixer, onModeChange }: MixerControlsProps) {
     try {
       if (stream === 'live') {
         await mixer.setDevices(deviceId, state.previewDevice);
-        setState(prev => ({ ...prev, liveDevice: deviceId }));
+        setState((prev) => ({ ...prev, liveDevice: deviceId }));
       } else {
         await mixer.setDevices(state.liveDevice, deviceId);
-        setState(prev => ({ ...prev, previewDevice: deviceId }));
+        setState((prev) => ({ ...prev, previewDevice: deviceId }));
       }
     } catch (err) {
       console.error(`Failed to set ${stream} device:`, err);
@@ -247,16 +247,10 @@ export function MixerControls({ mixer, onModeChange }: MixerControlsProps) {
 
       {/* Mode Toggle */}
       <div className="mode-toggle">
-        <button
-          className={`live ${state.currentMode === 'live' ? 'active' : ''}`}
-          onClick={handleModeToggle}
-        >
+        <button className={`live ${state.currentMode === 'live' ? 'active' : ''}`} onClick={handleModeToggle}>
           Live {state.liveActive && '🔊'}
         </button>
-        <button
-          className={state.currentMode === 'preview' ? 'active' : ''}
-          onClick={handleModeToggle}
-        >
+        <button className={state.currentMode === 'preview' ? 'active' : ''} onClick={handleModeToggle}>
           Preview {state.previewActive && '🎧'}
         </button>
       </div>
@@ -265,12 +259,9 @@ export function MixerControls({ mixer, onModeChange }: MixerControlsProps) {
       <div className="device-selection">
         <div className="device-row">
           <label>Live Output:</label>
-          <select
-            value={state.liveDevice || ''}
-            onChange={(e) => handleDeviceChange('live', e.target.value)}
-          >
+          <select value={state.liveDevice || ''} onChange={(e) => handleDeviceChange('live', e.target.value)}>
             <option value="">System Default</option>
-            {state.availableDevices.map(device => (
+            {state.availableDevices.map((device) => (
               <option key={device.deviceId} value={device.deviceId}>
                 {device.label || `Device ${device.deviceId.slice(0, 8)}`}
               </option>
@@ -279,12 +270,9 @@ export function MixerControls({ mixer, onModeChange }: MixerControlsProps) {
         </div>
         <div className="device-row">
           <label>Preview Output:</label>
-          <select
-            value={state.previewDevice || ''}
-            onChange={(e) => handleDeviceChange('preview', e.target.value)}
-          >
+          <select value={state.previewDevice || ''} onChange={(e) => handleDeviceChange('preview', e.target.value)}>
             <option value="">System Default</option>
-            {state.availableDevices.map(device => (
+            {state.availableDevices.map((device) => (
               <option key={device.deviceId} value={device.deviceId}>
                 {device.label || `Device ${device.deviceId.slice(0, 8)}`}
               </option>

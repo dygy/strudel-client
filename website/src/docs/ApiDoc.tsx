@@ -32,7 +32,7 @@ function ApiDoc() {
       </p>
     );
   }
-  
+
   return (
     <div>
       <p>

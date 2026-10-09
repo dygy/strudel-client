@@ -10,12 +10,12 @@ const mockLocation = {
   pathname: '/repl',
   search: '',
   hash: '',
-  href: 'http://localhost:3000/repl'
+  href: 'http://localhost:3000/repl',
 };
 
 const mockHistory = {
   pushState: vi.fn(),
-  replaceState: vi.fn()
+  replaceState: vi.fn(),
 };
 
 // Mock window object — stubbed per test and removed afterwards. The root config runs with
@@ -24,7 +24,7 @@ const mockHistory = {
 beforeEach(() => {
   vi.stubGlobal('window', {
     location: mockLocation,
-    history: mockHistory
+    history: mockHistory,
   });
 });
 
@@ -44,21 +44,21 @@ describe('URLParser Path-Based Routing', () => {
   describe('getCurrentTrackId', () => {
     it('should extract track ID from path-based URL', () => {
       mockLocation.pathname = '/repl/track123';
-      
+
       const trackId = URLParser.getCurrentTrackId();
       expect(trackId).toBe('track123');
     });
 
     it('should return null for base repl path', () => {
       mockLocation.pathname = '/repl';
-      
+
       const trackId = URLParser.getCurrentTrackId();
       expect(trackId).toBeNull();
     });
 
     it('should handle complex track IDs', () => {
       mockLocation.pathname = '/repl/po4d1tBa_uMHVQm1_Tp8N';
-      
+
       const trackId = URLParser.getCurrentTrackId();
       expect(trackId).toBe('po4d1tBa_uMHVQm1_Tp8N');
     });
@@ -67,7 +67,7 @@ describe('URLParser Path-Based Routing', () => {
       mockLocation.pathname = '/repl';
       mockLocation.search = '?track=legacy-track-id';
       mockLocation.href = 'http://localhost:3000/repl?track=legacy-track-id';
-      
+
       const trackId = URLParser.getCurrentTrackId();
       expect(trackId).toBe('legacy-track-id');
     });
@@ -75,14 +75,14 @@ describe('URLParser Path-Based Routing', () => {
     it('should prioritize path over query parameter', () => {
       mockLocation.pathname = '/repl/path-track-id';
       mockLocation.search = '?track=query-track-id';
-      
+
       const trackId = URLParser.getCurrentTrackId();
       expect(trackId).toBe('path-track-id');
     });
 
     it('should return null for non-repl paths', () => {
       mockLocation.pathname = '/learn/getting-started';
-      
+
       const trackId = URLParser.getCurrentTrackId();
       expect(trackId).toBeNull();
     });
@@ -91,73 +91,49 @@ describe('URLParser Path-Based Routing', () => {
   describe('updateTrackInURL', () => {
     it('should update URL to path-based format', () => {
       URLParser.updateTrackInURL('new-track-id');
-      
-      expect(mockHistory.pushState).toHaveBeenCalledWith(
-        null, 
-        '', 
-        '/repl/new-track-id'
-      );
+
+      expect(mockHistory.pushState).toHaveBeenCalledWith(null, '', '/repl/new-track-id');
     });
 
     it('should use replace when specified', () => {
       URLParser.updateTrackInURL('new-track-id', true);
-      
-      expect(mockHistory.replaceState).toHaveBeenCalledWith(
-        null, 
-        '', 
-        '/repl/new-track-id'
-      );
+
+      expect(mockHistory.replaceState).toHaveBeenCalledWith(null, '', '/repl/new-track-id');
     });
 
     it('should add step as query parameter', () => {
       URLParser.updateTrackInURL('track-id', false, 2);
-      
-      expect(mockHistory.pushState).toHaveBeenCalledWith(
-        null, 
-        '', 
-        '/repl/track-id?step=2'
-      );
+
+      expect(mockHistory.pushState).toHaveBeenCalledWith(null, '', '/repl/track-id?step=2');
     });
 
     it('should preserve hash', () => {
       mockLocation.hash = '#section1';
-      
+
       URLParser.updateTrackInURL('track-id');
-      
-      expect(mockHistory.pushState).toHaveBeenCalledWith(
-        null, 
-        '', 
-        '/repl/track-id#section1'
-      );
+
+      expect(mockHistory.pushState).toHaveBeenCalledWith(null, '', '/repl/track-id#section1');
     });
 
     it('should redirect to base repl when track is null', () => {
       URLParser.updateTrackInURL(null);
-      
-      expect(mockHistory.pushState).toHaveBeenCalledWith(
-        null, 
-        '', 
-        '/repl'
-      );
+
+      expect(mockHistory.pushState).toHaveBeenCalledWith(null, '', '/repl');
     });
 
     it('should handle track with step and hash', () => {
       mockLocation.hash = '#test';
-      
+
       URLParser.updateTrackInURL('track-id', false, 1);
-      
-      expect(mockHistory.pushState).toHaveBeenCalledWith(
-        null, 
-        '', 
-        '/repl/track-id?step=1#test'
-      );
+
+      expect(mockHistory.pushState).toHaveBeenCalledWith(null, '', '/repl/track-id?step=1#test');
     });
   });
 
   describe('hasTrackInURL', () => {
     it('should return true for path-based track URL', () => {
       mockLocation.pathname = '/repl/some-track';
-      
+
       expect(URLParser.hasTrackInURL()).toBe(true);
     });
 
@@ -165,14 +141,14 @@ describe('URLParser Path-Based Routing', () => {
       mockLocation.pathname = '/repl';
       mockLocation.search = '?track=some-track';
       mockLocation.href = 'http://localhost:3000/repl?track=some-track';
-      
+
       expect(URLParser.hasTrackInURL()).toBe(true);
     });
 
     it('should return false for base repl URL', () => {
       mockLocation.pathname = '/repl';
       mockLocation.search = '';
-      
+
       expect(URLParser.hasTrackInURL()).toBe(false);
     });
   });
@@ -180,22 +156,14 @@ describe('URLParser Path-Based Routing', () => {
   describe('clearTrackFromURL', () => {
     it('should clear track and redirect to base repl', () => {
       URLParser.clearTrackFromURL();
-      
-      expect(mockHistory.replaceState).toHaveBeenCalledWith(
-        null, 
-        '', 
-        '/repl'
-      );
+
+      expect(mockHistory.replaceState).toHaveBeenCalledWith(null, '', '/repl');
     });
 
     it('should use push when replace is false', () => {
       URLParser.clearTrackFromURL(false);
-      
-      expect(mockHistory.pushState).toHaveBeenCalledWith(
-        null, 
-        '', 
-        '/repl'
-      );
+
+      expect(mockHistory.pushState).toHaveBeenCalledWith(null, '', '/repl');
     });
   });
 
@@ -205,19 +173,15 @@ describe('URLParser Path-Based Routing', () => {
       mockLocation.pathname = '/repl';
       mockLocation.search = '?track=old-track-id&step=1';
       mockLocation.href = 'http://localhost:3000/repl?track=old-track-id&step=1';
-      
+
       // Get track ID (should work with old format)
       const trackId = URLParser.getCurrentTrackId();
       expect(trackId).toBe('old-track-id');
-      
+
       // Update to new format
       URLParser.updateTrackInURL(trackId, true, 1);
-      
-      expect(mockHistory.replaceState).toHaveBeenCalledWith(
-        null, 
-        '', 
-        '/repl/old-track-id?step=1'
-      );
+
+      expect(mockHistory.replaceState).toHaveBeenCalledWith(null, '', '/repl/old-track-id?step=1');
     });
   });
 });

@@ -66,10 +66,10 @@ async function hasStrudelJson(subpath: string): Promise<boolean> {
  */
 async function loadStrudelJson(subpath: string): Promise<void> {
   if (!readTextFile) return;
-  
+
   const contents = await readTextFile(subpath + '/strudel.json', { dir });
   const sampleMap: SampleMap = JSON.parse(contents);
-  
+
   processSampleMap(sampleMap, (key, bank) => {
     registerSound(key, (t, hapValue, onended) => onTriggerSample(t, hapValue, onended, bank, fileResolver(subpath)), {
       type: 'sample',
@@ -86,14 +86,14 @@ async function loadStrudelJson(subpath: string): Promise<void> {
  */
 async function writeStrudelJson(subpath: string): Promise<void> {
   if (!readDir || !writeTextFile) return;
-  
+
   const children = await readDir(subpath, { dir, recursive: true });
   const name = subpath.split('/').slice(-1)[0];
   const tree: FileTree = { name, children };
 
   const samples: SampleMap = {};
   let count = 0;
-  
+
   walkFileTree(tree, (entry, parent) => {
     if (['wav', 'mp3'].includes(entry.name.split('.').slice(-1)[0])) {
       samples[parent.name] = samples[parent.name] || [];
@@ -101,7 +101,7 @@ async function writeStrudelJson(subpath: string): Promise<void> {
       samples[parent.name].push(entry.subpath!.slice(1).concat([entry.name]).join('/'));
     }
   });
-  
+
   const json = JSON.stringify(samples, null, 2);
   const filepath = subpath + '/strudel.json';
   await writeTextFile(filepath, json, { dir });
@@ -127,7 +127,7 @@ export const walkFileTree = (node: FileTree, fn: WalkFileTreeCallback): void => 
   if (!Array.isArray(node?.children)) {
     return;
   }
-  
+
   for (const entry of node.children) {
     entry.subpath = (node.subpath || []).concat([node.name]);
     fn(entry, node);
@@ -168,7 +168,7 @@ export async function resolveFileURL(url: string): Promise<string> {
   if (loadCache[url]) {
     return loadCache[url];
   }
-  
+
   loadCache[url] = (async () => {
     if (!readBinaryFile) {
       throw new Error('readBinaryFile not available');
@@ -176,7 +176,7 @@ export async function resolveFileURL(url: string): Promise<string> {
     const contents = await readBinaryFile(url, { dir });
     return uint8ArrayToDataURL(contents);
   })();
-  
+
   return loadCache[url];
 }
 
@@ -185,8 +185,10 @@ export async function resolveFileURL(url: string): Promise<string> {
  * @param subpath - The base path for resolving files
  * @returns Function that resolves relative URLs
  */
-const fileResolver = (subpath: string): FileResolverFunction => 
-  (url: string) => resolveFileURL(subpath.endsWith('/') ? subpath + url : subpath + '/' + url);
+const fileResolver =
+  (subpath: string): FileResolverFunction =>
+  (url: string) =>
+    resolveFileURL(subpath.endsWith('/') ? subpath + url : subpath + '/' + url);
 
 /**
  * Plays an audio file from the file system

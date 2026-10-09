@@ -27,7 +27,7 @@ interface EmbeddedReplEditorProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export default function EmbeddedReplEditor({ context, ...editorProps }: EmbeddedReplEditorProps) {
   const { pending, started, handleTogglePlay, containerRef, editorRef, error, init } = context;
-  
+
   return (
     <div className="h-full flex flex-col relative" {...editorProps}>
       <Loader active={pending} />

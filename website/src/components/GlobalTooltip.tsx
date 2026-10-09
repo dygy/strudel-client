@@ -38,7 +38,7 @@ export function GlobalTooltip() {
       className={cx(
         'fixed z-[10002] px-2 py-1 text-xs rounded shadow-lg border pointer-events-none',
         'max-w-xs break-words',
-        style
+        style,
       )}
       style={{
         left: activeTooltip.position.x,
@@ -46,11 +46,7 @@ export function GlobalTooltip() {
         transform: 'translateX(-50%)', // Center horizontally
       }}
     >
-      {typeof activeTooltip.content === 'string' ? (
-        <span>{activeTooltip.content}</span>
-      ) : (
-        activeTooltip.content
-      )}
+      {typeof activeTooltip.content === 'string' ? <span>{activeTooltip.content}</span> : activeTooltip.content}
     </div>
   );
 }

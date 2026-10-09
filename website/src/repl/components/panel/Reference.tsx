@@ -31,18 +31,17 @@ interface JSDocJson {
 
 const typedJsdocJson = jsdocJson as JSDocJson;
 
-const isValid = ({ name, description }: DocEntry): boolean => 
-  !!name && !name.startsWith('_') && !!description;
+const isValid = ({ name, description }: DocEntry): boolean => !!name && !name.startsWith('_') && !!description;
 
 const availableFunctions = (() => {
   const seen = new Set<string>(); // avoid repetition
   const functions: DocEntry[] = [];
-  
+
   for (const doc of typedJsdocJson.docs) {
     if (!isValid(doc)) continue;
     functions.push(doc);
     const synonyms = doc.synonyms || [];
-    
+
     for (const s of synonyms) {
       if (!s || seen.has(s)) continue;
       seen.add(s);
@@ -88,12 +87,7 @@ export function Reference() {
     <div className="flex h-full w-full p-2 overflow-hidden">
       <div className="h-full  flex flex-col gap-2 w-1/3 max-w-72 ">
         <div className="w-full flex">
-          <Textbox 
-            className="w-full" 
-            placeholder={t('reference.search')} 
-            value={search} 
-            onChange={setSearch} 
-          />
+          <Textbox className="w-full" placeholder={t('reference.search')} value={search} onChange={setSearch} />
         </div>
         <div className="flex flex-col h-full overflow-y-auto  gap-1.5 bg-background bg-opacity-50  rounded-md">
           {visibleFunctions.length === 0 ? (

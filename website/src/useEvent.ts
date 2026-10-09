@@ -9,7 +9,7 @@ import { useEffect } from 'react';
 function useEvent<T = any>(
   name: string,
   onTrigger: (event: CustomEvent<T> | Event) => void,
-  useCapture: boolean = false
+  useCapture: boolean = false,
 ): void {
   useEffect(() => {
     document.addEventListener(name, onTrigger, useCapture);

@@ -1,10 +1,10 @@
 /**
  * @strudel/mixer - DJ-style audio mixer with preview stream
- * 
+ *
  * This package provides dual-stream audio mixing capabilities for Strudel,
  * enabling live coders to preview code changes on a separate audio output
  * before pushing them live.
- * 
+ *
  * @module @strudel/mixer
  * @license AGPL-3.0-or-later
  */

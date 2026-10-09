@@ -11,10 +11,7 @@ export default defineConfig({
       fileName: (ext) => ({ es: 'index.mjs' })[ext],
     },
     rollupOptions: {
-      external: [
-        '@strudel/core',
-        'nanostores',
-      ],
+      external: ['@strudel/core', 'nanostores'],
     },
     target: 'esnext',
   },

@@ -91,10 +91,10 @@ export const loadBuffer = (url, ac, s, n = 0) => {
         logger(`[sampler] load ${label}... done! loaded ${size} in ${took}ms`, 'loaded-sample', { url });
         const decoded = await ac.decodeAudioData(res);
         bufferCache[url] = decoded;
-        
+
         // Track cache access for the new caching system
         trackSampleAccess(url, decoded);
-        
+
         return decoded;
       });
   } else {

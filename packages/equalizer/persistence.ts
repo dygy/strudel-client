@@ -1,6 +1,6 @@
 /**
  * Settings Persistence Layer
- * 
+ *
  * Handles saving and loading equalizer settings to/from localStorage.
  */
 
@@ -45,21 +45,21 @@ export function loadEqualizerSettings(): EqualizerSettings | null {
   try {
     const serialized = localStorage.getItem(STORAGE_KEY);
     if (!serialized) return null;
-    
+
     const settings = JSON.parse(serialized) as EqualizerSettings;
-    
+
     // Validate settings structure
     if (!settings || typeof settings !== 'object') {
       console.warn('[Equalizer] Invalid settings format, using defaults');
       return null;
     }
-    
+
     // Validate bands array
     if (!Array.isArray(settings.bands) || settings.bands.length !== 10) {
       console.warn('[Equalizer] Invalid bands configuration, using defaults');
       return null;
     }
-    
+
     return settings;
   } catch (err) {
     console.warn('[Equalizer] Failed to load settings:', err);
@@ -85,7 +85,7 @@ export function getDefaultSettings(): EqualizerSettings {
       { frequency: 2000, gain: 0, Q: 1.0 },
       { frequency: 4000, gain: 0, Q: 1.0 },
       { frequency: 8000, gain: 0, Q: 1.0 },
-      { frequency: 16000, gain: 0, Q: 1.0 }
-    ]
+      { frequency: 16000, gain: 0, Q: 1.0 },
+    ],
   };
 }

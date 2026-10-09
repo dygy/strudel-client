@@ -21,7 +21,10 @@ export function InfoModal({ isOpen, onClose, title, items }: InfoModalProps) {
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="md">
       <div className="space-y-3">
         {items.map((item, index) => (
-          <div key={index} className="flex justify-between items-start py-2 border-b border-lineHighlight/30 last:border-b-0">
+          <div
+            key={index}
+            className="flex justify-between items-start py-2 border-b border-lineHighlight/30 last:border-b-0"
+          >
             <span className="text-foreground/70 dark:text-foreground/60 font-medium min-w-0 flex-shrink-0 mr-4">
               {item.label}:
             </span>
@@ -31,7 +34,7 @@ export function InfoModal({ isOpen, onClose, title, items }: InfoModalProps) {
           </div>
         ))}
       </div>
-      
+
       <div className="flex justify-end mt-6 pt-4 border-t border-lineHighlight/30">
         <button
           onClick={onClose}

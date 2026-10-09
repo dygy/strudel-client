@@ -50,14 +50,13 @@ interface UseHierarchicalFileTreeReturn {
 
 export function useHierarchicalFileTree({
   tracks,
-  folders
+  folders,
 }: UseHierarchicalFileTreeProps): UseHierarchicalFileTreeReturn {
-  
   const tree = useMemo(() => {
     // Convert object records to arrays
     const trackArray = Object.values(tracks);
     const folderArray = Object.values(folders);
-    
+
     // Transform to hierarchical structure
     return TreeDataTransformer.transformToTree(trackArray, folderArray);
   }, [tracks, folders]);
@@ -93,7 +92,7 @@ export function useHierarchicalFileTree({
     getItemPath,
     getAllTracks,
     getAllFolders,
-    getTreeStats
+    getTreeStats,
   };
 }
 

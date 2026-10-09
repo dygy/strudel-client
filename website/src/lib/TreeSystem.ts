@@ -7,27 +7,27 @@ import { nanoid } from 'nanoid';
 
 // Core tree node interfaces
 export interface TreeNode {
-  id: string;                    // UUID - unique identifier
-  name: string;                  // Display name (allows duplicates)
-  type: 'folder' | 'track';      // Node type
-  parentId: string | null;       // Parent node reference
-  userId: string;                // Owner identifier
-  created: string;               // ISO timestamp
-  modified: string;              // ISO timestamp
-  metadata: NodeMetadata;        // Additional properties
-  
+  id: string; // UUID - unique identifier
+  name: string; // Display name (allows duplicates)
+  type: 'folder' | 'track'; // Node type
+  parentId: string | null; // Parent node reference
+  userId: string; // Owner identifier
+  created: string; // ISO timestamp
+  modified: string; // ISO timestamp
+  metadata: NodeMetadata; // Additional properties
+
   // Computed properties (not stored in database)
-  path?: string;                 // Full hierarchical path
-  depth?: number;                // Distance from root
-  childCount?: number;           // Number of direct children
+  path?: string; // Full hierarchical path
+  depth?: number; // Distance from root
+  childCount?: number; // Number of direct children
 }
 
 export interface TrackNode extends TreeNode {
   type: 'track';
-  code: string;                  // Strudel code content
-  isMultitrack: boolean;         // Multitrack flag
-  steps?: TrackStep[];           // Multitrack steps
-  activeStep: number;            // Current active step
+  code: string; // Strudel code content
+  isMultitrack: boolean; // Multitrack flag
+  steps?: TrackStep[]; // Multitrack steps
+  activeStep: number; // Current active step
 }
 
 export interface FolderNode extends TreeNode {
@@ -44,12 +44,12 @@ export interface TrackStep {
 }
 
 export interface NodeMetadata {
-  tags?: string[];               // User-defined tags
-  color?: string;                // UI color hint
-  description?: string;          // User description
+  tags?: string[]; // User-defined tags
+  color?: string; // UI color hint
+  description?: string; // User description
   customProperties?: Record<string, any>; // Extensible metadata
-  deleted?: boolean;             // Soft delete flag
-  deletedAt?: string;            // Soft delete timestamp
+  deleted?: boolean; // Soft delete flag
+  deletedAt?: string; // Soft delete timestamp
 }
 
 // Tree statistics and validation interfaces
@@ -102,13 +102,13 @@ export interface ValidationWarning {
 
 // Search and query interfaces
 export interface SearchQuery {
-  term?: string;                 // Text search term
-  type?: 'folder' | 'track';     // Filter by node type
-  parentId?: string;             // Search within specific parent
-  tags?: string[];               // Filter by tags
-  pattern?: string;              // Regex pattern for names
-  maxDepth?: number;             // Limit search depth
-  includeMetadata?: boolean;     // Search in metadata
+  term?: string; // Text search term
+  type?: 'folder' | 'track'; // Filter by node type
+  parentId?: string; // Search within specific parent
+  tags?: string[]; // Filter by tags
+  pattern?: string; // Regex pattern for names
+  maxDepth?: number; // Limit search depth
+  includeMetadata?: boolean; // Search in metadata
 }
 
 export interface SearchResult {
@@ -147,10 +147,10 @@ export class TreeEngine {
     }
 
     this.nodes.set(node.id, node);
-    
+
     if (node.parentId) {
       this.parents.set(node.id, node.parentId);
-      
+
       if (!this.children.has(node.parentId)) {
         this.children.set(node.parentId, new Set());
       }
@@ -176,7 +176,7 @@ export class TreeEngine {
     // Remove all descendants recursively
     const childIds = this.children.get(nodeId);
     if (childIds) {
-      Array.from(childIds).forEach(childId => {
+      Array.from(childIds).forEach((childId) => {
         this.removeNode(childId);
       });
     }
@@ -232,13 +232,13 @@ export class TreeEngine {
     if (!root) return;
 
     const stack: Array<{ nodeId: string; depth: number; path: string }> = [
-      { nodeId: rootId, depth: 0, path: this.computePath(rootId) }
+      { nodeId: rootId, depth: 0, path: this.computePath(rootId) },
     ];
     const visited = new Set<string>();
 
     while (stack.length > 0) {
       const { nodeId, depth, path } = stack.pop()!;
-      
+
       // Prevent infinite loops in case of data corruption
       if (visited.has(nodeId)) continue;
       visited.add(nodeId);
@@ -263,14 +263,14 @@ export class TreeEngine {
       const childIds = this.children.get(nodeId);
       if (childIds) {
         const childArray = Array.from(childIds).reverse();
-        childArray.forEach(childId => {
+        childArray.forEach((childId) => {
           if (!visited.has(childId)) {
             const childNode = this.nodes.get(childId);
             if (childNode) {
               stack.push({
                 nodeId: childId,
                 depth: depth + 1,
-                path: `${path}/${childNode.name}`
+                path: `${path}/${childNode.name}`,
               });
             }
           }
@@ -284,13 +284,13 @@ export class TreeEngine {
     if (!root) return;
 
     const queue: Array<{ nodeId: string; depth: number; path: string }> = [
-      { nodeId: rootId, depth: 0, path: this.computePath(rootId) }
+      { nodeId: rootId, depth: 0, path: this.computePath(rootId) },
     ];
     const visited = new Set<string>();
 
     while (queue.length > 0) {
       const { nodeId, depth, path } = queue.shift()!;
-      
+
       // Prevent infinite loops in case of data corruption
       if (visited.has(nodeId)) continue;
       visited.add(nodeId);
@@ -314,14 +314,14 @@ export class TreeEngine {
       // Add children to queue
       const childIds = this.children.get(nodeId);
       if (childIds) {
-        Array.from(childIds).forEach(childId => {
+        Array.from(childIds).forEach((childId) => {
           if (!visited.has(childId)) {
             const childNode = this.nodes.get(childId);
             if (childNode) {
               queue.push({
                 nodeId: childId,
                 depth: depth + 1,
-                path: `${path}/${childNode.name}`
+                path: `${path}/${childNode.name}`,
               });
             }
           }
@@ -404,13 +404,13 @@ export class TreeEngine {
   // Enhanced path resolution with better error handling
   resolvePath(path: string): string | null {
     if (!path || path.trim().length === 0) return null;
-    
-    const parts = path.split('/').filter(part => part.length > 0);
+
+    const parts = path.split('/').filter((part) => part.length > 0);
     if (parts.length === 0) return null;
 
     // Find root nodes matching the first part (deterministic: return first match)
-    const rootNodes = Array.from(this.nodes.values()).filter(node => !node.parentId);
-    let currentNode = rootNodes.find(node => node.name === parts[0]);
+    const rootNodes = Array.from(this.nodes.values()).filter((node) => !node.parentId);
+    let currentNode = rootNodes.find((node) => node.name === parts[0]);
     if (!currentNode) return null;
 
     // Traverse path parts (deterministic: always take first match)
@@ -437,47 +437,47 @@ export class TreeEngine {
   // Batch path resolution for multiple paths
   resolveMultiplePaths(paths: string[]): Map<string, string | null> {
     const results = new Map<string, string | null>();
-    
+
     for (const path of paths) {
       results.set(path, this.resolvePath(path));
     }
-    
+
     return results;
   }
 
   // Find all paths matching a pattern
   findPathsByPattern(pattern: RegExp): Array<{ nodeId: string; path: string }> {
     const matches: Array<{ nodeId: string; path: string }> = [];
-    
+
     for (const nodeId of Array.from(this.nodes.keys())) {
       const path = this.computePath(nodeId);
       if (pattern.test(path)) {
         matches.push({ nodeId, path });
       }
     }
-    
+
     return matches;
   }
 
   // Get all paths in the tree (useful for debugging and export)
   getAllPaths(): Map<string, string> {
     const paths = new Map<string, string>();
-    
+
     for (const nodeId of Array.from(this.nodes.keys())) {
       paths.set(nodeId, this.computePath(nodeId));
     }
-    
+
     return paths;
   }
 
   // Enhanced cache invalidation with cascade support
   invalidatePathCache(nodeId: string): void {
     this.pathCache.delete(nodeId);
-    
+
     // Invalidate all descendants recursively
     const childIds = this.children.get(nodeId);
     if (childIds) {
-      Array.from(childIds).forEach(childId => {
+      Array.from(childIds).forEach((childId) => {
         this.invalidatePathCache(childId);
       });
     }
@@ -499,15 +499,15 @@ export class TreeEngine {
   searchNodes(query: SearchQuery): SearchResult {
     const startTime = performance.now();
     const matchingNodes: TreeNode[] = [];
-    
+
     for (const [nodeId, node] of Array.from(this.nodes.entries())) {
       let matches = true;
-      
+
       // Filter by type
       if (query.type && node.type !== query.type) {
         matches = false;
       }
-      
+
       // Filter by parent
       if (matches && query.parentId !== undefined) {
         if (query.parentId === null) {
@@ -518,49 +518,49 @@ export class TreeEngine {
           matches = node.parentId === query.parentId;
         }
       }
-      
+
       // Text search in name
       if (matches && query.term) {
         const searchTerm = query.term.toLowerCase();
         matches = node.name.toLowerCase().includes(searchTerm);
-        
+
         // Also search in metadata if requested
         if (!matches && query.includeMetadata) {
           const metadataStr = JSON.stringify(node.metadata).toLowerCase();
           matches = metadataStr.includes(searchTerm);
         }
       }
-      
+
       // Pattern matching
       if (matches && query.pattern) {
         const regex = new RegExp(query.pattern, 'i');
         matches = regex.test(node.name);
       }
-      
+
       // Tag filtering
       if (matches && query.tags && query.tags.length > 0) {
         const nodeTags = node.metadata.tags || [];
-        matches = query.tags.some(tag => nodeTags.includes(tag));
+        matches = query.tags.some((tag) => nodeTags.includes(tag));
       }
-      
+
       // Depth filtering
       if (matches && query.maxDepth !== undefined) {
         const depth = this.getNodeDepth(nodeId);
         matches = depth <= query.maxDepth;
       }
-      
+
       if (matches) {
         matchingNodes.push(node);
       }
     }
-    
+
     const searchTime = performance.now() - startTime;
-    
+
     return {
       nodes: matchingNodes,
       totalCount: matchingNodes.length,
       searchTime,
-      query
+      query,
     };
   }
 
@@ -576,7 +576,7 @@ export class TreeEngine {
         type: 'cycle',
         nodeId,
         message: `Node ${nodeId} is part of a cycle`,
-        severity: 'error'
+        severity: 'error',
       });
     }
 
@@ -587,7 +587,7 @@ export class TreeEngine {
         type: 'orphan',
         nodeId,
         message: `Node ${nodeId} references non-existent parent`,
-        severity: 'error'
+        severity: 'error',
       });
     }
 
@@ -598,7 +598,7 @@ export class TreeEngine {
           type: 'invalid_parent',
           nodeId,
           message: `Node ${nodeId} references non-existent parent ${node.parentId}`,
-          severity: 'error'
+          severity: 'error',
         });
       }
     }
@@ -612,7 +612,7 @@ export class TreeEngine {
             type: 'duplicate_name',
             nodeId,
             message: `Node ${nodeId} has duplicate name "${group.name}" with ${group.nodes.length - 1} other nodes`,
-            suggestion: 'Consider renaming to avoid confusion'
+            suggestion: 'Consider renaming to avoid confusion',
           });
         }
       }
@@ -627,7 +627,7 @@ export class TreeEngine {
           type: 'deep_nesting',
           nodeId,
           message: `Node ${nodeId} is at depth ${maxDepth}, which may impact performance`,
-          suggestion: 'Consider flattening the hierarchy'
+          suggestion: 'Consider flattening the hierarchy',
         });
       }
     }
@@ -635,7 +635,7 @@ export class TreeEngine {
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 
@@ -643,19 +643,15 @@ export class TreeEngine {
   detectCycle(nodeId: string): boolean {
     const visited = new Set<string>();
     const recursionStack = new Set<string>();
-    
+
     return this.detectCycleFromNodeEnhanced(nodeId, visited, recursionStack);
   }
 
-  private detectCycleFromNodeEnhanced(
-    nodeId: string,
-    visited: Set<string>,
-    recursionStack: Set<string>
-  ): boolean {
+  private detectCycleFromNodeEnhanced(nodeId: string, visited: Set<string>, recursionStack: Set<string>): boolean {
     if (recursionStack.has(nodeId)) {
       return true; // Cycle detected
     }
-    
+
     if (visited.has(nodeId)) {
       return false; // Already processed
     }
@@ -675,33 +671,33 @@ export class TreeEngine {
   // Find duplicate names within the same parent
   findDuplicateNames(): Array<{ name: string; count: number; nodes: string[] }> {
     const nameGroups = new Map<string, Map<string, string[]>>();
-    
+
     // Group nodes by parent and name
     for (const [nodeId, node] of Array.from(this.nodes.entries())) {
       const parentKey = node.parentId || 'root';
-      
+
       if (!nameGroups.has(parentKey)) {
         nameGroups.set(parentKey, new Map());
       }
-      
+
       const parentGroup = nameGroups.get(parentKey)!;
       if (!parentGroup.has(node.name)) {
         parentGroup.set(node.name, []);
       }
-      
+
       parentGroup.get(node.name)!.push(nodeId);
     }
 
     // Find duplicates
     const duplicates: Array<{ name: string; count: number; nodes: string[] }> = [];
-    
+
     for (const parentGroup of Array.from(nameGroups.values())) {
       for (const [name, nodeIds] of Array.from(parentGroup.entries())) {
         if (nodeIds.length > 1) {
           duplicates.push({
             name,
             count: nodeIds.length,
-            nodes: nodeIds
+            nodes: nodeIds,
           });
         }
       }
@@ -713,12 +709,12 @@ export class TreeEngine {
   // Get maximum depth in the tree
   getMaxDepth(): number {
     let maxDepth = 0;
-    
+
     for (const nodeId of Array.from(this.nodes.keys())) {
       const depth = this.getNodeDepth(nodeId);
       maxDepth = Math.max(maxDepth, depth);
     }
-    
+
     return maxDepth;
   }
 
@@ -727,7 +723,7 @@ export class TreeEngine {
     let depth = 0;
     let currentId = nodeId;
     const visited = new Set<string>();
-    
+
     while (currentId && !visited.has(currentId)) {
       visited.add(currentId);
       const parentId = this.parents.get(currentId);
@@ -738,20 +734,20 @@ export class TreeEngine {
         break;
       }
     }
-    
+
     return depth;
   }
 
   // Find all nodes at a specific depth
   findNodesAtDepth(targetDepth: number): string[] {
     const nodesAtDepth: string[] = [];
-    
+
     for (const nodeId of Array.from(this.nodes.keys())) {
       if (this.getNodeDepth(nodeId) === targetDepth) {
         nodesAtDepth.push(nodeId);
       }
     }
-    
+
     return nodesAtDepth;
   }
 
@@ -759,22 +755,22 @@ export class TreeEngine {
   repairOrphans(): string[] {
     const orphans = this.findOrphanedNodes();
     const repairedNodes: string[] = [];
-    
+
     for (const nodeId of orphans) {
       const node = this.nodes.get(nodeId);
       if (node) {
         // Move orphan to root
         node.parentId = null;
         node.modified = new Date().toISOString();
-        
+
         // Update internal structures
         this.parents.delete(nodeId);
         this.invalidatePathCache(nodeId);
-        
+
         repairedNodes.push(nodeId);
       }
     }
-    
+
     return repairedNodes;
   }
 
@@ -816,7 +812,7 @@ export class TreeEngine {
     while (current) {
       if (current === nodeId) return true;
       if (visited.has(current)) break; // Existing cycle, but not involving our node
-      
+
       visited.add(current);
       current = this.parents.get(current) || null;
     }
@@ -842,7 +838,7 @@ export class TreeEngine {
     nodeId: string,
     visited: Set<string>,
     recursionStack: Set<string>,
-    cycles: string[]
+    cycles: string[],
   ): boolean {
     visited.add(nodeId);
     recursionStack.add(nodeId);
@@ -882,7 +878,7 @@ export class TreeEngine {
     if (!childIds) return [];
 
     return Array.from(childIds)
-      .map(id => this.nodes.get(id))
+      .map((id) => this.nodes.get(id))
       .filter((node): node is TreeNode => node !== undefined);
   }
 
@@ -892,7 +888,7 @@ export class TreeEngine {
   }
 
   getRootNodes(): TreeNode[] {
-    return Array.from(this.nodes.values()).filter(node => !node.parentId);
+    return Array.from(this.nodes.values()).filter((node) => !node.parentId);
   }
 
   getNode(nodeId: string): TreeNode | null {
@@ -913,10 +909,10 @@ export function createFolderNode(
   name: string,
   userId: string,
   parentId: string | null = null,
-  metadata: NodeMetadata = {}
+  metadata: NodeMetadata = {},
 ): FolderNode {
   const now = new Date().toISOString();
-  
+
   return {
     id: nanoid(),
     name,
@@ -925,7 +921,7 @@ export function createFolderNode(
     userId,
     created: now,
     modified: now,
-    metadata
+    metadata,
   };
 }
 
@@ -935,10 +931,10 @@ export function createTrackNode(
   userId: string,
   parentId: string | null = null,
   isMultitrack: boolean = false,
-  metadata: NodeMetadata = {}
+  metadata: NodeMetadata = {},
 ): TrackNode {
   const now = new Date().toISOString();
-  
+
   return {
     id: nanoid(),
     name,
@@ -951,18 +947,18 @@ export function createTrackNode(
     code,
     isMultitrack,
     steps: isMultitrack ? [] : undefined,
-    activeStep: 0
+    activeStep: 0,
   };
 }
 
 export function createTrackStep(name: string, code: string): TrackStep {
   const now = new Date().toISOString();
-  
+
   return {
     id: nanoid(),
     name,
     code,
     created: now,
-    modified: now
+    modified: now,
   };
 }

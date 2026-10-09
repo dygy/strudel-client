@@ -141,7 +141,7 @@ export function SoundsTab() {
                   console.warn('No onTrigger function for sound:', name);
                   return;
                 }
-                
+
                 try {
                   const ctx = getAudioContext();
                   const params = {
@@ -155,20 +155,22 @@ export function SoundsTab() {
                   };
                   soundPreviewIdx++;
                   const time = ctx.currentTime + 0.05;
-                  const onended = () => trigRef.current?.then(ref => ref?.node?.disconnect());
-                  
+                  const onended = () => trigRef.current?.then((ref) => ref?.node?.disconnect());
+
                   trigRef.current = Promise.resolve(onTrigger(time, params, onended));
-                  trigRef.current.then((ref) => {
-                    if (ref?.node) {
-                      try {
-                        connectToDestination(ref.node);
-                      } catch (error) {
-                        console.warn('Failed to connect audio node:', error);
+                  trigRef.current
+                    .then((ref) => {
+                      if (ref?.node) {
+                        try {
+                          connectToDestination(ref.node);
+                        } catch (error) {
+                          console.warn('Failed to connect audio node:', error);
+                        }
                       }
-                    }
-                  }).catch((error) => {
-                    console.warn('Failed to trigger sound:', error);
-                  });
+                    })
+                    .catch((error) => {
+                      console.warn('Failed to trigger sound:', error);
+                    });
                 } catch (error) {
                   console.warn('Failed to preview sound:', name, error);
                 }

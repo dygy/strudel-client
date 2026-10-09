@@ -133,8 +133,9 @@ You might not be able to see this properly here: [open in REPL](/#YXdhaXQgaW5pdE
 ### Audio Frequency Bands
 
 The `a.fft` array has 4 frequency bands:
+
 - `a.fft[0]` - Bass frequencies
-- `a.fft[1]` - Low-mid frequencies  
+- `a.fft[1]` - Low-mid frequencies
 - `a.fft[2]` - High-mid frequencies
 - `a.fft[3]` - Treble frequencies
 
@@ -176,7 +177,6 @@ $: note("[<g1!3 <bb1 <f1 d1>>>]\*3").s("sawtooth")
 
 all(x=>x.fft(4).scope({pos:0,smear:.95}))`}
 />
-
 
 ## More Hydra Techniques
 
@@ -238,9 +238,9 @@ osc(10, 0.1, 0)
 let pattern = "0 1 2 [3 4]*2"
 
 osc(H(pattern).range(5, 30), 0.1, 0)
-  .kaleid(H(pattern).range(3, 8))
-  .color(0.8, 0.5, 0.9)
-  .out()
+.kaleid(H(pattern).range(3, 8))
+.color(0.8, 0.5, 0.9)
+.out()
 
 // Play the pattern
 n(pattern).scale("C:minor").piano()
@@ -259,6 +259,7 @@ n(pattern).scale("C:minor").piano()
 ## Common Hydra Functions
 
 ### Sources
+
 - `osc(freq, sync, offset)` - Oscillating pattern
 - `noise(scale, offset)` - Random noise
 - `shape(sides, radius, smoothing)` - Geometric shapes
@@ -266,6 +267,7 @@ n(pattern).scale("C:minor").piano()
 - `solid(r, g, b, a)` - Solid color
 
 ### Geometry
+
 - `rotate(angle, speed)` - Rotate the image
 - `scale(amount, xMult, yMult)` - Scale the image
 - `pixelate(x, y)` - Pixelate effect
@@ -273,6 +275,7 @@ n(pattern).scale("C:minor").piano()
 - `repeat(x, y)` - Tile the image
 
 ### Color
+
 - `color(r, g, b)` - Colorize
 - `invert(amount)` - Invert colors
 - `luma(threshold, tolerance)` - Luma key
@@ -280,6 +283,7 @@ n(pattern).scale("C:minor").piano()
 - `saturate(amount)` - Adjust saturation
 
 ### Blend
+
 - `blend(source, amount)` - Blend with another source
 - `diff(source)` - Difference blend
 - `add(source, amount)` - Additive blend

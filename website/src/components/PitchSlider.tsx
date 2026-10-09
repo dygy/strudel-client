@@ -183,7 +183,7 @@ export function PitchSlider({
     const expOffset = baseFrequency ? Math.log2(baseFrequency / min) : 0;
     const expValue = freq2pitchSlider(hz) * Math.log2(max / min) - expOffset;
     let semitones = parseFloat((expValue * 12).toFixed(2));
-    
+
     if (zeroOffset) {
       semitones = semitones + zeroOffset;
       const isWhole = Math.round(semitones) === semitones;

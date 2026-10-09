@@ -25,7 +25,7 @@ export const tooltipStore = atom<TooltipState>({
 export const tooltipActions = {
   show: (tooltip: TooltipData) => {
     const state = tooltipStore.get();
-    
+
     // Don't show tooltip if we're already showing the same one
     if (state.activeTooltip?.id === tooltip.id && state.isVisible) {
       return;
@@ -48,7 +48,7 @@ export const tooltipActions = {
 
   setHovered: (elementId: string | null) => {
     const state = tooltipStore.get();
-    
+
     // If we're hovering over the same element, don't change anything
     if (state.hoveredElement === elementId) {
       return;

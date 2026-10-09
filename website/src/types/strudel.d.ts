@@ -22,7 +22,13 @@ type TriggerFunction = (t: number, hapValue: HapValue, onended: () => void, ...a
 
 declare module '@strudel/webaudio' {
   export function registerSound(key: string, onTrigger: TriggerFunction, data?: any): void;
-  export function onTriggerSample(t: number, hapValue: HapValue, onended: () => void, bank: any, resolveUrl?: (url: string) => Promise<string> | string): void;
+  export function onTriggerSample(
+    t: number,
+    hapValue: HapValue,
+    onended: () => void,
+    bank: any,
+    resolveUrl?: (url: string) => Promise<string> | string,
+  ): void;
   export function getAudioContext(): AudioContext;
   export function getAudioContextCurrentTime(): number;
   export function samples(sampleMap: string | Record<string, string[]>, baseUrl?: string, options?: any): Promise<void>;
@@ -48,7 +54,7 @@ declare module '@strudel/webaudio' {
   export function registerSamplesPrefix(prefix: string, resolve: (path: string) => Promise<void> | void): void;
   export function processSampleMap(sampleMap: any, fn: (key: string, bank: any) => void, baseUrl?: string): void;
   export function loadBuffer(url: string, audioContext: AudioContext, s?: string, n?: number): Promise<AudioBuffer>;
-  
+
   // Sample Cache Functions
   export function configureSampleCache(config: any): void;
   export function getCacheConfig(): any;
@@ -78,7 +84,7 @@ declare module '@strudel/webaudio' {
   }
 
   export function getSuperdoughAudioController(): SuperdoughAudioController;
-  
+
   // Add other exports as needed
 }
 
@@ -161,14 +167,14 @@ declare module '@strudel/codemirror' {
   export const defaultSettings: any;
   export const themes: any;
   export function formatCode(code: string): Promise<string>;
-  
+
   // Prettier extension exports
   export interface FormatResult {
     success: boolean;
     formattedCode?: string;
     error?: string;
   }
-  
+
   export interface PrettierSettings {
     isPrettierEnabled?: boolean;
     prettierAutoFormatOnSave?: boolean;
@@ -182,10 +188,10 @@ declare module '@strudel/codemirror' {
     prettierArrowParens?: 'avoid' | 'always';
     prettierPrintWidth?: number;
   }
-  
+
   export function autoFormatOnSave(code: string, settings: PrettierSettings): Promise<FormatResult>;
   export function prettierExtension(): any;
-  
+
   // Add other exports as needed
 }
 
@@ -210,13 +216,16 @@ declare module '@strudel/soundfonts' {
 
 declare module '@strudel/mixer' {
   export class PreviewEngine {
-    constructor(audioContext: AudioContext, deps: {
-      superdough: Function;
-      repl: Function;
-      getTime: () => number;
-      SuperdoughAudioController: new (ctx: AudioContext) => any;
-      transpiler?: Function;
-    });
+    constructor(
+      audioContext: AudioContext,
+      deps: {
+        superdough: Function;
+        repl: Function;
+        getTime: () => number;
+        SuperdoughAudioController: new (ctx: AudioContext) => any;
+        transpiler?: Function;
+      },
+    );
 
     audioContext: AudioContext;
     controller: any | null;

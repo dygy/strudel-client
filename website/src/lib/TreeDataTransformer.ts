@@ -32,16 +32,16 @@ export interface TreeItem {
   created: string;
   modified?: string;
   children?: TreeItem[];
-  
+
   // Track-specific properties
   code?: string;
   isMultitrack?: boolean;
   steps?: any[];
   activeStep?: number;
-  
+
   // Folder-specific properties
   path?: string;
-  
+
   // Common properties
   user_id: string;
 }
@@ -63,91 +63,99 @@ export class TreeDataTransformer {
       type: 'folder',
       created: new Date().toISOString(),
       children: [],
-      user_id: tracks[0]?.user_id || folders[0]?.user_id || ''
+      user_id: tracks[0]?.user_id || folders[0]?.user_id || '',
     };
 
     // Create a map for quick folder lookup - USE ONLY UUIDs
     const folderMap = new Map<string, TreeItem>();
-    
+
     // Add root to folder map
     folderMap.set('root', root);
 
     // Convert folders to tree items first
-    const folderItems: TreeItem[] = folders.map(folder => ({
+    const folderItems: TreeItem[] = folders.map((folder) => ({
       id: folder.id,
       name: folder.name,
       type: 'folder' as const,
       created: folder.created,
       path: folder.path,
       children: [],
-      user_id: folder.user_id
+      user_id: folder.user_id,
     }));
 
     // SANITIZATION: Fix folders with duplicate paths by recalculating paths based on parent hierarchy
     const sanitizeFolderPaths = (folders: FlatFolder[]): FlatFolder[] => {
       console.log('TreeDataTransformer - Starting path sanitization for', folders.length, 'folders');
-      console.log('TreeDataTransformer - Input folders:', folders.map(f => ({ id: f.id, name: f.name, path: f.path, parent: f.parent })));
-      
+      console.log(
+        'TreeDataTransformer - Input folders:',
+        folders.map((f) => ({ id: f.id, name: f.name, path: f.path, parent: f.parent })),
+      );
+
       const pathCounts = new Map<string, number>();
       const sanitizedFolders: FlatFolder[] = [];
-      
+
       // Count path occurrences
-      folders.forEach(folder => {
+      folders.forEach((folder) => {
         pathCounts.set(folder.path, (pathCounts.get(folder.path) || 0) + 1);
       });
-      
+
       console.log('TreeDataTransformer - Path counts:', Array.from(pathCounts.entries()));
-      
+
       // Fix duplicate paths
-      folders.forEach(folder => {
+      folders.forEach((folder) => {
         if (pathCounts.get(folder.path)! > 1) {
           // This path is duplicated, recalculate based on parent
           let correctPath = folder.name;
-          
+
           if (folder.parent && folder.parent !== 'root' && folder.parent !== '') {
-            const parentFolder = folders.find(f => f.id === folder.parent);
+            const parentFolder = folders.find((f) => f.id === folder.parent);
             if (parentFolder) {
               correctPath = `${parentFolder.path}/${folder.name}`;
             }
           }
-          
-          console.warn(`TreeDataTransformer - Fixed duplicate path: "${folder.path}" -> "${correctPath}" for folder "${folder.name}" (ID: ${folder.id})`);
-          
+
+          console.warn(
+            `TreeDataTransformer - Fixed duplicate path: "${folder.path}" -> "${correctPath}" for folder "${folder.name}" (ID: ${folder.id})`,
+          );
+
           sanitizedFolders.push({
             ...folder,
-            path: correctPath
+            path: correctPath,
           });
         } else {
           sanitizedFolders.push(folder);
         }
       });
-      
-      console.log('TreeDataTransformer - Sanitized folders:', sanitizedFolders.map(f => ({ id: f.id, name: f.name, path: f.path, parent: f.parent })));
+
+      console.log(
+        'TreeDataTransformer - Sanitized folders:',
+        sanitizedFolders.map((f) => ({ id: f.id, name: f.name, path: f.path, parent: f.parent })),
+      );
       return sanitizedFolders;
     };
-    
+
     // Apply sanitization
     const sanitizedFolders = sanitizeFolderPaths(folders);
-    
+
     // Update folderItems with sanitized paths
-    const sanitizedFolderItems: TreeItem[] = sanitizedFolders.map(folder => ({
+    const sanitizedFolderItems: TreeItem[] = sanitizedFolders.map((folder) => ({
       id: folder.id,
       name: folder.name,
       type: 'folder' as const,
       created: folder.created,
       path: folder.path,
       children: [],
-      user_id: folder.user_id
+      user_id: folder.user_id,
     }));
 
     // Add folders to the map using ONLY their UUIDs
-    sanitizedFolderItems.forEach(folder => {
+    sanitizedFolderItems.forEach((folder) => {
       folderMap.set(folder.id, folder);
     });
-    
+
     // Also create a path-to-folder map for tracks that store folder paths
     const folderPathMap = new Map<string, TreeItem>();
-    sanitizedFolderItems.forEach(folder => {
+    sanitizedFolderItems.forEach((folder) => {
       if (folder.path) {
         folderPathMap.set(folder.path, folder);
       }
@@ -156,26 +164,28 @@ export class TreeDataTransformer {
     // Build folder hierarchy using UUIDs only
     // Process folders in dependency order: parents first, then children
     const processedFolders = new Set<string>();
-    
+
     const processFolderHierarchy = (folderId: string) => {
       if (processedFolders.has(folderId)) return;
-      
-      const folder = sanitizedFolderItems.find(f => f.id === folderId);
-      const originalFolder = sanitizedFolders.find(f => f.id === folderId);
-      
+
+      const folder = sanitizedFolderItems.find((f) => f.id === folderId);
+      const originalFolder = sanitizedFolders.find((f) => f.id === folderId);
+
       if (!folder || !originalFolder) return;
-      
+
       // Process parent first if it exists and hasn't been processed
-      if (originalFolder.parent && 
-          originalFolder.parent !== 'root' && 
-          originalFolder.parent !== '' && 
-          !processedFolders.has(originalFolder.parent)) {
+      if (
+        originalFolder.parent &&
+        originalFolder.parent !== 'root' &&
+        originalFolder.parent !== '' &&
+        !processedFolders.has(originalFolder.parent)
+      ) {
         processFolderHierarchy(originalFolder.parent);
       }
-      
+
       // Now process this folder
       let parentFolder: TreeItem;
-      
+
       if (!originalFolder.parent || originalFolder.parent === 'root' || originalFolder.parent === '') {
         // This folder belongs to root
         parentFolder = root;
@@ -183,29 +193,33 @@ export class TreeDataTransformer {
       } else {
         // Find parent folder by UUID only
         parentFolder = folderMap.get(originalFolder.parent) || root;
-        
+
         if (!folderMap.has(originalFolder.parent)) {
-          console.warn(`TreeDataTransformer - Parent folder UUID not found: ${originalFolder.parent}, placing "${folder.name}" in root`);
+          console.warn(
+            `TreeDataTransformer - Parent folder UUID not found: ${originalFolder.parent}, placing "${folder.name}" in root`,
+          );
         } else {
-          console.log(`TreeDataTransformer - Placing folder "${folder.name}" (${folder.id}) under parent "${parentFolder.name}" (${originalFolder.parent})`);
+          console.log(
+            `TreeDataTransformer - Placing folder "${folder.name}" (${folder.id}) under parent "${parentFolder.name}" (${originalFolder.parent})`,
+          );
         }
       }
 
       if (!parentFolder.children) {
         parentFolder.children = [];
       }
-      
+
       parentFolder.children.push(folder);
       processedFolders.add(folderId);
     };
-    
+
     // Process all folders
-    sanitizedFolderItems.forEach(folder => {
+    sanitizedFolderItems.forEach((folder) => {
       processFolderHierarchy(folder.id);
     });
 
     // Convert tracks to tree items and place them in appropriate folders
-    const trackItems: TreeItem[] = tracks.map(track => ({
+    const trackItems: TreeItem[] = tracks.map((track) => ({
       id: track.id,
       name: track.name,
       type: 'track' as const,
@@ -215,12 +229,12 @@ export class TreeDataTransformer {
       isMultitrack: track.isMultitrack,
       steps: track.steps,
       activeStep: track.activeStep,
-      user_id: track.user_id
+      user_id: track.user_id,
     }));
 
     // Place tracks in their folders - try UUID first, then path as fallback
-    trackItems.forEach(track => {
-      const originalTrack = tracks.find(t => t.id === track.id);
+    trackItems.forEach((track) => {
+      const originalTrack = tracks.find((t) => t.id === track.id);
       if (!originalTrack) return;
 
       let parentFolder: TreeItem;
@@ -232,26 +246,30 @@ export class TreeDataTransformer {
       } else {
         // Try to find parent folder by UUID first
         parentFolder = folderMap.get(originalTrack.folder);
-        
+
         if (!parentFolder) {
           // Fallback: try to find by path (for tracks that store folder paths)
           parentFolder = folderPathMap.get(originalTrack.folder);
-          
+
           if (!parentFolder) {
-            console.warn(`TreeDataTransformer - Folder not found for track "${track.name}", folder reference: "${originalTrack.folder}", placing in root`);
+            console.warn(
+              `TreeDataTransformer - Folder not found for track "${track.name}", folder reference: "${originalTrack.folder}", placing in root`,
+            );
             parentFolder = root;
           } else {
             console.log(`TreeDataTransformer - Found folder by path for track "${track.name}": "${parentFolder.name}"`);
           }
         } else {
-          console.log(`TreeDataTransformer - Placing track "${track.name}" (${track.id}) under folder "${parentFolder.name}" (${originalTrack.folder})`);
+          console.log(
+            `TreeDataTransformer - Placing track "${track.name}" (${track.id}) under folder "${parentFolder.name}" (${originalTrack.folder})`,
+          );
         }
       }
 
       if (!parentFolder.children) {
         parentFolder.children = [];
       }
-      
+
       parentFolder.children.push(track);
     });
 
@@ -261,10 +279,10 @@ export class TreeDataTransformer {
     // Debug: Log final tree structure
     console.log('TreeDataTransformer - Final tree structure:');
     console.log(`Root has ${root.children?.length || 0} direct children`);
-    root.children?.forEach(child => {
+    root.children?.forEach((child) => {
       if (child.type === 'folder') {
         console.log(`  📁 ${child.name} (${child.id}) - ${child.children?.length || 0} children`);
-        child.children?.forEach(grandchild => {
+        child.children?.forEach((grandchild) => {
           console.log(`    ${grandchild.type === 'folder' ? '📁' : '📄'} ${grandchild.name} (${grandchild.id})`);
         });
       } else {
@@ -287,13 +305,13 @@ export class TreeDataTransformer {
       if (a.type !== b.type) {
         return a.type === 'folder' ? -1 : 1;
       }
-      
+
       // Within same type, sort alphabetically
       return a.name.localeCompare(b.name);
     });
 
     // Recursively sort children of folders
-    item.children.forEach(child => {
+    item.children.forEach((child) => {
       if (child.type === 'folder') {
         this.sortTreeChildren(child);
       }
@@ -316,14 +334,14 @@ export class TreeDataTransformer {
 
   private static findItemByIdRecursive(item: TreeItem, id: string): TreeItem | null {
     if (item.id === id) return item;
-    
+
     if (item.children) {
       for (const child of item.children) {
         const found = this.findItemByIdRecursive(child, id);
         if (found) return found;
       }
     }
-    
+
     return null;
   }
 
@@ -338,11 +356,11 @@ export class TreeDataTransformer {
 
   private static getItemPathRecursive(item: TreeItem, targetId: string, currentPath: string[]): boolean {
     currentPath.push(item.name);
-    
+
     if (item.id === targetId) {
       return true;
     }
-    
+
     if (item.children) {
       for (const child of item.children) {
         if (this.getItemPathRecursive(child, targetId, currentPath)) {
@@ -350,7 +368,7 @@ export class TreeDataTransformer {
         }
       }
     }
-    
+
     currentPath.pop();
     return false;
   }
@@ -368,9 +386,9 @@ export class TreeDataTransformer {
     if (item.type === 'track') {
       tracks.push(item);
     }
-    
+
     if (item.children) {
-      item.children.forEach(child => {
+      item.children.forEach((child) => {
         this.collectTracksRecursive(child, tracks);
       });
     }
@@ -382,16 +400,16 @@ export class TreeDataTransformer {
   static getAllFolders(tree: TreeStructure): TreeItem[] {
     const folders: TreeItem[] = [];
     this.collectFoldersRecursive(tree.root, folders);
-    return folders.filter(f => f.id !== 'root'); // Exclude root
+    return folders.filter((f) => f.id !== 'root'); // Exclude root
   }
 
   private static collectFoldersRecursive(item: TreeItem, folders: TreeItem[]): void {
     if (item.type === 'folder') {
       folders.push(item);
     }
-    
+
     if (item.children) {
-      item.children.forEach(child => {
+      item.children.forEach((child) => {
         this.collectFoldersRecursive(child, folders);
       });
     }
@@ -409,12 +427,12 @@ export class TreeDataTransformer {
     const tracks = this.getAllTracks(tree);
     const folders = this.getAllFolders(tree);
     const maxDepth = this.getMaxDepth(tree.root, 0);
-    
+
     return {
       totalTracks: tracks.length,
       totalFolders: folders.length,
       maxDepth,
-      totalItems: tracks.length + folders.length
+      totalItems: tracks.length + folders.length,
     };
   }
 
@@ -422,38 +440,38 @@ export class TreeDataTransformer {
     if (!item.children || item.children.length === 0) {
       return currentDepth;
     }
-    
+
     let maxChildDepth = currentDepth;
-    item.children.forEach(child => {
+    item.children.forEach((child) => {
       const childDepth = this.getMaxDepth(child, currentDepth + 1);
       maxChildDepth = Math.max(maxChildDepth, childDepth);
     });
-    
+
     return maxChildDepth;
   }
 
   /**
    * Convert tree back to flat structure (for compatibility)
    */
-  static treeToFlat(tree: TreeStructure): { tracks: FlatTrack[], folders: FlatFolder[] } {
+  static treeToFlat(tree: TreeStructure): { tracks: FlatTrack[]; folders: FlatFolder[] } {
     const tracks: FlatTrack[] = [];
     const folders: FlatFolder[] = [];
-    
+
     this.treeToFlatRecursive(tree.root, tracks, folders, null);
-    
+
     return { tracks, folders };
   }
 
   private static treeToFlatRecursive(
-    item: TreeItem, 
-    tracks: FlatTrack[], 
-    folders: FlatFolder[], 
-    parentPath: string | null
+    item: TreeItem,
+    tracks: FlatTrack[],
+    folders: FlatFolder[],
+    parentPath: string | null,
   ): void {
     if (item.id === 'root') {
       // Skip root, process its children
       if (item.children) {
-        item.children.forEach(child => {
+        item.children.forEach((child) => {
           this.treeToFlatRecursive(child, tracks, folders, null);
         });
       }
@@ -467,12 +485,12 @@ export class TreeDataTransformer {
         path: item.path || item.name,
         parent: parentPath,
         created: item.created,
-        user_id: item.user_id
+        user_id: item.user_id,
       });
-      
+
       // Process children
       if (item.children) {
-        item.children.forEach(child => {
+        item.children.forEach((child) => {
           this.treeToFlatRecursive(child, tracks, folders, item.path || item.name);
         });
       }
@@ -487,7 +505,7 @@ export class TreeDataTransformer {
         isMultitrack: item.isMultitrack || false,
         steps: item.steps || [],
         activeStep: item.activeStep || 0,
-        user_id: item.user_id
+        user_id: item.user_id,
       });
     }
   }

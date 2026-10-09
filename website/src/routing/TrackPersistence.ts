@@ -23,7 +23,7 @@ export class TrackPersistence {
   static restoreFromURL(): PersistedTrackState | null {
     try {
       const params = URLParser.parseQueryParams();
-      
+
       if (!params.track) {
         return null;
       }
@@ -76,7 +76,7 @@ export class TrackPersistence {
       // Check URL length limit
       const queryString = URLParser.buildQueryString(params);
       const newUrl = `${window.location.pathname}${queryString}${window.location.hash}`;
-      
+
       if (newUrl.length > this.MAX_URL_LENGTH) {
         console.warn('TrackPersistence: URL too long, skipping persistence');
         return false;
@@ -88,7 +88,7 @@ export class TrackPersistence {
       } else {
         window.history.pushState(null, '', newUrl);
       }
-      
+
       return true;
     } catch (error) {
       console.error('TrackPersistence: Failed to persist to URL:', error);
@@ -198,7 +198,7 @@ export class TrackPersistence {
       const trackIds = Object.keys(tracks);
 
       // Look for tracks with similar names or IDs
-      const similar = trackIds.find(id => {
+      const similar = trackIds.find((id) => {
         const track = tracks[id];
         return (
           id.toLowerCase().includes(trackId.toLowerCase()) ||
@@ -273,11 +273,14 @@ export class TrackPersistence {
   /**
    * Generate a shareable URL for a track
    */
-  static generateShareableURL(trackId: string, options?: {
-    step?: number;
-    mode?: 'edit' | 'view' | 'play';
-    includeTimestamp?: boolean;
-  }): string {
+  static generateShareableURL(
+    trackId: string,
+    options?: {
+      step?: number;
+      mode?: 'edit' | 'view' | 'play';
+      includeTimestamp?: boolean;
+    },
+  ): string {
     try {
       const state: PersistedTrackState = {
         trackId,

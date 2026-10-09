@@ -30,10 +30,10 @@ export class PreviewEngine {
     this.audioContext = audioContext;
     this.deps = deps;
 
-    this.controller = null;   // Own SuperdoughAudioController
-    this.replInstance = null;  // Own repl instance
-    this.equalizer = null;     // Own AudioEqualizer
-    this.audioElement = null;  // HTMLAudioElement for device routing
+    this.controller = null; // Own SuperdoughAudioController
+    this.replInstance = null; // Own repl instance
+    this.equalizer = null; // Own AudioEqualizer
+    this.audioElement = null; // HTMLAudioElement for device routing
     this.mediaStreamDest = null;
     this.isInitialized = false;
     this.isPlaying = false;
@@ -55,7 +55,11 @@ export class PreviewEngine {
     // 2. Disconnect the controller's default output from audioContext.destination
     //    and route it through equalizer → MediaStreamDest → HTMLAudioElement for device routing
     const destGain = this.controller.output.destinationGain;
-    try { destGain.disconnect(); } catch (e) { /* may not be connected */ }
+    try {
+      destGain.disconnect();
+    } catch (e) {
+      /* may not be connected */
+    }
 
     // Create equalizer
     this.equalizer = new AudioEqualizer(ac);
@@ -72,9 +76,12 @@ export class PreviewEngine {
     // 3. Create a custom output function that uses OUR controller
     const previewController = this.controller;
     const previewOutput = (hap, _deadline, hapDuration, cps, t) => {
-      const value = typeof hap.ensureObjectValue === 'function'
-        ? (hap.ensureObjectValue(), hap.value)
-        : (typeof hap.value === 'object' ? hap.value : { s: hap.value });
+      const value =
+        typeof hap.ensureObjectValue === 'function'
+          ? (hap.ensureObjectValue(), hap.value)
+          : typeof hap.value === 'object'
+            ? hap.value
+            : { s: hap.value };
       return superdough(value, t, hapDuration, cps, hap.whole?.begin?.valueOf?.() ?? 0, previewController);
     };
 
@@ -164,7 +171,11 @@ export class PreviewEngine {
       this.equalizer = null;
     }
     if (this.controller?.output?.destinationGain) {
-      try { this.controller.output.destinationGain.disconnect(); } catch (e) { /* ok */ }
+      try {
+        this.controller.output.destinationGain.disconnect();
+      } catch (e) {
+        /* ok */
+      }
     }
     this.mediaStreamDest = null;
     this.controller = null;

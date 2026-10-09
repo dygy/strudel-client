@@ -65,58 +65,63 @@ export function MiniRepl({
   const autoDrawEnabled = !!punchcard || !!claviature || !!autodraw;
   const finalDrawTime = (drawTime ?? punchcard) ? [0, 4] : [-2, 2];
   const actualDrawTime = claviature ? [0, 0] : finalDrawTime;
-  
+
   const [activeNotes, setActiveNotes] = useState<(string | number)[]>([]);
 
-  const init = useCallback(({ code, autodraw }: { code: string; autodraw: boolean }) => {
-    const drawContext = canvasId ? document.querySelector<HTMLCanvasElement>('#' + canvasId)?.getContext('2d') : getDrawContext();
+  const init = useCallback(
+    ({ code, autodraw }: { code: string; autodraw: boolean }) => {
+      const drawContext = canvasId
+        ? document.querySelector<HTMLCanvasElement>('#' + canvasId)?.getContext('2d')
+        : getDrawContext();
 
-    const editor = new StrudelMirror({
-      id,
-      defaultOutput: webaudioOutput,
-      getTime: () => getAudioContext().currentTime,
-      transpiler,
-      autodraw,
-      root: containerRef.current,
-      initialCode: '// LOADING',
-      pattern: silence,
-      drawTime: actualDrawTime as [number, number],
-      drawContext,
-      editPattern: (pat: any, id: string) => {
-        if (onTrigger) {
-          pat = pat.onTrigger(onTrigger, false);
-        }
-        if (claviature) {
-          pat = pat.onPaint((ctx: any, time: number, haps: any[], drawTime: [number, number]) => {
-            const active = haps
-              .map((hap) => hap.value.note)
-              .filter(Boolean)
-              .map((n) => (typeof n === 'string' ? noteToMidi(n) : n));
-            setActiveNotes(active);
-          });
-        }
-        if (punchcard) {
-          pat = pat.punchcard({ labels: !!punchcardLabels });
-        }
-        return pat;
-      },
-      prebake: async () => Promise.all([modulesLoading, prebaked]),
-      onUpdateState: (state: ReplState) => {
-        setReplState({ ...state });
-      },
-      onToggle: (playing: boolean) => {
-        if (!playing) {
-          // clearHydra(); // TBD: doesn't work with multiple MiniRepl's on a page
-        }
-      },
-      beforeStart: () => audioReady,
-      afterEval: ({ code }: { code: string }) => setVersionDefaultsFrom(code),
-      mondo,
-    });
-    // init settings
-    editor.setCode(code);
-    editorRef.current = editor;
-  }, [canvasId, onTrigger, claviature, punchcard, punchcardLabels, actualDrawTime, mondo]);
+      const editor = new StrudelMirror({
+        id,
+        defaultOutput: webaudioOutput,
+        getTime: () => getAudioContext().currentTime,
+        transpiler,
+        autodraw,
+        root: containerRef.current,
+        initialCode: '// LOADING',
+        pattern: silence,
+        drawTime: actualDrawTime as [number, number],
+        drawContext,
+        editPattern: (pat: any, id: string) => {
+          if (onTrigger) {
+            pat = pat.onTrigger(onTrigger, false);
+          }
+          if (claviature) {
+            pat = pat.onPaint((ctx: any, time: number, haps: any[], drawTime: [number, number]) => {
+              const active = haps
+                .map((hap) => hap.value.note)
+                .filter(Boolean)
+                .map((n) => (typeof n === 'string' ? noteToMidi(n) : n));
+              setActiveNotes(active);
+            });
+          }
+          if (punchcard) {
+            pat = pat.punchcard({ labels: !!punchcardLabels });
+          }
+          return pat;
+        },
+        prebake: async () => Promise.all([modulesLoading, prebaked]),
+        onUpdateState: (state: ReplState) => {
+          setReplState({ ...state });
+        },
+        onToggle: (playing: boolean) => {
+          if (!playing) {
+            // clearHydra(); // TBD: doesn't work with multiple MiniRepl's on a page
+          }
+        },
+        beforeStart: () => audioReady,
+        afterEval: ({ code }: { code: string }) => setVersionDefaultsFrom(code),
+        mondo,
+      });
+      // init settings
+      editor.setCode(code);
+      editorRef.current = editor;
+    },
+    [canvasId, onTrigger, claviature, punchcard, punchcardLabels, actualDrawTime, mondo],
+  );
 
   const [replState, setReplState] = useState<ReplState>({});
   const { started, isDirty, error } = replState;

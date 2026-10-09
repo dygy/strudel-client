@@ -11,7 +11,9 @@ export const DEFAULT_TRACK_CODE = `// Start coding your pattern here
  * @returns boolean indicating if this is the default code
  */
 export function isDefaultCode(code: string): boolean {
-  return code.includes('/* ========== SETUP ========== */') && 
-         code.includes('setcps(160/60/4)') && 
-         code.includes('all(x => x.color("cyan"))');
+  return (
+    code.includes('/* ========== SETUP ========== */') &&
+    code.includes('setcps(160/60/4)') &&
+    code.includes('all(x => x.color("cyan"))')
+  );
 }

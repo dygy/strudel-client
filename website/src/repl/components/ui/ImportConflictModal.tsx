@@ -12,13 +12,7 @@ interface ImportConflictModalProps {
   currentIndex: number;
 }
 
-export function ImportConflictModal({
-  isOpen,
-  onClose,
-  conflicts,
-  onResolve,
-  currentIndex
-}: ImportConflictModalProps) {
+export function ImportConflictModal({ isOpen, onClose, conflicts, onResolve, currentIndex }: ImportConflictModalProps) {
   const { t } = useTranslation(['files', 'common']);
 
   if (conflicts.length === 0) return null;
@@ -57,16 +51,16 @@ export function ImportConflictModal({
           <ExclamationTriangleIcon className="w-6 h-6 text-yellow-500 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="text-sm font-medium text-foreground">
-              {t('files:importConflict.message', { 
+              {t('files:importConflict.message', {
                 type: getTypeLabel().toLowerCase(),
-                name: conflict.name 
+                name: conflict.name,
               })}
             </p>
             {isMultiple && (
               <p className="text-xs text-foreground/70 mt-1">
-                {t('files:importConflict.multipleConflicts', { 
-                  current: currentIndex + 1, 
-                  total: conflicts.length 
+                {t('files:importConflict.multipleConflicts', {
+                  current: currentIndex + 1,
+                  total: conflicts.length,
                 })}
               </p>
             )}
@@ -86,8 +80,12 @@ export function ImportConflictModal({
             </div>
             {conflict.existingItem && (
               <div className="text-xs text-foreground/60 space-y-1 ml-10">
-                <p>{t('files:created')}: {new Date(conflict.existingItem.created).toLocaleString()}</p>
-                <p>{t('files:modified')}: {new Date(conflict.existingItem.modified).toLocaleString()}</p>
+                <p>
+                  {t('files:created')}: {new Date(conflict.existingItem.created).toLocaleString()}
+                </p>
+                <p>
+                  {t('files:modified')}: {new Date(conflict.existingItem.modified).toLocaleString()}
+                </p>
               </div>
             )}
           </div>
@@ -104,10 +102,14 @@ export function ImportConflictModal({
             {conflict.newItem && (
               <div className="text-xs text-foreground/60 space-y-1 ml-10">
                 {conflict.newItem.size && (
-                  <p>{t('files:size')}: {(conflict.newItem.size / 1024).toFixed(2)} KB</p>
+                  <p>
+                    {t('files:size')}: {(conflict.newItem.size / 1024).toFixed(2)} KB
+                  </p>
                 )}
                 {conflict.newItem.stepsCount && (
-                  <p>{t('files:steps')}: {conflict.newItem.stepsCount}</p>
+                  <p>
+                    {t('files:steps')}: {conflict.newItem.stepsCount}
+                  </p>
                 )}
               </div>
             )}
@@ -130,7 +132,7 @@ export function ImportConflictModal({
               {t('files:importConflict.skip')}
             </button>
           </div>
-          
+
           {isMultiple && (
             <div className="flex space-x-2">
               <button
@@ -147,7 +149,7 @@ export function ImportConflictModal({
               </button>
             </div>
           )}
-          
+
           <button
             onClick={onClose}
             className="w-full px-4 py-2 text-sm bg-lineHighlight/40 hover:bg-lineHighlight/60 text-foreground rounded transition-colors focus:outline-none focus:ring-2 focus:ring-lineHighlight"

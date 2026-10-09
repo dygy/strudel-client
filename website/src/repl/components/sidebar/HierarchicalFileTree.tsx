@@ -24,13 +24,7 @@ interface TreeNodeProps {
   selectedTrackId?: string | null;
 }
 
-const TreeNode: React.FC<TreeNodeProps> = ({
-  item,
-  level,
-  onTrackSelect,
-  onFolderSelect,
-  selectedTrackId
-}) => {
+const TreeNode: React.FC<TreeNodeProps> = ({ item, level, onTrackSelect, onFolderSelect, selectedTrackId }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const hasChildren = item.children && item.children.length > 0;
   const isSelected = item.type === 'track' && item.id === selectedTrackId;
@@ -56,7 +50,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
     <div className="tree-node">
       <div
         className={`tree-node-content ${isSelected ? 'selected' : ''}`}
-        style={{ 
+        style={{
           paddingLeft: `${level * 20}px`,
           cursor: 'pointer',
           padding: '4px 8px',
@@ -65,34 +59,30 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           gap: '8px',
           backgroundColor: isSelected ? '#e3f2fd' : 'transparent',
           borderRadius: '4px',
-          margin: '1px 0'
+          margin: '1px 0',
         }}
         onClick={handleClick}
       >
-        <span style={{ minWidth: '16px' }}>
-          {getIcon()}
-        </span>
-        <span style={{ flex: 1 }}>
-          {item.name}
-        </span>
+        <span style={{ minWidth: '16px' }}>{getIcon()}</span>
+        <span style={{ flex: 1 }}>{item.name}</span>
         {item.type === 'track' && item.isMultitrack && (
-          <span style={{ 
-            fontSize: '12px', 
-            color: '#666',
-            backgroundColor: '#f0f0f0',
-            padding: '2px 6px',
-            borderRadius: '10px'
-          }}>
+          <span
+            style={{
+              fontSize: '12px',
+              color: '#666',
+              backgroundColor: '#f0f0f0',
+              padding: '2px 6px',
+              borderRadius: '10px',
+            }}
+          >
             {item.steps?.length || 0} steps
           </span>
         )}
         {item.type === 'folder' && hasChildren && (
-          <span style={{ fontSize: '12px', color: '#666' }}>
-            ({item.children!.length})
-          </span>
+          <span style={{ fontSize: '12px', color: '#666' }}>({item.children!.length})</span>
         )}
       </div>
-      
+
       {item.type === 'folder' && hasChildren && isExpanded && (
         <div className="tree-node-children">
           {item.children!.map((child) => (
@@ -117,26 +107,29 @@ export const HierarchicalFileTree: React.FC<HierarchicalFileTreeProps> = ({
   onTrackSelect,
   onFolderSelect,
   selectedTrackId,
-  className = ''
+  className = '',
 }) => {
   const { tree, rootItems, getTreeStats } = useHierarchicalFileTree({
     tracks,
-    folders
+    folders,
   });
 
   const stats = getTreeStats();
 
   return (
     <div className={`hierarchical-file-tree ${className}`}>
-      <div className="tree-header" style={{ 
-        padding: '8px',
-        borderBottom: '1px solid #eee',
-        fontSize: '12px',
-        color: '#666'
-      }}>
+      <div
+        className="tree-header"
+        style={{
+          padding: '8px',
+          borderBottom: '1px solid #eee',
+          fontSize: '12px',
+          color: '#666',
+        }}
+      >
         {stats.totalFolders} folders, {stats.totalTracks} tracks
       </div>
-      
+
       <div className="tree-content" style={{ padding: '8px' }}>
         {rootItems.map((item) => (
           <TreeNode
@@ -148,14 +141,16 @@ export const HierarchicalFileTree: React.FC<HierarchicalFileTreeProps> = ({
             selectedTrackId={selectedTrackId}
           />
         ))}
-        
+
         {rootItems.length === 0 && (
-          <div style={{ 
-            textAlign: 'center', 
-            color: '#999', 
-            padding: '20px',
-            fontStyle: 'italic'
-          }}>
+          <div
+            style={{
+              textAlign: 'center',
+              color: '#999',
+              padding: '20px',
+              fontStyle: 'italic',
+            }}
+          >
             No files or folders
           </div>
         )}

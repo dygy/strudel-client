@@ -11,12 +11,12 @@ interface ResizableSidebarProps {
   className?: string;
 }
 
-export function ResizableSidebar({ 
-  children, 
-  defaultWidth = 300, 
-  minWidth = 200, 
+export function ResizableSidebar({
+  children,
+  defaultWidth = 300,
+  minWidth = 200,
   maxWidth = 600,
-  className = ''
+  className = '',
 }: ResizableSidebarProps) {
   const [width, setWidth] = useState(defaultWidth);
   const [isResizing, setIsResizing] = useState(false);
@@ -32,7 +32,7 @@ export function ResizableSidebar({
     setIsResizing(true);
     startX.current = e.clientX;
     startWidth.current = width;
-    
+
     // Prevent text selection during resize
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'col-resize';
@@ -41,13 +41,14 @@ export function ResizableSidebar({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
-      
+
       // For RTL: resize from left edge (subtract deltaX)
       // For LTR: resize from right edge (add deltaX)
       const deltaX = e.clientX - startX.current;
-      const newWidth = Math.max(minWidth, Math.min(maxWidth, 
-        isRTL ? startWidth.current - deltaX : startWidth.current + deltaX
-      ));
+      const newWidth = Math.max(
+        minWidth,
+        Math.min(maxWidth, isRTL ? startWidth.current - deltaX : startWidth.current + deltaX),
+      );
       setWidth(newWidth);
     };
 
@@ -69,22 +70,22 @@ export function ResizableSidebar({
   }, [isResizing, minWidth, maxWidth, isRTL]);
 
   return (
-    <div 
+    <div
       ref={sidebarRef}
       className={cx('relative flex-shrink-0 overflow-hidden', className)}
-      style={{ 
+      style={{
         width: `${width}px`,
         transition: isResizing ? 'none' : 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
       {children}
-      
+
       {/* Resize handle - position based on RTL/LTR */}
       <div
         className={cx(
           'absolute top-0 w-1 h-full cursor-col-resize hover:bg-blue-500 transition-colors',
           isRTL ? 'left-0' : 'right-0',
-          isResizing && 'bg-blue-500'
+          isResizing && 'bg-blue-500',
         )}
         onMouseDown={handleMouseDown}
       />

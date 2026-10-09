@@ -2,7 +2,7 @@
 
 /**
  * Clean Missing VCSL Samples
- * 
+ *
  * This script removes references to non-existent samples from vcsl.json
  * to prevent 404 errors in the application.
  */
@@ -20,12 +20,12 @@ function sampleExists(samplePath) {
   // Convert the JSON path to actual file path
   // Remove 'samples/vcsl/' prefix and handle URL encoding
   const relativePath = samplePath.replace('samples/vcsl/', '');
-  
+
   // The files are stored with %20 encoding, but JSON has %2520
   // So we need to convert %2520 back to %20 for the file system path
   const fileSystemPath = relativePath.replace(/%2520/g, '%20');
   const fullPath = path.join(SAMPLES_DIR, fileSystemPath);
-  
+
   return fs.existsSync(fullPath);
 }
 
@@ -34,25 +34,25 @@ function sampleExists(samplePath) {
  */
 function cleanMissingSamples() {
   console.log('🧹 Cleaning missing samples from vcsl.json...\n');
-  
+
   try {
     // Read the current vcsl.json
     const content = fs.readFileSync(VCSL_JSON_PATH, 'utf8');
     const vcslData = JSON.parse(content);
-    
+
     let totalSamples = 0;
     let removedSamples = 0;
     let emptyCategories = 0;
     const removedCategories = [];
-    
+
     // Process each category
     for (const [category, samples] of Object.entries(vcslData)) {
       if (Array.isArray(samples)) {
         const originalCount = samples.length;
         totalSamples += originalCount;
-        
+
         // Filter out non-existent samples
-        const existingSamples = samples.filter(samplePath => {
+        const existingSamples = samples.filter((samplePath) => {
           const exists = sampleExists(samplePath);
           if (!exists) {
             console.log(`❌ Removing missing: ${category}/${path.basename(samplePath)}`);
@@ -60,7 +60,7 @@ function cleanMissingSamples() {
           }
           return exists;
         });
-        
+
         // Update the category
         if (existingSamples.length === 0) {
           // Remove empty categories
@@ -73,26 +73,25 @@ function cleanMissingSamples() {
         }
       }
     }
-    
+
     // Write the cleaned JSON
     fs.writeFileSync(VCSL_JSON_PATH, JSON.stringify(vcslData, null, 2));
-    
+
     console.log(`\n✅ Cleaned vcsl.json:`);
     console.log(`   📊 Total samples processed: ${totalSamples}`);
     console.log(`   ❌ Removed missing samples: ${removedSamples}`);
     console.log(`   🗑️  Removed empty categories: ${emptyCategories}`);
     console.log(`   📁 Remaining categories: ${Object.keys(vcslData).length}`);
-    
+
     if (removedCategories.length > 0) {
       console.log(`\n🗑️  Removed categories: ${removedCategories.join(', ')}`);
     }
-    
+
     if (removedSamples > 0) {
       console.log(`\n💡 This should eliminate 404 errors for missing samples in the Strudel interface.`);
     } else {
       console.log(`\n✨ No missing samples found - vcsl.json is already clean!`);
     }
-    
   } catch (error) {
     console.error('❌ Error cleaning missing samples:', error.message);
     process.exit(1);
@@ -104,23 +103,23 @@ function cleanMissingSamples() {
  */
 function showStatus() {
   console.log('📊 VCSL Missing Samples Status\n');
-  
+
   try {
     const content = fs.readFileSync(VCSL_JSON_PATH, 'utf8');
     const vcslData = JSON.parse(content);
-    
+
     let totalSamples = 0;
     let existingSamples = 0;
     let missingSamples = 0;
     const missingByCategory = {};
-    
+
     for (const [category, samples] of Object.entries(vcslData)) {
       if (Array.isArray(samples)) {
         let categoryMissing = 0;
-        
+
         for (const samplePath of samples) {
           totalSamples++;
-          
+
           if (sampleExists(samplePath)) {
             existingSamples++;
           } else {
@@ -128,18 +127,18 @@ function showStatus() {
             categoryMissing++;
           }
         }
-        
+
         if (categoryMissing > 0) {
           missingByCategory[category] = categoryMissing;
         }
       }
     }
-    
+
     console.log(`📁 Categories: ${Object.keys(vcslData).length}`);
     console.log(`📊 Total samples in JSON: ${totalSamples}`);
     console.log(`✅ Existing samples: ${existingSamples}`);
     console.log(`❌ Missing samples: ${missingSamples}`);
-    
+
     if (missingSamples > 0) {
       console.log(`\n❌ Missing samples by category:`);
       for (const [category, count] of Object.entries(missingByCategory)) {
@@ -149,7 +148,6 @@ function showStatus() {
     } else {
       console.log(`\n✅ All samples in vcsl.json exist locally!`);
     }
-    
   } catch (error) {
     console.error('❌ Error checking status:', error.message);
     process.exit(1);
@@ -161,16 +159,16 @@ function showStatus() {
  */
 function main() {
   const command = process.argv[2] || 'help';
-  
+
   switch (command) {
     case 'clean':
       cleanMissingSamples();
       break;
-      
+
     case 'status':
       showStatus();
       break;
-      
+
     case 'help':
     default:
       console.log('🧹 Clean Missing VCSL Samples\n');

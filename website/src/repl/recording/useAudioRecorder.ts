@@ -80,15 +80,18 @@ export function useAudioRecorder(isScreenRecording = false): UseAudioRecorderRet
       engine.start(destinationGain);
     } else {
       // Stop recording — get the blob
-      engine.stop().then((blob) => {
-        if (blob.size > 0) {
-          setExportBlob(blob);
-        } else {
-          setError('Recording was empty — nothing to export.');
-        }
-      }).catch((err) => {
-        setError(`Failed to stop recording: ${err instanceof Error ? err.message : String(err)}`);
-      });
+      engine
+        .stop()
+        .then((blob) => {
+          if (blob.size > 0) {
+            setExportBlob(blob);
+          } else {
+            setError('Recording was empty — nothing to export.');
+          }
+        })
+        .catch((err) => {
+          setError(`Failed to stop recording: ${err instanceof Error ? err.message : String(err)}`);
+        });
     }
   }, [getOrCreateEngine, isScreenRecording]);
 
@@ -107,38 +110,44 @@ export function useAudioRecorder(isScreenRecording = false): UseAudioRecorderRet
       // MediaRecorder.stop() is async, so we attempt to salvage what we can
       try {
         // We can't truly await here, but we try to trigger a download
-        engine.stop().then((blob) => {
-          if (blob.size === 0) return;
+        engine
+          .stop()
+          .then((blob) => {
+            if (blob.size === 0) return;
 
-          const audioContext = getAudioContext();
-          if (!audioContext) return;
+            const audioContext = getAudioContext();
+            if (!audioContext) return;
 
-          // Attempt to decode and encode as WAV for emergency save
-          const reader = new FileReader();
-          reader.onload = () => {
-            const arrayBuffer = reader.result as ArrayBuffer;
-            audioContext.decodeAudioData(arrayBuffer).then((audioBuffer) => {
-              const wavBlob = encodeWAV(audioBuffer);
-              const url = URL.createObjectURL(wavBlob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = generateFilename(new Date(), 'wav');
-              a.click();
-              URL.revokeObjectURL(url);
-            }).catch(() => {
-              // Last resort: download the raw webm blob
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = generateFilename(new Date(), 'wav');
-              a.click();
-              URL.revokeObjectURL(url);
-            });
-          };
-          reader.readAsArrayBuffer(blob);
-        }).catch(() => {
-          // Nothing we can do
-        });
+            // Attempt to decode and encode as WAV for emergency save
+            const reader = new FileReader();
+            reader.onload = () => {
+              const arrayBuffer = reader.result as ArrayBuffer;
+              audioContext
+                .decodeAudioData(arrayBuffer)
+                .then((audioBuffer) => {
+                  const wavBlob = encodeWAV(audioBuffer);
+                  const url = URL.createObjectURL(wavBlob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = generateFilename(new Date(), 'wav');
+                  a.click();
+                  URL.revokeObjectURL(url);
+                })
+                .catch(() => {
+                  // Last resort: download the raw webm blob
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = generateFilename(new Date(), 'wav');
+                  a.click();
+                  URL.revokeObjectURL(url);
+                });
+            };
+            reader.readAsArrayBuffer(blob);
+          })
+          .catch(() => {
+            // Nothing we can do
+          });
       } catch {
         // Best-effort — swallow errors on unload
       }

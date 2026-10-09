@@ -8,7 +8,6 @@ interface CodeProps {
 }
 
 export const Code = React.memo(function Code({ editorRef, containerRef, init }: CodeProps) {
-
   // Use a ref to track if we've already initialized
   const hasInitialized = useRef(false);
 
@@ -26,9 +25,11 @@ export const Code = React.memo(function Code({ editorRef, containerRef, init }: 
         // Check if there's a track that should be loaded
         const activePattern = (window as any).getActivePattern?.();
         if (activePattern) {
-          window.dispatchEvent(new CustomEvent('strudel-editor-ready', {
-            detail: { activePattern }
-          }));
+          window.dispatchEvent(
+            new CustomEvent('strudel-editor-ready', {
+              detail: { activePattern },
+            }),
+          );
         }
 
         // Also check for any pending code in the nano store

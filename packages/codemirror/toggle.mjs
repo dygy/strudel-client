@@ -35,7 +35,7 @@ export class ToggleWidget extends WidgetType {
     toggle.to = this.to;
     toggle.style = 'width:64px;margin-right:4px;transform:translateY(4px);cursor:pointer';
     this.toggle = toggle;
-    
+
     toggle.addEventListener('click', (e) => {
       // Toggle between 0 and 1
       const currentValue = Number(toggle.originalValue);
@@ -49,7 +49,7 @@ export class ToggleWidget extends WidgetType {
       const id = getToggleID(toggle.originalFrom);
       window.postMessage({ type: 'cm-toggle', value: next, id });
     });
-    
+
     return wrap;
   }
 

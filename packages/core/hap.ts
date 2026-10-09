@@ -51,11 +51,11 @@ export class Hap<T = any> {
   public stateful: boolean;
 
   constructor(
-    whole: TimeSpan | undefined, 
-    part: TimeSpan, 
-    value: T | StatefulFunction<any>, 
-    context: HapContext = {}, 
-    stateful: boolean = false
+    whole: TimeSpan | undefined,
+    part: TimeSpan,
+    value: T | StatefulFunction<any>,
+    context: HapContext = {},
+    stateful: boolean = false,
   ) {
     this.whole = whole;
     this.part = part;
@@ -144,8 +144,10 @@ export class Hap<T = any> {
   }
 
   spanEquals(other: Hap<any>): boolean {
-    return (this.whole == undefined && other.whole == undefined) || 
-           (this.whole != undefined && other.whole != undefined && this.whole.equals(other.whole));
+    return (
+      (this.whole == undefined && other.whole == undefined) ||
+      (this.whole != undefined && other.whole != undefined && this.whole.equals(other.whole))
+    );
   }
 
   equals(other: Hap<any>): boolean {
@@ -192,10 +194,10 @@ export class Hap<T = any> {
 
   combineContext(b: Hap<any>): HapContext {
     const a = this;
-    return { 
-      ...a.context, 
-      ...b.context, 
-      locations: (a.context.locations || []).concat(b.context.locations || []) 
+    return {
+      ...a.context,
+      ...b.context,
+      locations: (a.context.locations || []).concat(b.context.locations || []),
     };
   }
 

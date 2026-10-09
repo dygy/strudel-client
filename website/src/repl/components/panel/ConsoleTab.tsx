@@ -20,7 +20,7 @@ interface LogEntry {
 export function ConsoleTab() {
   const log = useStore($strudel_log_history) as LogEntry[];
   const { fontFamily } = useSettings();
-  
+
   return (
     <div id="console-tab" className="break-all w-full  first-line:text-sm p-2  h-full" style={{ fontFamily }}>
       <div className="bg-background h-full w-full overflow-auto space-y-1 p-2 rounded-md">

@@ -75,7 +75,7 @@ class GlobalSaveManager {
           trackId: currentTrackId,
           trackName: trackData.name,
           currentLength: currentCode.length,
-          savedLength: trackData.code.length
+          savedLength: trackData.code.length,
         });
       }
 
@@ -136,7 +136,7 @@ class GlobalSaveManager {
         trackId: currentTrackId,
         trackName: trackData.name,
         codeLength: currentCode.length,
-        source: 'URL-based'
+        source: 'URL-based',
       });
 
       // Perform the save using URL-based track ID
@@ -159,7 +159,6 @@ class GlobalSaveManager {
       }
 
       return result;
-
     } catch (error) {
       console.error('GlobalSaveManager: Emergency save error:', error);
       return false;
@@ -178,7 +177,7 @@ class GlobalSaveManager {
       isSaving: this.isSaving,
       hasUnsavedChanges: this.hasUnsavedChanges(),
       currentTrackId,
-      source: 'URL-based'
+      source: 'URL-based',
     };
   }
 }
@@ -198,11 +197,14 @@ if (typeof window !== 'undefined') {
       event.returnValue = message;
 
       // Attempt emergency save (non-blocking)
-      globalSaveManager.performEmergencySave().then(success => {
-        console.log('Global beforeunload: Emergency save result (URL-based):', success);
-      }).catch(error => {
-        console.error('Global beforeunload: Emergency save error:', error);
-      });
+      globalSaveManager
+        .performEmergencySave()
+        .then((success) => {
+          console.log('Global beforeunload: Emergency save result (URL-based):', success);
+        })
+        .catch((error) => {
+          console.error('Global beforeunload: Emergency save error:', error);
+        });
 
       return message;
     }

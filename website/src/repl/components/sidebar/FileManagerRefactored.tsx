@@ -46,7 +46,7 @@ interface PendingImport {
 
 export function FileManagerRefactored({ context, fileManagerHook, readOnly = false }: FileManagerProps) {
   const { t, i18n } = useTranslation(['files', 'common', 'tabs', 'auth']);
-  
+
   // CRITICAL: Call useTracks() at the top level before any conditional returns
   const tracks = useTracks();
 
@@ -57,7 +57,7 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
   const [showInfoModal, setShowInfoModal] = React.useState(false);
   const [infoModalData, setInfoModalData] = React.useState<{
     title: string;
-    items: Array<{ label: string; value: string }>
+    items: Array<{ label: string; value: string }>;
   }>({ title: '', items: [] });
 
   // Import conflict state
@@ -68,59 +68,63 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
   const [pendingImports, setPendingImports] = React.useState<PendingImport[]>([]);
 
   // Always call the operations hook, but with safe defaults when no fileManagerState
-  const operations = useFileManagerOperations(fileManagerState ? {
-    ...fileManagerState,
-    context,
-    t,
-    deleteTrack: fileManagerState.deleteTrack,
-    readOnly,
-  } : {
-    // Provide safe defaults when fileManagerState is null
-    tracks: {},
-    folders: {},
-    selectedTrack: null,
-    trackToDelete: null,
-    newTrackName: '',
-    newFolderName: '',
-    newItemParentPath: '',
-    newStepName: '',
-    renamingTrack: null,
-    renamingFolder: null,
-    renamingStep: null,
-    renameValue: '',
-    folderToDelete: null,
-    setTracks: () => {},
-    setFolders: () => {},
-    setSelectedTrack: () => {},
-    setNewTrackName: () => {},
-    setNewFolderName: () => {},
-    setNewItemParentPath: () => {},
-    setIsCreating: () => {},
-    setIsCreatingFolder: () => {},
-    setIsCreatingStep: () => {},
-    setNewStepName: () => {},
-    setSelectedStepTrack: () => {},
-    setTrackToDelete: () => {},
-    setShowDeleteModal: () => {},
-    setFolderToDelete: () => {},
-    setShowDeleteFolderModal: () => {},
-    setFolderContents: () => {},
-    setRenamingTrack: () => {},
-    setRenamingFolder: () => {},
-    setRenamingStep: () => {},
-    setRenameValue: () => {},
-    loadTrack: () => {},
-    saveCurrentTrack: async () => false,
-    createTrack: undefined,
-    createFolder: undefined,
-    updateFolder: undefined,
-    deleteTrack: undefined,
-    isDeletingTrackRef: { current: false },
-    isDeletingFolderRef: { current: new Set() },
-    context,
-    t,
-    readOnly,
-  });
+  const operations = useFileManagerOperations(
+    fileManagerState
+      ? {
+          ...fileManagerState,
+          context,
+          t,
+          deleteTrack: fileManagerState.deleteTrack,
+          readOnly,
+        }
+      : {
+          // Provide safe defaults when fileManagerState is null
+          tracks: {},
+          folders: {},
+          selectedTrack: null,
+          trackToDelete: null,
+          newTrackName: '',
+          newFolderName: '',
+          newItemParentPath: '',
+          newStepName: '',
+          renamingTrack: null,
+          renamingFolder: null,
+          renamingStep: null,
+          renameValue: '',
+          folderToDelete: null,
+          setTracks: () => {},
+          setFolders: () => {},
+          setSelectedTrack: () => {},
+          setNewTrackName: () => {},
+          setNewFolderName: () => {},
+          setNewItemParentPath: () => {},
+          setIsCreating: () => {},
+          setIsCreatingFolder: () => {},
+          setIsCreatingStep: () => {},
+          setNewStepName: () => {},
+          setSelectedStepTrack: () => {},
+          setTrackToDelete: () => {},
+          setShowDeleteModal: () => {},
+          setFolderToDelete: () => {},
+          setShowDeleteFolderModal: () => {},
+          setFolderContents: () => {},
+          setRenamingTrack: () => {},
+          setRenamingFolder: () => {},
+          setRenamingStep: () => {},
+          setRenameValue: () => {},
+          loadTrack: () => {},
+          saveCurrentTrack: async () => false,
+          createTrack: undefined,
+          createFolder: undefined,
+          updateFolder: undefined,
+          deleteTrack: undefined,
+          isDeletingTrackRef: { current: false },
+          isDeletingFolderRef: { current: new Set() },
+          context,
+          t,
+          readOnly,
+        },
+  );
 
   // If no fileManagerHook (unauthenticated), show sign-in prompt
   if (!fileManagerState) {
@@ -128,14 +132,15 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
       <div className="h-full flex flex-col items-center justify-center p-6 text-center bg-lineHighlight">
         <div className="mb-6">
           <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
           </svg>
-          <h3 className="text-xl font-semibold text-foreground mb-2">
-            {t('auth:signInRequired')}
-          </h3>
-          <p className="text-gray-400 mb-6">
-            {t('auth:signInDescription')}
-          </p>
+          <h3 className="text-xl font-semibold text-foreground mb-2">{t('auth:signInRequired')}</h3>
+          <p className="text-gray-400 mb-6">{t('auth:signInDescription')}</p>
         </div>
         <div className="text-sm text-gray-500">
           <p>{t('common:clickAuthButtonToSignIn')}</p>
@@ -160,7 +165,7 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
         { label: t('files:characters'), value: track.code.length.toString() },
         { label: t('files:size'), value: `${(new Blob([track.code]).size / 1024).toFixed(2)} KB` },
         { label: t('files:folder'), value: track.folder || t('files:rootFolder') },
-      ]
+      ],
     });
     setShowInfoModal(true);
   };
@@ -168,13 +173,15 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
   const getEmptySpaceContextItems = () => {
     // In read-only mode, only show export functionality
     if (readOnly) {
-      return Object.keys(fileManagerState.tracks).length > 0 || Object.keys(fileManagerState.folders).length > 0 ? [
-        {
-          label: t('files:exportLibraryAsZip'),
-          icon: <span>📦</span>,
-          onClick: () => operations.downloadFolder(''),
-        },
-      ] : [];
+      return Object.keys(fileManagerState.tracks).length > 0 || Object.keys(fileManagerState.folders).length > 0
+        ? [
+            {
+              label: t('files:exportLibraryAsZip'),
+              icon: <span>📦</span>,
+              onClick: () => operations.downloadFolder(''),
+            },
+          ]
+        : [];
     }
 
     return [
@@ -188,19 +195,21 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
         icon: <span>📁</span>,
         onClick: () => operations.handleFolderCreate(),
       },
-      ...(Object.keys(fileManagerState.tracks).length > 0 || Object.keys(fileManagerState.folders).length > 0 ? [
-        {
-          label: t('files:exportLibraryAsZip'),
-          icon: <span>📦</span>,
-          onClick: () => operations.downloadFolder(''),
-        },
-        {
-          label: t('files:deleteAllTracks'),
-          icon: <span>🗑️</span>,
-          onClick: () => fileManagerState.setShowDeleteAllModal(true),
-          className: 'text-red-400 hover:text-red-300',
-        }
-      ] : []),
+      ...(Object.keys(fileManagerState.tracks).length > 0 || Object.keys(fileManagerState.folders).length > 0
+        ? [
+            {
+              label: t('files:exportLibraryAsZip'),
+              icon: <span>📦</span>,
+              onClick: () => operations.downloadFolder(''),
+            },
+            {
+              label: t('files:deleteAllTracks'),
+              icon: <span>🗑️</span>,
+              onClick: () => fileManagerState.setShowDeleteAllModal(true),
+              className: 'text-red-400 hover:text-red-300',
+            },
+          ]
+        : []),
       {
         label: t('files:importLibraryFromZip'),
         icon: <span>📥</span>,
@@ -303,7 +312,7 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
       const entries = await readDirectory(dirEntry);
 
       // Check if this is a multitrack folder (has metadata.json)
-      const hasMetadata = entries.some(e => e.isFile && e.name === 'metadata.json');
+      const hasMetadata = entries.some((e) => e.isFile && e.name === 'metadata.json');
 
       if (hasMetadata) {
         console.log('Detected multitrack folder:', dirEntry.name);
@@ -340,13 +349,10 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
   };
 
   // Import multitrack from folder
-  const handleMultitrackFolderImport = async (
-    dirEntry: FileSystemDirectoryEntry,
-    entries: FileSystemEntry[]
-  ) => {
+  const handleMultitrackFolderImport = async (dirEntry: FileSystemDirectoryEntry, entries: FileSystemEntry[]) => {
     try {
       // Read metadata.json
-      const metadataEntry = entries.find(e => e.isFile && e.name === 'metadata.json') as FileSystemFileEntry;
+      const metadataEntry = entries.find((e) => e.isFile && e.name === 'metadata.json') as FileSystemFileEntry;
       if (!metadataEntry) {
         toastActions.error(t('files:invalidMultitrackFile'));
         return;
@@ -366,8 +372,8 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
 
       // Find step files
       const stepFiles = entries
-        .filter(e => e.isFile && e.name.match(/\.(js|txt)$/i))
-        .filter(e => e.name !== 'metadata.json')
+        .filter((e) => e.isFile && e.name.match(/\.(js|txt)$/i))
+        .filter((e) => e.name !== 'metadata.json')
         .sort((a, b) => a.name.localeCompare(b.name));
 
       if (stepFiles.length === 0) {
@@ -397,27 +403,31 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
 
       if (existingTrack) {
         // Show conflict modal
-        setImportConflicts([{
-          type: 'multitrack',
-          name: trackName,
-          path: existingTrack.folder || '',
-          existingItem: {
-            created: existingTrack.created,
-            modified: existingTrack.modified,
+        setImportConflicts([
+          {
+            type: 'multitrack',
+            name: trackName,
+            path: existingTrack.folder || '',
+            existingItem: {
+              created: existingTrack.created,
+              modified: existingTrack.modified,
+            },
+            newItem: {
+              stepsCount: steps.length,
+            },
           },
-          newItem: {
-            stepsCount: steps.length,
-          }
-        }]);
-        setPendingImports([{
-          type: 'multitrack',
-          name: trackName,
-          code: steps[0]?.code || '',
-          folder: existingTrack.folder,
-          isMultitrack: true,
-          steps,
-          activeStep: metadata.activeStep || 0,
-        }]);
+        ]);
+        setPendingImports([
+          {
+            type: 'multitrack',
+            name: trackName,
+            code: steps[0]?.code || '',
+            folder: existingTrack.folder,
+            isMultitrack: true,
+            steps,
+            activeStep: metadata.activeStep || 0,
+          },
+        ]);
         setCurrentConflictIndex(0);
         setShowConflictModal(true);
         return;
@@ -431,13 +441,13 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
           undefined,
           true,
           steps,
-          metadata.activeStep || 0
+          metadata.activeStep || 0,
         );
 
         if (createdTrack) {
           toastActions.success(t('files:multitrackImported', { name: trackName }));
 
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 100));
           fileManagerHook.loadTrack(createdTrack);
 
           setTimeout(() => {
@@ -468,9 +478,9 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
   // Helper to check if track name exists
   const checkTrackExists = (name: string, folder?: string): Track | null => {
     const tracksArray = Object.values(fileManagerState.tracks) as Track[];
-    return tracksArray.find((track: Track) =>
-      track.name === name && (track.folder || null) === (folder || null)
-    ) || null;
+    return (
+      tracksArray.find((track: Track) => track.name === name && (track.folder || null) === (folder || null)) || null
+    );
   };
 
   // Handle conflict resolution
@@ -532,7 +542,7 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
           importData.folder,
           importData.isMultitrack,
           importData.steps,
-          importData.activeStep
+          importData.activeStep,
         );
         toastActions.success(t('files:trackImported', { name: importData.name }));
       }
@@ -582,24 +592,28 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
 
           if (existingTrack) {
             // Show conflict modal
-            setImportConflicts([{
-              type: 'track',
-              name: trackName,
-              path: existingTrack.folder || '',
-              existingItem: {
-                created: existingTrack.created,
-                modified: existingTrack.modified,
+            setImportConflicts([
+              {
+                type: 'track',
+                name: trackName,
+                path: existingTrack.folder || '',
+                existingItem: {
+                  created: existingTrack.created,
+                  modified: existingTrack.modified,
+                },
+                newItem: {
+                  size: new Blob([content]).size,
+                },
               },
-              newItem: {
-                size: new Blob([content]).size,
-              }
-            }]);
-            setPendingImports([{
-              type: 'track',
-              name: trackName,
-              code: content,
-              folder: existingTrack.folder,
-            }]);
+            ]);
+            setPendingImports([
+              {
+                type: 'track',
+                name: trackName,
+                code: content,
+                folder: existingTrack.folder,
+              },
+            ]);
             setCurrentConflictIndex(0);
             setShowConflictModal(true);
             resolve();
@@ -611,10 +625,15 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
             console.log('FileManager - Importing track to Supabase:', trackName, 'code length:', content.length);
             const createdTrack = await fileManagerHook.createTrack(trackName, content);
             if (createdTrack) {
-              console.log('FileManager - Track created in database:', createdTrack.id, 'code length:', createdTrack.code?.length);
+              console.log(
+                'FileManager - Track created in database:',
+                createdTrack.id,
+                'code length:',
+                createdTrack.code?.length,
+              );
               toastActions.success(t('files:trackImported', { name: trackName }));
 
-              await new Promise(resolve => setTimeout(resolve, 300));
+              await new Promise((resolve) => setTimeout(resolve, 300));
 
               const trackUrl = generateTrackUrlPath(createdTrack.name, createdTrack.folder, fileManagerState.folders);
               window.history.pushState({}, '', trackUrl);
@@ -674,23 +693,19 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
 
       // Only check for multitrack if it's NOT a library
       // Look for multitrack-specific metadata.json files (not library-metadata.json)
-      const multitrackMetadataFiles = allFiles.filter(f =>
-        f.endsWith('metadata.json') &&
-        f !== 'library-metadata.json' &&
-        !f.includes('library-metadata.json')
+      const multitrackMetadataFiles = allFiles.filter(
+        (f) => f.endsWith('metadata.json') && f !== 'library-metadata.json' && !f.includes('library-metadata.json'),
       );
       console.log('ZIP Import Debug - Found multitrack metadata files:', multitrackMetadataFiles);
 
       // For single multitrack detection, check if we have exactly one metadata file at root level
-      const rootMetadataFiles = multitrackMetadataFiles.filter(f => !f.includes('/'));
+      const rootMetadataFiles = multitrackMetadataFiles.filter((f) => !f.includes('/'));
       const hasRootMetadata = rootMetadataFiles.length === 1;
 
       // Check for step files pattern at root level only (for single multitrack)
-      const hasRootStepFiles = allFiles.some(filename =>
-        !filename.includes('/') && (
-          filename.match(/^step_\d+\.js$/i) ||
-          filename.match(/^Step\s*_?\d+\.js$/i)
-        )
+      const hasRootStepFiles = allFiles.some(
+        (filename) =>
+          !filename.includes('/') && (filename.match(/^step_\d+\.js$/i) || filename.match(/^Step\s*_?\d+\.js$/i)),
       );
       console.log('ZIP Import Debug - Has root step files pattern:', hasRootStepFiles);
       console.log('ZIP Import Debug - Has root metadata:', hasRootMetadata);
@@ -747,15 +762,19 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
       const allFiles = Object.keys(zipContent.files);
 
       // Find step files with different patterns, considering folder prefix
-      let stepFiles = allFiles.filter(filename => {
-        // Remove folder prefix if it exists
-        const relativePath = folderPrefix ? filename.replace(folderPrefix, '') : filename;
-        return relativePath.match(/^step_\d+\.js$/) ||
-               relativePath.match(/^Step\s+\d+\.js$/i) ||
-               relativePath.match(/^\d+\.js$/) ||
-               filename.match(/step_\d+\.js$/i) ||
-               filename.match(/Step\s*_?\d+\.js$/i);
-      }).sort();
+      let stepFiles = allFiles
+        .filter((filename) => {
+          // Remove folder prefix if it exists
+          const relativePath = folderPrefix ? filename.replace(folderPrefix, '') : filename;
+          return (
+            relativePath.match(/^step_\d+\.js$/) ||
+            relativePath.match(/^Step\s+\d+\.js$/i) ||
+            relativePath.match(/^\d+\.js$/) ||
+            filename.match(/step_\d+\.js$/i) ||
+            filename.match(/Step\s*_?\d+\.js$/i)
+          );
+        })
+        .sort();
 
       console.log('Multitrack Debug - Found step files:', stepFiles);
 
@@ -810,12 +829,12 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
           undefined, // folder
           multitrackData.isMultitrack,
           multitrackData.steps,
-          multitrackData.activeStep
+          multitrackData.activeStep,
         );
         if (createdTrack) {
           toastActions.success(t('files:multitrackImported', { name: multitrackData.name }));
           // Load the imported track
-          await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay
           fileManagerHook.loadTrack(createdTrack);
 
           // Dispatch event to notify other components that tracks were imported
@@ -860,22 +879,20 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
           const folderPath = filename.substring(0, filename.lastIndexOf('/'));
           if (folderPath) {
             // Check if this folder has multiple JS files (potential steps)
-            const jsFiles = allFiles.filter(f =>
-              f.startsWith(folderPath + '/') &&
-              f.match(/\.js$/i) &&
-              f !== filename // exclude the metadata file itself
+            const jsFiles = allFiles.filter(
+              (f) => f.startsWith(folderPath + '/') && f.match(/\.js$/i) && f !== filename, // exclude the metadata file itself
             );
 
             // Also check for traditional step file patterns
-            const traditionalStepFiles = jsFiles.filter(f =>
-              f.match(/\/step_\d+\.js$/i) || f.match(/\/Step\s*_?\d+\.js$/i)
+            const traditionalStepFiles = jsFiles.filter(
+              (f) => f.match(/\/step_\d+\.js$/i) || f.match(/\/Step\s*_?\d+\.js$/i),
             );
 
             // If we have traditional step files OR multiple JS files in a folder with metadata, treat as multitrack
             if (traditionalStepFiles.length > 0 || jsFiles.length > 1) {
               potentialMultitracks.set(folderPath, {
                 metadataPath: filename,
-                stepFiles: jsFiles // Use all JS files as potential steps
+                stepFiles: jsFiles, // Use all JS files as potential steps
               });
               console.log('Library Import - Found potential multitrack:', folderPath, 'with', jsFiles.length, 'files');
             }
@@ -909,7 +926,9 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
         if (!uniqueFolders.has(folderPath)) {
           uniqueFolders.add(folderPath);
           const folderName = folderPath.split('/').pop() || folderPath;
-          const parentPath = folderPath.includes('/') ? folderPath.substring(0, folderPath.lastIndexOf('/')) : undefined;
+          const parentPath = folderPath.includes('/')
+            ? folderPath.substring(0, folderPath.lastIndexOf('/'))
+            : undefined;
 
           foldersToImport.push({
             name: folderName,
@@ -1000,8 +1019,8 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
         const fileObj = file as any;
         if (filename.match(/\.(js|txt|md)$/i) && !fileObj.dir) {
           // Skip if this file is part of a multitrack
-          const isPartOfMultitrack = Array.from(potentialMultitracks.values()).some(mt =>
-            mt.stepFiles.includes(filename) || filename === mt.metadataPath
+          const isPartOfMultitrack = Array.from(potentialMultitracks.values()).some(
+            (mt) => mt.stepFiles.includes(filename) || filename === mt.metadataPath,
           );
 
           if (isPartOfMultitrack) {
@@ -1035,7 +1054,7 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
 
       console.log('Library Import - Prepared for batch import:', {
         tracks: tracksToImport.length,
-        folders: foldersToImport.length
+        folders: foldersToImport.length,
       });
 
       // Perform batch import to Supabase (authentication required)
@@ -1049,7 +1068,7 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
       console.log('Library Import - Sending batch import to Supabase...');
       const { data: result, error } = await batch.importLibrary({
         tracks: tracksToImport,
-        folders: foldersToImport
+        folders: foldersToImport,
       });
 
       if (error) {
@@ -1067,8 +1086,8 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
         console.log('🔍 DEBUG - Data before refresh:', {
           tracksToImport: tracksToImport.length,
           foldersToImport: foldersToImport.length,
-          sampleTracks: tracksToImport.slice(0, 2).map(t => ({ name: t.name, folder: t.folder })),
-          sampleFolders: foldersToImport.slice(0, 2).map(f => ({ name: f.name, path: f.path }))
+          sampleTracks: tracksToImport.slice(0, 2).map((t) => ({ name: t.name, folder: t.folder })),
+          sampleFolders: foldersToImport.slice(0, 2).map((f) => ({ name: f.name, path: f.path })),
         });
 
         // Show success message
@@ -1096,7 +1115,7 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
           await fileManagerHook.loadDataFromSupabase();
 
           // Give React more time to process state updates and re-render
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise((resolve) => setTimeout(resolve, 500));
 
           console.log('Library Import - Data refresh completed, UI should now show updated structure');
         }
@@ -1143,7 +1162,7 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
               const newTrack = await fileManagerState.createTrack(
                 fileManagerState.newTrackName.trim(),
                 DEFAULT_TRACK_CODE,
-                fileManagerState.newItemParentPath || undefined
+                fileManagerState.newItemParentPath || undefined,
               );
               if (newTrack) {
                 fileManagerState.setNewTrackName('');
@@ -1211,10 +1230,14 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
           onRenameCancel={operations.cancelRename}
           emptySpaceContextItems={getEmptySpaceContextItems()}
           onConvertToMultitrack={readOnly ? undefined : operations.convertToMultitrack}
-          onAddStep={readOnly ? undefined : (trackId) => {
-            fileManagerState.setSelectedStepTrack(trackId);
-            fileManagerState.setIsCreatingStep(true);
-          }}
+          onAddStep={
+            readOnly
+              ? undefined
+              : (trackId) => {
+                  fileManagerState.setSelectedStepTrack(trackId);
+                  fileManagerState.setIsCreatingStep(true);
+                }
+          }
           onSwitchStep={operations.switchToStep}
           onRenameStep={readOnly ? undefined : operations.startRenameStep}
           onDeleteStep={readOnly ? undefined : operations.deleteStep}
@@ -1232,7 +1255,9 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
         tracks={fileManagerState.tracks}
         saveStatus={fileManagerState.saveStatus}
         t={t}
-        onSaveCurrentTrack={async () => { await fileManagerState.saveCurrentTrack(true); }}
+        onSaveCurrentTrack={async () => {
+          await fileManagerState.saveCurrentTrack(true);
+        }}
       />
 
       {/* Modals */}
@@ -1278,26 +1303,30 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
         onClose={() => {
           fileManagerState.setShowDeleteFolderModal(false);
           fileManagerState.setFolderToDelete(null);
-          fileManagerState.setFolderContents({subfolders: [], tracks: []});
+          fileManagerState.setFolderContents({ subfolders: [], tracks: [] });
         }}
         onConfirm={operations.confirmFolderDelete}
         title={t('files:deleteFolder')}
         message={
           fileManagerState.folderToDelete ? (
             <div>
-              <p>{t('files:confirmDeleteFolder')} "{fileManagerState.folders[fileManagerState.folderToDelete]?.name}"?</p>
+              <p>
+                {t('files:confirmDeleteFolder')} "{fileManagerState.folders[fileManagerState.folderToDelete]?.name}"?
+              </p>
               <p className="mt-2 text-sm text-gray-400">{t('files:folderContainsItems')}:</p>
               <ul className="mt-1 text-sm text-gray-300 list-disc list-inside">
-                {fileManagerState.folderContents.subfolders.map(name => (
+                {fileManagerState.folderContents.subfolders.map((name) => (
                   <li key={name}>📁 {name}</li>
                 ))}
-                {fileManagerState.folderContents.tracks.map(name => (
+                {fileManagerState.folderContents.tracks.map((name) => (
                   <li key={name}>📄 {name}</li>
                 ))}
               </ul>
               <p className="mt-2 text-sm text-red-400">{t('files:actionCannotBeUndone')}</p>
             </div>
-          ) : ''
+          ) : (
+            ''
+          )
         }
         confirmText={t('common:delete')}
         cancelText={t('common:cancel')}
@@ -1325,7 +1354,7 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
                 if (trackCount > 0 && folderCount > 0) {
                   return t('files:deleteAllTracksAndFoldersWarning', {
                     trackCount,
-                    folderCount
+                    folderCount,
                   });
                 } else if (trackCount > 0) {
                   return t('files:deleteAllTracksWarning', { count: trackCount });

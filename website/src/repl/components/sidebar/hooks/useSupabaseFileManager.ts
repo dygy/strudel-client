@@ -1,13 +1,13 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {useSettings} from '@src/settings';
-import {getActivePattern, setActivePattern, useActivePattern} from '@src/user_pattern_utils';
-import {toastActions} from '@src/stores/toastStore';
-import {useTranslation} from '@src/i18n';
-import {useAuth} from '@src/hooks/useAuth';
-import {db, type Folder, type Track, secureApi} from '@src/lib/secureApi.ts';
-import {getEditorInstance, setPendingCode} from '@src/stores/editorStore.ts';
-import {tracksStore, tracksActions} from '@src/stores/tracksStore.ts';
-import {nanoid} from 'nanoid';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useSettings } from '@src/settings';
+import { getActivePattern, setActivePattern, useActivePattern } from '@src/user_pattern_utils';
+import { toastActions } from '@src/stores/toastStore';
+import { useTranslation } from '@src/i18n';
+import { useAuth } from '@src/hooks/useAuth';
+import { db, type Folder, type Track, secureApi } from '@src/lib/secureApi.ts';
+import { getEditorInstance, setPendingCode } from '@src/stores/editorStore.ts';
+import { tracksStore, tracksActions } from '@src/stores/tracksStore.ts';
+import { nanoid } from 'nanoid';
 import { TreeDataTransformer } from '@src/lib/TreeDataTransformer';
 import {
   parseTrackUrlPath,
@@ -20,7 +20,10 @@ import {
 // Helper: Get current track ID from URL (source of truth)
 // Now handles slug-based URLs with folder support
 // IMPORTANT: Handles both folder paths (new) and folder IDs (legacy) for backward compatibility
-const getCurrentTrackIdFromURL = (tracksMap: Record<string, Track>, foldersMap: Record<string, Folder>): string | null => {
+const getCurrentTrackIdFromURL = (
+  tracksMap: Record<string, Track>,
+  foldersMap: Record<string, Folder>,
+): string | null => {
   if (typeof window === 'undefined') return null;
 
   const currentPath = window.location.pathname;
@@ -41,7 +44,7 @@ const getCurrentTrackIdFromURL = (tracksMap: Record<string, Track>, foldersMap: 
   const tracks = Object.values(tracksMap);
 
   // Try to find track by matching slug and folder
-  const track = tracks.find(t => {
+  const track = tracks.find((t) => {
     const tSlug = trackNameToSlug(t.name);
     const slugMatch = tSlug === trackSlug;
 
@@ -74,7 +77,11 @@ const getCurrentTrackIdFromURL = (tracksMap: Record<string, Track>, foldersMap: 
 
   // Only log if track not found and we have tracks loaded (to help debug issues)
   if (!track && tracks.length > 0) {
-    console.warn('getCurrentTrackIdFromURL - track not found for URL:', { trackSlug, urlFolderPath, availableTracks: tracks.length });
+    console.warn('getCurrentTrackIdFromURL - track not found for URL:', {
+      trackSlug,
+      urlFolderPath,
+      availableTracks: tracks.length,
+    });
   }
 
   return track?.id || null;
@@ -82,18 +89,18 @@ const getCurrentTrackIdFromURL = (tracksMap: Record<string, Track>, foldersMap: 
 
 // Helper: Convert array to record keyed by id
 const arrayToRecord = <T extends { id: string }>(items: T[]): Record<string, T> =>
-  Object.fromEntries(items.map(item => [item.id, item]));
+  Object.fromEntries(items.map((item) => [item.id, item]));
 
 // Helper: Sync local state to global tracksStore
 const syncToGlobalStore = (tracksObj: Record<string, Track>, foldersObj: Record<string, Folder>) => {
   tracksActions.clear();
-  Object.values(tracksObj).forEach(track => tracksActions.addTrack(track));
-  Object.values(foldersObj).forEach(folder => tracksActions.addFolder(folder));
+  Object.values(tracksObj).forEach((track) => tracksActions.addTrack(track));
+  Object.values(foldersObj).forEach((folder) => tracksActions.addFolder(folder));
   tracksStore.set({
     ...tracksStore.get(),
     isInitialized: true,
     isLoading: false,
-    error: null
+    error: null,
   });
 };
 
@@ -102,7 +109,7 @@ const handleApiError = (
   error: unknown,
   context: string,
   setSyncError: (err: string | null) => void,
-  toastMessage?: string
+  toastMessage?: string,
 ) => {
   console.error(`SupabaseFileManager - ${context}:`, error);
   const message = error instanceof Error ? error.message : 'Unknown error';
@@ -194,7 +201,11 @@ interface ReplContext {
   trackRouter?: any;
 }
 
-export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks: any[]; folders: any[]; } | null, readOnly: boolean = false) {
+export function useSupabaseFileManager(
+  context: ReplContext,
+  ssrData?: { tracks: any[]; folders: any[] } | null,
+  readOnly: boolean = false,
+) {
   const { user, isAuthenticated, loading, checkAuth } = useAuth();
 
   // Always call all hooks at the top level - never conditionally!
@@ -223,7 +234,10 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
   const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
   const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<string | null>(null);
-  const [folderContents, setFolderContents] = useState<{subfolders: string[], tracks: string[]}>({subfolders: [], tracks: []});
+  const [folderContents, setFolderContents] = useState<{ subfolders: string[]; tracks: string[] }>({
+    subfolders: [],
+    tracks: [],
+  });
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
 
   // Step creation state
@@ -245,13 +259,18 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
   const isDeletingFolderRef = useRef<Set<string>>(new Set());
 
   // Track-specific autosave contexts to prevent cross-contamination
-  const trackAutosaveContextsRef = useRef<Map<string, {
-    trackId: string;
-    lastSavedCode: string;
-    lastSavedTimestamp: number;
-    isAutosaving: boolean;
-    timer: NodeJS.Timeout | null;
-  }>>(new Map());
+  const trackAutosaveContextsRef = useRef<
+    Map<
+      string,
+      {
+        trackId: string;
+        lastSavedCode: string;
+        lastSavedTimestamp: number;
+        isAutosaving: boolean;
+        timer: NodeJS.Timeout | null;
+      }
+    >
+  >(new Map());
 
   // Hooks
   const { isAutosaveEnabled, autosaveInterval } = useSettings();
@@ -341,8 +360,6 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     };
   }, [user, loading, isAuthenticated, ssrData, readOnly]); // Add readOnly to dependencies
 
-
-
   const loadDataFromSupabase = async () => {
     if (!user) return;
 
@@ -356,9 +373,8 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
           const { tracks: tracksData, folders: foldersData } = await secureApi.getTracks();
 
           if (tracksData && foldersData) {
-
             // Convert to expected format
-            const tracks = tracksData.map(track => ({
+            const tracks = tracksData.map((track) => ({
               id: track.id,
               name: track.name,
               code: track.code || '',
@@ -371,7 +387,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
               user_id: track.user_id,
             }));
 
-            const folders = foldersData.map(folder => ({
+            const folders = foldersData.map((folder) => ({
               id: folder.id,
               name: folder.name,
               path: folder.path,
@@ -403,10 +419,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       });
 
       // Ensure we have a valid session before making database calls with timeout
-      const validSession = await Promise.race([
-        checkAuth(),
-        timeoutPromise
-      ]);
+      const validSession = await Promise.race([checkAuth(), timeoutPromise]);
 
       if (!validSession) {
         throw new Error('Unable to establish valid session');
@@ -417,7 +430,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
       if (tracksData && foldersData) {
         // Convert to expected format
-        const tracks = tracksData.map(track => ({
+        const tracks = tracksData.map((track) => ({
           id: track.id,
           name: track.name,
           code: track.code || '',
@@ -430,7 +443,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
           user_id: track.user_id,
         }));
 
-        const folders = foldersData.map(folder => ({
+        const folders = foldersData.map((folder) => ({
           id: folder.id,
           name: folder.name,
           path: folder.path,
@@ -451,7 +464,6 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
         setIsInitialized(true);
         setHasLoadedData(true);
         syncToGlobalStore(tracksObj, foldersObj);
-
       } else {
         console.error('SupabaseFileManager - No data returned from secureApi');
       }
@@ -467,7 +479,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
           if (tracksData && foldersData) {
             // Convert to expected format
-            const tracks = tracksData.map(track => ({
+            const tracks = tracksData.map((track) => ({
               id: track.id,
               name: track.name,
               code: track.code || '',
@@ -480,7 +492,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
               user_id: track.user_id,
             }));
 
-            const folders = foldersData.map(folder => ({
+            const folders = foldersData.map((folder) => ({
               id: folder.id,
               name: folder.name,
               path: folder.path,
@@ -526,7 +538,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
         lastSavedCode: '',
         lastSavedTimestamp: 0,
         isAutosaving: false,
-        timer: null
+        timer: null,
       });
     }
 
@@ -547,83 +559,89 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
   /**
    * Clean up autosave context when track is deleted or component unmounts
    */
-  const cleanupTrackAutosaveContext = useCallback((trackId: string) => {
-    clearTrackAutosaveTimer(trackId);
-    trackAutosaveContextsRef.current.delete(trackId);
-  }, [clearTrackAutosaveTimer]);
+  const cleanupTrackAutosaveContext = useCallback(
+    (trackId: string) => {
+      clearTrackAutosaveTimer(trackId);
+      trackAutosaveContextsRef.current.delete(trackId);
+    },
+    [clearTrackAutosaveTimer],
+  );
 
-  const loadTrack = useCallback((track: Track) => {
-    setSelectedTrack(track.id);
+  const loadTrack = useCallback(
+    (track: Track) => {
+      setSelectedTrack(track.id);
 
-    // Initialize track-specific autosave context
-    const autosaveContext = getTrackAutosaveContext(track.id);
-    autosaveContext.lastSavedCode = track.code;
-    autosaveContext.lastSavedTimestamp = Date.now();
+      // Initialize track-specific autosave context
+      const autosaveContext = getTrackAutosaveContext(track.id);
+      autosaveContext.lastSavedCode = track.code;
+      autosaveContext.lastSavedTimestamp = Date.now();
 
-    // Clear any existing timer for this track
-    clearTrackAutosaveTimer(track.id);
+      // Clear any existing timer for this track
+      clearTrackAutosaveTimer(track.id);
 
-    lastSavedCodeRef.current = track.code;
+      lastSavedCodeRef.current = track.code;
 
-    // Store the code in nano store so it can be picked up when editor is ready
-    setPendingCode(track.code);
-    console.log('SupabaseFileManager - stored code in nano store:', track.code.substring(0, 50) + '...');
+      // Store the code in nano store so it can be picked up when editor is ready
+      setPendingCode(track.code);
+      console.log('SupabaseFileManager - stored code in nano store:', track.code.substring(0, 50) + '...');
 
-    // Preload samples from track code
-    const preloadSamples = async () => {
-      try {
-        const webaudioModule = await import('@strudel/webaudio');
-        if (webaudioModule.preloadTrackSamples && track.code) {
-          await webaudioModule.preloadTrackSamples(track.code, track.name || track.id);
+      // Preload samples from track code
+      const preloadSamples = async () => {
+        try {
+          const webaudioModule = await import('@strudel/webaudio');
+          if (webaudioModule.preloadTrackSamples && track.code) {
+            await webaudioModule.preloadTrackSamples(track.code, track.name || track.id);
+          }
+        } catch (error) {
+          console.debug('Sample preloading not available:', error);
         }
-      } catch (error) {
-        console.debug('Sample preloading not available:', error);
-      }
-    };
+      };
 
-    preloadSamples();
+      preloadSamples();
 
-    // CRITICAL: Only call handleUpdate if the code is actually different
-    // This prevents unnecessary re-renders that destroy the CodeMirror editor
-    const currentCode = context.editorRef?.current?.code || context.activeCode || '';
-    if (currentCode !== track.code) {
-      console.log('SupabaseFileManager - calling handleUpdate because code changed');
-      context.handleUpdate({ id: track.id, code: track.code }, false);
-    } else {
-      console.log('SupabaseFileManager - skipping handleUpdate, code is the same');
-    }
-
-    // DIRECT APPROACH: Set code directly in editor without triggering re-renders
-    const setCodeDirectly = () => {
-      console.log('SupabaseFileManager - setting code directly in editor via setCode');
-
-      // Method 1: Use editorRef if available
-      if (context.editorRef?.current?.setCode) {
-        context.editorRef.current.setCode(track.code);
-        console.log('SupabaseFileManager - setting code property directly');
-        context.editorRef.current.code = track.code;
-        return true;
+      // CRITICAL: Only call handleUpdate if the code is actually different
+      // This prevents unnecessary re-renders that destroy the CodeMirror editor
+      const currentCode = context.editorRef?.current?.code || context.activeCode || '';
+      if (currentCode !== track.code) {
+        console.log('SupabaseFileManager - calling handleUpdate because code changed');
+        context.handleUpdate({ id: track.id, code: track.code }, false);
+      } else {
+        console.log('SupabaseFileManager - skipping handleUpdate, code is the same');
       }
 
-      // Method 2: Use stored editor instance
-      const storedEditor = getEditorInstance();
-      if (storedEditor?.setCode) {
-        console.log('SupabaseFileManager - found code element, attempting direct update');
-        storedEditor.setCode(track.code);
-        return true;
+      // DIRECT APPROACH: Set code directly in editor without triggering re-renders
+      const setCodeDirectly = () => {
+        console.log('SupabaseFileManager - setting code directly in editor via setCode');
+
+        // Method 1: Use editorRef if available
+        if (context.editorRef?.current?.setCode) {
+          context.editorRef.current.setCode(track.code);
+          console.log('SupabaseFileManager - setting code property directly');
+          context.editorRef.current.code = track.code;
+          return true;
+        }
+
+        // Method 2: Use stored editor instance
+        const storedEditor = getEditorInstance();
+        if (storedEditor?.setCode) {
+          console.log('SupabaseFileManager - found code element, attempting direct update');
+          storedEditor.setCode(track.code);
+          return true;
+        }
+
+        return false;
+      };
+
+      // Try to set code directly, with retries if editor isn't ready yet
+      if (!setCodeDirectly()) {
+        setTimeout(() => setCodeDirectly(), 100);
+        setTimeout(() => setCodeDirectly(), 500);
       }
 
-      return false;
-    };
-
-    // Try to set code directly, with retries if editor isn't ready yet
-    if (!setCodeDirectly()) {
-      setTimeout(() => setCodeDirectly(), 100);
-      setTimeout(() => setCodeDirectly(), 500);
-    }
-
-    lastSavedCodeRef.current = track.code;
-  }, [context]);
+      lastSavedCodeRef.current = track.code;
+    },
+    [context],
+  );
 
   // Handle activePattern changes (URL routing)
   useEffect(() => {
@@ -665,9 +683,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     // If we have a step name and found the track, find the step index
     if (stepName && targetTrack?.isMultitrack && targetTrack.steps) {
       const stepSlug = trackNameToSlug(stepName);
-      targetStepIndex = targetTrack.steps.findIndex(step =>
-        trackNameToSlug(step.name) === stepSlug
-      );
+      targetStepIndex = targetTrack.steps.findIndex((step) => trackNameToSlug(step.name) === stepSlug);
 
       if (targetStepIndex === -1) {
         console.warn('SupabaseFileManager - step not found:', stepName, 'defaulting to first step');
@@ -677,24 +693,29 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
 
     // If we found a target track, load it (even if it's the same track, we might need to switch steps)
     if (targetTrack) {
-      const needsLoad = selectedTrack !== targetTrack.id ||
-                       (targetStepIndex !== null && targetTrack.activeStep !== targetStepIndex);
+      const needsLoad =
+        selectedTrack !== targetTrack.id || (targetStepIndex !== null && targetTrack.activeStep !== targetStepIndex);
 
       if (needsLoad) {
         // If there's a step parameter and track is multitrack, load that step
-        if (targetStepIndex !== null && targetTrack.isMultitrack && targetTrack.steps && targetTrack.steps[targetStepIndex]) {
+        if (
+          targetStepIndex !== null &&
+          targetTrack.isMultitrack &&
+          targetTrack.steps &&
+          targetTrack.steps[targetStepIndex]
+        ) {
           const trackWithStep = {
             ...targetTrack,
             activeStep: targetStepIndex,
-            code: targetTrack.steps[targetStepIndex].code
+            code: targetTrack.steps[targetStepIndex].code,
           };
 
           console.log('SupabaseFileManager - updating track state with activeStep:', targetStepIndex);
 
           // Update the track state with the new activeStep
-          setTracks(prev => ({
+          setTracks((prev) => ({
             ...prev,
-            [targetTrack.id]: trackWithStep
+            [targetTrack.id]: trackWithStep,
           }));
 
           setSelectedTrack(targetTrack.id);
@@ -710,199 +731,228 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     } else {
       console.log('SupabaseFileManager - no track found for activePattern:', activePattern);
     }
-  }, [activePattern, isInitialized, selectedTrack, loadTrack, tracks, user, selectedStepTrack, setSelectedStepTrack, setTracks]);
+  }, [
+    activePattern,
+    isInitialized,
+    selectedTrack,
+    loadTrack,
+    tracks,
+    user,
+    selectedStepTrack,
+    setSelectedStepTrack,
+    setTracks,
+  ]);
 
-  const saveSpecificTrack = useCallback(async (trackId: string, showToast: boolean = true) => {
-    // In read-only mode (admin viewing another user), never save
-    if (readOnly) {
-      console.log('SupabaseFileManager - saveSpecificTrack: read-only mode, skipping save');
-      return false;
-    }
+  const saveSpecificTrack = useCallback(
+    async (trackId: string, showToast: boolean = true) => {
+      // In read-only mode (admin viewing another user), never save
+      if (readOnly) {
+        console.log('SupabaseFileManager - saveSpecificTrack: read-only mode, skipping save');
+        return false;
+      }
 
-    if (!trackId || !user) {
-      console.warn('SupabaseFileManager - saveSpecificTrack: not authenticated or invalid track ID:', trackId);
-      return false;
-    }
+      if (!trackId || !user) {
+        console.warn('SupabaseFileManager - saveSpecificTrack: not authenticated or invalid track ID:', trackId);
+        return false;
+      }
 
-    // STRICT VALIDATION: Ensure we're still on the same track
-    if (selectedTrack !== trackId) {
-      console.log('SupabaseFileManager - saveSpecificTrack: track changed, skipping autosave for:', trackId);
-      return false;
-    }
+      // STRICT VALIDATION: Ensure we're still on the same track
+      if (selectedTrack !== trackId) {
+        console.log('SupabaseFileManager - saveSpecificTrack: track changed, skipping autosave for:', trackId);
+        return false;
+      }
 
-    if (!tracks[trackId]) {
-      console.warn('SupabaseFileManager - saveSpecificTrack: track not found:', trackId);
-      return false;
-    }
+      if (!tracks[trackId]) {
+        console.warn('SupabaseFileManager - saveSpecificTrack: track not found:', trackId);
+        return false;
+      }
 
-    // Get track-specific autosave context
-    const autosaveContext = getTrackAutosaveContext(trackId);
+      // Get track-specific autosave context
+      const autosaveContext = getTrackAutosaveContext(trackId);
 
-    // Prevent concurrent saves for the same track
-    if (autosaveContext.isAutosaving) {
-      console.log('SupabaseFileManager - saveSpecificTrack: already autosaving track:', trackId);
-      return false;
-    }
+      // Prevent concurrent saves for the same track
+      if (autosaveContext.isAutosaving) {
+        console.log('SupabaseFileManager - saveSpecificTrack: already autosaving track:', trackId);
+        return false;
+      }
 
-    let currentCode = context.editorRef?.current?.code || context.activeCode || '';
-    if (!currentCode.trim()) {
-      if (showToast) toastActions.warning(t('files:noCodeToSave'));
-      return false;
-    }
+      let currentCode = context.editorRef?.current?.code || context.activeCode || '';
+      if (!currentCode.trim()) {
+        if (showToast) toastActions.warning(t('files:noCodeToSave'));
+        return false;
+      }
 
-    // Use track-specific last saved code instead of global reference
-    if (currentCode === autosaveContext.lastSavedCode) {
-      console.log('SupabaseFileManager - saveSpecificTrack: no changes for track:', trackId);
-      return false;
-    }
+      // Use track-specific last saved code instead of global reference
+      if (currentCode === autosaveContext.lastSavedCode) {
+        console.log('SupabaseFileManager - saveSpecificTrack: no changes for track:', trackId);
+        return false;
+      }
 
-    // STRICT CODE VALIDATION: Ensure code matches what we expect for this track
-    const expectedCode = tracks[trackId].code;
-    if (autosaveContext.lastSavedCode !== expectedCode && autosaveContext.lastSavedCode !== '') {
-      console.error('SupabaseFileManager - saveSpecificTrack: CRITICAL - code mismatch detected!', {
-        trackId,
-        trackName: tracks[trackId].name,
-        expectedLength: expectedCode.length,
-        contextLength: autosaveContext.lastSavedCode.length,
-        currentLength: currentCode.length
-      });
-      return false;
-    }
+      // STRICT CODE VALIDATION: Ensure code matches what we expect for this track
+      const expectedCode = tracks[trackId].code;
+      if (autosaveContext.lastSavedCode !== expectedCode && autosaveContext.lastSavedCode !== '') {
+        console.error('SupabaseFileManager - saveSpecificTrack: CRITICAL - code mismatch detected!', {
+          trackId,
+          trackName: tracks[trackId].name,
+          expectedLength: expectedCode.length,
+          contextLength: autosaveContext.lastSavedCode.length,
+          currentLength: currentCode.length,
+        });
+        return false;
+      }
 
-    // Mark as autosaving to prevent concurrent operations
-    autosaveContext.isAutosaving = true;
+      // Mark as autosaving to prevent concurrent operations
+      autosaveContext.isAutosaving = true;
 
-    // Auto-format on save if enabled
-    let codeToSave = currentCode;
-    try {
-      // Get current settings from the proper settings store
-      const { settingsMap } = await import('@src/settings');
-      const settings = settingsMap.get();
+      // Auto-format on save if enabled
+      let codeToSave = currentCode;
+      try {
+        // Get current settings from the proper settings store
+        const { settingsMap } = await import('@src/settings');
+        const settings = settingsMap.get();
 
-      if (settings?.isPrettierEnabled && settings?.prettierAutoFormatOnSave) {
-        console.log('SupabaseFileManager - auto-formatting code before save');
+        if (settings?.isPrettierEnabled && settings?.prettierAutoFormatOnSave) {
+          console.log('SupabaseFileManager - auto-formatting code before save');
 
-        // Dynamically import the auto-format function
-        const { autoFormatOnSave } = await import('@strudel/codemirror');
-        const formatResult = await autoFormatOnSave(currentCode, settings);
+          // Dynamically import the auto-format function
+          const { autoFormatOnSave } = await import('@strudel/codemirror');
+          const formatResult = await autoFormatOnSave(currentCode, settings);
 
-        if (formatResult.success && formatResult.formattedCode) {
-          codeToSave = formatResult.formattedCode;
+          if (formatResult.success && formatResult.formattedCode) {
+            codeToSave = formatResult.formattedCode;
 
-          // Update the editor with formatted code if it's different
-          if (codeToSave !== currentCode && context.editorRef?.current?.setCode) {
-            context.editorRef.current.setCode(codeToSave);
-          }
+            // Update the editor with formatted code if it's different
+            if (codeToSave !== currentCode && context.editorRef?.current?.setCode) {
+              context.editorRef.current.setCode(codeToSave);
+            }
 
-          console.log('SupabaseFileManager - code auto-formatted successfully');
-        } else if (formatResult.error) {
-          console.warn('SupabaseFileManager - auto-format failed:', formatResult.error);
-          // Continue with original code if formatting fails
-          if (showToast) {
-            toastActions.warning(`Auto-format failed: ${formatResult.error}`);
+            console.log('SupabaseFileManager - code auto-formatted successfully');
+          } else if (formatResult.error) {
+            console.warn('SupabaseFileManager - auto-format failed:', formatResult.error);
+            // Continue with original code if formatting fails
+            if (showToast) {
+              toastActions.warning(`Auto-format failed: ${formatResult.error}`);
+            }
           }
         }
-      }
-    } catch (error) {
-      console.error('SupabaseFileManager - auto-format error:', error);
-      // Continue with original code if formatting fails
-      if (showToast) {
-        toastActions.warning('Auto-format failed, saving original code');
-      }
-    }
-
-    console.log('SupabaseFileManager - saving to Supabase:', tracks[trackId]?.name, 'ID:', trackId);
-
-    try {
-      // Update in Supabase directly
-      const { data, error } = await db.tracks.update(trackId, {
-        code: codeToSave,
-        modified: new Date().toISOString()
-      });
-
-      if (error) {
-        throw error;
+      } catch (error) {
+        console.error('SupabaseFileManager - auto-format error:', error);
+        // Continue with original code if formatting fails
+        if (showToast) {
+          toastActions.warning('Auto-format failed, saving original code');
+        }
       }
 
-      // Update local state
-      setTracks(prev => ({
-        ...prev,
-        [trackId]: {
-          ...prev[trackId],
+      console.log('SupabaseFileManager - saving to Supabase:', tracks[trackId]?.name, 'ID:', trackId);
+
+      try {
+        // Update in Supabase directly
+        const { data, error } = await db.tracks.update(trackId, {
           code: codeToSave,
-          modified: new Date().toISOString()
+          modified: new Date().toISOString(),
+        });
+
+        if (error) {
+          throw error;
         }
-      }));
 
-      // Update track-specific context
-      autosaveContext.lastSavedCode = codeToSave;
-      autosaveContext.lastSavedTimestamp = Date.now();
-      lastSavedCodeRef.current = codeToSave;
+        // Update local state
+        setTracks((prev) => ({
+          ...prev,
+          [trackId]: {
+            ...prev[trackId],
+            code: codeToSave,
+            modified: new Date().toISOString(),
+          },
+        }));
 
-      if (showToast) {
-        toastActions.success(t('files:trackSaved'));
-        setSaveStatus('Saved!');
-        setTimeout(() => setSaveStatus(''), 2000);
+        // Update track-specific context
+        autosaveContext.lastSavedCode = codeToSave;
+        autosaveContext.lastSavedTimestamp = Date.now();
+        lastSavedCodeRef.current = codeToSave;
+
+        if (showToast) {
+          toastActions.success(t('files:trackSaved'));
+          setSaveStatus('Saved!');
+          setTimeout(() => setSaveStatus(''), 2000);
+        }
+
+        console.log('SupabaseFileManager - saveSpecificTrack: SUCCESS for track:', trackId);
+        return true;
+      } catch (error) {
+        console.error('Error saving track to Supabase:', error);
+        if (showToast) {
+          toastActions.error(t('files:errors.saveFailed'));
+        }
+        setSyncError(error instanceof Error ? error.message : 'Save failed');
+        return false;
+      } finally {
+        // Always clear the autosaving flag
+        autosaveContext.isAutosaving = false;
       }
+    },
+    [context, t, selectedTrack, tracks, user, getTrackAutosaveContext, readOnly],
+  );
 
-      console.log('SupabaseFileManager - saveSpecificTrack: SUCCESS for track:', trackId);
-      return true;
-    } catch (error) {
-      console.error('Error saving track to Supabase:', error);
-      if (showToast) {
-        toastActions.error(t('files:errors.saveFailed'));
-      }
-      setSyncError(error instanceof Error ? error.message : 'Save failed');
-      return false;
-    } finally {
-      // Always clear the autosaving flag
-      autosaveContext.isAutosaving = false;
-    }
-  }, [context, t, selectedTrack, tracks, user, getTrackAutosaveContext, readOnly]);
-
-  const saveCurrentTrack = useCallback(async (showToast: boolean = true) => {
-    if (!selectedTrack || !user) return false;
-    return await saveSpecificTrack(selectedTrack, showToast);
-  }, [selectedTrack, user, saveSpecificTrack]);
+  const saveCurrentTrack = useCallback(
+    async (showToast: boolean = true) => {
+      if (!selectedTrack || !user) return false;
+      return await saveSpecificTrack(selectedTrack, showToast);
+    },
+    [selectedTrack, user, saveSpecificTrack],
+  );
 
   /**
    * Schedule autosave for a specific track with strict isolation
    */
-  const scheduleTrackAutosave = useCallback((trackId: string) => {
-    // Don't schedule autosave in read-only mode
-    if (readOnly || !isAutosaveEnabled || !trackId || !user) return;
+  const scheduleTrackAutosave = useCallback(
+    (trackId: string) => {
+      // Don't schedule autosave in read-only mode
+      if (readOnly || !isAutosaveEnabled || !trackId || !user) return;
 
-    const autosaveContext = getTrackAutosaveContext(trackId);
+      const autosaveContext = getTrackAutosaveContext(trackId);
 
-    // Clear any existing timer for this track
-    clearTrackAutosaveTimer(trackId);
+      // Clear any existing timer for this track
+      clearTrackAutosaveTimer(trackId);
 
-    // Don't schedule if already autosaving
-    if (autosaveContext.isAutosaving) {
-      console.log('SupabaseFileManager - scheduleTrackAutosave: already autosaving, skipping:', trackId);
-      return;
-    }
-
-    autosaveContext.timer = setTimeout(async () => {
-      // Double-check that we're still on the same track when timer fires (URL-based)
-      const currentTrackIdFromURL = getCurrentTrackIdFromURL(tracks, folders);
-
-      if (!currentTrackIdFromURL) {
-        console.warn('SupabaseFileManager - autosave timer: Could not determine track from URL, skipping save');
+      // Don't schedule if already autosaving
+      if (autosaveContext.isAutosaving) {
+        console.log('SupabaseFileManager - scheduleTrackAutosave: already autosaving, skipping:', trackId);
         return;
       }
 
-      if (currentTrackIdFromURL === trackId) {
-        console.log('SupabaseFileManager - autosave timer fired for track (URL-based):', trackId);
-        await saveSpecificTrack(trackId, false); // Don't show toast for autosave
-      } else {
-        console.log('SupabaseFileManager - autosave timer fired but track changed (URL-based):', {
-          scheduled: trackId,
-          currentFromURL: currentTrackIdFromURL
-        });
-      }
-    }, autosaveInterval);
-  }, [isAutosaveEnabled, user, autosaveInterval, selectedTrack, folders, getTrackAutosaveContext, clearTrackAutosaveTimer, saveSpecificTrack, readOnly]);
+      autosaveContext.timer = setTimeout(async () => {
+        // Double-check that we're still on the same track when timer fires (URL-based)
+        const currentTrackIdFromURL = getCurrentTrackIdFromURL(tracks, folders);
+
+        if (!currentTrackIdFromURL) {
+          console.warn('SupabaseFileManager - autosave timer: Could not determine track from URL, skipping save');
+          return;
+        }
+
+        if (currentTrackIdFromURL === trackId) {
+          console.log('SupabaseFileManager - autosave timer fired for track (URL-based):', trackId);
+          await saveSpecificTrack(trackId, false); // Don't show toast for autosave
+        } else {
+          console.log('SupabaseFileManager - autosave timer fired but track changed (URL-based):', {
+            scheduled: trackId,
+            currentFromURL: currentTrackIdFromURL,
+          });
+        }
+      }, autosaveInterval);
+    },
+    [
+      isAutosaveEnabled,
+      user,
+      autosaveInterval,
+      selectedTrack,
+      folders,
+      getTrackAutosaveContext,
+      clearTrackAutosaveTimer,
+      saveSpecificTrack,
+      readOnly,
+    ],
+  );
 
   /**
    * Handle code changes to trigger autosave scheduling - URL-based
@@ -932,78 +982,95 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     };
   }, [user, saveCurrentTrack]);
 
-  const createTrack = useCallback(async (name: string, code: string = '', folderOrEvent?: string | React.SyntheticEvent, isMultitrack?: boolean, steps?: any[], activeStep?: number) => {
-    // Handle case where folder parameter might be a SyntheticEvent (from React event handlers)
-    const folder = typeof folderOrEvent === 'string' ? folderOrEvent : undefined;
+  const createTrack = useCallback(
+    async (
+      name: string,
+      code: string = '',
+      folderOrEvent?: string | React.SyntheticEvent,
+      isMultitrack?: boolean,
+      steps?: any[],
+      activeStep?: number,
+    ) => {
+      // Handle case where folder parameter might be a SyntheticEvent (from React event handlers)
+      const folder = typeof folderOrEvent === 'string' ? folderOrEvent : undefined;
 
-    if (!user) {
-      console.error('SupabaseFileManager - createTrack: not authenticated');
-      toastActions.error(t('auth:errors.notAuthenticated'));
-      return null;
-    }
+      if (!user) {
+        console.error('SupabaseFileManager - createTrack: not authenticated');
+        toastActions.error(t('auth:errors.notAuthenticated'));
+        return null;
+      }
 
-    // Ensure valid session before creating track
-    const isValidSession = await checkAuth();
-    if (!isValidSession) {
-      console.error('SupabaseFileManager - createTrack: unable to establish valid session');
-      toastActions.error('Unable to verify authentication. Please try again.');
-      return null;
-    }
+      // Ensure valid session before creating track
+      const isValidSession = await checkAuth();
+      if (!isValidSession) {
+        console.error('SupabaseFileManager - createTrack: unable to establish valid session');
+        toastActions.error('Unable to verify authentication. Please try again.');
+        return null;
+      }
 
-    console.log('SupabaseFileManager - createTrack called:', { name, folder, isMultitrack, stepsCount: steps?.length });
-
-    try {
-      const trackData = {
+      console.log('SupabaseFileManager - createTrack called:', {
         name,
-        code,
-        folder: folder || null, // Convert empty string/undefined to null for root folder
+        folder,
         isMultitrack,
-        steps,
-        activeStep,
-      };
-
-      console.log('SupabaseFileManager - creating track directly in Supabase:', trackData);
-
-      // Call the API endpoint directly instead of using db.tracks.create
-      const response = await fetch('/api/tracks/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(trackData),
+        stepsCount: steps?.length,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('SupabaseFileManager - API error:', errorData);
+      try {
+        const trackData = {
+          name,
+          code,
+          folder: folder || null, // Convert empty string/undefined to null for root folder
+          isMultitrack,
+          steps,
+          activeStep,
+        };
 
-        // Handle specific error cases
-        if (response.status === 401) {
-          toastActions.error('Authentication failed. Please try refreshing the page.');
-          return null;
+        console.log('SupabaseFileManager - creating track directly in Supabase:', trackData);
+
+        // Call the API endpoint directly instead of using db.tracks.create
+        const response = await fetch('/api/tracks/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(trackData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('SupabaseFileManager - API error:', errorData);
+
+          // Handle specific error cases
+          if (response.status === 401) {
+            toastActions.error('Authentication failed. Please try refreshing the page.');
+            return null;
+          }
+
+          throw new Error(errorData.error || errorData.message || 'Failed to create track');
         }
 
-        throw new Error(errorData.error || errorData.message || 'Failed to create track');
+        const result = await response.json();
+
+        if (result.success && result.track) {
+          console.log('✅ Track created successfully:', result.track.id, result.track.name);
+          setTracks((prev) => ({ ...prev, [result.track.id]: result.track }));
+          toastActions.success(t('files:trackCreated'));
+          return result.track;
+        }
+
+        return null;
+      } catch (error) {
+        console.error('SupabaseFileManager - Error creating track:', error);
+        toastActions.error(
+          t('files:errors.createTrackFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'),
+        );
+        setSyncError(error instanceof Error ? error.message : 'Create failed');
+        return null;
       }
-
-      const result = await response.json();
-
-      if (result.success && result.track) {
-        console.log('✅ Track created successfully:', result.track.id, result.track.name);
-        setTracks(prev => ({ ...prev, [result.track.id]: result.track }));
-        toastActions.success(t('files:trackCreated'));
-        return result.track;
-      }
-
-      return null;
-    } catch (error) {
-      console.error('SupabaseFileManager - Error creating track:', error);
-      toastActions.error(t('files:errors.createTrackFailed') + ': ' + (error instanceof Error ? error.message : 'Unknown error'));
-      setSyncError(error instanceof Error ? error.message : 'Create failed');
-      return null;
-    }
-  }, [user, checkAuth, t]);
+    },
+    [user, checkAuth, t],
+  );
 
   // Listen for new user pattern creation and automatically save to Supabase
   useEffect(() => {
@@ -1027,7 +1094,7 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
           undefined, // folder
           false, // isMultitrack
           undefined, // steps
-          undefined // activeStep
+          undefined, // activeStep
         );
 
         if (newTrack) {
@@ -1051,222 +1118,240 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
     };
   }, [user, tracks, createTrack]);
 
-  const createFolder = useCallback(async (name: string, path: string, parent?: string) => {
-    console.log('SupabaseFileManager - createFolder called:', { name, path, parent });
+  const createFolder = useCallback(
+    async (name: string, path: string, parent?: string) => {
+      console.log('SupabaseFileManager - createFolder called:', { name, path, parent });
 
-    if (!user) {
-      console.error('SupabaseFileManager - createFolder: not authenticated');
-      toastActions.error(t('auth:errors.notAuthenticated'));
-      return null;
-    }
-
-    try {
-      // Ensure valid session before creating folder
-      const isValidSession = await checkAuth();
-      if (!isValidSession) {
-        console.error('SupabaseFileManager - createFolder: unable to establish valid session');
-        toastActions.error('Unable to verify authentication. Please try again.');
+      if (!user) {
+        console.error('SupabaseFileManager - createFolder: not authenticated');
+        toastActions.error(t('auth:errors.notAuthenticated'));
         return null;
       }
 
-      // Get the current user from the auth context (checkAuth already set it)
-      if (!user?.id) {
-        console.error('SupabaseFileManager - createFolder: no user available after session validation');
-        toastActions.error('Authentication error: No user found. Please try refreshing the page.');
-        return null;
-      }
-
-      // Validate input parameters
-      if (!name || typeof name !== 'string' || !name.trim()) {
-        console.error('SupabaseFileManager - createFolder: invalid name parameter:', name);
-        toastActions.error('Folder name is required');
-        return null;
-      }
-
-      if (!path || typeof path !== 'string' || !path.trim()) {
-        console.error('SupabaseFileManager - createFolder: invalid path parameter:', path);
-        toastActions.error('Folder path is required');
-        return null;
-      }
-
-      const newFolder = {
-        id: nanoid(), // Use nanoid for proper UUID generation
-        name: name.trim(),
-        path: path.trim(),
-        parent: parent || null,
-        created: new Date().toISOString(),
-        user_id: user.id,
-      };
-
-      console.log('SupabaseFileManager - creating folder via API:', newFolder);
-
-      // Call the API endpoint instead of direct database access
-      const response = await fetch('/api/folders/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(newFolder),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('SupabaseFileManager - API error:', errorData);
-
-        // Handle specific error cases
-        if (response.status === 401) {
-          toastActions.error('Authentication failed. Please try refreshing the page.');
+      try {
+        // Ensure valid session before creating folder
+        const isValidSession = await checkAuth();
+        if (!isValidSession) {
+          console.error('SupabaseFileManager - createFolder: unable to establish valid session');
+          toastActions.error('Unable to verify authentication. Please try again.');
           return null;
         }
 
-        throw new Error(errorData.error || errorData.message || 'Failed to create folder');
-      }
-
-      const result = await response.json();
-
-      if (result.data) {
-        // Update local state
-        setFolders(prev => ({ ...prev, [result.data.id]: result.data }));
-        toastActions.success(t('files:success.folderCreated', { name: result.data.name }) || `Folder "${result.data.name}" created successfully`);
-        console.log('SupabaseFileManager - folder created successfully:', result.data);
-        return result.data;
-      }
-
-      return null;
-    } catch (error) {
-      const isNetworkError = error instanceof Error && error.message.includes('fetch');
-      const toastMsg = isNetworkError ? 'Network error. Please check your connection.' : (error instanceof Error ? error.message : 'Failed to create folder');
-      handleApiError(error, 'Error creating folder', setSyncError, toastMsg);
-      return null;
-    }
-  }, [user, t, checkAuth, setFolders]);
-
-  const updateFolder = useCallback(async (folderId: string, updates: { parent?: string | null; name?: string; path?: string }) => {
-    console.log('SupabaseFileManager - updateFolder called:', { folderId, updates });
-
-    if (!user) {
-      console.error('SupabaseFileManager - updateFolder: not authenticated');
-      toastActions.error('Not authenticated. Please refresh the page.');
-      return null;
-    }
-
-    try {
-      // Ensure valid session before updating folder
-      const isValidSession = await checkAuth();
-      if (!isValidSession) {
-        console.error('SupabaseFileManager - updateFolder: unable to establish valid session');
-        toastActions.error('Unable to verify authentication. Please try again.');
-        return null;
-      }
-
-      console.log('SupabaseFileManager - updating folder via API:', folderId, updates);
-
-      // Call the API endpoint
-      const response = await fetch('/api/folders/update', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          folderId,
-          updates
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('SupabaseFileManager - API error:', errorData);
-
-        // Handle specific error cases
-        if (response.status === 401) {
-          toastActions.error('Authentication failed. Please try refreshing the page.');
+        // Get the current user from the auth context (checkAuth already set it)
+        if (!user?.id) {
+          console.error('SupabaseFileManager - createFolder: no user available after session validation');
+          toastActions.error('Authentication error: No user found. Please try refreshing the page.');
           return null;
         }
 
-        if (response.status === 404) {
-          toastActions.error('Folder not found. It may have been deleted by another session.');
+        // Validate input parameters
+        if (!name || typeof name !== 'string' || !name.trim()) {
+          console.error('SupabaseFileManager - createFolder: invalid name parameter:', name);
+          toastActions.error('Folder name is required');
           return null;
         }
 
-        throw new Error(errorData.error || 'Failed to update folder');
-      }
+        if (!path || typeof path !== 'string' || !path.trim()) {
+          console.error('SupabaseFileManager - createFolder: invalid path parameter:', path);
+          toastActions.error('Folder path is required');
+          return null;
+        }
 
-      const result = await response.json();
+        const newFolder = {
+          id: nanoid(), // Use nanoid for proper UUID generation
+          name: name.trim(),
+          path: path.trim(),
+          parent: parent || null,
+          created: new Date().toISOString(),
+          user_id: user.id,
+        };
 
-      if (result.success && result.folder) {
-        // Update local state
-        setFolders(prev => ({
-          ...prev,
-          [folderId]: {
-            ...prev[folderId],
-            ...result.folder
+        console.log('SupabaseFileManager - creating folder via API:', newFolder);
+
+        // Call the API endpoint instead of direct database access
+        const response = await fetch('/api/folders/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(newFolder),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('SupabaseFileManager - API error:', errorData);
+
+          // Handle specific error cases
+          if (response.status === 401) {
+            toastActions.error('Authentication failed. Please try refreshing the page.');
+            return null;
           }
-        }));
 
-        console.log('SupabaseFileManager - folder updated successfully:', result.folder);
-        return result.folder;
+          throw new Error(errorData.error || errorData.message || 'Failed to create folder');
+        }
+
+        const result = await response.json();
+
+        if (result.data) {
+          // Update local state
+          setFolders((prev) => ({ ...prev, [result.data.id]: result.data }));
+          toastActions.success(
+            t('files:success.folderCreated', { name: result.data.name }) ||
+              `Folder "${result.data.name}" created successfully`,
+          );
+          console.log('SupabaseFileManager - folder created successfully:', result.data);
+          return result.data;
+        }
+
+        return null;
+      } catch (error) {
+        const isNetworkError = error instanceof Error && error.message.includes('fetch');
+        const toastMsg = isNetworkError
+          ? 'Network error. Please check your connection.'
+          : error instanceof Error
+            ? error.message
+            : 'Failed to create folder';
+        handleApiError(error, 'Error creating folder', setSyncError, toastMsg);
+        return null;
+      }
+    },
+    [user, t, checkAuth, setFolders],
+  );
+
+  const updateFolder = useCallback(
+    async (folderId: string, updates: { parent?: string | null; name?: string; path?: string }) => {
+      console.log('SupabaseFileManager - updateFolder called:', { folderId, updates });
+
+      if (!user) {
+        console.error('SupabaseFileManager - updateFolder: not authenticated');
+        toastActions.error('Not authenticated. Please refresh the page.');
+        return null;
       }
 
-      return null;
-    } catch (error) {
-      const isNetworkError = error instanceof Error && error.message.includes('fetch');
-      const toastMsg = isNetworkError ? 'Network error. Please check your connection.' : (error instanceof Error ? error.message : 'Failed to update folder');
-      handleApiError(error, 'Error updating folder', setSyncError, toastMsg);
-      return null;
-    }
-  }, [user, t, checkAuth, setFolders]);
+      try {
+        // Ensure valid session before updating folder
+        const isValidSession = await checkAuth();
+        if (!isValidSession) {
+          console.error('SupabaseFileManager - updateFolder: unable to establish valid session');
+          toastActions.error('Unable to verify authentication. Please try again.');
+          return null;
+        }
 
-  const deleteTrack = useCallback(async (trackId: string) => {
-    if (!user) {
-      toastActions.error(t('auth:errors.notAuthenticated'));
-      return false;
-    }
+        console.log('SupabaseFileManager - updating folder via API:', folderId, updates);
 
-    try {
-      // Ensure valid session before deleting
-      const validSession = await checkAuth();
-      if (!validSession) {
-        console.error('SupabaseFileManager - deleteTrack: unable to establish valid session');
-        toastActions.error(t('auth:errors.sessionExpired'));
+        // Call the API endpoint
+        const response = await fetch('/api/folders/update', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            folderId,
+            updates,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('SupabaseFileManager - API error:', errorData);
+
+          // Handle specific error cases
+          if (response.status === 401) {
+            toastActions.error('Authentication failed. Please try refreshing the page.');
+            return null;
+          }
+
+          if (response.status === 404) {
+            toastActions.error('Folder not found. It may have been deleted by another session.');
+            return null;
+          }
+
+          throw new Error(errorData.error || 'Failed to update folder');
+        }
+
+        const result = await response.json();
+
+        if (result.success && result.folder) {
+          // Update local state
+          setFolders((prev) => ({
+            ...prev,
+            [folderId]: {
+              ...prev[folderId],
+              ...result.folder,
+            },
+          }));
+
+          console.log('SupabaseFileManager - folder updated successfully:', result.folder);
+          return result.folder;
+        }
+
+        return null;
+      } catch (error) {
+        const isNetworkError = error instanceof Error && error.message.includes('fetch');
+        const toastMsg = isNetworkError
+          ? 'Network error. Please check your connection.'
+          : error instanceof Error
+            ? error.message
+            : 'Failed to update folder';
+        handleApiError(error, 'Error updating folder', setSyncError, toastMsg);
+        return null;
+      }
+    },
+    [user, t, checkAuth, setFolders],
+  );
+
+  const deleteTrack = useCallback(
+    async (trackId: string) => {
+      if (!user) {
+        toastActions.error(t('auth:errors.notAuthenticated'));
         return false;
       }
 
-      console.log('SupabaseFileManager - deleting track directly via Supabase:', trackId);
+      try {
+        // Ensure valid session before deleting
+        const validSession = await checkAuth();
+        if (!validSession) {
+          console.error('SupabaseFileManager - deleteTrack: unable to establish valid session');
+          toastActions.error(t('auth:errors.sessionExpired'));
+          return false;
+        }
 
-      // Delete track directly from Supabase
-      const { error } = await db.tracks.delete(trackId);
+        console.log('SupabaseFileManager - deleting track directly via Supabase:', trackId);
 
-      if (error) {
-        console.error('SupabaseFileManager - Error deleting track:', error);
-        throw error;
+        // Delete track directly from Supabase
+        const { error } = await db.tracks.delete(trackId);
+
+        if (error) {
+          console.error('SupabaseFileManager - Error deleting track:', error);
+          throw error;
+        }
+
+        // Update local state
+        setTracks((prev) => {
+          const newTracks = { ...prev };
+          delete newTracks[trackId];
+          return newTracks;
+        });
+
+        // CRITICAL: Also update the global tracks store so ReplEditor can see the change
+        tracksActions.removeTrack(trackId);
+        console.log('SupabaseFileManager - global store updated, track removed:', trackId);
+
+        if (selectedTrack === trackId) {
+          setSelectedTrack(null);
+        }
+
+        toastActions.success(t('files:trackDeleted'));
+        return true;
+      } catch (error) {
+        handleApiError(error, 'Error deleting track', setSyncError, t('files:errors.deleteFailed'));
+        return false;
       }
-
-      // Update local state
-      setTracks(prev => {
-        const newTracks = { ...prev };
-        delete newTracks[trackId];
-        return newTracks;
-      });
-
-      // CRITICAL: Also update the global tracks store so ReplEditor can see the change
-      tracksActions.removeTrack(trackId);
-      console.log('SupabaseFileManager - global store updated, track removed:', trackId);
-
-      if (selectedTrack === trackId) {
-        setSelectedTrack(null);
-      }
-
-      toastActions.success(t('files:trackDeleted'));
-      return true;
-    } catch (error) {
-      handleApiError(error, 'Error deleting track', setSyncError, t('files:errors.deleteFailed'));
-      return false;
-    }
-  }, [user, selectedTrack, t, checkAuth]);
-
-
+    },
+    [user, selectedTrack, t, checkAuth],
+  );
 
   const deleteAllTracks = useCallback(async () => {
     if (!user) {
@@ -1316,11 +1401,12 @@ export function useSupabaseFileManager(context: ReplContext, ssrData?: { tracks:
       await loadDataFromSupabase();
 
       // Update success message to reflect both tracks and folders
-      const message = trackIds.length > 0 && folderIds.length > 0
-        ? t('files:allTracksAndFoldersDeleted')
-        : trackIds.length > 0
-          ? t('files:allTracksDeleted')
-          : t('files:allFoldersDeleted');
+      const message =
+        trackIds.length > 0 && folderIds.length > 0
+          ? t('files:allTracksAndFoldersDeleted')
+          : trackIds.length > 0
+            ? t('files:allTracksDeleted')
+            : t('files:allFoldersDeleted');
 
       toastActions.success(message);
 

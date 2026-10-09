@@ -40,21 +40,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const data = await response.json();
         if (data.user) {
           setUser(data.user);
-          
+
           // Update session expiry info if available
           if (data.sessionExpiresAt) {
             const expiresAt = new Date(data.sessionExpiresAt);
             setSessionExpiresAt(expiresAt);
-            
+
             // Check if session expires within 5 minutes
             const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
             setSessionWarning(expiresAt < fiveMinutesFromNow);
           }
-          
+
           return true;
         }
       }
-      
+
       setUser(null);
       setSessionExpiresAt(null);
       setSessionWarning(false);
@@ -74,7 +74,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (user) {
       return true;
     }
-    
+
     try {
       // Only make API call if we don't have a user
       const response = await fetch('/api/auth/user', {
@@ -89,19 +89,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const data = await response.json();
         if (data.user) {
           setUser(data.user);
-          
+
           if (data.sessionExpiresAt) {
             const expiresAt = new Date(data.sessionExpiresAt);
             setSessionExpiresAt(expiresAt);
-            
+
             const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
             setSessionWarning(expiresAt < fiveMinutesFromNow);
           }
-          
+
           return true;
         }
       }
-      
+
       setUser(null);
       setSessionExpiresAt(null);
       setSessionWarning(false);
@@ -146,9 +146,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         } else {
           setUser(null);
-          
+
           // If 401, redirect to login
-          if (response.status === 401 && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          if (
+            response.status === 401 &&
+            typeof window !== 'undefined' &&
+            !window.location.pathname.includes('/login')
+          ) {
             window.location.href = '/login';
             return;
           }
@@ -157,7 +161,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.error('AuthContext - Backend auth check error:', error);
         setUser(null);
       }
-      
+
       // Always set loading to false
       if (mounted) {
         setLoading(false);
@@ -167,7 +171,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     checkBackendAuth();
 
     // Listen for auth changes from OAuth callback
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
       if (event === 'SIGNED_IN' && session) {
@@ -202,8 +208,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
-        }
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
       if (error) {
         console.error('Error signing in with Google:', error);
@@ -249,11 +255,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     sessionWarning,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

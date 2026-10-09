@@ -37,34 +37,28 @@ interface ShortcutSectionProps {
 function ShortcutSection({ title, children }: ShortcutSectionProps) {
   return (
     <div className="mb-6">
-      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3 px-4">
-        {title}
-      </h3>
-      <div className="space-y-1">
-        {children}
-      </div>
+      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3 px-4">{title}</h3>
+      <div className="space-y-1">{children}</div>
     </div>
   );
 }
 
 export function ShortcutsTab() {
   const { t } = useTranslation(['shortcuts', 'common']);
-  
+
   // Detect platform for showing correct modifier key
-  const isMac = typeof navigator !== 'undefined' && (
-    navigator.userAgent.includes('Mac') || 
-    navigator.userAgent.includes('iPhone') || 
-    navigator.userAgent.includes('iPad')
-  );
+  const isMac =
+    typeof navigator !== 'undefined' &&
+    (navigator.userAgent.includes('Mac') ||
+      navigator.userAgent.includes('iPhone') ||
+      navigator.userAgent.includes('iPad'));
   const modKey = isMac ? 'Cmd' : 'Ctrl';
 
   return (
     <div className="h-full overflow-auto bg-background text-foreground">
       <div className="p-4">
         <div className="mb-6">
-          <h2 className="text-lg font-bold text-foreground mb-2">
-            {t('shortcuts:title', 'Keyboard Shortcuts')}
-          </h2>
+          <h2 className="text-lg font-bold text-foreground mb-2">{t('shortcuts:title', 'Keyboard Shortcuts')}</h2>
           <p className="text-sm text-gray-400">
             {t('shortcuts:description', 'Speed up your live coding workflow with these keyboard shortcuts')}
           </p>
@@ -122,18 +116,16 @@ export function ShortcutsTab() {
             keys={[modKey, 'Shift', 'X']}
             description={t('shortcuts:crossfadeTransition', 'Crossfade transition to live')}
           />
-          <ShortcutItem
-            keys={[modKey, 'Shift', 'S']}
-            description={t('shortcuts:stopPreview', 'Stop preview stream')}
-          />
+          <ShortcutItem keys={[modKey, 'Shift', 'S']} description={t('shortcuts:stopPreview', 'Stop preview stream')} />
         </ShortcutSection>
 
         <div className="mt-8 p-4 bg-gray-800/30 rounded-lg">
-          <h4 className="text-sm font-semibold text-gray-300 mb-2">
-            {t('shortcuts:tip.title', 'Pro Tip')}
-          </h4>
+          <h4 className="text-sm font-semibold text-gray-300 mb-2">{t('shortcuts:tip.title', 'Pro Tip')}</h4>
           <p className="text-xs text-gray-400 leading-relaxed">
-            {t('shortcuts:tip.description', 'Use Ctrl+Enter or Ctrl+U frequently during live coding to hear your changes instantly. Ctrl+P lets you quickly stop everything when needed.')}
+            {t(
+              'shortcuts:tip.description',
+              'Use Ctrl+Enter or Ctrl+U frequently during live coding to hear your changes instantly. Ctrl+P lets you quickly stop everything when needed.',
+            )}
           </p>
         </div>
 

@@ -20,7 +20,7 @@ export function getMetadata(raw_code: string | null | undefined): MetadataTags {
     console.error('could not extract metadata from missing pattern code');
     raw_code = '';
   }
-  
+
   const comment_regexp = /\/\*([\s\S]*?)\*\/|\/\/(.*)$/gm;
   const comments = [...raw_code.matchAll(comment_regexp)].map((c) => (c[1] || c[2] || '').trim());
   const tags: MetadataTags = {};

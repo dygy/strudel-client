@@ -1,6 +1,6 @@
 /**
  * Emergency Save Hook
- * 
+ *
  * Provides emergency save functionality that can be called from beforeunload
  * or other critical moments to prevent data loss.
  */
@@ -27,11 +27,11 @@ export function useEmergencySave(options: EmergencySaveOptions) {
     }
 
     isSavingRef.current = true;
-    
+
     try {
       const fileManagerHook = getFileManagerHook();
       const context = getContext();
-      
+
       if (!fileManagerHook || !context) {
         console.log('EmergencySave: No file manager or context available');
         return false;
@@ -39,7 +39,7 @@ export function useEmergencySave(options: EmergencySaveOptions) {
 
       const currentCode = context.editorRef?.current?.code || context.activeCode || '';
       const selectedTrack = fileManagerHook.selectedTrack;
-      
+
       if (!selectedTrack || !currentCode.trim()) {
         console.log('EmergencySave: No track selected or no code to save');
         return true; // Not an error, just nothing to save
@@ -48,7 +48,7 @@ export function useEmergencySave(options: EmergencySaveOptions) {
       // Check if code has changed
       const currentTracks = fileManagerHook.tracks || {};
       const trackData = currentTracks[selectedTrack];
-      
+
       if (!trackData) {
         console.warn('EmergencySave: Selected track not found');
         return false;
@@ -62,20 +62,20 @@ export function useEmergencySave(options: EmergencySaveOptions) {
       console.log('🚨 EmergencySave: Saving changes before unload', {
         trackId: selectedTrack,
         trackName: trackData.name,
-        codeLength: currentCode.length
+        codeLength: currentCode.length,
       });
 
       // Create a promise with timeout
       const savePromise = new Promise<boolean>(async (resolve) => {
         try {
           let result = false;
-          
+
           if (fileManagerHook.saveCurrentTrack) {
             result = await fileManagerHook.saveCurrentTrack(false);
           } else if (fileManagerHook.saveSpecificTrack) {
             result = await fileManagerHook.saveSpecificTrack(selectedTrack, false);
           }
-          
+
           resolve(result);
         } catch (error) {
           console.error('EmergencySave: Save error:', error);
@@ -92,15 +92,14 @@ export function useEmergencySave(options: EmergencySaveOptions) {
       });
 
       const result = await Promise.race([savePromise, timeoutPromise]);
-      
+
       if (result) {
         console.log('✅ EmergencySave: Successfully saved');
       } else {
         console.error('❌ EmergencySave: Failed to save');
       }
-      
+
       return result;
-      
     } catch (error) {
       console.error('EmergencySave: Critical error:', error);
       return false;
@@ -116,7 +115,7 @@ export function useEmergencySave(options: EmergencySaveOptions) {
     try {
       const fileManagerHook = getFileManagerHook();
       const context = getContext();
-      
+
       if (!fileManagerHook || !context) return false;
 
       const currentCode = context.editorRef?.current?.code || context.activeCode || '';
@@ -134,6 +133,6 @@ export function useEmergencySave(options: EmergencySaveOptions) {
   return {
     performEmergencySave,
     hasUnsavedChanges,
-    isSaving: isSavingRef.current
+    isSaving: isSavingRef.current,
   };
 }

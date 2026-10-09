@@ -7,10 +7,10 @@ import { useEffect, useState } from 'react';
  */
 export default function useClient(): boolean {
   const [client, setClient] = useState<boolean>(false);
-  
+
   useEffect(() => {
     setClient(true);
   }, []);
-  
+
   return client;
 }

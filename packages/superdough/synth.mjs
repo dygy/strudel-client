@@ -419,7 +419,7 @@ export function waveformN(partials, type) {
   if (partials < 1) {
     partials = 1;
   }
-  
+
   const real = new Float32Array(partials + 1);
   const imag = new Float32Array(partials + 1);
   const ac = getAudioContext();
