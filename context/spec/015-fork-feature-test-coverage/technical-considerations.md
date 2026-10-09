@@ -93,7 +93,7 @@ Mocked only. The tests assert on the recorded `AudioParam` schedule (ramps versu
 - **Positive and negative tests** for every acceptance criterion, all 31 of them, with each test named after its criterion.
 - **RED→GREEN** for at least one assertion per test file, with the evidence quoted in the agent report and spot-checked by the orchestrator.
 - **Suite gates:**
-  - `pnpm exec vitest run` passes with 0 failures, run 3 times plus once with `--sequence.shuffle`.
+  - `pnpm exec vitest run` passes with 0 failures, run 3 times plus once with `--sequence.shuffle.files`. A full `--sequence.shuffle` (shuffling tests within files) fails in `packages/mondo`, whose tests depend on their order; that was there before this change and is out of scope.
   - `pnpm run lint` reports 0 errors.
   - `pnpm run format-check` is clean.
 - **`pnpm build:cloudflare`** isn't needed, because no shipped code changes. The orchestrator confirms with `git diff --stat`, which must show only test files, mocks and docs.

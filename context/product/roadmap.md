@@ -43,7 +43,16 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
   - [x] **Fix the mixer and save-manager tests:** mixer Web Audio mock caught up with the EQ; save manager was the alias (2026-10-09).
   - [x] **Fix `xen`:** it was a `window` stub leaking between files under `isolate: false`; fixed with `unstubGlobals` (2026-10-09). `known-red-tests.txt` is empty.
   - [x] **Gate the deploy:** format, lint and tests all block the deploy (`needs: check`, 2026-10-09).
-- [ ] **Coverage for untested fork features:** smooth transitions, EQ, screen recorder, import, admin.
+- [ ] **Coverage for untested fork features:** smooth transitions, EQ, screen recorder, import, admin ([015](../spec/015-fork-feature-test-coverage/)).
+- [ ] **Fix what the coverage found** ([015 §4 Findings](../spec/015-fork-feature-test-coverage/functional-spec.md#4-findings)). Each one has a check waiting to go green:
+  - [ ] **EQ is audible while switched off** after a reload, when moved while off, or when a saved state is restored. User-audible: do this first.
+  - [ ] **Damaged EQ settings break the EQ panel** (empty bands or non-numeric gains pass the loader). Fall back to flat.
+  - [ ] **Screen picker cancel message:** decide on the wording for cancel versus deny.
+  - [ ] **Malformed imports get the wrong answer** (an empty-valued track or folder list, or a body that isn't an object, gives 500 or a false success instead of 400 "invalid data").
+  - [ ] **Import doesn't check individual tracks** (no name or no code): decide whether to refuse them.
+  - [ ] **Failed smooth transition shows no message.**
+  - [ ] **Unused tracks bulk-create route** copies whatever fields it's sent: remove it or narrow it.
+- [ ] **`packages/mondo` tests depend on their order** (they fail under `vitest --sequence.shuffle`).
 
 ### Phase 5 — Debt and decisions (later)
 

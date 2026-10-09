@@ -1,7 +1,7 @@
 # Functional Specification: Safety Net for the Untested Fork Features
 
 - **Roadmap Item:** Phase 4: Make it safe to change → Coverage for untested fork features (smooth transitions, EQ, screen recorder, import, admin)
-- **Status:** Draft
+- **Status:** In Review
 - **Author:** Dygy
 
 ---
@@ -129,4 +129,13 @@ Recorded while writing this spec (confirmed by reading the product's behaviour, 
 1. **Import does not check individual tracks.** A track with no name is accepted, and a track with no code is saved as an empty track. Whether that should be refused is a product decision. → follow-up roadmap item.
 2. **A failed transition reports its error nowhere the user can see.** Volume is restored, but no message appears. Today's failures mostly come from broken pattern code, which the editor already reports on its own, so the impact is low. → follow-up roadmap item.
 
-Behaviour found broken while writing the checks is added here, each with a link to its follow-up roadmap item.
+Found while writing the checks (each guarded by a check that is expected to fail until the follow-up lands):
+
+3. **The EQ is audible while switched off.** When the page loads with the EQ saved as off and a shaped curve, the curve is applied anyway while the screen shows the EQ as off. Moving a slider or picking a preset while it is off does the same. **User-audible**, so this is the highest-priority follow-up.
+4. **Cancelling the screen picker shows "Screen capture permission is required…"** The spec says cancelling should show nothing. Browsers report "cancel" and "deny" the same way, so this is a product decision: either keep one message, or word it to cover both.
+5. **Some malformed imports get the wrong answer.** An empty-valued track or folder list, or an import that is not a list at all, either reports a generic error or claims success, instead of "invalid data". Nothing is saved in any of these cases, so the user's library is safe; only the message is wrong.
+6. **An unused import route copies whatever fields it is sent onto the saved tracks.** It is not called by the app today, and the owner of each track is still forced to the signed-in user. Remove it or narrow it.
+
+7. **Damaged EQ settings can break the EQ panel on load.** Settings with the right number of bands but unreadable values (empty bands, non-numeric gains) are accepted. The panel then fails to open, or passes an invalid gain to the audio engine, instead of starting flat. The same "audible while off" problem (finding 3) also happens when a whole saved EQ state is restored with the EQ off.
+
+Follow-ups for 1–7 are on the roadmap under Phase 4.

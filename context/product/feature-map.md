@@ -28,8 +28,8 @@ Last surveyed: 2026-10-08.
 | Synthesis and sample engine | U | `packages/{superdough,supradough,webaudio,sampler,soundfonts,csound}` | none | none | audio |
 | I/O: MIDI, OSC, MQTT, serial, gamepad, motion | U | `packages/{midi,osc,mqtt,serial,gamepad,motion}` | none | none | audio |
 | Mixer and headphone preview on a second engine, plus device selection | F | `packages/mixer/{AudioMixer,PreviewEngine,KeyboardShortcutManager}.mjs`; `website/src/repl/components/{MixerControls,MixerHealthIndicator}.tsx`; `panel/{MixerSettings,AudioDeviceSelector,AudioEngineTargetSelector}.tsx` | [006](../spec/006-audio-mixer-preview/) | `packages/mixer/test/AudioMixer.test.mjs` (16, incl. EQ routing; mock in `webAudioMock.mjs`) | audio |
-| Smooth crossfade transitions | F | `packages/mixer/{SmoothTransitionManager,TransitionMixer}.mjs` | [009](../spec/009-smooth-track-transitions/) | `packages/mixer/test/SmoothTransitionManager.test.mjs` (Update must hot-swap, never stop: regression 2026-10-09) | audio |
-| 10-band parametric EQ, presets and visualisation | F | `packages/equalizer/*`; `panel/EqualizerUI.tsx` | [008](../spec/008-audio-equalizer/) | none | audio |
+| Smooth crossfade transitions | F | `packages/mixer/{SmoothTransitionManager,TransitionMixer}.mjs` | [009](../spec/009-smooth-track-transitions/), [015](../spec/015-fork-feature-test-coverage/) | `packages/mixer/test/SmoothTransitionManager.test.mjs`: hot-swap regression, settings clamp/persist, ramps never jump, queue keeps latest, failure restores volume | audio |
+| 10-band parametric EQ, presets and visualisation | F | `packages/equalizer/*`; `panel/EqualizerUI.tsx` | [008](../spec/008-audio-equalizer/), [015](../spec/015-fork-feature-test-coverage/) | `packages/equalizer/test/*`: chain, per-band, ±12 dB / Q clamps, presets, on/off, persistence, utils. **Known gap:** audible while off (`it.fails`) | audio |
 | Sample cache settings | F | `panel/SampleCacheSettings.tsx` | none | none | audio |
 
 ## Editor
@@ -57,7 +57,7 @@ Last surveyed: 2026-10-08.
 |---|---|---|---|---|---|
 | Sidebar file tree, with folders, multitracks/steps and drag and drop | F | `website/src/repl/components/sidebar/*` | none | none | web |
 | Strict autosave | F | `sidebar/hooks/useStrictAutosave*` | none | `sidebar/hooks/__tests__/strictAutosave*` | web |
-| ZIP and folder import with conflict modal; folder and multitrack export | F | `ui/ImportConflictModal.tsx`; `/api/library/batch-import`; `/api/{tracks,folders}/bulk-create` | [003](../spec/003-supabase-import-fix/) | none | web |
+| ZIP and folder import with conflict modal; folder and multitrack export | F | `ui/ImportConflictModal.tsx`; `/api/library/batch-import`; `/api/{tracks,folders}/bulk-create` | [003](../spec/003-supabase-import-fix/), [015](../spec/015-fork-feature-test-coverage/) | `pages/api/__tests__/import.test.ts`: auth, session-owned `user_id`, malformed refusal, duplicate-name suffixes | web |
 | Track routing (`/repl/<folder>/<track>/<step>`) | F | `website/src/routing/{TrackRouter,URLParser,NavigationState,TrackPersistence}.ts`; `stores/tracksStore.ts` | [001](../spec/001-track-routing-navigation/) | `routing/__tests__/*` (path `/repl/<slug>` contract); `stores/__tests__/tracksStore-url-fix` | web |
 | Random track on `/repl` | F | `pages/repl/[...trackPath].astro` | [005](../spec/005-random-track-loading-fix/) | none | web |
 | Scalable tree filesystem (`tree_*` tables, `/api/tree/*`) | F | `website/src/lib/{TreeManager,TreeSystem,FileSystemGraph,TreeDataTransformer}.ts`; `lib/database/tree-schema.sql` | [002](../spec/002-scalable-tree-filesystem/) | none | web. **Partial**: the API went back to the `tracks` table in `d8b4bdf` and `4d671f2`. |
@@ -68,14 +68,14 @@ Last surveyed: 2026-10-08.
 |---|---|---|---|---|---|
 | Google OAuth through Supabase: session restore, refresh, health monitoring | F | `contexts/AuthContext.tsx`; `stores/authStore.ts`; `lib/{supabase,supabaseClient,authUtils,authListener,secureApi}.ts`; `/api/auth/*`; `/login`; `/auth/callback` | none | none | web |
 | Data model (`profiles`, `tracks`, `folders`, `file_system_nodes`, `tree_*`; RLS by `auth.uid()`) | F | `supabase_schema.sql`; `website/src/lib/database/tree-schema.sql`; types in `website/database.types.ts` | none | none | web |
-| Admin read-only dashboard | F | `pages/admin.astro`; `components/admin/AdminDashboard.tsx`; `/api/admin/users`; `lib/adminAuth.ts` (hardcoded admin email) | none | none | web |
+| Admin read-only dashboard | F | `pages/admin.astro`; `components/admin/AdminDashboard.tsx`; `/api/admin/users`; `lib/adminAuth.ts` (hardcoded admin email) | none | `pages/api/__tests__/admin.test.ts`: exact-match admin, 401/403/200, no service-role reads before the admin check | web |
 
 ## Recording and embed
 
 | Feature | Origin | Code | Spec | Tests | Owner |
 |---|---|---|---|---|---|
 | Audio recorder (WAV, or MP3 encoded in a worker) | F | `website/src/repl/recording/{AudioRecorderEngine,mp3Encoder,mp3Worker,wavEncoder,useAudioRecorder}.ts` | [013](../spec/013-audio-recorder/) | `recording/__tests__/formatUtils` | audio |
-| Screen and tab recorder (WebM) with export dialog | F | `recording/{ScreenRecorderEngine,useScreenRecorder}.ts`; `components/ExportDialog.tsx` | [014](../spec/014-screen-recorder/) | none | audio |
+| Screen and tab recorder (WebM) with export dialog | F | `recording/{ScreenRecorderEngine,useScreenRecorder}.ts`; `components/ExportDialog.tsx` | [014](../spec/014-screen-recorder/), [015](../spec/015-fork-feature-test-coverage/) | `recording/__tests__/ScreenRecorderEngine.test.ts`: lifecycle, cancel, Stop sharing, mime fallback | audio |
 | `/embed` REPL with no auth, for MIDI-grep and Puppeteer | F | `pages/embed.astro`; `repl/components/EmbeddedReplEditor.tsx` | [007](../spec/007-midi-grep-embed-integration/) | none | web |
 
 ## Site, desktop and platform
