@@ -93,7 +93,7 @@ A subagent starts cold, re-reads what you already know, and returns a *claim*.
 
 ## Hooks
 
-- **Push gate** (`PreToolUse`, blocking). Before a push to `main`, it runs the whole vitest suite and refuses on any failing file that isn't in `known-red-tests.txt`, but only when the tree is clean.
+- **Push gate** (`PreToolUse`, blocking). Before a push to `main`, it runs the same checks CI gates on (~15 s): `pnpm run format-check`, `pnpm run lint`, and the whole vitest suite (refusing any failing file not in `known-red-tests.txt`, after re-running it alone to rule out a flake). It blocks only when the tree is clean.
   - It reports instead of blocking when the check can't run or the tree is dirty.
   - To bypass a single push, run `STRUDEL_SKIP_PUSH_GATE=1 git push …` and say so.
 - **Delivery reminder** (`PostToolUse`, advisory). After a successful push to `main`, it reminds you to:
@@ -109,4 +109,4 @@ A subagent starts cold, re-reads what you already know, and returns a *claim*.
 - **Supabase.** RLS by `auth.uid()` on every table. The service-role key is used in `/api/admin/*` only. `tracks` is the live store; the `tree_*` layer is partial (spec 002). Schema changes ship as a migration file, and are applied to prod only as an approved step.
 - **Upstream packages** (`core`, `mini`, `superdough`, …) stay mergeable. Prefer additive changes and say when you diverge. Public functions need JSDoc, which drives the docs and the autocomplete.
 - **i18n.** A new string goes into all 9 locales under `website/src/i18n`.
-- **CI gates the deploy on format, lint and tests.** Any of them failing blocks it. Run `pnpm run format-check`, `pnpm run lint` and `pnpm exec vitest run` before pushing; the push gate covers tests only.
+- **CI gates the deploy on format, lint and tests.** Any of them failing blocks it. The push gate runs all three before a push to `main`; `pnpm run codeformat` fixes formatting.

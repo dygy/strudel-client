@@ -18,7 +18,7 @@ These are the commands every implementer and reviewer runs, with their measured 
 | Branch with an open PR | CI `check` job only (format, lint, test). No deploy |
 | `main` | CI `check` job, then — **only if format, lint and tests pass** — build + `wrangler deploy` to PROD at `strudel.dygy.app`. There is no staging |
 
-Before any push to `main`, the `strudel-push-gate` hook (`.claude/hooks/strudel-push-gate.sh`) runs the whole vitest suite. It refuses the push when a test file fails that isn't on the known-red list. A refusal is a finding to fix, not a reason to bypass the hook.
+Before any push to `main`, the `strudel-push-gate` hook (`.claude/hooks/strudel-push-gate.sh`) runs format-check, lint and the whole vitest suite — the same checks CI gates on. It refuses the push on a format or lint failure, or when a test file fails that isn't on the known-red list. A refusal is a finding to fix, not a reason to bypass the hook.
 
 Verify a deploy by pinning the run to its sha, then checking what prod serves:
 

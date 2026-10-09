@@ -6,9 +6,12 @@
 # A PreToolUse hook on Bash. A push to `main` builds and deploys PROD to
 # Cloudflare Workers (.github/workflows/deploy.yml), and CI's test job is
 # advisory, so nothing else stops a regression from going live. Before the push
-# goes out this runs the WHOLE vitest suite (~3 s, 659 tests on 2026-10-08) and
-# compares the failing files against the known-red baseline in
-# context/product/known-red-tests.txt.
+# goes out this runs the same three checks CI gates the deploy on (~15 s total):
+#   1. pnpm run format-check   (prettier, repo-wide clean since 7fbf4af)
+#   2. pnpm run lint           (eslint, 0 errors since b6eaad8)
+#   3. the WHOLE vitest suite, compared against context/product/known-red-tests.txt
+# Format/lint failures in a clean tree block immediately; the test checks below
+# still run when the tree is dirty, and every note carries the format/lint result.
 #
 # It BLOCKS only on a verified NEW failure in a CLEAN tree. Everything else is
 # reported, never silently passed:
@@ -22,8 +25,9 @@
 set -uo pipefail
 
 allow_quiet() { exit 0; }
+pre=""   # format/lint findings, prefixed to every later note
 allow_note() {
-  jq -cn --arg m "$1" '{systemMessage: $m}' 2>/dev/null || true
+  jq -cn --arg m "${pre}$1" '{systemMessage: $m}' 2>/dev/null || true
   exit 0
 }
 deny() {
@@ -83,6 +87,32 @@ git -C "$root" fetch -q origin main 2>/dev/null
 changed="$(git -C "$root" diff --name-only origin/main...HEAD 2>/dev/null)"
 [ -n "$changed" ] || allow_quiet
 
+dirty="$(git -C "$root" status --porcelain --untracked-files=no 2>/dev/null)"
+
+# 1+2. Format and lint — CI blocks the deploy on either, so catch them before the push.
+fmt_out="$(cd "$root" && pnpm run format-check 2>&1)"; fmt_rc=$?
+lint_out="$(cd "$root" && pnpm run lint 2>&1)"; lint_rc=$?
+style=""
+if [ $fmt_rc -ne 0 ]; then
+  files="$(printf '%s\n' "$fmt_out" | grep -E '^\[warn\] ' | grep -v 'Code style issues' | sed 's/^\[warn\] /  /' | head -15)"
+  style="${style}FORMAT: prettier check failed (fix: pnpm run codeformat):
+${files:-$(printf '%s\n' "$fmt_out" | tail -5)}
+"
+fi
+if [ $lint_rc -ne 0 ]; then
+  style="${style}LINT: eslint errors (pnpm run lint):
+$(printf '%s\n' "$lint_out" | grep -E '^/|error' | head -15)
+"
+fi
+if [ -n "$style" ]; then
+  [ -z "$dirty" ] && deny "Strudel push gate: this push deploys PROD and CI will refuse to deploy it.
+${style}Fix and re-commit. Bypass once with STRUDEL_SKIP_PUSH_GATE=1 git push … and say so."
+  pre="Format/lint FAILED, but the tree has uncommitted changes so this may not be what is pushed — verify:
+${style}
+"
+fi
+
+# 3. Tests.
 mkdir -p "$state_dir" 2>/dev/null
 out="$state_dir/vitest-$$.json"
 ( cd "$root" && pnpm exec vitest run --reporter=json --outputFile="$out" >/dev/null 2>&1 )
@@ -91,7 +121,7 @@ out="$state_dir/vitest-$$.json"
 failing="$(jq -r --arg r "$root/" '.testResults[] | select(.status=="failed") | .name | ltrimstr($r)' "$out" 2>/dev/null | sort -u)"
 total="$(jq -r '.numTotalTests // 0' "$out" 2>/dev/null)"
 rm -f "$out"
-[ -n "$failing" ] || allow_note "Strudel push gate: vitest green (${total} tests)."
+[ -n "$failing" ] || allow_note "Strudel push gate: format + lint + vitest green (${total} tests)."
 
 known="$root/context/product/known-red-tests.txt"
 new="$(printf '%s\n' "$failing" | grep -vxF -f <(grep -vE '^[[:space:]]*(#|$)' "$known" 2>/dev/null) 2>/dev/null)"
@@ -112,7 +142,7 @@ flaky="$(printf '%s' "$flaky" | sed '/^$/d')"
 [ -n "$new" ] || allow_note "Strudel push gate: no real new failures. Flaky under full-suite load but green in isolation (worth fixing):
 $flaky"
 
-if [ -n "$(git -C "$root" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+if [ -n "$dirty" ]; then
   allow_note "Strudel push gate: NEW test failures, but the tree has uncommitted changes so they may not be what is pushed — verify before calling it safe:
 $new"
 fi
