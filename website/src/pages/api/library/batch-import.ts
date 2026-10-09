@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
 import { serverEnv } from '../../../lib/server-env';
+import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 
 export const prerender = false;
 
@@ -74,22 +75,22 @@ export const POST: APIRoute = async ({ request }) => {
 
     console.log('API /library/batch-import - User verified:', user.id);
 
-    // Parse request body
-    const body = await request.json();
+    // Parse and validate the request body before touching it: an unparseable or
+    // non-object body, or a tracks/folders value that is not a list, is refused with
+    // 400. A missing key still means "none" (an empty list).
+    const body = await readJsonObject(request);
+    if (!body) {
+      return invalidDataResponse();
+    }
     const { tracks = [], folders = [] } = body;
+    if (!Array.isArray(tracks) || !Array.isArray(folders)) {
+      return invalidDataResponse();
+    }
 
     console.log('API /library/batch-import - Received data:', {
       tracksCount: tracks.length,
       foldersCount: folders.length,
     });
-
-    // Validate input
-    if (!Array.isArray(tracks) || !Array.isArray(folders)) {
-      return new Response(JSON.stringify({ error: 'Invalid data format' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
 
     // Start a transaction-like operation
     const results = {

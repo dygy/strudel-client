@@ -141,15 +141,17 @@ export interface ApiContextOptions {
   token?: string;
   /** JSON-serialised as the request body */
   body?: unknown;
+  /** sent verbatim instead of `body` (e.g. unparseable JSON) */
+  rawBody?: string;
 }
 
-export function apiContext({ url, method = 'GET', token, body }: ApiContextOptions): any {
+export function apiContext({ url, method = 'GET', token, body, rawBody }: ApiContextOptions): any {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (token) headers.cookie = `sb-access-token=${token}`;
   const request = new Request(url, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: rawBody !== undefined ? rawBody : body === undefined ? undefined : JSON.stringify(body),
   });
   const jar: Record<string, string> = token ? { 'sb-access-token': token } : {};
   return {

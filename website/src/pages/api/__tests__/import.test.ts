@@ -16,6 +16,7 @@ import {
 } from './apiTestHelpers';
 import { POST as batchImport } from '../library/batch-import';
 import { POST as bulkCreate } from '../tracks/bulk-create';
+import { POST as folderBulkCreate } from '../folders/bulk-create';
 
 vi.mock('@supabase/supabase-js', async () => {
   const helpers = await import('./apiTestHelpers');
@@ -130,10 +131,9 @@ describe('batch-import: a malformed import is refused and nothing is saved', () 
     expect(fakeState.inserts).toEqual([]);
   });
 
-  // FINDING (spec 015 §4): `tracks: null` skips the `= []` default, then `tracks.length`
-  // (batch-import.ts:82) throws before the Array.isArray check, so the route answers
-  // 500 "Internal server error" instead of 400 "Invalid data format". Nothing is saved.
-  it.fails('refuses tracks: null with 400 "Invalid data format"', async () => {
+  // Regression (spec 015 finding 5, fixed 2026-10-09): `tracks: null` used to throw on
+  // `tracks.length` before validation and answer 500 instead of 400.
+  it('refuses tracks: null with 400 "Invalid data format"', async () => {
     signIn(TOKEN, USER);
     const res = await post(routes[0], { tracks: null }, TOKEN);
     expect(res.status).toBe(400);
@@ -141,12 +141,9 @@ describe('batch-import: a malformed import is refused and nothing is saved', () 
 });
 
 // m1: bodies that are not an object of { tracks, folders } lists.
-// FINDING (spec 015 §4): batch-import.ts:79 destructures `body` with defaults and validates
-// only afterwards (:87), so a non-object body is never refused with 400 "Invalid data format":
-//  - a bare array or a string falls through to `tracks = []` and answers 200 with nothing created;
-//  - `null` throws on destructuring at :79 and answers 500;
-//  - `folders: null` skips the `= []` default and throws on `folders.length` at :83, answering 500.
-// Nothing is saved in any of these cases.
+// Regression (spec 015 finding 5, fixed 2026-10-09): batch-import used to destructure the body
+// with defaults before validating it, so a bare array or a string answered 200 "success" with
+// nothing created, and null / folders: null threw (500). Nothing was saved in any case.
 const notAListOfTracksAndFolders = [
   { label: 'a bare array of tracks', body: [{ name: 'Beat', code: 'x' }] },
   { label: 'a string', body: 'x' },
@@ -165,10 +162,55 @@ describe.each(notAListOfTracksAndFolders)('batch-import: a body that is $label',
     expect(fakeState.mutations).toEqual([]);
   });
 
-  it.fails('is refused with 400 "Invalid data format"', async () => {
+  it('is refused with 400 "Invalid data format"', async () => {
     const res = await post(routes[0], body, TOKEN);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: 'Invalid data format' });
+  });
+});
+
+// Every import route the app can reach refuses a body it cannot read (unparseable JSON or
+// a JSON null) with 400 "Invalid data format", instead of throwing into a 500.
+const allImportRoutes = [
+  ...routes,
+  { name: 'folders/bulk-create', url: 'http://test/api/folders/bulk-create', handler: folderBulkCreate },
+];
+
+describe.each(allImportRoutes)('$name: an unreadable body', (route) => {
+  beforeEach(() => {
+    signIn(TOKEN, USER);
+  });
+
+  it.each([
+    ['unparseable JSON', '{"tracks": [ oops'],
+    ['a JSON null', 'null'],
+    ['a bare array', JSON.stringify([{ name: 'Beat', code: 'x' }])],
+    ['a string', JSON.stringify('x')],
+    ['a non-list value for the list', JSON.stringify({ tracks: 'x', folders: 'x' })],
+  ])('%s is refused with 400 "Invalid data format" and nothing is saved', async (_label, rawBody) => {
+    const res = await route.handler(apiContext({ url: route.url, method: 'POST', token: TOKEN, rawBody }));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Invalid data format' });
+    expect(fakeState.inserts).toEqual([]);
+    expect(fakeState.mutations).toEqual([]);
+  });
+
+  it('a signed-out caller is refused with 401 before the body is read, even if it is unreadable', async () => {
+    const res = await route.handler(apiContext({ url: route.url, method: 'POST', rawBody: 'null' }));
+
+    expect(res.status).toBe(401);
+    expect(fakeState.inserts).toEqual([]);
+  });
+
+  it('a well-formed body is still accepted', async () => {
+    const key = route.name === 'folders/bulk-create' ? 'folders' : 'tracks';
+    const item = key === 'folders' ? { id: 'f1', name: 'Drums', path: 'Drums' } : { name: 'Beat', code: 'x' };
+    const res = await route.handler(
+      apiContext({ url: route.url, method: 'POST', token: TOKEN, body: { [key]: [item] } }),
+    );
+
+    expect(res.status).toBe(200);
   });
 });
 

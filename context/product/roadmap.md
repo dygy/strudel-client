@@ -48,10 +48,11 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
   - [x] **EQ is audible while switched off** after a reload, when moved while off, or when a saved state is restored (fixed 2026-10-09).
   - [x] **Damaged EQ settings break the EQ panel** (empty bands or non-numeric gains pass the loader). They now fall back to flat (fixed 2026-10-09).
   - [ ] **Screen picker cancel message:** decide on the wording for cancel versus deny.
-  - [ ] **Malformed imports get the wrong answer** (an empty-valued track or folder list, or a body that isn't an object, gives 500 or a false success instead of 400 "invalid data").
-  - [ ] **Import doesn't check individual tracks** (no name or no code): decide whether to refuse them.
+  - [x] **Malformed imports get the wrong answer.** All three import routes now refuse an unreadable or non-object body, or a non-list track or folder list, with 400 "Invalid data format" (fixed 2026-10-09).
+  - [ ] **Import doesn't check individual tracks** (no name or no code): decide whether to refuse them. Related: a bad track item after the folders are saved leaves a **partial import** (the folders stay, then 500). Validate every item before saving anything.
   - [ ] **Failed smooth transition shows no message.**
   - [ ] **Unused tracks bulk-create route** copies whatever fields it's sent: remove it or narrow it.
+- [ ] **13 other API routes read the request body unguarded** (`filesystem/*`, `folders/create|update`, `tracks/create|delete|update`, `tree/move|nodes|search`), so a bad body may give 500. Move them to `readJsonObject` (`website/src/lib/apiBody.ts`).
 - [ ] **`packages/mondo` tests depend on their order** (they fail under `vitest --sequence.shuffle`).
 
 ### Phase 5 — Debt and decisions (later)

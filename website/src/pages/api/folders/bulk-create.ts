@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { serverEnv } from '../../../lib/server-env';
+import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 
 export const prerender = false;
 
@@ -30,15 +31,16 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
 
-    // Parse the request body
-    const { folders } = await request.json();
+    // Parse the request body (unparseable or non-object bodies are refused, not a 500)
+    const body = await readJsonObject(request);
+    if (!body) {
+      return invalidDataResponse();
+    }
+    const { folders } = body;
 
     // Validate required fields
     if (!Array.isArray(folders)) {
-      return new Response(JSON.stringify({ error: 'Folders must be an array' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return invalidDataResponse();
     }
 
     // Add user_id to all folders

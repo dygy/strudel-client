@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { serverEnv } from '../../../lib/server-env';
+import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 
 export const prerender = false;
 
@@ -30,15 +31,16 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
 
-    // Parse the request body
-    const { tracks } = await request.json();
+    // Parse the request body (unparseable or non-object bodies are refused, not a 500)
+    const body = await readJsonObject(request);
+    if (!body) {
+      return invalidDataResponse();
+    }
+    const { tracks } = body;
 
     // Validate required fields
     if (!Array.isArray(tracks)) {
-      return new Response(JSON.stringify({ error: 'Tracks must be an array' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return invalidDataResponse();
     }
 
     // Convert UI format to database format and add user_id
