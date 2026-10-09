@@ -39,9 +39,9 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
 ### Phase 4 — Make it safe to change (next)
 
 - [ ] **A test suite that can gate deploys**
-  - [ ] **Fix the routing tests:** the root vitest config doesn't resolve the `@src` alias, which turns 4 test files red.
-  - [ ] **Fix the mixer and save-manager tests:** 11 and 9 failing assertions.
-  - [ ] **Fix `xen`:** `document is not defined` under node.
+  - [x] **Fix the routing tests:** `@src` alias added to the root vitest config; tests moved to the `/repl/<slug>` contract (2026-10-09, `da9ca9d`).
+  - [x] **Fix the mixer and save-manager tests:** mixer Web Audio mock caught up with the EQ; save manager was the alias (2026-10-09).
+  - [x] **Fix `xen`:** it was a `window` stub leaking between files under `isolate: false`; fixed with `unstubGlobals` (2026-10-09). `known-red-tests.txt` is empty.
   - [ ] **Gate the deploy:** once `known-red-tests.txt` is empty, make CI's check job a `needs:` of the deploy job.
 - [ ] **Coverage for untested fork features:** smooth transitions, EQ, screen recorder, import, admin.
 
