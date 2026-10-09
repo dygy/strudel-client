@@ -12,12 +12,17 @@ const mockLocation = {
   hash: ''
 };
 
-// Mock window object
-Object.defineProperty(global, 'window', {
-  value: {
+// Mock window object — stubbed per test and removed afterwards. The root config runs with
+// isolate:false, so a permanent global.window leaks into later files in the same worker
+// (e.g. @strudel/core's signal.mjs then sees `window` without `document` and throws on import).
+beforeEach(() => {
+  vi.stubGlobal('window', {
     location: mockLocation
-  },
-  writable: true
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('TracksStore URL Track Loading', () => {

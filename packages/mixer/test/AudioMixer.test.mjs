@@ -4,12 +4,15 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AudioMixer } from '../AudioMixer.mjs';
+import { stubWebAudio, unstubWebAudio } from './webAudioMock.mjs';
 
 describe('AudioMixer', () => {
   let audioContext;
   let mixer;
 
   beforeEach(async () => {
+    // Per-test stubs: the root config runs with isolate:false, so globals must not outlive this file.
+    stubWebAudio();
     audioContext = new AudioContext();
     mixer = new AudioMixer(audioContext);
   });
@@ -21,6 +24,7 @@ describe('AudioMixer', () => {
     if (audioContext) {
       audioContext.close();
     }
+    unstubWebAudio();
   });
 
   describe('Initialization', () => {
@@ -58,6 +62,37 @@ describe('AudioMixer', () => {
       expect(mixer.liveStream.name).toBe('live');
       expect(mixer.previewStream.name).toBe('preview');
     });
+
+    it('routes each stream through a 10-band equalizer', async () => {
+      await mixer.initialize();
+
+      for (const stream of [mixer.liveStream, mixer.previewStream]) {
+        const eq = stream.getState().equalizer;
+        expect(eq.isEnabled).toBe(true);
+        expect(eq.bands.map((b) => b.frequency)).toEqual([31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]);
+        // inputGain feeds the EQ input, not the media stream directly
+        expect(stream.getInput().connections).toContain(stream.equalizer.getInput());
+        expect(stream.getInput().connections).not.toContain(stream.mediaStreamDest);
+      }
+    });
+
+    it('does not re-create streams when initialize is called twice', async () => {
+      await mixer.initialize();
+      const live = mixer.liveStream;
+
+      await mixer.initialize();
+
+      expect(mixer.liveStream).toBe(live);
+    });
+
+    it('rejects initialization when the AudioContext cannot build the EQ chain', async () => {
+      const broken = new AudioContext();
+      broken.createBiquadFilter = undefined;
+      const brokenMixer = new AudioMixer(broken);
+
+      await expect(brokenMixer.initialize()).rejects.toThrow('AudioMixer initialization failed');
+      expect(brokenMixer.isInitialized).toBe(false);
+    });
   });
 
   describe('Device Management', () => {
@@ -69,8 +104,14 @@ describe('AudioMixer', () => {
       const devices = await mixer.getAvailableDevices();
       
       expect(Array.isArray(devices)).toBe(true);
-      // Mock setup provides 3 devices
-      expect(devices.length).toBeGreaterThan(0);
+      expect(devices.map((d) => d.deviceId)).toEqual(['default', 'device1', 'device2']);
+    });
+
+    it('excludes non-output devices from the device list', async () => {
+      const devices = await mixer.getAvailableDevices();
+
+      expect(devices.every((d) => d.kind === 'audiooutput')).toBe(true);
+      expect(devices.map((d) => d.deviceId)).not.toContain('mic');
     });
 
     it('sets devices for both streams', async () => {
@@ -78,6 +119,16 @@ describe('AudioMixer', () => {
       
       expect(mixer.config.liveDeviceId).toBe('device1');
       expect(mixer.config.previewDeviceId).toBe('device2');
+      expect(mixer.liveStream.audioElement.sinkId).toBe('device1');
+      expect(mixer.previewStream.audioElement.sinkId).toBe('device2');
+    });
+
+    it('refuses to set devices before initialization', async () => {
+      const fresh = new AudioMixer(audioContext);
+
+      await expect(fresh.setDevices('device1', 'device2')).rejects.toThrow('Not initialized');
+      expect(fresh.config.liveDeviceId).toBeNull();
+      fresh.destroy();
     });
   });
 
@@ -89,7 +140,7 @@ describe('AudioMixer', () => {
       mixer.persistConfig();
       
       const stored = localStorage.getItem('strudel-mixer-config');
-      expect(stored).toBeDefined();
+      expect(stored).not.toBeNull();
       
       const config = JSON.parse(stored);
       expect(config.liveDeviceId).toBe('device1');

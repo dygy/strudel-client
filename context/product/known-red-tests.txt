@@ -2,20 +2,8 @@
 # Measured 2026-10-08 on d02d450 with `pnpm exec vitest run` (20 failing tests).
 # One repo-relative path per line. Remove a line the moment its file goes green;
 # add one only with proof it already fails on origin/main (quote the run).
-
-# 11 failing assertions
-packages/mixer/test/AudioMixer.test.mjs
-# FLAKY: "document is not defined" in the 2026-10-08 baseline, green in 5/5 full
-# runs on 2026-10-09 — kept until it is understood
-packages/xen/test/xen.test.mjs
-# Also flaky (not listed — the gate re-runs new failures in isolation):
-#   packages/transpiler/test/transpiler.test.mjs failed once under full-suite
-#   load on 2026-10-09, green alone 3/3 and in 5/5 full runs.
-# 9 failing assertions
-website/src/repl/__tests__/globalSaveManager.test.ts
-# suite fails to load: root vitest.config.mjs does not resolve the `@src` alias
-# (website/src/routing/URLParser.ts imports @src/lib/slugUtils)
-website/src/routing/__tests__/TrackPersistence.test.ts
-website/src/routing/__tests__/TrackRouter.test.ts
-website/src/routing/__tests__/URLParser-path-routing.test.ts
-website/src/routing/__tests__/URLParser.test.ts
+#
+# Emptied 2026-10-09: @src/@components aliases + unstubGlobals in the root config, the
+# mixer Web Audio mock brought up to the 10-band EQ, router tests moved to the /repl/<slug>
+# contract, and the two module-level `global.window` leaks (which caused the xen/transpiler/
+# core "document is not defined" flakes under isolate:false) converted to per-test stubs.

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fc from 'fast-check';
 import { URLParser } from '../URLParser';
 
@@ -31,6 +31,11 @@ beforeEach(() => {
   mockLocation.pathname = '/';
   mockLocation.search = '';
   mockLocation.hash = '';
+});
+
+// isolate:false — don't let the window stub outlive this file
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('URLParser', () => {
@@ -81,37 +86,76 @@ describe('URLParser', () => {
   describe('Property Tests', () => {
     /**
      * Feature: track-routing-navigation, Property 1: URL routing consistency
-     * For any valid track ID, navigating to a URL with that track parameter should load 
-     * the corresponding track, and switching to any track should update the URL to reflect the current track
+     * Legacy `?track=` query URLs must still parse (backward compatibility), while
+     * switching tracks writes the path-based URL `/repl/<slug>`.
      */
     it('should maintain URL routing consistency', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 50 }).filter(s => /^[a-zA-Z0-9_-]+$/.test(s)),
-          (trackId) => {
-            // Test 1: URL with track parameter should be parseable
-            const urlWithTrack = `https://example.com/?track=${trackId}`;
+          // Already-canonical slugs: lowercase alphanumerics joined by single hyphens
+          fc.stringMatching(/^[a-z0-9]{1,10}(-[a-z0-9]{1,10}){0,3}$/),
+          (trackSlug) => {
+            // Spy history is shared across property runs; reset so we judge this run only
+            mockHistory.pushState.mockClear();
+            mockHistory.replaceState.mockClear();
+
+            // Test 1: legacy URL with track parameter should be parseable
+            const urlWithTrack = `https://example.com/?track=${trackSlug}`;
             const parsed = URLParser.parseQueryParams(urlWithTrack);
-            expect(parsed.track).toBe(trackId);
+            expect(parsed.track).toBe(trackSlug);
 
             // Test 2: Building query string should be reversible
-            const queryString = URLParser.buildQueryString({ track: trackId });
+            const queryString = URLParser.buildQueryString({ track: trackSlug });
             const rebuiltUrl = `https://example.com/${queryString}`;
             const reparsed = URLParser.parseQueryParams(rebuiltUrl);
-            expect(reparsed.track).toBe(trackId);
+            expect(reparsed.track).toBe(trackSlug);
 
-            // Test 3: URL update should call history API correctly
-            mockLocation.href = 'https://example.com/';
-            URLParser.updateTrackInURL(trackId, false);
-            expect(mockHistory.pushState).toHaveBeenCalledWith(
-              null, 
-              '', 
-              `/?track=${trackId}`
-            );
+            // Test 3: URL update pushes exactly one path-based URL, never the old query form
+            mockLocation.href = 'https://example.com/repl';
+            URLParser.updateTrackInURL(trackSlug, false);
+            expect(mockHistory.pushState).toHaveBeenCalledTimes(1);
+            expect(mockHistory.pushState).toHaveBeenLastCalledWith(null, '', `/repl/${trackSlug}`);
+            expect(mockHistory.replaceState).not.toHaveBeenCalled();
+
+            // Test 4: the written path round-trips back to the same identifier
+            mockLocation.pathname = mockHistory.pushState.mock.calls[0][2];
+            expect(URLParser.getCurrentTrackIdentifier()).toBe(trackSlug);
           }
         ),
         { numRuns: 100 }
       );
+    });
+
+    it('should normalise any track name into a single URL-safe slug segment', () => {
+      fc.assert(
+        fc.property(fc.string({ minLength: 1, maxLength: 50 }), (trackName) => {
+          mockHistory.pushState.mockClear();
+          URLParser.updateTrackInURL(trackName, false);
+
+          expect(mockHistory.pushState).toHaveBeenCalledTimes(1);
+          const url: string = mockHistory.pushState.mock.calls[0][2];
+          if (trackName.startsWith('/repl/')) {
+            // Already a path: passed through verbatim
+            expect(url).toBe(trackName);
+          } else {
+            expect(url).toMatch(/^\/repl\/[a-z0-9]+(-[a-z0-9]+)*$/);
+            expect(url).not.toContain('?track=');
+          }
+        }),
+        { numRuns: 100 }
+      );
+    });
+
+    it.each([
+      ['Hello World', '/repl/hello-world'],
+      ['  My_Track!! v2 ', '/repl/my-track-v2'],
+      ['ABC', '/repl/abc'],
+      ['___', '/repl/untitled'],
+      ['/repl/folder/beat', '/repl/folder/beat'],
+    ])('should write %j as %s', (trackName, expected) => {
+      URLParser.updateTrackInURL(trackName, false);
+      expect(mockHistory.pushState).toHaveBeenCalledWith(null, '', expected);
+      expect(mockHistory.pushState).not.toHaveBeenCalledWith(null, '', `/?track=${trackName}`);
     });
 
     /**
