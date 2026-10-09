@@ -45,7 +45,10 @@ function httpRequest(url, options = {}) {
  * Download a file from URL to local path
  */
 async function downloadFile(url, localPath) {
-  return new Promise(async (resolve, reject) => {
+  return new Promise((resolve, reject) => {
+    // Not an async executor (no-async-promise-executor): run the async body in an IIFE;
+    // every error still reaches reject via the catch below.
+    (async () => {
     try {
       const response = await httpRequest(url);
       
@@ -74,6 +77,7 @@ async function downloadFile(url, localPath) {
     } catch (error) {
       reject(error);
     }
+    })();
   });
 }
 
@@ -256,7 +260,7 @@ async function main() {
   const arg = process.argv[3];
   
   switch (command) {
-    case 'download':
+    case 'download': {
       const limit = arg ? parseInt(arg) : null;
       const result = await downloadAllSamples(limit);
       
@@ -265,6 +269,7 @@ async function main() {
         updateVcslJson(loadVcslJson());
       }
       break;
+    }
       
     case 'status':
       showStatus();

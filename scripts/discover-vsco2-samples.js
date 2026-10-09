@@ -216,10 +216,11 @@ async function main() {
       await discoverVSCO2();
       break;
       
-    case 'download':
+    case 'download': {
       const limit = arg ? parseInt(arg) : null;
       await downloadSamples(limit);
       break;
+    }
       
     case 'help':
     default:

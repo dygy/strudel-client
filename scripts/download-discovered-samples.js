@@ -197,10 +197,11 @@ async function main() {
   const arg = process.argv[3];
   
   switch (command) {
-    case 'download':
+    case 'download': {
       const limit = arg ? parseInt(arg) : null;
       await downloadAllSamples(limit);
       break;
+    }
       
     case 'status':
       showStatus();

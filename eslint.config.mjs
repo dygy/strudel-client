@@ -44,6 +44,8 @@ export default [
       'packages/hs2js/src/hs2js.mjs',
       'packages/supradough/dough-export.mjs',
       '**/samples',
+      // A Strudel pattern (uses REPL globals like sound()), not a Node/ES module.
+      'test-track.js',
     ],
   },
   ...compat.extends('eslint:recommended').map((config) => ({

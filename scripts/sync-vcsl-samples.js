@@ -283,10 +283,11 @@ async function main() {
       await checkRepositories();
       break;
       
-    case 'test':
+    case 'test': {
       const limit = parseInt(process.argv[3]) || 10;
       await testSamples(limit);
       break;
+    }
       
     case 'fork':
       showForkInstructions();

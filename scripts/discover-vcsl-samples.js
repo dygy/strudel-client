@@ -166,7 +166,10 @@ function createCategoryMapping(audioFiles) {
  * Download a file from URL to local path
  */
 async function downloadFile(url, localPath, fileName) {
-  return new Promise(async (resolve, reject) => {
+  return new Promise((resolve, reject) => {
+    // Not an async executor (no-async-promise-executor): run the async body in an IIFE;
+    // every error still reaches reject via the catch below.
+    (async () => {
     try {
       const response = await httpRequest(url);
       
@@ -209,6 +212,7 @@ async function downloadFile(url, localPath, fileName) {
     } catch (error) {
       reject(error);
     }
+    })();
   });
 }
 
@@ -321,10 +325,11 @@ async function main() {
       await discoverAndDownload(false);
       break;
       
-    case 'download':
+    case 'download': {
       const limit = arg ? parseInt(arg) : null;
       await discoverAndDownload(true, limit);
       break;
+    }
       
     case 'help':
     default:

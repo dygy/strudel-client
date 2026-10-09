@@ -181,7 +181,7 @@ function formatStrudelCode(code, options) {
     }
 
     // Handle closing brackets/parentheses - decrease indent before the line
-    if (line.match(/^[\}\)\]]/)) {
+    if (line.match(/^[})\]]/)) {
       indentLevel = Math.max(0, indentLevel - 1);
     }
 
@@ -215,8 +215,8 @@ function formatStrudelCode(code, options) {
 
     // Apply formatting to non-string parts only
     tempLine = tempLine
-      .replace(/([^=!<>+\-*\/])=([^=>])/g, '$1 = $2')  // Add spaces around = (but not ==, !=, =>, +=, -=, *=, /=)
-      .replace(/([0-9])\s*([\+\-\*\/])\s*([0-9])/g, '$1 $2 $3')  // Add spaces around math operators between numbers only
+      .replace(/([^=!<>+\-*/])=([^=>])/g, '$1 = $2')  // Add spaces around = (but not ==, !=, =>, +=, -=, *=, /=)
+      .replace(/([0-9])\s*([+\-*/])\s*([0-9])/g, '$1 $2 $3')  // Add spaces around math operators between numbers only
       .replace(/,([^\s])/g, ', $1')              // Add space after commas
       .replace(/\s+/g, ' ')                      // Normalize multiple spaces to single
       .replace(/\s*;\s*/g, ';')                  // Normalize semicolons
@@ -233,7 +233,7 @@ function formatStrudelCode(code, options) {
     spacedLine = tempLine;
 
     // Handle opening brackets/parentheses - increase indent after the line
-    if (line.match(/[\{\(\[]$/)) {
+    if (line.match(/[{([]$/)) {
       indentLevel++;
     }
 
