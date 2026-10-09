@@ -5,8 +5,12 @@
 
 # 11 failing assertions
 packages/mixer/test/AudioMixer.test.mjs
-# suite fails to load: "document is not defined" (needs a DOM environment)
+# FLAKY: "document is not defined" in the 2026-10-08 baseline, green in 5/5 full
+# runs on 2026-10-09 — kept until it is understood
 packages/xen/test/xen.test.mjs
+# Also flaky (not listed — the gate re-runs new failures in isolation):
+#   packages/transpiler/test/transpiler.test.mjs failed once under full-suite
+#   load on 2026-10-09, green alone 3/3 and in 5/5 full runs.
 # 9 failing assertions
 website/src/repl/__tests__/globalSaveManager.test.ts
 # suite fails to load: root vitest.config.mjs does not resolve the `@src` alias

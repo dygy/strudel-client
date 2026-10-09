@@ -99,6 +99,19 @@ new="$(printf '%s\n' "$failing" | grep -vxF -f <(grep -vE '^[[:space:]]*(#|$)' "
 [ -n "$new" ] || allow_note "Strudel push gate: only known-red test files failed (context/product/known-red-tests.txt):
 $failing"
 
+# A file can fail under full-suite load and pass alone (seen 2026-10-09 with
+# transpiler.test.mjs). Re-run each new failure once in isolation; only a file
+# that fails again is a real regression. Flakes are reported, not blocked.
+flaky=""; still=""
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  if ( cd "$root" && pnpm exec vitest run "$f" >/dev/null 2>&1 ); then flaky="$flaky$f"$'\n'; else still="$still$f"$'\n'; fi
+done <<<"$new"
+new="$(printf '%s' "$still" | sed '/^$/d')"
+flaky="$(printf '%s' "$flaky" | sed '/^$/d')"
+[ -n "$new" ] || allow_note "Strudel push gate: no real new failures. Flaky under full-suite load but green in isolation (worth fixing):
+$flaky"
+
 if [ -n "$(git -C "$root" status --porcelain --untracked-files=no 2>/dev/null)" ]; then
   allow_note "Strudel push gate: NEW test failures, but the tree has uncommitted changes so they may not be what is pushed — verify before calling it safe:
 $new"
