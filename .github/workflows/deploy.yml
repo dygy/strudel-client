@@ -12,13 +12,12 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Advisory only. format-check, lint and test all fail on code that predates
-  # this workflow (228 unformatted files, 29 lint errors, 20 failing tests), so
-  # every step is continue-on-error and the deploy below does NOT wait on them.
-  # Once a category is clean, drop its continue-on-error and add this job to
-  # the deploy job's `needs:` so it starts gating.
+  # Tests GATE the deploy (the suite went fully green on 2026-10-09, da9ca9d).
+  # format-check and lint are still advisory: they fail on code that predates
+  # this workflow (228 unformatted files, 29 lint errors). Once one is clean,
+  # drop its continue-on-error and it gates too.
   check:
-    name: Format, lint, test (advisory)
+    name: Test (gating); format, lint (advisory)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,10 +40,10 @@ jobs:
         continue-on-error: true
 
       - run: pnpm run test
-        continue-on-error: true
 
   deploy:
     name: Build and deploy to Cloudflare
+    needs: check
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: production

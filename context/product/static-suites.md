@@ -2,9 +2,9 @@
 
 These are the commands every implementer and reviewer runs, with their measured baselines. The bar for any change is **no new failures** against these baselines. "It was already red" has to be proven against `origin/main`, not asserted.
 
-| Suite | Command | Baseline (measured 2026-10-08 on `d02d450`) |
+| Suite | Command | Baseline (test row re-measured 2026-10-09) |
 |---|---|---|
-| Unit tests | `pnpm exec vitest run` (whole repo, ~3 s) | 659 tests: 639 pass, 20 fail, all in the 7 files listed in [`known-red-tests.txt`](./known-red-tests.txt) |
+| Unit tests | `pnpm exec vitest run` (whole repo, ~3 s) | **721/721 pass** (2026-10-09, `c4c2414`). [`known-red-tests.txt`](./known-red-tests.txt) is empty, so any failure is new. **Gates the CI deploy** |
 | Unit tests, with jsdoc | `pnpm test` | Same as above, plus regenerating `doc.json` first. Use it when touching JSDoc in `packages/{core,mini,codemirror,csound,draw,tonal,transpiler,webaudio}` |
 | Lint | `pnpm run lint` | 29 errors pre-existing (CI comment). Judge by no new errors in touched files: `pnpm exec eslint <files>` |
 | Format | `pnpm exec prettier --check <touched files>` | 228 files unformatted repo-wide. Only touched files must be clean |
@@ -15,8 +15,8 @@ These are the commands every implementer and reviewer runs, with their measured 
 
 | Push | Effect |
 |---|---|
-| Branch with an open PR | CI `check` job only (advisory). No deploy |
-| `main` | CI `check` job (advisory), and **build + `wrangler deploy` to PROD at `strudel.dygy.app`**. There is no staging |
+| Branch with an open PR | CI `check` job only (tests must pass; format and lint advisory). No deploy |
+| `main` | CI `check` job, then — **only if tests pass** — build + `wrangler deploy` to PROD at `strudel.dygy.app`. There is no staging |
 
 Before any push to `main`, the `strudel-push-gate` hook (`.claude/hooks/strudel-push-gate.sh`) runs the whole vitest suite. It refuses the push when a test file fails that isn't on the known-red list. A refusal is a finding to fix, not a reason to bypass the hook.
 

@@ -27,7 +27,7 @@
   - The Cloudflare build runs with PWA off and image passthrough.
 - **CI/CD:** `.github/workflows/deploy.yml`.
   - **Push to `main` → build → `wrangler deploy` to PROD.** There is no staging environment.
-  - On PRs, the format, lint and test job runs as advisory only. It does not gate the deploy.
+  - The `check` job runs first. **A failing test blocks the deploy** (`needs: check`); format and lint are still advisory. On PRs, `check` runs without a deploy.
 - **Secrets (names only):**
   - Wrangler vars: `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY`.
   - Wrangler secret: `SUPABASE_SERVICE_ROLE_KEY`, with `.dev.vars` locally.

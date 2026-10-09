@@ -42,7 +42,7 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
   - [x] **Fix the routing tests:** `@src` alias added to the root vitest config; tests moved to the `/repl/<slug>` contract (2026-10-09, `da9ca9d`).
   - [x] **Fix the mixer and save-manager tests:** mixer Web Audio mock caught up with the EQ; save manager was the alias (2026-10-09).
   - [x] **Fix `xen`:** it was a `window` stub leaking between files under `isolate: false`; fixed with `unstubGlobals` (2026-10-09). `known-red-tests.txt` is empty.
-  - [ ] **Gate the deploy:** once `known-red-tests.txt` is empty, make CI's check job a `needs:` of the deploy job.
+  - [x] **Gate the deploy:** tests now block the deploy (`needs: check`, 2026-10-09). Format and lint are still advisory.
 - [ ] **Coverage for untested fork features:** smooth transitions, EQ, screen recorder, import, admin.
 
 ### Phase 5 — Debt and decisions (later)
