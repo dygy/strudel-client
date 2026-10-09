@@ -1,0 +1,17 @@
+# Vitest files that fail on origin/main — the push gate tolerates ONLY these.
+# Measured 2026-10-08 on d02d450 with `pnpm exec vitest run` (20 failing tests).
+# One repo-relative path per line. Remove a line the moment its file goes green;
+# add one only with proof it already fails on origin/main (quote the run).
+
+# 11 failing assertions
+packages/mixer/test/AudioMixer.test.mjs
+# suite fails to load: "document is not defined" (needs a DOM environment)
+packages/xen/test/xen.test.mjs
+# 9 failing assertions
+website/src/repl/__tests__/globalSaveManager.test.ts
+# suite fails to load: root vitest.config.mjs does not resolve the `@src` alias
+# (website/src/routing/URLParser.ts imports @src/lib/slugUtils)
+website/src/routing/__tests__/TrackPersistence.test.ts
+website/src/routing/__tests__/TrackRouter.test.ts
+website/src/routing/__tests__/URLParser-path-routing.test.ts
+website/src/routing/__tests__/URLParser.test.ts

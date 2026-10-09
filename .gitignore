@@ -161,3 +161,7 @@ samples/*
 
 # Playwright MCP session artifacts
 .playwright-mcp/
+
+# AWOS working evidence (never committed)
+review/
+docs/screenshots/
