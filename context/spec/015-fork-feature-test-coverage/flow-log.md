@@ -27,3 +27,9 @@
 - New findings 5 (widened) and 7 recorded; roadmap updated.
 - Flow defect: both parallel agents used the same copy-aside path (scratchpad/orig) → one restore wrote ScreenRecorderEngine contents into batch-import.ts. Agent restored from HEAD; orchestrator verified every production source == HEAD. Parallel agents doing RED proofs need unique backup names (mktemp).
 - Final: vitest 827/827 ×3 + shuffle.files; lint 0; format clean; production files untouched.
+
+## 2026-10-09 · Steps 9–11 · ship
+- Push approved; 6f6f3d6..46d0d4b passed the local push gate (format, lint, 827 tests).
+- CI run 37986239943: Format, lint, test ✓ → Build and deploy ✓. Prod: / 200, /embed/ 200, /repl 302. Test-only change, so the app is unchanged.
+- Roadmap item ticked; spec Status Completed. Follow-ups (7 findings + mondo order-dependence) are on the roadmap under Phase 4.
+- Agents dispatched: 3 (2 test engineers + 1 reviewer), plus 2 follow-ups to the same agents.

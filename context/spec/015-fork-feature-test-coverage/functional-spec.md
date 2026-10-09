@@ -1,7 +1,7 @@
 # Functional Specification: Safety Net for the Untested Fork Features
 
 - **Roadmap Item:** Phase 4: Make it safe to change → Coverage for untested fork features (smooth transitions, EQ, screen recorder, import, admin)
-- **Status:** In Review
+- **Status:** Completed
 - **Author:** Dygy
 
 ---
