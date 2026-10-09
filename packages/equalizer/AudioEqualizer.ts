@@ -180,8 +180,12 @@ export class AudioEqualizer {
     if (gain !== undefined) {
       // Clamp gain to [-12, 12] dB range
       const clampedGain = Math.max(-12, Math.min(12, gain));
-      band.filter.gain.setValueAtTime(clampedGain, now);
       band.config.gain = clampedGain;
+      // While the EQ is off every filter stays at 0 dB (pass-through). The new
+      // value is only remembered and is applied by setEnabled(true).
+      if (this.isEnabled) {
+        band.filter.gain.setValueAtTime(clampedGain, now);
+      }
     }
 
     if (Q !== undefined) {

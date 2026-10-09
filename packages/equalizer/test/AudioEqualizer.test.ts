@@ -157,22 +157,35 @@ describe('AudioEqualizer (spec 015 §2.2)', () => {
       expect(storedGains(eq)).toEqual(EQUALIZER_PRESETS.rock.gains);
     });
 
-    // FINDING (spec 015 §4): setBand applies gain to the filter even while the EQ is off
-    // (packages/equalizer/AudioEqualizer.ts:183). EqualizerUI applies saved settings as
-    // setEnabled(saved.isEnabled) then setBand(...) per band (EqualizerUI.tsx:36-38), so a
-    // reload with the EQ saved as OFF and a shaped curve makes the EQ audible while the UI
-    // says off. The same happens when moving a slider or picking a preset while off.
-    it.fails('while the EQ is off, applying saved band values (as on reload) keeps the sound flat', () => {
+    // Regression (spec 015 finding 3, fixed 2026-10-09): setBand used to write the filter gain
+    // even while the EQ was off, so reloading with the EQ saved as OFF (EqualizerUI applies
+    // setEnabled(saved) then setBand per band), moving a slider or picking a preset while off,
+    // or setState({isEnabled:false}) made the EQ audible while the UI said off.
+    it('while the EQ is off, applying saved band values (as on reload) keeps the sound flat', () => {
       eq.setEnabled(false);
       EQUALIZER_PRESETS.rock.gains.forEach((gain, i) => eq.setBand(i, { gain }));
 
       expect(appliedGains(eq)).toEqual(Array(10).fill(0));
     });
 
-    // FINDING (spec 015 §4), second path: setState calls setEnabled(state.isEnabled) and then
-    // setBand for each band (packages/equalizer/AudioEqualizer.ts:160-168); setBand writes the
-    // filter gain regardless of isEnabled (:183). Restoring an "off" state applies the curve.
-    it.fails('restoring a saved state that is off keeps the sound flat', () => {
+    it('a preset picked while off is remembered, and heard only once the EQ is switched on', () => {
+      eq.setEnabled(false);
+      eq.applyPreset('rock');
+
+      expect(appliedGains(eq)).toEqual(Array(10).fill(0));
+      expect(storedGains(eq)).toEqual(EQUALIZER_PRESETS.rock.gains);
+
+      eq.setEnabled(true);
+      expect(appliedGains(eq)).toEqual(EQUALIZER_PRESETS.rock.gains);
+    });
+
+    it('a band moved while on is still applied immediately', () => {
+      eq.setBand(5, { gain: 6 });
+
+      expect(appliedGains(eq)[5]).toBe(6);
+    });
+
+    it('restoring a saved state that is off keeps the sound flat', () => {
       const bands = EQUALIZER_PRESETS.rock.gains.map((gain, i) => ({
         frequency: FREQUENCIES[i],
         type: 'peaking' as BiquadFilterType,
@@ -184,6 +197,9 @@ describe('AudioEqualizer (spec 015 §2.2)', () => {
 
       expect(eq.getState().isEnabled).toBe(false);
       expect(appliedGains(eq)).toEqual(Array(10).fill(0));
+
+      eq.setEnabled(true);
+      expect(appliedGains(eq)).toEqual(EQUALIZER_PRESETS.rock.gains);
     });
   });
 

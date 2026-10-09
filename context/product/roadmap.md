@@ -45,7 +45,7 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
   - [x] **Gate the deploy:** format, lint and tests all block the deploy (`needs: check`, 2026-10-09).
 - [x] **Coverage for untested fork features:** smooth transitions, EQ, screen recorder, import, admin ([015](../spec/015-fork-feature-test-coverage/), 106 tests, 2026-10-09).
 - [ ] **Fix what the coverage found** ([015 §4 Findings](../spec/015-fork-feature-test-coverage/functional-spec.md#4-findings)). Each one has a check waiting to go green:
-  - [ ] **EQ is audible while switched off** after a reload, when moved while off, or when a saved state is restored. User-audible: do this first.
+  - [x] **EQ is audible while switched off** after a reload, when moved while off, or when a saved state is restored (fixed 2026-10-09).
   - [ ] **Damaged EQ settings break the EQ panel** (empty bands or non-numeric gains pass the loader). Fall back to flat.
   - [ ] **Screen picker cancel message:** decide on the wording for cancel versus deny.
   - [ ] **Malformed imports get the wrong answer** (an empty-valued track or folder list, or a body that isn't an object, gives 500 or a false success instead of 400 "invalid data").
