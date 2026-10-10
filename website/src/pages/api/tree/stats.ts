@@ -7,6 +7,7 @@ import type { APIRoute } from 'astro';
 import { TreeManager } from '@src/lib/TreeManager.ts';
 import { createClient } from '@supabase/supabase-js';
 import { serverEnv } from '../../../lib/server-env';
+import { getAuthenticatedUser, AuthError } from '../_auth';
 
 export const prerender = false;
 
@@ -21,51 +22,6 @@ function getSupabase() {
   return supabaseClient;
 }
 
-async function getAuthenticatedUser(request: Request) {
-  const cookies = request.headers.get('cookie') || '';
-
-  if (!cookies) {
-    throw new Error('No authentication cookies found');
-  }
-
-  // Parse cookies to get Supabase session tokens
-  const cookieMap = new Map();
-  cookies.split(';').forEach((cookie) => {
-    const [key, value] = cookie.trim().split('=');
-    if (key && value) {
-      cookieMap.set(key, decodeURIComponent(value));
-    }
-  });
-
-  // Look for Supabase auth cookies
-  let accessToken = null;
-
-  // Try different cookie patterns that Supabase might use
-  for (const [key, value] of cookieMap) {
-    // Access token should be a JWT (starts with eyJ and has dots)
-    if ((key.includes('access') || key.includes('auth-token') || key.startsWith('sb-access')) && value.includes('.')) {
-      accessToken = value;
-      break;
-    }
-  }
-
-  if (!accessToken) {
-    throw new Error('No access token found in cookies');
-  }
-
-  // Verify the access token
-  const {
-    data: { user },
-    error,
-  } = await getSupabase().auth.getUser(accessToken);
-
-  if (error || !user) {
-    throw new Error('Invalid session');
-  }
-
-  return user;
-}
-
 function createTreeManager(userId: string): TreeManager {
   return new TreeManager({
     userId,
@@ -76,7 +32,7 @@ function createTreeManager(userId: string): TreeManager {
 // GET /api/tree/stats - Get tree statistics
 export const GET: APIRoute = async ({ request, url }) => {
   try {
-    const user = await getAuthenticatedUser(request);
+    const { user } = await getAuthenticatedUser(request);
     const treeManager = createTreeManager(user.id);
 
     const nodeId = url.searchParams.get('nodeId');
@@ -136,7 +92,7 @@ export const GET: APIRoute = async ({ request, url }) => {
         error: error.message || 'Failed to get statistics',
       }),
       {
-        status: error.message?.includes('authorization') ? 401 : 500,
+        status: error instanceof AuthError ? 401 : 500,
         headers: { 'Content-Type': 'application/json' },
       },
     );

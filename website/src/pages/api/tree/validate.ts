@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { TreeManager } from '../../../lib/TreeManager';
 import { serverEnv } from '../../../lib/server-env';
+import { getAuthenticatedUser, AuthError } from '../_auth';
 
 export const prerender = false;
 
@@ -20,70 +21,27 @@ function getSupabase() {
 }
 
 /**
- * Get authenticated user from request
- */
-async function getAuthenticatedUser(request: Request) {
-  const cookies = request.headers.get('cookie') || '';
-
-  if (!cookies) {
-    throw new Error('No authentication cookies found');
-  }
-
-  // Parse cookies to get Supabase session tokens
-  const cookieMap = new Map();
-  cookies.split(';').forEach((cookie) => {
-    const [key, value] = cookie.trim().split('=');
-    if (key && value) {
-      cookieMap.set(key, decodeURIComponent(value));
-    }
-  });
-
-  // Look for Supabase auth cookies
-  let accessToken = null;
-
-  // Try different cookie patterns that Supabase might use
-  for (const [key, value] of cookieMap) {
-    // Access token should be a JWT (starts with eyJ and has dots)
-    if ((key.includes('access') || key.includes('auth-token') || key.startsWith('sb-access')) && value.includes('.')) {
-      accessToken = value;
-      break;
-    }
-  }
-
-  if (!accessToken) {
-    throw new Error('No access token found in cookies');
-  }
-
-  // Create anon client for token verification
-  const supabaseAnon = createClient(serverEnv().supabaseUrl, serverEnv().supabaseAnonKey);
-  const {
-    data: { user },
-    error,
-  } = await supabaseAnon.auth.getUser(accessToken);
-
-  if (error || !user) {
-    throw new Error('Invalid session');
-  }
-
-  return user;
-}
-
-/**
  * Create TreeManager instance for user
  */
 function createTreeManager(userId: string) {
-  return new TreeManager(getSupabase(), userId);
+  // TreeManager takes a config object; passing the client positionally left config.supabase
+  // undefined, so it fell back to process.env (absent on Workers) and every call was a 500.
+  return new TreeManager({ userId, supabase: getSupabase() });
 }
 
 // GET /api/tree/validate - Validate tree integrity
 export const GET: APIRoute = async ({ request }) => {
   try {
-    const user = await getAuthenticatedUser(request);
+    const { user } = await getAuthenticatedUser(request);
     const treeManager = createTreeManager(user.id);
 
     const validation = await treeManager.validateTree();
     const cycles = await treeManager.detectCycles();
     const orphans = await treeManager.findOrphans();
+    // getPath is async: awaiting it here, otherwise every orphan's path serialises as {}.
+    const orphansWithPaths = await Promise.all(
+      orphans.map(async (node) => ({ ...node, path: await treeManager.getPath(node.id) })),
+    );
 
     return new Response(
       JSON.stringify({
@@ -91,10 +49,7 @@ export const GET: APIRoute = async ({ request }) => {
         validation: {
           ...validation,
           cycles,
-          orphans: orphans.map((node) => ({
-            ...node,
-            path: treeManager.getPath(node.id),
-          })),
+          orphans: orphansWithPaths,
         },
       }),
       {
@@ -111,7 +66,7 @@ export const GET: APIRoute = async ({ request }) => {
         error: error.message || 'Validation failed',
       }),
       {
-        status: error.message?.includes('authorization') ? 401 : 500,
+        status: error instanceof AuthError ? 401 : 500,
         headers: { 'Content-Type': 'application/json' },
       },
     );

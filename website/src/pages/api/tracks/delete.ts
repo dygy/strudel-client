@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
-import { getAuthenticatedUser } from '../_auth';
+import { getAuthenticatedUser, AuthError } from '../_auth';
 import { serverEnv } from '../../../lib/server-env';
 import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 
@@ -16,6 +16,11 @@ export const DELETE: APIRoute = async ({ request }) => {
       user = authResult.user;
       accessToken = authResult.accessToken;
     } catch (authError) {
+      // Only a missing/invalid session falls back to the alternative method (and, if that
+      // fails, a 401). Anything else (e.g. missing env, a malformed cookie) is a real 500.
+      if (!(authError instanceof AuthError)) {
+        throw authError;
+      }
       console.log('DELETE API - Cookie auth failed, trying alternative method:', authError.message);
 
       // Alternative: Try to get session from Supabase directly
@@ -60,10 +65,10 @@ export const DELETE: APIRoute = async ({ request }) => {
             throw new Error('Session validation failed: ' + (sessionError?.message || 'No user'));
           }
         } catch (sessionErr) {
-          throw new Error('Authentication failed: ' + authError.message);
+          throw new AuthError('Authentication failed: ' + authError.message);
         }
       } else {
-        throw new Error('Authentication failed: ' + authError.message);
+        throw new AuthError('Authentication failed: ' + authError.message);
       }
     }
 
@@ -130,7 +135,7 @@ export const DELETE: APIRoute = async ({ request }) => {
   } catch (error) {
     console.error('API /tracks/delete error:', error);
 
-    const status = error.message?.includes('Authentication') || error.message?.includes('token') ? 401 : 500;
+    const status = error instanceof AuthError ? 401 : 500;
 
     return new Response(
       JSON.stringify({

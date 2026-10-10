@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
-import { getAuthenticatedUser } from '../_auth';
+import { getAuthenticatedUser, AuthError } from '../_auth';
 import { serverEnv } from '../../../lib/server-env';
 import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 
@@ -152,7 +152,7 @@ export const PUT: APIRoute = async ({ request }) => {
   } catch (error) {
     console.error('API /tracks/update error:', error);
 
-    const status = error.message?.includes('Authentication') || error.message?.includes('token') ? 401 : 500;
+    const status = error instanceof AuthError ? 401 : 500;
 
     return new Response(
       JSON.stringify({

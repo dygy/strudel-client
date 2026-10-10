@@ -6,6 +6,17 @@
 import { createClient } from '@supabase/supabase-js';
 import { serverEnv } from '../../lib/server-env';
 
+/**
+ * Thrown when a request has no valid session. Routes map it to 401 by type, never by
+ * message text: the client only refreshes the session and retries on a 401.
+ */
+export class AuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
+
 export async function getAuthenticatedUser(request: Request) {
   try {
     let accessToken = null;
@@ -47,7 +58,7 @@ export async function getAuthenticatedUser(request: Request) {
 
     if (!accessToken) {
       console.log('API Auth - No access token found in headers or cookies');
-      throw new Error('No access token found');
+      throw new AuthError('No access token found');
     }
 
     // Create Supabase client with anon key and verify the access token
@@ -60,7 +71,7 @@ export async function getAuthenticatedUser(request: Request) {
 
     if (error || !user) {
       console.log('API Auth - Authentication failed:', error?.message || 'No user returned');
-      throw new Error('Authentication failed: ' + (error?.message || 'No user returned'));
+      throw new AuthError('Authentication failed: ' + (error?.message || 'No user returned'));
     }
 
     return { user, accessToken };

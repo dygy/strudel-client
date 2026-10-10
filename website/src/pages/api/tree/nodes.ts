@@ -8,6 +8,7 @@ import { TreeManager } from '../../../lib/TreeManager';
 import { createClient } from '@supabase/supabase-js';
 import { serverEnv } from '../../../lib/server-env';
 import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
+import { getAuthenticatedUser, AuthError } from '../_auth';
 
 export const prerender = false;
 
@@ -22,43 +23,6 @@ function getSupabase() {
   return supabaseClient;
 }
 
-async function getAuthenticatedUser(request: Request) {
-  const cookies = request.headers.get('cookie') || '';
-
-  if (!cookies) {
-    throw new Error('No authentication cookies found');
-  }
-
-  // Parse cookies to get Supabase session tokens
-  const cookieMap = new Map();
-  cookies.split(';').forEach((cookie) => {
-    const [key, value] = cookie.trim().split('=');
-    if (key && value) {
-      cookieMap.set(key, decodeURIComponent(value));
-    }
-  });
-
-  // Look for the specific Supabase access token cookie set by auth callback
-  const accessToken = cookieMap.get('sb-access-token');
-
-  if (!accessToken) {
-    throw new Error('No access token found in cookies');
-  }
-
-  // Verify the access token using anon client (same as auth/user.ts)
-  const supabaseAnon = createClient(serverEnv().supabaseUrl, serverEnv().supabaseAnonKey);
-  const {
-    data: { user },
-    error,
-  } = await supabaseAnon.auth.getUser(accessToken);
-
-  if (error || !user) {
-    throw new Error('Invalid session');
-  }
-
-  return user;
-}
-
 function createTreeManager(userId: string): TreeManager {
   return new TreeManager({
     userId,
@@ -69,7 +33,7 @@ function createTreeManager(userId: string): TreeManager {
 // GET /api/tree/nodes - List nodes (with optional parent filter)
 export const GET: APIRoute = async ({ request, url }) => {
   try {
-    const user = await getAuthenticatedUser(request);
+    const { user } = await getAuthenticatedUser(request);
     const treeManager = createTreeManager(user.id);
 
     const parentId = url.searchParams.get('parent');
@@ -123,7 +87,7 @@ export const GET: APIRoute = async ({ request, url }) => {
         error: error.message || 'Failed to get nodes',
       }),
       {
-        status: error.message?.includes('authorization') ? 401 : 500,
+        status: error instanceof AuthError ? 401 : 500,
         headers: { 'Content-Type': 'application/json' },
       },
     );
@@ -133,7 +97,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 // POST /api/tree/nodes - Create new node
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const user = await getAuthenticatedUser(request);
+    const { user } = await getAuthenticatedUser(request);
     const treeManager = createTreeManager(user.id);
 
     // Unparseable or non-object bodies are refused with 400, not a 500.
@@ -205,7 +169,7 @@ export const POST: APIRoute = async ({ request }) => {
         error: error.message || 'Failed to create node',
       }),
       {
-        status: error.message?.includes('authorization') ? 401 : 500,
+        status: error instanceof AuthError ? 401 : 500,
         headers: { 'Content-Type': 'application/json' },
       },
     );
@@ -215,7 +179,7 @@ export const POST: APIRoute = async ({ request }) => {
 // PUT /api/tree/nodes - Update node
 export const PUT: APIRoute = async ({ request }) => {
   try {
-    const user = await getAuthenticatedUser(request);
+    const { user } = await getAuthenticatedUser(request);
     const treeManager = createTreeManager(user.id);
 
     // Unparseable or non-object bodies are refused with 400, not a 500.
@@ -265,7 +229,7 @@ export const PUT: APIRoute = async ({ request }) => {
         error: error.message || 'Failed to update node',
       }),
       {
-        status: error.message?.includes('authorization') ? 401 : 500,
+        status: error instanceof AuthError ? 401 : 500,
         headers: { 'Content-Type': 'application/json' },
       },
     );
@@ -275,7 +239,7 @@ export const PUT: APIRoute = async ({ request }) => {
 // DELETE /api/tree/nodes - Delete node
 export const DELETE: APIRoute = async ({ request }) => {
   try {
-    const user = await getAuthenticatedUser(request);
+    const { user } = await getAuthenticatedUser(request);
     const treeManager = createTreeManager(user.id);
 
     // Unparseable or non-object bodies are refused with 400, not a 500.
@@ -319,7 +283,7 @@ export const DELETE: APIRoute = async ({ request }) => {
         error: error.message || 'Failed to delete node',
       }),
       {
-        status: error.message?.includes('authorization') ? 401 : 500,
+        status: error instanceof AuthError ? 401 : 500,
         headers: { 'Content-Type': 'application/json' },
       },
     );

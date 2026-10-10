@@ -53,11 +53,13 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
   - [ ] **Failed smooth transition shows no message.**
   - [ ] **Unused tracks bulk-create route** copies whatever fields it's sent: remove it or narrow it.
 - [x] **13 other API routes read the request body unguarded.** All now use `readJsonObject` (`website/src/lib/apiBody.ts`), so a bad body gets 400 "Invalid data format" (fixed 2026-10-10; `bodyGuard.test.ts`).
-- [ ] **`tree/*` routes answer 500 instead of 401 for an expired or missing session.** Their catch only maps messages containing "authorization", so the app never refreshes and retries. They also ignore the `Authorization: Bearer` header that `secureApi` sends. Applies to `tree/move`, `tree/nodes` and `tree/search`.
+- [x] **`tree/*` routes answer 500 instead of 401 for an expired or missing session.** All tree routes now use the shared `api/_auth.ts`, which also reads the Bearer header, and map a typed `AuthError` to 401. The `tracks/*` routes no longer guess the status from message text. `tree/validate` no longer fails for every user (wrong `TreeManager` construction). Fixed 2026-10-10.
 - [ ] **`packages/mondo` tests depend on their order** (they fail under `vitest --sequence.shuffle`).
 
 ### Phase 5 — Debt and decisions (later)
 
-- [ ] **Tree filesystem: finish or remove.** The `tree_*` tables and `/api/tree/*` exist, but the API reverted to `tracks` ([002](../spec/002-scalable-tree-filesystem/)).
+- [ ] **Tree filesystem: finish or remove.** The `tree_*` tables and `/api/tree/*` exist, but the API reverted to `tracks` ([002](../spec/002-scalable-tree-filesystem/)). No UI calls the tree API today. If it's finished, two things must change first:
+  - `tree/{move,nodes,search,stats}` query with the anon key and never pass the user's token, so RLS sees no user: reads come back empty and writes fail.
+  - `tree/validate` uses the service-role key outside `/api/admin/*`. It's isolated today only by an explicit `user_id` filter.
 - [ ] **Admin identity:** replace the hardcoded admin email with a role.
 - [ ] **Remove the Heroku leftovers:** `Dockerfile`, `server.js`.
