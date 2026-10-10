@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { serverEnv } from '../../../lib/server-env';
+import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 
 export const prerender = false;
 
@@ -59,7 +60,11 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     console.log('API folders/create - User verified:', user.id);
 
     // Parse the request body
-    const folderData = await request.json();
+    // Unparseable or non-object bodies are refused with 400, not a 500.
+    const folderData = await readJsonObject(request);
+    if (!folderData) {
+      return invalidDataResponse();
+    }
 
     // Validate required fields
     if (!folderData.name || !folderData.id) {

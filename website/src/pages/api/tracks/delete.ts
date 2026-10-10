@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { getAuthenticatedUser } from '../_auth';
 import { serverEnv } from '../../../lib/server-env';
+import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 
 export const prerender = false;
 
@@ -67,7 +68,11 @@ export const DELETE: APIRoute = async ({ request }) => {
     }
 
     // Parse request body
-    const body = await request.json();
+    // Unparseable or non-object bodies are refused with 400, not a 500.
+    const body = await readJsonObject(request);
+    if (!body) {
+      return invalidDataResponse();
+    }
     const { trackId } = body;
 
     if (!trackId) {

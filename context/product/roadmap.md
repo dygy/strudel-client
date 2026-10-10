@@ -52,7 +52,8 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
   - [ ] **Import doesn't check individual tracks** (no name or no code): decide whether to refuse them. Related: a bad track item after the folders are saved leaves a **partial import** (the folders stay, then 500). Validate every item before saving anything.
   - [ ] **Failed smooth transition shows no message.**
   - [ ] **Unused tracks bulk-create route** copies whatever fields it's sent: remove it or narrow it.
-- [ ] **13 other API routes read the request body unguarded** (`filesystem/*`, `folders/create|update`, `tracks/create|delete|update`, `tree/move|nodes|search`), so a bad body may give 500. Move them to `readJsonObject` (`website/src/lib/apiBody.ts`).
+- [x] **13 other API routes read the request body unguarded.** All now use `readJsonObject` (`website/src/lib/apiBody.ts`), so a bad body gets 400 "Invalid data format" (fixed 2026-10-10; `bodyGuard.test.ts`).
+- [ ] **`tree/*` routes answer 500 instead of 401 for an expired or missing session.** Their catch only maps messages containing "authorization", so the app never refreshes and retries. They also ignore the `Authorization: Bearer` header that `secureApi` sends. Applies to `tree/move`, `tree/nodes` and `tree/search`.
 - [ ] **`packages/mondo` tests depend on their order** (they fail under `vitest --sequence.shuffle`).
 
 ### Phase 5 — Debt and decisions (later)

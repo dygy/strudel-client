@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
 import { getAuthenticatedUser } from '../_auth';
 import { serverEnv } from '../../../lib/server-env';
+import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 
 export const prerender = false;
 
@@ -11,7 +12,11 @@ export const POST: APIRoute = async ({ request }) => {
     const { user, accessToken } = await getAuthenticatedUser(request);
 
     // Parse request body
-    const body = await request.json();
+    // Unparseable or non-object bodies are refused with 400, not a 500.
+    const body = await readJsonObject(request);
+    if (!body) {
+      return invalidDataResponse();
+    }
     const { name, code = '', folder, isMultitrack, steps, activeStep } = body;
 
     if (!name) {

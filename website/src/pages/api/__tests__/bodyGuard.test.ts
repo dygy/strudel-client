@@ -1,0 +1,124 @@
+/**
+ * Every API route that reads a JSON body refuses an unreadable one with 400 "Invalid data format"
+ * (via `lib/apiBody.ts`) instead of throwing into a 500, and still checks sign-in first.
+ * The import routes have their own, deeper tests in import.test.ts.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { apiContext, clearTestEnv, fakeState, resetSupabaseFake, signIn, useTestEnv } from './apiTestHelpers';
+
+import { POST as fsBatchCreate } from '../filesystem/batch-create';
+import { POST as fsCreate } from '../filesystem/create';
+import { DELETE as fsDelete } from '../filesystem/delete';
+import { POST as fsMove } from '../filesystem/move';
+import { PUT as fsUpdate } from '../filesystem/update';
+import { POST as folderCreate } from '../folders/create';
+import { PUT as folderUpdate } from '../folders/update';
+import { POST as trackCreate } from '../tracks/create';
+import { DELETE as trackDelete } from '../tracks/delete';
+import { PUT as trackUpdate } from '../tracks/update';
+import { POST as treeMove } from '../tree/move';
+import { POST as treeNodesCreate, PUT as treeNodesUpdate, DELETE as treeNodesDelete } from '../tree/nodes';
+import { POST as treeSearch } from '../tree/search';
+
+vi.mock('@supabase/supabase-js', async () => {
+  const helpers = await import('./apiTestHelpers');
+  return { createClient: helpers.createClientMock };
+});
+
+const USER = { id: 'user-session', email: 'someone@example.test' };
+// JWT-shaped: api/_auth.ts only accepts a cookie value that contains a dot.
+const TOKEN = 'eyJ.test.token';
+
+// A well-formed body for each route, used only to show it is NOT refused as "Invalid data format".
+const routes = [
+  {
+    name: 'POST filesystem/batch-create',
+    handler: fsBatchCreate,
+    method: 'POST',
+    ok: { nodes: [{ id: 'n1', name: 'A', type: 'folder' }] },
+  },
+  { name: 'POST filesystem/create', handler: fsCreate, method: 'POST', ok: { id: 'n1', name: 'A', type: 'folder' } },
+  { name: 'DELETE filesystem/delete', handler: fsDelete, method: 'DELETE', ok: { id: 'n1' } },
+  { name: 'POST filesystem/move', handler: fsMove, method: 'POST', ok: { nodeId: 'n1', newParentId: null } },
+  { name: 'PUT filesystem/update', handler: fsUpdate, method: 'PUT', ok: { id: 'n1', name: 'B' } },
+  {
+    name: 'POST folders/create',
+    handler: folderCreate,
+    method: 'POST',
+    ok: { id: 'f1', name: 'Drums', path: 'Drums' },
+  },
+  {
+    name: 'PUT folders/update',
+    handler: folderUpdate,
+    method: 'PUT',
+    ok: { folderId: 'f1', updates: { name: 'Drums 2' } },
+  },
+  { name: 'POST tracks/create', handler: trackCreate, method: 'POST', ok: { name: 'Beat', code: 's("bd")' } },
+  { name: 'DELETE tracks/delete', handler: trackDelete, method: 'DELETE', ok: { trackId: 't1' } },
+  {
+    name: 'PUT tracks/update',
+    handler: trackUpdate,
+    method: 'PUT',
+    ok: { trackId: 't1', updates: { code: 's("bd")' } },
+  },
+  { name: 'POST tree/move', handler: treeMove, method: 'POST', ok: { nodeId: 'n1', newParentId: null } },
+  { name: 'POST tree/nodes', handler: treeNodesCreate, method: 'POST', ok: { name: 'A', type: 'folder' } },
+  { name: 'PUT tree/nodes', handler: treeNodesUpdate, method: 'PUT', ok: { nodeId: 'n1', name: 'B' } },
+  { name: 'DELETE tree/nodes', handler: treeNodesDelete, method: 'DELETE', ok: { nodeId: 'n1' } },
+  { name: 'POST tree/search', handler: treeSearch, method: 'POST', ok: { query: 'beat' } },
+] as const;
+
+const url = 'http://test/api/route';
+const call = (route: (typeof routes)[number], opts: { token?: string; rawBody?: string; body?: unknown }) =>
+  route.handler(apiContext({ url, method: route.method, ...opts }));
+
+let consoleSpies: Array<{ mockRestore: () => void }> = [];
+
+beforeEach(() => {
+  resetSupabaseFake();
+  useTestEnv();
+  consoleSpies = ['log', 'error', 'warn'].map((m) => vi.spyOn(console, m as 'log').mockImplementation(() => {}));
+});
+
+afterEach(() => {
+  consoleSpies.forEach((s) => s.mockRestore());
+  clearTestEnv();
+});
+
+describe.each(routes)('$name: an unreadable body', (route) => {
+  it.each([
+    ['unparseable JSON', '{"name": [ oops'],
+    ['a JSON null', 'null'],
+    ['a bare array', '[]'],
+  ])(
+    '%s from a signed-in user is refused with 400 "Invalid data format" and nothing is written',
+    async (_l, rawBody) => {
+      signIn(TOKEN, USER);
+
+      const res = await call(route, { token: TOKEN, rawBody });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ error: 'Invalid data format' });
+      expect(fakeState.inserts).toEqual([]);
+      expect(fakeState.mutations).toEqual([]);
+    },
+  );
+
+  it('from a signed-out caller is never answered as "Invalid data format" (sign-in is checked first)', async () => {
+    const res = await call(route, { rawBody: 'null' });
+
+    expect(res.status).not.toBe(400);
+    expect(fakeState.inserts).toEqual([]);
+    expect(fakeState.mutations).toEqual([]);
+  });
+
+  it('a well-formed body gets past validation (not a 400)', async () => {
+    signIn(TOKEN, USER);
+
+    const res = await call(route, { token: TOKEN, body: route.ok });
+
+    const json = await res.json().catch(() => ({}));
+    expect(json.error).not.toBe('Invalid data format');
+    expect(res.status).not.toBe(400);
+  });
+});

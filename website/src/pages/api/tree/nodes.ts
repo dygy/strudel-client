@@ -7,6 +7,7 @@ import type { APIRoute } from 'astro';
 import { TreeManager } from '../../../lib/TreeManager';
 import { createClient } from '@supabase/supabase-js';
 import { serverEnv } from '../../../lib/server-env';
+import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 
 export const prerender = false;
 
@@ -135,7 +136,11 @@ export const POST: APIRoute = async ({ request }) => {
     const user = await getAuthenticatedUser(request);
     const treeManager = createTreeManager(user.id);
 
-    const body = await request.json();
+    // Unparseable or non-object bodies are refused with 400, not a 500.
+    const body = await readJsonObject(request);
+    if (!body) {
+      return invalidDataResponse();
+    }
     const { name, type, parentId, code, isMultitrack, steps, activeStep, metadata } = body;
 
     if (!name || !type) {
@@ -213,7 +218,11 @@ export const PUT: APIRoute = async ({ request }) => {
     const user = await getAuthenticatedUser(request);
     const treeManager = createTreeManager(user.id);
 
-    const body = await request.json();
+    // Unparseable or non-object bodies are refused with 400, not a 500.
+    const body = await readJsonObject(request);
+    if (!body) {
+      return invalidDataResponse();
+    }
     const { nodeId, ...updates } = body;
 
     if (!nodeId) {
@@ -269,7 +278,11 @@ export const DELETE: APIRoute = async ({ request }) => {
     const user = await getAuthenticatedUser(request);
     const treeManager = createTreeManager(user.id);
 
-    const body = await request.json();
+    // Unparseable or non-object bodies are refused with 400, not a 500.
+    const body = await readJsonObject(request);
+    if (!body) {
+      return invalidDataResponse();
+    }
     const { nodeId, cascade = true } = body;
 
     if (!nodeId) {

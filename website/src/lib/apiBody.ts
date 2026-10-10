@@ -5,7 +5,8 @@
  * number — so API routes can answer 400 "Invalid data format" instead of destructuring
  * a non-object (a 500) or silently treating it as an empty request (a false 200).
  */
-export async function readJsonObject(request: Request): Promise<Record<string, unknown> | null> {
+// Typed like request.json() (any-valued) so existing destructuring keeps working unchanged.
+export async function readJsonObject(request: Request): Promise<Record<string, any> | null> {
   let body: unknown;
   try {
     body = await request.json();
@@ -15,7 +16,7 @@ export async function readJsonObject(request: Request): Promise<Record<string, u
   if (body === null || typeof body !== 'object' || Array.isArray(body)) {
     return null;
   }
-  return body as Record<string, unknown>;
+  return body as Record<string, any>;
 }
 
 export function invalidDataResponse(): Response {
