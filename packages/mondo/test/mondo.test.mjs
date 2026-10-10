@@ -138,7 +138,9 @@ describe('mondo sugar', () => {
     expect(printAst(parser.desugar_lambda(lambda.children, target))).toEqual('(fast 2 xyz)')); */
 });
 
-describe('mondo arithmetic', () => {
+// The sicp tests below are a REPL transcript: they share `scope` / `lscope` and
+// build on (and redefine) earlier definitions, so their order is part of the test.
+describe('mondo arithmetic', { shuffle: false }, () => {
   let multi =
     (op) =>
     (init, ...rest) =>
