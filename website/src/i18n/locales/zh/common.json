@@ -16,6 +16,8 @@
   "playAtMixer": "在混音器播放",
   "playPreview": "预听",
   "stopPreview": "停止预听",
+  "record": "录制",
+  "stopRecording": "停止录制",
   "files": "文件",
   "docs": "文档",
   "toggleFileManager": "切换文件管理器",

@@ -67,6 +67,8 @@
   "prettierTrailingCommaAll": "Все",
   "prettierArrowParensAvoid": "Избегать",
   "prettierArrowParensAlways": "Всегда",
+  "prettierPreview": "Предпросмотр",
+  "prettierPreviewDescription": "Так ваш код будет отформатирован с текущими настройками",
   "settingsSubtitle": "Настройте ваш опыт работы со Strudel",
   "sampleCache": {
     "title": "Кэш образцов",

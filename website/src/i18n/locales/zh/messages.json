@@ -1,5 +1,9 @@
 {
   "zenModeHint": "按 Ctrl+. 切换禅模式",
   "reloadRequired": "此更改需要重新加载页面。继续吗？",
-  "confirmReset": "您确定要将所有设置重置为默认值吗？"
+  "confirmReset": "您确定要将所有设置重置为默认值吗？",
+  "prettierFormatSuccess": "代码格式化成功",
+  "prettierFormatError": "格式化失败：{error}",
+  "prettierAutoFormatFailed": "自动格式化失败：{error}",
+  "prettierAutoFormatFailedSavingOriginal": "自动格式化失败，正在保存原始代码"
 }

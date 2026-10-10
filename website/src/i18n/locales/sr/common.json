@@ -16,9 +16,12 @@
   "playAtMixer": "пусти на миксеру",
   "playPreview": "преслушај",
   "stopPreview": "заустави преслушавање",
+  "record": "снимај",
+  "stopRecording": "заустави снимање",
   "files": "фајлови",
   "docs": "DOCS",
   "toggleFileManager": "Пребаци менаџер фајлова",
+  "clickAuthButtonToSignIn": "Кликните на дугме за пријаву у горњем десном углу да бисте почели",
   "reference": {
     "search": "Претражи функције...",
     "noResults": "Нема резултата"

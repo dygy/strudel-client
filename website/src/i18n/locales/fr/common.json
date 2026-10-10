@@ -16,9 +16,12 @@
   "playAtMixer": "jouer sur mixeur",
   "playPreview": "pré-écoute",
   "stopPreview": "arrêter pré-écoute",
+  "record": "enregistrer",
+  "stopRecording": "arrêter l'enregistrement",
   "files": "fichiers",
   "docs": "DOCS",
   "toggleFileManager": "Basculer le gestionnaire de fichiers",
+  "clickAuthButtonToSignIn": "Cliquez sur le bouton de connexion en haut à droite pour commencer",
   "reference": {
     "search": "Rechercher des fonctions...",
     "noResults": "Aucun résultat trouvé"

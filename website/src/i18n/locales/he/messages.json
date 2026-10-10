@@ -1,5 +1,9 @@
 {
   "zenModeHint": "לחץ Ctrl+. להחלפת מצב זן",
   "reloadRequired": "שינוי זה דורש רענון הדף. להמשיך?",
-  "confirmReset": "האם אתה בטוח שברצונך לאפס את כל ההגדרות לברירת המחדל?"
+  "confirmReset": "האם אתה בטוח שברצונך לאפס את כל ההגדרות לברירת המחדל?",
+  "prettierFormatSuccess": "הקוד עוצב בהצלחה",
+  "prettierFormatError": "העיצוב נכשל: {error}",
+  "prettierAutoFormatFailed": "העיצוב האוטומטי נכשל: {error}",
+  "prettierAutoFormatFailedSavingOriginal": "העיצוב האוטומטי נכשל, שומר את הקוד המקורי"
 }

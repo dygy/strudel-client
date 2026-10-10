@@ -1,5 +1,9 @@
 {
   "zenModeHint": "اضغط Ctrl+. للتبديل إلى وضع زن",
   "reloadRequired": "يتطلب هذا التغيير إعادة تحميل الصفحة. متابعة؟",
-  "confirmReset": "هل أنت متأكد من أنك تريد إعادة تعيين جميع الإعدادات إلى القيم الافتراضية؟"
+  "confirmReset": "هل أنت متأكد من أنك تريد إعادة تعيين جميع الإعدادات إلى القيم الافتراضية؟",
+  "prettierFormatSuccess": "تم تنسيق الكود بنجاح",
+  "prettierFormatError": "فشل التنسيق: {error}",
+  "prettierAutoFormatFailed": "فشل التنسيق التلقائي: {error}",
+  "prettierAutoFormatFailedSavingOriginal": "فشل التنسيق التلقائي، سيتم حفظ الكود الأصلي"
 }

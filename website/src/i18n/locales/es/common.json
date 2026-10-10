@@ -16,9 +16,12 @@
   "playAtMixer": "reproducir en mezclador",
   "playPreview": "preescuchar",
   "stopPreview": "parar preescucha",
+  "record": "grabar",
+  "stopRecording": "parar grabación",
   "files": "archivos",
   "docs": "DOCS",
   "toggleFileManager": "Alternar gestor de archivos",
+  "clickAuthButtonToSignIn": "Haz clic en el botón de iniciar sesión arriba a la derecha para comenzar",
   "reference": {
     "search": "Buscar funciones...",
     "noResults": "No se encontraron resultados"

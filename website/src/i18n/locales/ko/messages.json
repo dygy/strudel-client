@@ -1,5 +1,9 @@
 {
   "zenModeHint": "Ctrl+.을 눌러 젠 모드를 토글하세요",
   "reloadRequired": "이 변경사항은 페이지 새로고침이 필요합니다. 계속하시겠습니까?",
-  "confirmReset": "모든 설정을 기본값으로 재설정하시겠습니까?"
+  "confirmReset": "모든 설정을 기본값으로 재설정하시겠습니까?",
+  "prettierFormatSuccess": "코드가 성공적으로 포맷되었습니다",
+  "prettierFormatError": "포맷 실패: {error}",
+  "prettierAutoFormatFailed": "자동 포맷 실패: {error}",
+  "prettierAutoFormatFailedSavingOriginal": "자동 포맷에 실패하여 원본 코드를 저장합니다"
 }

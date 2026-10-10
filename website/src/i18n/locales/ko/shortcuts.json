@@ -4,7 +4,8 @@
   "sections": {
     "essential": "필수",
     "file": "파일 관리", 
-    "editor": "코드 에디터"
+    "editor": "코드 에디터",
+    "mixer": "오디오 믹서"
   },
   "evaluate": "평가/패턴 실행",
   "update": "패턴 업데이트 (대안)",
@@ -12,6 +13,10 @@
   "save": "현재 트랙 저장",
   "comment": "줄 주석 토글",
   "format": "Prettier로 코드 포맷",
+  "toggleMixerMode": "라이브/미리듣기 모드 토글",
+  "instantTransition": "라이브로 즉시 전환",
+  "crossfadeTransition": "크로스페이드로 라이브 전환",
+  "stopPreview": "미리듣기 스트림 중지",
   "tip": {
     "title": "프로 팁",
     "description": "라이브 코딩 중에 Ctrl+Enter 또는 Ctrl+U를 자주 사용하여 변경사항을 즉시 들어보세요. 필요할 때 Ctrl+P로 모든 것을 빠르게 중지할 수 있습니다."

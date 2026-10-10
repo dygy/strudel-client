@@ -16,9 +16,12 @@
   "playAtMixer": "играть на микшере",
   "playPreview": "предпрослушка",
   "stopPreview": "стоп предпрослушка",
+  "record": "запись",
+  "stopRecording": "стоп запись",
   "files": "файлы",
   "docs": "DOCS",
   "toggleFileManager": "Переключить файловый менеджер",
+  "clickAuthButtonToSignIn": "Нажмите кнопку входа в правом верхнем углу, чтобы начать",
   "reference": {
     "search": "Поиск функций...",
     "noResults": "Результаты не найдены"

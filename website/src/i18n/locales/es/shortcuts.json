@@ -4,7 +4,8 @@
   "sections": {
     "essential": "Esenciales",
     "file": "Gestión de Archivos", 
-    "editor": "Editor de Código"
+    "editor": "Editor de Código",
+    "mixer": "Mezclador de Audio"
   },
   "evaluate": "Evaluar/ejecutar patrón",
   "update": "Actualizar patrón (alternativa)",
@@ -12,6 +13,10 @@
   "save": "Guardar pista actual",
   "comment": "Alternar comentario de línea",
   "format": "Formatear código con Prettier",
+  "toggleMixerMode": "Alternar modo En vivo/Preescucha",
+  "instantTransition": "Transición instantánea a en vivo",
+  "crossfadeTransition": "Transición con fundido cruzado a en vivo",
+  "stopPreview": "Detener la preescucha",
   "tip": {
     "title": "Consejo Pro",
     "description": "Usa Ctrl+Enter o Ctrl+U frecuentemente durante el live coding para escuchar tus cambios al instante. Ctrl+P te permite detener todo rápidamente cuando sea necesario."

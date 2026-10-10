@@ -4,7 +4,8 @@
   "sections": {
     "essential": "Essentiels",
     "file": "Gestion des Fichiers", 
-    "editor": "Éditeur de Code"
+    "editor": "Éditeur de Code",
+    "mixer": "Mixeur Audio"
   },
   "evaluate": "Évaluer/exécuter le motif",
   "update": "Mettre à jour le motif (alternative)",
@@ -12,6 +13,10 @@
   "save": "Sauvegarder la piste actuelle",
   "comment": "Basculer le commentaire de ligne",
   "format": "Formater le code avec Prettier",
+  "toggleMixerMode": "Basculer le mode Direct/Pré-écoute",
+  "instantTransition": "Transition instantanée vers le direct",
+  "crossfadeTransition": "Transition en fondu enchaîné vers le direct",
+  "stopPreview": "Arrêter le flux de pré-écoute",
   "tip": {
     "title": "Conseil Pro",
     "description": "Utilisez Ctrl+Entrée ou Ctrl+U fréquemment pendant le live coding pour entendre vos changements instantanément. Ctrl+P vous permet d'arrêter tout rapidement si nécessaire."

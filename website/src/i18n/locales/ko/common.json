@@ -16,6 +16,8 @@
   "playAtMixer": "믹서에서 재생",
   "playPreview": "미리듣기",
   "stopPreview": "미리듣기 중지",
+  "record": "녹음",
+  "stopRecording": "녹음 중지",
   "files": "파일",
   "docs": "문서",
   "toggleFileManager": "파일 관리자 토글",

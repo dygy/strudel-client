@@ -16,9 +16,12 @@
   "playAtMixer": "تشغيل على الخلاط",
   "playPreview": "تشغيل المعاينة",
   "stopPreview": "إيقاف المعاينة",
+  "record": "تسجيل",
+  "stopRecording": "إيقاف التسجيل",
   "files": "ملفات",
   "docs": "DOCS",
   "toggleFileManager": "تبديل مدير الملفات",
+  "clickAuthButtonToSignIn": "انقر على زر تسجيل الدخول في الأعلى للبدء",
   "reference": {
     "search": "البحث عن الوظائف...",
     "noResults": "لم يتم العثور على نتائج"

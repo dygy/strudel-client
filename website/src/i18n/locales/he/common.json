@@ -16,9 +16,12 @@
   "playAtMixer": "נגן במיקסר",
   "playPreview": "נגן תצוגה מקדימה",
   "stopPreview": "עצור תצוגה מקדימה",
+  "record": "הקלט",
+  "stopRecording": "עצור הקלטה",
   "files": "קבצים",
   "docs": "DOCS",
   "toggleFileManager": "החלף מנהל קבצים",
+  "clickAuthButtonToSignIn": "לחץ על כפתור ההתחברות בחלק העליון כדי להתחיל",
   "reference": {
     "search": "חפש פונקציות...",
     "noResults": "לא נמצאו תוצאות"

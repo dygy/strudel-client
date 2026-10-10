@@ -1,5 +1,9 @@
 {
   "zenModeHint": "Presiona Ctrl+. para alternar el modo zen",
   "reloadRequired": "Este cambio requiere recargar la página. ¿Continuar?",
-  "confirmReset": "¿Estás seguro de que quieres restablecer toda la configuración a los valores predeterminados?"
+  "confirmReset": "¿Estás seguro de que quieres restablecer toda la configuración a los valores predeterminados?",
+  "prettierFormatSuccess": "Código formateado exitosamente",
+  "prettierFormatError": "Error al formatear: {error}",
+  "prettierAutoFormatFailed": "Error en el formateo automático: {error}",
+  "prettierAutoFormatFailedSavingOriginal": "Error en el formateo automático, guardando el código original"
 }

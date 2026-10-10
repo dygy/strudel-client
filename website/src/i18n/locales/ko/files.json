@@ -81,6 +81,7 @@
   "libraryImported": "라이브러리가 성공적으로 가져와졌습니다!",
   "invalidLibraryFile": "유효하지 않은 라이브러리 파일 형식입니다",
   "dropToImport": ".js, .txt 또는 .zip 파일을 여기에 드롭하여 가져오세요",
+  "folderImportNotSupported": "일반 폴더 가져오기는 지원되지 않습니다. 멀티트랙 폴더(metadata.json 포함)만 가져올 수 있습니다.",
   "trackImported": "트랙 '{{name}}'이 성공적으로 가져와졌습니다!",
   "invalidFileType": ".js 또는 .txt 파일만 드롭해 주세요",
   "convertToMultitrack": "멀티트랙으로 변환",
