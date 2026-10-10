@@ -54,9 +54,13 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
   - [ ] **Unused tracks bulk-create route** copies whatever fields it's sent: remove it or narrow it.
 - [x] **13 other API routes read the request body unguarded.** All now use `readJsonObject` (`website/src/lib/apiBody.ts`), so a bad body gets 400 "Invalid data format" (fixed 2026-10-10; `bodyGuard.test.ts`).
 - [x] **`tree/*` routes answer 500 instead of 401 for an expired or missing session.** All tree routes now use the shared `api/_auth.ts`, which also reads the Bearer header, and map a typed `AuthError` to 401. The `tracks/*` routes no longer guess the status from message text. `tree/validate` no longer fails for every user (wrong `TreeManager` construction). Fixed 2026-10-10.
-- [ ] **Toast store can block a toast for the rest of the session.** When more than 5 toasts pile up, the oldest are trimmed off screen but their keys stay "active", so a toast with the same key never shows again (`website/src/stores/toastStore.ts` around line 88).
-- [ ] **Some locales are missing strings.** `settings.json` key counts differ (`en` 124, `fr` 119, `ar`/`sr` 121, `ru` 122), and the missing keys fall back to the raw key name.
-- [ ] **`packages/mondo` tests depend on their order** (they fail under `vitest --sequence.shuffle`).
+- [x] **Toast store can block a toast for the rest of the session.** Trimmed, dismissed and cleared toasts now release their key, and the exit-animation timer is cleared on unmount (fixed 2026-10-10).
+- [x] **Some locales are missing strings.** 138 keys were added across 8 locales; `localeCompleteness.test.ts` keeps every locale complete (fixed 2026-10-10).
+- [ ] **Locale quality issues** found while filling the gaps:
+  - `sr/auth.json` is in Latin script; the rest of `sr` is Cyrillic.
+  - `files.dropToImport` in all 8 locales doesn't mention multitrack folders.
+  - `ko` and `zh` `files.json` each have a duplicate `noTracksToExport` key (same value both times).
+- [x] **`packages/mondo` tests depend on their order.** The SICP walkthrough suite deliberately builds on earlier steps, so its order is now pinned with `{ shuffle: false }`; production evaluations always start from a fresh scope (fixed 2026-10-10).
 
 ### Phase 5 — Debt and decisions (later)
 
