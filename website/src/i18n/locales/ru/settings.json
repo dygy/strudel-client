@@ -67,7 +67,6 @@
   "prettierTrailingCommaAll": "Все",
   "prettierArrowParensAvoid": "Избегать",
   "prettierArrowParensAlways": "Всегда",
-  "settingsTitle": "Настройки",
   "settingsSubtitle": "Настройте ваш опыт работы со Strudel",
   "sampleCache": {
     "title": "Кэш образцов",
@@ -94,7 +93,8 @@
   "mixerDefaultDevice": "Устройство по умолчанию",
   "mixerPreviewEngineActive": "Движок превью активен",
   "smoothTransitions": "Плавные переходы между треками",
-  "smoothTransitionsDescription": "Затухание между треками при обновлении кода",
+  "smoothTransitionsDescription": "Затухание при переключении между треками",
+  "smoothTransitionFailed": "Плавный переход не удался — трек переключён без затухания.",
   "transitionDuration": "Длительность перехода",
   "equalizer": "Эквалайзер",
   "equalizerDescription": "Настройка частот аудио",

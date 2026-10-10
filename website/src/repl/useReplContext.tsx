@@ -54,6 +54,7 @@ import {
 } from '../stores/editorStore';
 import { useAudioRecorder } from './recording/useAudioRecorder';
 import { useScreenRecorder } from './recording/useScreenRecorder';
+import { listenForSmoothTransitionErrors } from './smoothTransitionNotifier';
 
 // Type definitions
 interface ReplState {
@@ -537,9 +538,12 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
 
     // Delay initialization to ensure audio context and repl are ready
     const timer = setTimeout(initSmoothTransitions, 1000);
+    // Show the user when a smooth track transition fails (it falls back to an instant switch).
+    const stopListeningForTransitionErrors = listenForSmoothTransitionErrors();
 
     return () => {
       clearTimeout(timer);
+      stopListeningForTransitionErrors();
       if (smoothTransitionManagerRef.current) {
         smoothTransitionManagerRef.current.destroy();
         smoothTransitionManagerRef.current = null;

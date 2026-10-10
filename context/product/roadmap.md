@@ -50,10 +50,12 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
   - [ ] **Screen picker cancel message:** decide on the wording for cancel versus deny.
   - [x] **Malformed imports get the wrong answer.** All three import routes now refuse an unreadable or non-object body, or a non-list track or folder list, with 400 "Invalid data format" (fixed 2026-10-09).
   - [ ] **Import doesn't check individual tracks** (no name or no code): decide whether to refuse them. Related: a bad track item after the folders are saved leaves a **partial import** (the folders stay, then 500). Validate every item before saving anything.
-  - [ ] **Failed smooth transition shows no message.**
+  - [x] **Failed smooth transition shows no message.** It now shows a warning, "Smooth transition failed — switched tracks without a fade", in all 9 locales. The setting description now says transitions apply when switching tracks (fixed 2026-10-10).
   - [ ] **Unused tracks bulk-create route** copies whatever fields it's sent: remove it or narrow it.
 - [x] **13 other API routes read the request body unguarded.** All now use `readJsonObject` (`website/src/lib/apiBody.ts`), so a bad body gets 400 "Invalid data format" (fixed 2026-10-10; `bodyGuard.test.ts`).
 - [x] **`tree/*` routes answer 500 instead of 401 for an expired or missing session.** All tree routes now use the shared `api/_auth.ts`, which also reads the Bearer header, and map a typed `AuthError` to 401. The `tracks/*` routes no longer guess the status from message text. `tree/validate` no longer fails for every user (wrong `TreeManager` construction). Fixed 2026-10-10.
+- [ ] **Toast store can block a toast for the rest of the session.** When more than 5 toasts pile up, the oldest are trimmed off screen but their keys stay "active", so a toast with the same key never shows again (`website/src/stores/toastStore.ts` around line 88).
+- [ ] **Some locales are missing strings.** `settings.json` key counts differ (`en` 124, `fr` 119, `ar`/`sr` 121, `ru` 122), and the missing keys fall back to the raw key name.
 - [ ] **`packages/mondo` tests depend on their order** (they fail under `vitest --sequence.shuffle`).
 
 ### Phase 5 — Debt and decisions (later)

@@ -127,7 +127,7 @@ Each requirement describes behaviour the live coder relies on today, and that mu
 Recorded while writing this spec (confirmed by reading the product's behaviour, 2026-10-09):
 
 1. **Import does not check individual tracks.** A track with no name is accepted, and a track with no code is saved as an empty track. Whether that should be refused is a product decision. → follow-up roadmap item.
-2. **A failed transition reports its error nowhere the user can see.** Volume is restored, but no message appears. Today's failures mostly come from broken pattern code, which the editor already reports on its own, so the impact is low. → follow-up roadmap item.
+2. **FIXED 2026-10-10.** **A failed transition reports its error nowhere the user can see.** Volume is restored, but no message appears. Today's failures mostly come from broken pattern code, which the editor already reports on its own, so the impact is low. → follow-up roadmap item.
 
 Found while writing the checks (each guarded by a check that is expected to fail until the follow-up lands):
 
