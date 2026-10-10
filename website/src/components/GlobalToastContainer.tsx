@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '@nanostores/react';
 import {
@@ -44,10 +44,20 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
   const [isPaused, setIsPaused] = useState(false);
   const Icon = toastIcons[toast.type];
 
+  // The exit animation's timer must not outlive this toast: if the toast is trimmed off the
+  // list meanwhile, its id can be reused by a new toast that this stale timer would remove.
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (exitTimer.current) clearTimeout(exitTimer.current);
+    },
+    [],
+  );
+
   const handleRemove = useCallback(() => {
     if (isLeaving) return; // Prevent multiple removal calls
     setIsLeaving(true);
-    setTimeout(() => onRemove(toast.id), 300);
+    exitTimer.current = setTimeout(() => onRemove(toast.id), 300);
   }, [isLeaving, onRemove, toast.id]);
 
   useEffect(() => {

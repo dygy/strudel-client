@@ -19,6 +19,17 @@ let toastId = 0;
 // Track recent toasts to prevent duplicates
 const recentToasts = new Map<string, number>();
 const activeToasts = new Set<string>();
+// Which de-duplication key each toast id holds, so the key is released whenever that toast
+// leaves the list — dismissed, cleared, or trimmed off by the 5-toast limit.
+const keyByToastId = new Map<string, string>();
+
+function releaseToastKey(id: string) {
+  const key = keyByToastId.get(id);
+  if (key !== undefined) {
+    activeToasts.delete(key);
+    keyByToastId.delete(id);
+  }
+}
 
 // Toast actions
 export const toastActions = {
@@ -83,9 +94,13 @@ export const toastActions = {
 
     console.log('ToastStore - adding new toast:', { id, title: toast.title, effectiveKey });
 
+    keyByToastId.set(id, effectiveKey);
+
     // Update the store
     const newToasts = [...currentToasts, newToast];
-    // Limit to maximum 5 toasts to prevent overflow
+    // Limit to maximum 5 toasts to prevent overflow. Toasts trimmed off here never reach
+    // removeToast, so release their keys now or they would block that toast for the session.
+    newToasts.slice(0, -5).forEach((dropped) => releaseToastKey(dropped.id));
     toastsStore.set(newToasts.slice(-5));
 
     return id;
@@ -101,6 +116,7 @@ export const toastActions = {
       activeToasts.delete(id); // Remove by ID
       activeToasts.delete(toastKey); // Remove by key as well
     }
+    releaseToastKey(id);
 
     // Update the store
     toastsStore.set(currentToasts.filter((toast) => toast.id !== id));
@@ -111,6 +127,7 @@ export const toastActions = {
     toastsStore.set([]);
     recentToasts.clear(); // Also clear the recent toasts cache
     activeToasts.clear(); // Clear active toasts tracking
+    keyByToastId.clear();
   },
 
   success: (title: string, message?: string, duration?: number, customId?: string) =>
