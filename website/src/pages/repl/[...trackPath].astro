@@ -9,6 +9,8 @@ import { parseTrackUrlPath, findTrackByFolderAndSlug } from '../../lib/slugUtils
 
 import type { SSRData } from '../../types/ssr';
 import { serverEnv } from '../../lib/server-env';
+import { loginUrlFor } from '../../lib/authRedirect';
+import { isInvalidSessionError } from '../../lib/authErrorKind';
 
 export const prerender = false; // Enable SSR for authenticated data
 
@@ -214,10 +216,14 @@ try {
         } else {
           console.error('REPL SSR - Database error:', tracksError || foldersError);
         }
+      } else if (userError && !isInvalidSessionError(userError)) {
+        // Supabase unreachable / 5xx (getUser returns AuthRetryableFetchError): the session may be
+        // fine, so don't sign the user out. Render without SSR data; the client loads it via the API.
+        console.error('REPL SSR - Could not verify the session (auth service error), rendering without SSR data:', userError);
       } else {
         console.log('REPL SSR - User verification failed, redirecting to login:', userError?.message || 'No user');
         // Redirect to login if user verification fails
-        return Astro.redirect('/login');
+        return Astro.redirect(loginUrlFor(Astro.url.pathname + Astro.url.search));
       }
     } else {
       console.log('REPL SSR - Supabase not configured properly');
@@ -225,7 +231,7 @@ try {
   } else {
     console.log('REPL SSR - No access token found for track path, redirecting to login:', { folderPath, trackSlug });
     // Redirect to login if no access token
-    return Astro.redirect('/login');
+    return Astro.redirect(loginUrlFor(Astro.url.pathname + Astro.url.search));
   }
 } catch (error) {
   console.error('REPL SSR - Error fetching data:', error);

@@ -5,6 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { serverEnv } from '../../lib/server-env';
+import { isInvalidSessionError } from '../../lib/authErrorKind';
 
 /**
  * Thrown when a request has no valid session. Routes map it to 401 by type, never by
@@ -16,6 +17,19 @@ export class AuthError extends Error {
     this.name = 'AuthError';
   }
 }
+
+/**
+ * The auth service couldn't be asked (network error, 5xx). Deliberately NOT an AuthError, so routes
+ * answer 500 and the client keeps the user signed in ("unknown") instead of treating it as a 401.
+ */
+export class AuthServiceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthServiceError';
+  }
+}
+
+export { isInvalidSessionError };
 
 export async function getAuthenticatedUser(request: Request) {
   try {
@@ -68,6 +82,13 @@ export async function getAuthenticatedUser(request: Request) {
       data: { user },
       error,
     } = await supabaseAnon.auth.getUser(accessToken);
+
+    if (error && !isInvalidSessionError(error)) {
+      // Supabase unreachable / 5xx: auth-js *returns* AuthRetryableFetchError from getUser instead
+      // of throwing. That says nothing about the session, so it must not become a 401/"signed out".
+      console.error('API Auth - Could not verify the session (auth service error):', error);
+      throw new AuthServiceError('Could not verify the session: ' + (error.message || 'auth service error'));
+    }
 
     if (error || !user) {
       console.log('API Auth - Authentication failed:', error?.message || 'No user returned');

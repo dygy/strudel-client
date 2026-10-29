@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { authActions } from '../stores/authStore';
+import { syncSessionCookies } from './authCookies';
 
 let authListener: { data: { subscription: { unsubscribe: () => void } } } | null = null;
 
@@ -16,6 +17,10 @@ export function initializeAuthListener() {
 
   authListener = supabase.auth.onAuthStateChange(async (event, session) => {
     console.log('Auth state change:', event, session ? 'session present' : 'no session');
+
+    // supabase-js is the only refresh owner; mirror every new access token into the cookie the
+    // server reads (SSR pages, /api cookie fallback) and clear it on sign-out.
+    syncSessionCookies(event, session);
 
     switch (event) {
       case 'SIGNED_IN':
@@ -48,6 +53,10 @@ export function initializeAuthListener() {
             authActions.setSessionInfo(expiresAt, expiresAt < fifteenMinutesFromNow);
           }
         }
+        break;
+
+      case 'INITIAL_SESSION':
+        // Session restored from storage on page load; the cookie was synced above.
         break;
 
       case 'USER_UPDATED':

@@ -1,9 +1,19 @@
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { isInvalidSessionError } from './authErrorKind';
+
+export interface SessionResult {
+  success: boolean;
+  session?: Session;
+  error?: string;
+  /** true only when the client holds no session at all (signed out), not when a refresh failed */
+  noSession?: boolean;
+}
 
 /**
  * Utility to ensure we have a valid session before making API calls
  */
-export async function ensureValidSession() {
+export async function ensureValidSession(): Promise<SessionResult> {
   try {
     // Get current session
     const {
@@ -17,7 +27,7 @@ export async function ensureValidSession() {
     }
 
     if (!session) {
-      return { success: false, error: 'No active session' };
+      return { success: false, error: 'No active session', noSession: true };
     }
 
     // Check if token is about to expire (within 10 minutes for more buffer)
@@ -45,9 +55,9 @@ export async function ensureValidSession() {
     }
 
     return { success: true, session };
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('ensureValidSession error:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
@@ -135,5 +145,36 @@ export async function isSessionValid(): Promise<boolean> {
   } catch (error) {
     console.error('Error checking session validity:', error);
     return false;
+  }
+}
+
+export interface ForcedRefreshResult {
+  success: boolean;
+  session?: Session;
+  /** true when the auth service rejected the refresh token itself (the session is really gone) */
+  invalid?: boolean;
+  error?: string;
+}
+
+/**
+ * Refresh the client session now, whatever the local clock says about its expiry.
+ *
+ * ensureValidSession decides by the local clock; with a clock running >10 min slow it never
+ * refreshes a token the server already sees as expired. Use this when the server has just
+ * rejected a token the client believes is valid. Only a 4xx answer marks the session invalid;
+ * a network/5xx failure leaves it undecided.
+ */
+export async function forceRefreshSession(): Promise<ForcedRefreshResult> {
+  try {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error) {
+      return { success: false, invalid: isInvalidSessionError(error), error: error.message };
+    }
+    if (!data.session) {
+      return { success: false, error: 'No session after refresh' };
+    }
+    return { success: true, session: data.session };
+  } catch (error: unknown) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }

@@ -3,6 +3,8 @@
  * This script runs on the auth callback page to complete the OAuth flow
  */
 import { createSupabaseClient } from '../lib/supabaseClient';
+import { writeSessionCookies } from '../lib/authCookies';
+import { REDIRECT_AFTER_AUTH_KEY, safeRedirectPath } from '../lib/authRedirect';
 
 async function handleCallback() {
   try {
@@ -70,15 +72,12 @@ async function handleCallback() {
     if (session) {
       console.log('OAuth callback - Success! Setting cookies and redirecting to /repl');
 
-      // Set cookies that the server can read
-      document.cookie = `sb-access-token=${session.access_token}; path=/; max-age=3600; secure; samesite=lax`;
-      if (session.refresh_token) {
-        document.cookie = `sb-refresh-token=${session.refresh_token}; path=/; max-age=86400; secure; samesite=lax`;
-      }
+      // Mirror the access token into the cookie the server reads (never the refresh token)
+      writeSessionCookies(session);
 
-      // Check if there's a redirect URL stored in sessionStorage
-      const redirectUrl = sessionStorage.getItem('strudel_redirect_after_auth') || '/repl';
-      sessionStorage.removeItem('strudel_redirect_after_auth');
+      // Return to the page that sent the user to /login (same-site paths only)
+      const redirectUrl = safeRedirectPath(sessionStorage.getItem(REDIRECT_AFTER_AUTH_KEY));
+      sessionStorage.removeItem(REDIRECT_AFTER_AUTH_KEY);
 
       window.location.href = redirectUrl;
     } else {

@@ -8,69 +8,10 @@ export const prerender = false;
 
 export const DELETE: APIRoute = async ({ request }) => {
   try {
-    // Try the cookie-based authentication first
-    let user, accessToken;
-
-    try {
-      const authResult = await getAuthenticatedUser(request);
-      user = authResult.user;
-      accessToken = authResult.accessToken;
-    } catch (authError) {
-      // Only a missing/invalid session falls back to the alternative method (and, if that
-      // fails, a 401). Anything else (e.g. missing env, a malformed cookie) is a real 500.
-      if (!(authError instanceof AuthError)) {
-        throw authError;
-      }
-      console.log('DELETE API - Cookie auth failed, trying alternative method:', authError.message);
-
-      // Alternative: Try to get session from Supabase directly
-      const cookies = request.headers.get('cookie') || '';
-      const supabaseAnon = createClient(serverEnv().supabaseUrl, serverEnv().supabaseAnonKey);
-
-      // Parse cookies for Supabase session
-      const cookieMap = new Map();
-      cookies.split(';').forEach((cookie) => {
-        const [key, value] = cookie.trim().split('=');
-        if (key && value) {
-          cookieMap.set(key, decodeURIComponent(value));
-        }
-      });
-
-      // Look for session cookies
-      let sessionToken = null;
-      let refreshToken = null;
-
-      for (const [key, value] of cookieMap) {
-        if (key.includes('access') || key.includes('session')) {
-          sessionToken = value;
-        }
-        if (key.includes('refresh')) {
-          refreshToken = value;
-        }
-      }
-
-      if (sessionToken && refreshToken) {
-        try {
-          // Set the session manually
-          const { data: sessionData, error: sessionError } = await supabaseAnon.auth.setSession({
-            access_token: sessionToken,
-            refresh_token: refreshToken,
-          });
-
-          if (!sessionError && sessionData.user) {
-            user = sessionData.user;
-            accessToken = sessionToken;
-            console.log('DELETE API - Alternative auth successful');
-          } else {
-            throw new Error('Session validation failed: ' + (sessionError?.message || 'No user'));
-          }
-        } catch (sessionErr) {
-          throw new AuthError('Authentication failed: ' + authError.message);
-        }
-      } else {
-        throw new AuthError('Authentication failed: ' + authError.message);
-      }
-    }
+    // Bearer header or sb-access-token cookie. An AuthError becomes a 401 below, on which the client
+    // refreshes its own session and retries. No setSession/refresh fallback here: refresh tokens are
+    // single-use and the browser client is the only refresh owner.
+    const { user } = await getAuthenticatedUser(request);
 
     // Parse request body
     // Unparseable or non-object bodies are refused with 400, not a 500.

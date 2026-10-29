@@ -1,6 +1,8 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { serverEnv } from '../../../lib/server-env';
+import { ACCESS_TOKEN_COOKIE, SERVER_ACCESS_COOKIE_OPTIONS } from '../../../lib/authCookies';
+import { safeRedirectPath } from '../../../lib/authRedirect';
 
 export const prerender = false;
 
@@ -105,27 +107,18 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
 
     console.log('Auth callback API - session established for:', data.session.user.email);
 
-    // Set HTTP-only cookies with the session tokens
+    // Session cookies the server reads
     const maxAge = 60 * 60 * 24 * 7; // 7 days
     const isProduction = import.meta.env.PROD;
 
     console.log('Auth callback API - setting cookies (production mode:', isProduction, ')');
 
-    cookies.set('sb-access-token', data.session.access_token, {
-      httpOnly: true,
-      secure: isProduction, // Only secure in production (HTTPS)
-      sameSite: 'lax',
-      maxAge,
-      path: '/',
-    });
+    // Never httpOnly: the browser client rewrites this cookie on every token refresh, and
+    // document.cookie can't overwrite an httpOnly cookie (it would go stale after ~1 h).
+    cookies.set(ACCESS_TOKEN_COOKIE, data.session.access_token, SERVER_ACCESS_COOKIE_OPTIONS);
 
-    cookies.set('sb-refresh-token', data.session.refresh_token, {
-      httpOnly: true,
-      secure: isProduction, // Only secure in production (HTTPS)
-      sameSite: 'lax',
-      maxAge,
-      path: '/',
-    });
+    // No refresh-token cookie: refresh tokens are single-use and the browser supabase client is the
+    // only refresh owner (see lib/authCookies.ts).
 
     // Store user info in a readable cookie for client-side use
     const userInfo = {
@@ -155,7 +148,8 @@ export const GET: APIRoute = async ({ url, cookies, redirect }) => {
         // The state parameter might contain the original URL
         const decodedState = decodeURIComponent(trackParam);
         if (decodedState.includes('track=')) {
-          redirectUrl = decodedState;
+          // Same-site paths only (no open redirect through ?state=)
+          redirectUrl = safeRedirectPath(decodedState);
         }
       } catch (error) {
         console.log('Error decoding state parameter:', error);

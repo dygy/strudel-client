@@ -1,109 +1,34 @@
 import type { APIRoute } from 'astro';
-import { createClient } from '@supabase/supabase-js';
 import { getUserMetadata } from '../../../types/supabase';
-import { serverEnv } from '../../../lib/server-env';
+import { getAuthenticatedUser, AuthError } from '../_auth';
 
 export const prerender = false;
 
-export const POST: APIRoute = async ({ cookies }) => {
-  console.log('Token refresh API endpoint called');
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+/**
+ * Kept for old clients; it no longer refreshes anything.
+ *
+ * Refresh tokens are single-use and the browser supabase client is the only refresh owner, so a
+ * server-side refresh would revoke the client's token and sign the user out. This route only
+ * reports whether the current access token is still valid: 200 if it is, 401 if not (the client
+ * then refreshes its own session and retries).
+ */
+export const POST: APIRoute = async ({ request, cookies }) => {
+  if (cookies.get('sb-refresh-token')) cookies.delete('sb-refresh-token', { path: '/' });
 
   try {
-    const refreshToken = cookies.get('sb-refresh-token')?.value;
-
-    if (!refreshToken) {
-      console.log('No refresh token found in cookies');
-      return new Response(JSON.stringify({ error: 'No refresh token' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Create a Supabase client for server-side use
-    const supabase = createClient(serverEnv().supabaseUrl, serverEnv().supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false,
-      },
+    const { user } = await getAuthenticatedUser(request);
+    return json({
+      success: true,
+      user: { id: user.id, email: user.email, user_metadata: getUserMetadata(user) },
     });
-
-    console.log('Refreshing session with refresh token...');
-
-    // Refresh the session
-    const { data, error } = await supabase.auth.refreshSession({
-      refresh_token: refreshToken,
-    });
-
-    if (error) {
-      console.error('Error refreshing session:', error);
-      // Clear invalid cookies
-      cookies.delete('sb-access-token', { path: '/' });
-      cookies.delete('sb-refresh-token', { path: '/' });
-      cookies.delete('sb-user', { path: '/' });
-
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
+  } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return json({ error: 'Session expired: refresh it on the client and retry' }, 401);
     }
-
-    if (!data.session) {
-      console.error('No session returned from refresh');
-      return new Response(JSON.stringify({ error: 'No session' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    console.log('Session refreshed successfully for user:', data.session.user.email);
-
-    // Update cookies with new tokens
-    const maxAge = 60 * 60 * 24 * 30; // 30 days
-    const cookieOptions = {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax' as const,
-      maxAge,
-      path: '/',
-    };
-
-    cookies.set('sb-access-token', data.session.access_token, cookieOptions);
-    cookies.set('sb-refresh-token', data.session.refresh_token, cookieOptions);
-    cookies.set(
-      'sb-user',
-      JSON.stringify({
-        id: data.session.user.id,
-        email: data.session.user.email,
-        user_metadata: getUserMetadata(data.session.user),
-      }),
-      {
-        secure: true,
-        sameSite: 'lax' as const,
-        maxAge,
-        path: '/',
-      },
-    );
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        user: {
-          id: data.session.user.id,
-          email: data.session.user.email,
-          user_metadata: getUserMetadata(data.session.user),
-        },
-      }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      },
-    );
-  } catch (error) {
-    console.error('Unexpected error during token refresh:', error);
-    return new Response(JSON.stringify({ error: 'Refresh failed' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    console.error('Unexpected error in /api/auth/refresh:', error);
+    return json({ error: 'Refresh check failed' }, 500);
   }
 };

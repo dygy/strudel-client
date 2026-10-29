@@ -6,6 +6,8 @@ import { AdminDashboard } from '../components/admin/AdminDashboard';
 import { createClient } from '@supabase/supabase-js';
 import { isAdmin } from '../lib/adminAuth';
 import { serverEnv } from '../lib/server-env';
+import { loginUrlFor } from '../lib/authRedirect';
+import { isInvalidSessionError } from '../lib/authErrorKind';
 
 export const prerender = false; // Enable SSR
 
@@ -14,7 +16,7 @@ const accessToken = Astro.cookies.get('sb-access-token')?.value;
 
 if (!accessToken) {
   console.log('Admin page - No access token, redirecting to login');
-  return Astro.redirect('/login');
+  return Astro.redirect(loginUrlFor(Astro.url.pathname + Astro.url.search));
 }
 
 const supabaseUrl = serverEnv().supabaseUrl;
@@ -35,9 +37,18 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 // Verify user token
 const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
 
+if (userError && !isInvalidSessionError(userError)) {
+  // Supabase unreachable / 5xx: not a sign-out. Admin access can't be checked, so ask for a retry.
+  console.error('Admin page - Could not verify the session (auth service error):', userError);
+  return new Response('Could not verify your session right now. Please reload the page in a few seconds.', {
+    status: 503,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '5', 'Cache-Control': 'no-store' },
+  });
+}
+
 if (!user || userError) {
   console.log('Admin page - User verification failed:', userError?.message);
-  return Astro.redirect('/login');
+  return Astro.redirect(loginUrlFor(Astro.url.pathname + Astro.url.search));
 }
 
 // Check admin status

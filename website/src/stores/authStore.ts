@@ -1,5 +1,6 @@
 import { atom } from 'nanostores';
 import type { User } from '../lib/secureApi';
+import { loginUrlForCurrentLocation } from '../lib/authRedirect';
 
 interface AuthState {
   user: User | null;
@@ -19,7 +20,60 @@ const initialState: AuthState = {
 export const authStore = atom<AuthState>(initialState);
 
 // Single interval reference - outside of any component
-let sessionCheckInterval: NodeJS.Timeout | null = null;
+let sessionCheckInterval: ReturnType<typeof setInterval> | null = null;
+let checkInFlight: Promise<boolean> | null = null;
+let resumeListenersAttached = false;
+
+// Timers are throttled in background tabs: when the tab comes back, check (and refresh) right away
+// instead of waiting for the next tick, which may land after the access token expired.
+function handleResume() {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+  if (!authStore.get().user) return;
+  authActions.checkAuth().catch((error: unknown) => {
+    console.error('Auth check on tab resume failed:', error);
+  });
+}
+
+function redirectToLogin() {
+  if (typeof window === 'undefined' || window.location.pathname.includes('/login')) return;
+  // Leaving the page runs the beforeunload/pagehide emergency save in globalSaveManager.
+  window.location.href = loginUrlForCurrentLocation();
+}
+
+async function runAuthCheck(): Promise<boolean> {
+  try {
+    const { checkAuthUser } = await import('../lib/authCheck');
+    const result = await checkAuthUser();
+
+    if (result.status === 'authenticated') {
+      authActions.setUser(result.user);
+      if (result.sessionExpiresAt) {
+        const expiresAt = new Date(result.sessionExpiresAt);
+        // Show warning if expiring within 15 minutes (more buffer)
+        const fifteenMinutesFromNow = new Date(Date.now() + 15 * 60 * 1000);
+        authActions.setSessionInfo(expiresAt, expiresAt < fifteenMinutesFromNow);
+      }
+      return true;
+    }
+
+    if (result.status === 'signed-out') {
+      authActions.setUser(null);
+      authActions.setSessionInfo(null, false);
+      // 403 clears the user but stays put, as before
+      if (result.httpStatus !== 403) redirectToLogin();
+      return false;
+    }
+
+    // Unknown (network, 5xx, transient refresh failure): keep the current auth state
+    console.warn('Auth check inconclusive, keeping current auth state:', result.reason);
+    if (!authActions.getUser()) authActions.setLoading(false);
+    return !!authActions.getUser();
+  } catch (error: unknown) {
+    console.error('Auth check failed:', error);
+    if (!authActions.getUser()) authActions.setLoading(false);
+    return !!authActions.getUser();
+  }
+}
 
 // Auth actions
 export const authActions = {
@@ -49,74 +103,19 @@ export const authActions = {
     });
   },
 
-  async checkAuth(): Promise<boolean> {
-    try {
-      const response = await fetch('/api/auth/user', {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
+  /**
+   * Ask whether the user is still signed in. The client supabase session is refreshed first and
+   * sent as a Bearer token (lib/authCheck.ts), so an expired cookie alone never signs anyone out.
+   * Only redirects to /login when the client has no session and the server agrees.
+   * Concurrent calls (interval + tab resume) share one request.
+   */
+  checkAuth(): Promise<boolean> {
+    if (!checkInFlight) {
+      checkInFlight = runAuthCheck().finally(() => {
+        checkInFlight = null;
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.user) {
-          this.setUser(data.user);
-
-          if (data.sessionExpiresAt) {
-            const expiresAt = new Date(data.sessionExpiresAt);
-            // Show warning if expiring within 15 minutes (more buffer)
-            const fifteenMinutesFromNow = new Date(Date.now() + 15 * 60 * 1000);
-            this.setSessionInfo(expiresAt, expiresAt < fifteenMinutesFromNow);
-          }
-
-          return true;
-        } else {
-          // API returned 200 but no user - user is not authenticated
-          this.setUser(null);
-          this.setSessionInfo(null, false);
-
-          // Redirect to login if not already on login page
-          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-            window.location.href = '/login';
-          }
-
-          return false;
-        }
-      }
-
-      // Only clear user on explicit 401/403, not on network errors
-      if (response.status === 401 || response.status === 403) {
-        this.setUser(null);
-        this.setSessionInfo(null, false);
-
-        // Redirect to login on 401
-        if (response.status === 401 && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
-        }
-
-        return false;
-      }
-
-      // For other status codes, don't clear user - might be temporary server issue
-      console.warn('Auth check returned non-OK status:', response.status, 'keeping current auth state');
-      return !!this.getUser();
-    } catch (error) {
-      console.error('Auth check failed:', error);
-
-      // Don't clear user on network errors - keep current state
-      // Only log the error and return current auth status
-      const currentUser = this.getUser();
-      if (currentUser) {
-        console.log('Network error during auth check, keeping user logged in');
-        return true;
-      }
-
-      // If no current user and network error, stop loading but don't redirect
-      this.setLoading(false);
-      return false;
     }
+    return checkInFlight;
   },
 
   getUser(): User | null {
@@ -162,6 +161,8 @@ export const authActions = {
         throw error;
       }
 
+      const { clearSessionCookies } = await import('../lib/authCookies');
+      clearSessionCookies();
       this.setUser(null);
       this.setSessionInfo(null, false);
 
@@ -204,6 +205,12 @@ export const authActions = {
         this.stopPeriodicCheck();
       }
     }, 60 * 1000); // Check every 60 seconds (less frequent to reduce race conditions)
+
+    if (typeof window !== 'undefined' && !resumeListenersAttached) {
+      document.addEventListener('visibilitychange', handleResume);
+      window.addEventListener('focus', handleResume);
+      resumeListenersAttached = true;
+    }
   },
 
   stopPeriodicCheck() {
@@ -211,6 +218,11 @@ export const authActions = {
       console.log('AuthStore - Stopping periodic session check');
       clearInterval(sessionCheckInterval);
       sessionCheckInterval = null;
+    }
+    if (typeof window !== 'undefined' && resumeListenersAttached) {
+      document.removeEventListener('visibilitychange', handleResume);
+      window.removeEventListener('focus', handleResume);
+      resumeListenersAttached = false;
     }
   },
 

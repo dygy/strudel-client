@@ -11,6 +11,8 @@ import { isAdmin } from '../../../lib/adminAuth';
 
 import type { SSRData } from '../../../types/ssr';
 import { serverEnv } from '../../../lib/server-env';
+import { loginUrlFor } from '../../../lib/authRedirect';
+import { isInvalidSessionError } from '../../../lib/authErrorKind';
 
 export const prerender = false; // Enable SSR for authenticated data
 
@@ -53,7 +55,7 @@ try {
 
   if (!accessToken) {
     console.log('Admin REPL SSR - No access token, redirecting to login');
-    return Astro.redirect('/login');
+    return Astro.redirect(loginUrlFor(Astro.url.pathname + Astro.url.search));
   }
 
   const supabaseUrl = serverEnv().supabaseUrl;
@@ -69,9 +71,18 @@ try {
   // Verify the current user token
   const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser(accessToken);
 
+  if (userError && !isInvalidSessionError(userError)) {
+    // Supabase unreachable / 5xx: not a sign-out. Admin access can't be checked, so ask for a retry.
+    console.error('Admin REPL SSR - Could not verify the session (auth service error):', userError);
+    return new Response('Could not verify your session right now. Please reload the page in a few seconds.', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '5', 'Cache-Control': 'no-store' },
+    });
+  }
+
   if (!currentUser || userError) {
     console.log('Admin REPL SSR - User verification failed:', userError?.message);
-    return Astro.redirect('/login');
+    return Astro.redirect(loginUrlFor(Astro.url.pathname + Astro.url.search));
   }
 
   // Check if current user is admin

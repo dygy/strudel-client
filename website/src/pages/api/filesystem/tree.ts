@@ -7,54 +7,39 @@ import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { TreeDataTransformer } from '../../../lib/TreeDataTransformer';
 import { serverEnv } from '../../../lib/server-env';
+import { getAuthenticatedUser, AuthError } from '../_auth';
 
 export const prerender = false;
 
-// Cloudflare supplies vars and secrets per request rather than at build
-// time, so the client is created on first use instead of at module scope.
-let supabaseClient: ReturnType<typeof createClient> | undefined;
-function getSupabase() {
-  if (!supabaseClient) {
-    const { supabaseUrl, supabaseAnonKey: supabaseKey } = serverEnv();
-    supabaseClient = createClient(supabaseUrl, supabaseKey);
-  }
-  return supabaseClient;
-}
-
-export const GET: APIRoute = async ({ request, cookies }) => {
+export const GET: APIRoute = async ({ request }) => {
   try {
-    // Get user session
-    const sessionCookie = cookies.get('sb-access-token');
-    if (!sessionCookie) {
+    // Bearer header or sb-access-token cookie. Never setSession/refresh here: the browser client
+    // is the only refresh owner, and an expired token answers 401 so the client refreshes and retries.
+    let auth: Awaited<ReturnType<typeof getAuthenticatedUser>>;
+    try {
+      auth = await getAuthenticatedUser(request);
+    } catch (authError: unknown) {
+      if (!(authError instanceof AuthError)) throw authError;
       return new Response(JSON.stringify({ error: 'Not authenticated' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+    const { user, accessToken } = auth;
 
-    // Set auth header
-    getSupabase().auth.setSession({
-      access_token: sessionCookie.value,
-      refresh_token: cookies.get('sb-refresh-token')?.value || '',
+    // One client per request (a module-level client would carry one user's session into the
+    // next request). The caller's token goes in the header so RLS applies as that user.
+    const { supabaseUrl, supabaseAnonKey } = serverEnv();
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
     });
-
-    // Get current user
-    const {
-      data: { user },
-      error: userError,
-    } = await getSupabase().auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Invalid session' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
 
     // Fetch tracks and folders
     const [tracksResult, foldersResult] = await Promise.all([
-      getSupabase().from('tracks').select('*').eq('user_id', user.id).order('created', { ascending: true }),
+      supabase.from('tracks').select('*').eq('user_id', user.id).order('created', { ascending: true }),
 
-      getSupabase().from('folders').select('*').eq('user_id', user.id).order('created', { ascending: true }),
+      supabase.from('folders').select('*').eq('user_id', user.id).order('created', { ascending: true }),
     ]);
 
     if (tracksResult.error) {

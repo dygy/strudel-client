@@ -124,7 +124,14 @@ export const supabaseFake = {
   auth: {
     getUser: vi.fn(async (token: string) => {
       const user = state.sessions.get(token);
-      return user ? { data: { user }, error: null } : { data: { user: null }, error: { message: 'invalid JWT' } };
+      // An unknown token gets what the auth service answers for an expired/invalid JWT: an
+      // AuthApiError with a 4xx status (api/_auth.ts maps only 4xx to AuthError -> 401).
+      return user
+        ? { data: { user }, error: null }
+        : {
+            data: { user: null },
+            error: { name: 'AuthApiError', message: 'invalid JWT', status: 403, code: 'bad_jwt' },
+          };
     }),
     admin: {
       listUsers: vi.fn(async () => ({ data: { users: state.authUsers }, error: null })),

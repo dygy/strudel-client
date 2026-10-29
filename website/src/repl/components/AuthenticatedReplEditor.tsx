@@ -5,6 +5,7 @@ import ReplEditor from './ReplEditor';
 import { useSupabaseFileManager } from './sidebar/hooks/useSupabaseFileManager';
 import { useReplContext } from '../useReplContext';
 import type { SSRData } from '@src/types/ssr';
+import { loginUrlForCurrentLocation } from '../../lib/authRedirect';
 
 interface ReplContext {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -58,7 +59,7 @@ function AuthenticatedReplContent({
   // Require authentication - redirect to login if not authenticated
   if (!isAuthenticated) {
     // This should not happen due to server-side redirect, but handle it as fallback
-    window.location.href = '/login';
+    window.location.href = loginUrlForCurrentLocation();
     return (
       <div className="h-full w-full flex items-center justify-center">
         <div className="text-center">

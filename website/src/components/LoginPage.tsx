@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { forceRefreshSession } from '../lib/authUtils';
+import { writeSessionCookies } from '../lib/authCookies';
+import { REDIRECT_AFTER_AUTH_KEY, redirectTargetFromSearch } from '../lib/authRedirect';
+import { resumeSessionFromLogin } from '../lib/loginResume';
 import { useTranslation } from 'react-i18next';
 import { languages } from '../i18n';
 // Import i18n to ensure it's initialized
@@ -35,6 +39,30 @@ export default function LoginPage({ error, hasTrack }: LoginPageProps) {
     }
   }, [i18n]);
 
+  // Back to the page that sent us here when the client session is still alive (lib/loginResume.ts:
+  // forced refresh, cookie rewrite, at most once per 30 s, never with ?error).
+  useEffect(() => {
+    let cancelled = false;
+    resumeSessionFromLogin({
+      search: window.location.search,
+      storage: window.sessionStorage,
+      hasClientSession: async () => {
+        const { data } = await supabase.auth.getSession();
+        return !cancelled && !!data.session;
+      },
+      forceRefresh: forceRefreshSession,
+      writeCookie: writeSessionCookies,
+      navigate: (path) => {
+        if (!cancelled) window.location.replace(path);
+      },
+    }).catch((error: unknown) => {
+      console.warn('Login page - could not resume the existing session:', error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Listen for language changes
   useEffect(() => {
     const handleLanguageChange = (lng: string) => {
@@ -68,14 +96,8 @@ export default function LoginPage({ error, hasTrack }: LoginPageProps) {
 
   const signInWithGoogle = async () => {
     try {
-      // Store redirect URL if we have track parameter
-      const urlParams = new URLSearchParams(window.location.search);
-      const trackId = urlParams.get('track');
-      if (trackId) {
-        sessionStorage.setItem('strudel_redirect_after_auth', `/repl/${trackId}`);
-      } else {
-        sessionStorage.setItem('strudel_redirect_after_auth', '/repl');
-      }
+      // Come back to the page that sent the user here (?redirect=, legacy ?track=, else /repl)
+      sessionStorage.setItem(REDIRECT_AFTER_AUTH_KEY, redirectTargetFromSearch(window.location.search));
 
       console.log('=== SIGN IN WITH GOOGLE DEBUG ===');
       const currentOrigin = window.location.origin;

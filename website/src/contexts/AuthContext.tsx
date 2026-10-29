@@ -1,6 +1,9 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { type User } from '../lib/secureApi';
+import { checkAuthUser } from '../lib/authCheck';
+import { syncSessionCookies } from '../lib/authCookies';
+import { loginUrlForCurrentLocation } from '../lib/authRedirect';
 
 interface AuthContextType {
   user: User | null;
@@ -24,48 +27,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
   const [sessionExpiresAt, setSessionExpiresAt] = useState<Date | null>(null);
   const [sessionWarning, setSessionWarning] = useState(false);
+  const userRef = useRef<User | null>(null);
+  userRef.current = user;
 
-  // Function to check authentication using backend API
-  const checkAuth = async () => {
-    try {
-      const response = await fetch('/api/auth/user', {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.user) {
-          setUser(data.user);
-
-          // Update session expiry info if available
-          if (data.sessionExpiresAt) {
-            const expiresAt = new Date(data.sessionExpiresAt);
-            setSessionExpiresAt(expiresAt);
-
-            // Check if session expires within 5 minutes
-            const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
-            setSessionWarning(expiresAt < fiveMinutesFromNow);
-          }
-
-          return true;
-        }
+  // One shared check (lib/authCheck.ts): refreshes the client session first, mirrors it into the
+  // cookie and sends it as a Bearer token, so a stale cookie alone never signs anyone out.
+  // 'unknown' (network, 5xx, transient refresh failure) keeps the current state.
+  const checkAuth = async (): Promise<boolean> => {
+    const result = await checkAuthUser();
+    if (result.status === 'authenticated') {
+      setUser(result.user);
+      if (result.sessionExpiresAt) {
+        const expiresAt = new Date(result.sessionExpiresAt);
+        setSessionExpiresAt(expiresAt);
+        // Check if session expires within 5 minutes
+        const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
+        setSessionWarning(expiresAt < fiveMinutesFromNow);
       }
-
-      setUser(null);
-      setSessionExpiresAt(null);
-      setSessionWarning(false);
-      return false;
-    } catch (error) {
-      console.error('Auth check failed:', error);
+      return true;
+    }
+    if (result.status === 'signed-out') {
       setUser(null);
       setSessionExpiresAt(null);
       setSessionWarning(false);
       return false;
     }
+    console.warn('AuthContext - auth check inconclusive, keeping current state:', result.reason);
+    return userRef.current !== null;
   };
 
   // Function to refresh session if needed
@@ -74,45 +62,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (user) {
       return true;
     }
-
-    try {
-      // Only make API call if we don't have a user
-      const response = await fetch('/api/auth/user', {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Cache-Control': 'no-cache',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.user) {
-          setUser(data.user);
-
-          if (data.sessionExpiresAt) {
-            const expiresAt = new Date(data.sessionExpiresAt);
-            setSessionExpiresAt(expiresAt);
-
-            const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
-            setSessionWarning(expiresAt < fiveMinutesFromNow);
-          }
-
-          return true;
-        }
-      }
-
-      setUser(null);
-      setSessionExpiresAt(null);
-      setSessionWarning(false);
-      return false;
-    } catch (error) {
-      console.error('Session validation failed:', error);
-      setUser(null);
-      setSessionExpiresAt(null);
-      setSessionWarning(false);
-      return false;
-    }
+    return checkAuth();
   };
 
   // Periodic session health check - DISABLED to stop spam
@@ -125,41 +75,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     let mounted = true;
 
-    // Simple backend authentication check
     const checkBackendAuth = async () => {
+      let signedOut = false;
       try {
-        // Just ask the backend if we're authenticated
-        const response = await fetch('/api/auth/user', {
-          method: 'GET',
-          credentials: 'include', // Include HTTP-only cookies
-          headers: {
-            'Cache-Control': 'no-cache',
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.user) {
-            setUser(data.user);
-          } else {
-            setUser(null);
-          }
-        } else {
+        const result = await checkAuthUser();
+        if (!mounted) return;
+        if (result.status === 'authenticated') {
+          setUser(result.user);
+        } else if (result.status === 'signed-out') {
           setUser(null);
-
-          // If 401, redirect to login
-          if (
-            response.status === 401 &&
-            typeof window !== 'undefined' &&
-            !window.location.pathname.includes('/login')
-          ) {
-            window.location.href = '/login';
-            return;
-          }
+          signedOut = result.httpStatus === 401;
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('AuthContext - Backend auth check error:', error);
-        setUser(null);
+      }
+
+      if (signedOut && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        window.location.href = loginUrlForCurrentLocation();
+        return;
       }
 
       // Always set loading to false
@@ -174,6 +107,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Keep the server's cookie copy of the access token current (and clear it on sign-out)
+      syncSessionCookies(event, session);
       if (!mounted) return;
 
       if (event === 'SIGNED_IN' && session) {
