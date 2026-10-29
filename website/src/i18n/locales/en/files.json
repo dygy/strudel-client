@@ -143,7 +143,10 @@
     "importFailed": "Failed to import file",
     "exportFailed": "Failed to export file",
     "saveFailed": "Failed to save track",
-    "renameFailed": "Failed to rename item"
+    "renameFailed": "Failed to rename item",
+    "folderNameEmpty": "Folder name cannot be empty",
+    "folderNameSlash": "Folder name cannot contain \"/\"",
+    "folderNameTaken": "A folder named '{{name}}' already exists here"
   },
   
   "success": {

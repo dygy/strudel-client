@@ -143,7 +143,10 @@
     "importFailed": "ייבוא הקובץ נכשל",
     "exportFailed": "ייצוא הקובץ נכשל",
     "saveFailed": "שמירת הרצועה נכשלה",
-    "renameFailed": "שינוי שם הפריט נכשל"
+    "renameFailed": "שינוי שם הפריט נכשל",
+    "folderNameEmpty": "שם התיקייה לא יכול להיות ריק",
+    "folderNameSlash": "שם התיקייה לא יכול להכיל \"/\"",
+    "folderNameTaken": "תיקייה בשם '{{name}}' כבר קיימת כאן"
   },
 
   "success": {

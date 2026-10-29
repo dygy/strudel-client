@@ -143,7 +143,10 @@
     "importFailed": "Échec de l'importation du fichier",
     "exportFailed": "Échec de l'exportation du fichier",
     "saveFailed": "Échec de l'enregistrement de la piste",
-    "renameFailed": "Échec du renommage de l'élément"
+    "renameFailed": "Échec du renommage de l'élément",
+    "folderNameEmpty": "Le nom du dossier ne peut pas être vide",
+    "folderNameSlash": "Le nom du dossier ne peut pas contenir \"/\"",
+    "folderNameTaken": "Un dossier nommé '{{name}}' existe déjà ici"
   },
 
   "success": {

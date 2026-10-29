@@ -30,6 +30,7 @@ import { GET as treeValidate } from '../tree/validate';
 import { POST as trackCreate } from '../tracks/create';
 import { PUT as trackUpdate } from '../tracks/update';
 import { DELETE as trackDelete } from '../tracks/delete';
+import { PUT as folderUpdate } from '../folders/update';
 
 vi.mock('@supabase/supabase-js', async () => {
   const helpers = await import('./apiTestHelpers');
@@ -53,6 +54,12 @@ const handlers = [
   { name: 'POST tracks/create', handler: trackCreate, method: 'POST', body: { name: 'Beat', code: 's("bd")' } },
   { name: 'PUT tracks/update', handler: trackUpdate, method: 'PUT', body: { trackId: 't1', updates: { code: 'x' } } },
   { name: 'DELETE tracks/delete', handler: trackDelete, method: 'DELETE', body: { trackId: 't1' } },
+  {
+    name: 'PUT folders/update',
+    handler: folderUpdate,
+    method: 'PUT',
+    body: { folderId: 'f1', updates: { name: 'Drums' } },
+  },
 ] as const;
 
 type H = (typeof handlers)[number];

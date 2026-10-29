@@ -143,7 +143,10 @@
     "importFailed": "فشل استيراد الملف",
     "exportFailed": "فشل تصدير الملف",
     "saveFailed": "فشل حفظ المسار",
-    "renameFailed": "فشل إعادة تسمية العنصر"
+    "renameFailed": "فشل إعادة تسمية العنصر",
+    "folderNameEmpty": "لا يمكن أن يكون اسم المجلد فارغًا",
+    "folderNameSlash": "لا يمكن أن يحتوي اسم المجلد على \"/\"",
+    "folderNameTaken": "يوجد مجلد باسم '{{name}}' هنا بالفعل"
   },
 
   "success": {

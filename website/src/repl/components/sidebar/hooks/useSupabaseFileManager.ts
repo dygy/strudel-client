@@ -1192,7 +1192,7 @@ export function useSupabaseFileManager(
   );
 
   const updateFolder = useCallback(
-    async (folderId: string, updates: { parent?: string | null; name?: string; path?: string }) => {
+    async (folderId: string, updates: { parent?: string | null; name?: string }) => {
       console.log('SupabaseFileManager - updateFolder called:', { folderId, updates });
 
       if (!user) {
@@ -1238,6 +1238,24 @@ export function useSupabaseFileManager(
           if (response.status === 404) {
             toastActions.error('Folder not found. It may have been deleted by another session.');
             return null;
+          }
+
+          // A sibling folder already has a name with the same URL slug.
+          if (response.status === 409) {
+            // 'track_conflict': a track would collide with one already at the new path.
+            toastActions.error(
+              errorData.code === 'track_conflict'
+                ? t('files:errors.renameFailed')
+                : t('files:errors.folderNameTaken', { name: updates.name ?? '' }),
+            );
+            return null;
+          }
+
+          // The server could not undo every step: its state is unknown, so the caller must
+          // reload from the server rather than revert locally.
+          if (errorData.code === 'rollback_incomplete') {
+            toastActions.error(t('files:errors.renameFailed'));
+            return { rollbackIncomplete: true as const };
           }
 
           throw new Error(errorData.error || 'Failed to update folder');

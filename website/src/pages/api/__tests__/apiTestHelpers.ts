@@ -27,7 +27,15 @@ interface FakeState {
   /** every insert, in order */
   inserts: Array<{ table: string; rows: Row[] }>;
   /** every update / upsert / delete, in order. Any entry here means an existing row could change. */
-  mutations: Array<{ table: string; op: 'update' | 'upsert' | 'delete'; data?: Row | Row[] }>;
+  mutations: Array<{
+    table: string;
+    op: 'update' | 'upsert' | 'delete';
+    data?: Row | Row[];
+    /** `eq` / `in` filters chained after the mutation call, in order (`in` values are an InList) */
+    filters?: Array<[string, unknown]>;
+  }>;
+  /** Return an error message to make an update on `table` fail (rows stay unchanged). */
+  failUpdate?: (table: string, data: Row, filters: Array<[string, unknown]>) => string | null;
   /** auth.admin.listUsers() result */
   authUsers: Row[];
 }
@@ -40,21 +48,50 @@ const state: FakeState = {
   authUsers: [],
 };
 
+/** The value of an `.in(column, values)` filter. */
+export class InList {
+  constructor(readonly values: unknown[]) {}
+}
+
 function queryBuilder(table: string) {
   let rows: Row[] | undefined;
   let filters: Array<[string, unknown]> = [];
   let inserted: Row[] | undefined;
+  let mutation: FakeState['mutations'][number] | undefined;
+  let updateData: Row | undefined;
 
+  const matches = (r: Row) => filters.every(([k, v]) => (v instanceof InList ? v.values.includes(r[k]) : r[k] === v));
   const result = () => {
     if (inserted) return { data: inserted, error: null };
+    if (updateData) {
+      // Updates apply to the stored rows that match the eq filters, like a real table.
+      const failure = state.failUpdate?.(table, updateData, filters) ?? null;
+      if (failure) return { data: null, error: { message: failure } };
+      const data = updateData;
+      const updated: Row[] = [];
+      state.tables[table] = (state.tables[table] ?? []).map((r) => {
+        if (!matches(r)) return r;
+        const next = { ...r, ...data };
+        updated.push(next);
+        return next;
+      });
+      updateData = undefined;
+      return { data: updated, error: null };
+    }
     const base = rows ?? state.tables[table] ?? [];
-    return { data: base.filter((r) => filters.every(([k, v]) => r[k] === v)), error: null };
+    return { data: base.filter(matches), error: null };
   };
 
   const builder: any = {
     select: vi.fn(() => builder),
     eq: vi.fn((col: string, val: unknown) => {
       filters = [...filters, [col, val]];
+      if (mutation) mutation.filters = filters;
+      return builder;
+    }),
+    in: vi.fn((col: string, vals: unknown[]) => {
+      filters = [...filters, [col, new InList(vals)]];
+      if (mutation) mutation.filters = filters;
       return builder;
     }),
     insert: vi.fn((data: Row | Row[]) => {
@@ -63,7 +100,9 @@ function queryBuilder(table: string) {
       return builder;
     }),
     update: vi.fn((data: Row) => {
-      state.mutations.push({ table, op: 'update', data });
+      mutation = { table, op: 'update', data, filters: [] };
+      updateData = data;
+      state.mutations.push(mutation);
       return builder;
     }),
     upsert: vi.fn((data: Row | Row[]) => {
@@ -104,6 +143,7 @@ export function resetSupabaseFake(): void {
   state.inserts = [];
   state.mutations = [];
   state.authUsers = [];
+  state.failUpdate = undefined;
   supabaseFake.auth.getUser.mockClear();
   supabaseFake.auth.admin.listUsers.mockClear();
   supabaseFake.from.mockClear();

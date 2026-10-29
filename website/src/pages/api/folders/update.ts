@@ -1,52 +1,29 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
+import { getAuthenticatedUser, AuthError } from '../_auth';
 import { serverEnv } from '../../../lib/server-env';
 import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
+import { planFolderRename, type FolderRenamePlan, type RenamableFolder } from '../../../lib/folderRename';
 
 export const prerender = false;
 
-// Cloudflare supplies vars and secrets per request rather than at build
-// time, so the client is created on first use instead of at module scope.
-let supabaseClient: ReturnType<typeof createClient> | undefined;
-function getSupabase() {
-  if (!supabaseClient) {
-    const { supabaseUrl, supabaseServiceKey: supabaseKey } = serverEnv();
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase environment variables');
-    }
-    supabaseClient = createClient(supabaseUrl, supabaseKey);
-  }
-  return supabaseClient;
-}
+const json = (body: unknown, status: number) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-export const PUT: APIRoute = async ({ request, cookies }) => {
+const RENAME_ERRORS = {
+  notFound: { status: 404, error: 'Folder not found or access denied' },
+  empty: { status: 400, error: 'Folder name cannot be empty' },
+  slash: { status: 400, error: 'Folder name cannot contain "/"' },
+  duplicate: { status: 409, error: 'A folder with this name already exists here' },
+} as const;
+
+type FolderRow = RenamableFolder & { user_id?: string; created?: string; updated_at?: string };
+
+export const PUT: APIRoute = async ({ request }) => {
   try {
-    console.log('API /folders/update - Starting folder update');
+    // Sign-in is checked before the body is read (api/_auth.ts: Bearer header, then cookie).
+    const { user } = await getAuthenticatedUser(request);
 
-    // Get the session from cookies
-    const accessToken = cookies.get('sb-access-token')?.value;
-    if (!accessToken) {
-      return new Response(JSON.stringify({ error: 'Not authenticated' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Verify the user token
-    const {
-      data: { user },
-      error: userError,
-    } = await getSupabase().auth.getUser(accessToken);
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Invalid token' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    console.log('API /folders/update - User verified:', user.id);
-
-    // Parse request body
     // Unparseable or non-object bodies are refused with 400, not a 500.
     const body = await readJsonObject(request);
     if (!body) {
@@ -54,167 +31,213 @@ export const PUT: APIRoute = async ({ request, cookies }) => {
     }
     const { folderId, updates } = body;
 
-    console.log('API /folders/update - Received data:', {
-      folderId,
-      updates: Object.keys(updates || {}),
-    });
-
-    // Validate input
     if (!folderId || typeof folderId !== 'string') {
-      return new Response(JSON.stringify({ error: 'Folder ID is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return json({ error: 'Folder ID is required' }, 400);
+    }
+    if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+      return json({ error: 'Updates object is required' }, 400);
+    }
+    if (updates.name !== undefined && typeof updates.name !== 'string') {
+      return json({ error: 'Folder name must be a string' }, 400);
     }
 
-    if (!updates || typeof updates !== 'object') {
-      return new Response(JSON.stringify({ error: 'Updates object is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    // Service-role client: every query below is scoped by the session user's id.
+    const { supabaseUrl, supabaseServiceKey } = serverEnv();
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify folder ownership
-    const { data: existingFolder, error: fetchError } = await getSupabase()
+    // The whole folder list of this user: needed for the ownership check, the sibling-name
+    // check, the parent/cycle checks and the descendant cascade.
+    const { data: folderRows, error: listError } = await supabase
       .from('folders')
-      .select('id, user_id, name, path, parent')
-      .eq('id', folderId)
-      .eq('user_id', user.id)
-      .single();
+      .select('id, user_id, name, path, parent, created')
+      .eq('user_id', user.id);
+    if (listError) {
+      console.error('API /folders/update - Failed to list folders:', listError);
+      return json({ error: 'Failed to update folder' }, 500);
+    }
+    const folders = ((folderRows ?? []) as FolderRow[]).filter((f) => f && typeof f.id === 'string');
 
-    if (fetchError || !existingFolder) {
-      console.log('API /folders/update - Folder not found or access denied:', fetchError?.message);
-      return new Response(JSON.stringify({ error: 'Folder not found or access denied' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    const existingFolder = folders.find((f) => f.id === folderId);
+    if (!existingFolder) {
+      return json(RENAME_ERRORS.notFound, 404);
     }
 
-    // Prepare update data
-    const updateData: any = {
-      updated_at: new Date().toISOString(),
-    };
-
-    // Handle allowed updates
-    if (updates.name && typeof updates.name === 'string') {
-      updateData.name = updates.name.trim();
-    }
+    const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    let effectiveParent = existingFolder.parent ?? null;
 
     if (updates.parent !== undefined) {
-      // Validate parent folder exists and belongs to user (if not null)
       if (updates.parent !== null) {
-        const { data: parentFolder, error: parentError } = await getSupabase()
-          .from('folders')
-          .select('id')
-          .eq('id', updates.parent)
-          .eq('user_id', user.id)
-          .single();
-
-        if (parentError || !parentFolder) {
-          console.log('API /folders/update - Parent folder not found:', parentError?.message);
-          return new Response(JSON.stringify({ error: 'Parent folder not found or access denied' }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' },
-          });
+        if (typeof updates.parent !== 'string' || !folders.some((f) => f.id === updates.parent)) {
+          return json({ error: 'Parent folder not found or access denied' }, 400);
         }
-
-        // Check for circular dependency (prevent moving folder into itself or its descendants)
-        const isCircular = await checkCircularDependency(getSupabase(), folderId, updates.parent);
-        if (isCircular) {
-          console.log('API /folders/update - Circular dependency detected');
-          return new Response(JSON.stringify({ error: 'Cannot move folder into itself or its descendants' }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json' },
-          });
+        if (isCircular(folders, folderId, updates.parent)) {
+          return json({ error: 'Cannot move folder into itself or its descendants' }, 400);
         }
       }
-
       updateData.parent = updates.parent;
+      effectiveParent = updates.parent;
     }
 
-    if (updates.path && typeof updates.path === 'string') {
-      updateData.path = updates.path.trim();
+    // A client-sent `path` is ignored: the path is always derived from the parent's path.
+    let plan: FolderRenamePlan | null = null;
+    if (typeof updates.name === 'string') {
+      const withParent = folders.map((f) => (f.id === folderId ? { ...f, parent: effectiveParent } : f));
+      const result = planFolderRename(withParent, folderId, updates.name);
+      if ('error' in result) {
+        const { status, error } = RENAME_ERRORS[result.error];
+        return json({ error, code: result.error }, status);
+      }
+      plan = result.plan;
+      updateData.name = plan.newName;
+      updateData.path = plan.pathChanges[0].newPath;
     }
 
-    console.log('API /folders/update - Updating folder with data:', updateData);
+    // Tracks that store a renamed raw path (older rows) move by id, never by folder string:
+    // rows that already hold one of the new paths (orphans) must neither be swept along on the
+    // way forward nor dragged back by a rollback. Tracks storing a folder id need nothing.
+    const trackMoves: Array<{ ids: string[]; oldPath: string; newPath: string }> = [];
+    if (plan && plan.trackFolderRemaps.length) {
+      const oldPaths = plan.trackFolderRemaps.map((r) => r.oldPath);
+      const newPaths = plan.trackFolderRemaps.map((r) => r.newPath);
+      const { data: trackRows, error: trackError } = await supabase
+        .from('tracks')
+        .select('id, name, folder')
+        .eq('user_id', user.id)
+        .in('folder', [...oldPaths, ...newPaths]);
+      if (trackError) {
+        console.error('API /folders/update - Failed to list tracks:', trackError);
+        return json({ error: 'Failed to update folder' }, 500);
+      }
+      const rows = (trackRows ?? []) as Array<{ id: string; name: string; folder: string }>;
+      for (const remap of plan.trackFolderRemaps) {
+        const moving = rows.filter((t) => t.folder === remap.oldPath);
+        // unique (user_id, name, folder): a track of the same name already sits at the new path.
+        const taken = new Set(rows.filter((t) => t.folder === remap.newPath).map((t) => t.name));
+        if (moving.some((t) => taken.has(t.name))) {
+          return json(
+            { error: 'A track with the same name already exists at the new path', code: 'track_conflict' },
+            409,
+          );
+        }
+        if (moving.length) trackMoves.push({ ids: moving.map((t) => t.id), ...remap });
+      }
+    }
 
-    // Update the folder
-    const { data: updatedFolder, error: updateError } = await getSupabase()
-      .from('folders')
-      .update(updateData)
-      .eq('id', folderId)
-      .eq('user_id', user.id)
-      .select()
-      .single();
+    // Each step is scoped by the session user's id as well as its own key.
+    const updateRow = (
+      table: 'folders' | 'tracks',
+      [column, value]: [string, string],
+      data: Record<string, unknown>,
+    ): PromiseLike<{ error: unknown }> =>
+      supabase
+        .from(table)
+        .update(data as never)
+        .eq(column, value)
+        .eq('user_id', user.id);
+    const updateTracksById = (ids: string[], folder: string): PromiseLike<{ error: unknown }> =>
+      supabase
+        .from('tracks')
+        .update({ folder } as never)
+        .eq('user_id', user.id)
+        .in('id', ids);
 
+    // supabase-js reports failures as `{ error }`, not by throwing — both are checked.
+    const applied: Array<{ what: string; undo: () => PromiseLike<{ error: unknown }> }> = [];
+    const fail = async (what: string, err: unknown) => {
+      console.error(`API /folders/update - ${what} failed, rolling back:`, err);
+      const failedUndos: string[] = [];
+      for (const step of applied.reverse()) {
+        let undoError: unknown = null;
+        try {
+          undoError = (await step.undo()).error;
+        } catch (thrown: unknown) {
+          undoError = thrown ?? 'thrown';
+        }
+        if (undoError) {
+          console.error(`API /folders/update - rollback of ${step.what} failed:`, undoError);
+          failedUndos.push(step.what);
+        }
+      }
+      if (failedUndos.length) {
+        return json(
+          { error: 'Failed to update folder; the rollback is incomplete', code: 'rollback_incomplete', failedUndos },
+          500,
+        );
+      }
+      return json({ error: 'Failed to update folder' }, 500);
+    };
+
+    const { error: updateError } = await updateRow('folders', ['id', folderId], updateData);
     if (updateError) {
-      console.error('API /folders/update - Update failed:', updateError);
-      return new Response(
-        JSON.stringify({
-          error: 'Failed to update folder',
-          details: updateError.message,
+      return fail('Folder update', updateError);
+    }
+    applied.push({
+      what: `folder ${folderId}`,
+      undo: () =>
+        updateRow('folders', ['id', folderId], {
+          name: existingFolder.name,
+          path: existingFolder.path,
+          parent: existingFolder.parent ?? null,
         }),
-        {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' },
-        },
-      );
+    });
+
+    if (plan) {
+      // Descendant folders: rebuild their paths below the new one.
+      for (const change of plan.pathChanges.slice(1)) {
+        if (change.oldPath === change.newPath) continue;
+        const { error } = await updateRow('folders', ['id', change.id], { path: change.newPath });
+        if (error) return fail('Descendant folder update', error);
+        applied.push({
+          what: `folder ${change.id}`,
+          undo: () => updateRow('folders', ['id', change.id], { path: change.oldPath }),
+        });
+      }
+
+      for (const move of trackMoves) {
+        const { error } = await updateTracksById(move.ids, move.newPath);
+        if (error) return fail('Track folder update', error);
+        applied.push({
+          what: `tracks in ${move.oldPath}`,
+          undo: () => updateTracksById(move.ids, move.oldPath),
+        });
+      }
     }
 
-    console.log('API /folders/update - Folder updated successfully:', updatedFolder.id);
-
-    return new Response(
-      JSON.stringify({
+    const updatedFolder = { ...existingFolder, ...updateData } as FolderRow;
+    return json(
+      {
         success: true,
         folder: {
           id: updatedFolder.id,
           name: updatedFolder.name,
           path: updatedFolder.path,
-          parent: updatedFolder.parent,
+          parent: updatedFolder.parent ?? null,
           created: updatedFolder.created,
           updated_at: updatedFolder.updated_at,
         },
-      }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
+        pathChanges: plan?.pathChanges ?? [],
+        trackFolderRemaps: plan?.trackFolderRemaps ?? [],
       },
+      200,
     );
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return json({ error: 'Not authenticated' }, 401);
+    }
     console.error('API /folders/update - Unexpected error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return json({ error: 'Internal server error' }, 500);
   }
 };
 
-/**
- * Check if moving a folder would create a circular dependency
- */
-async function checkCircularDependency(supabase: any, folderId: string, targetParentId: string): Promise<boolean> {
-  // If trying to move folder to itself, that's circular
-  if (folderId === targetParentId) {
-    return true;
-  }
-
-  // Walk up the parent chain of the target to see if we encounter the folder being moved
-  let currentParentId = targetParentId;
+/** Would making `targetParentId` the parent of `folderId` create a cycle? (in-memory, this user's folders only) */
+function isCircular(folders: RenamableFolder[], folderId: string, targetParentId: string): boolean {
+  const parentOf = new Map(folders.map((f) => [f.id, f.parent ?? null]));
+  let current: string | null = targetParentId;
   const visited = new Set<string>();
-
-  while (currentParentId && !visited.has(currentParentId)) {
-    visited.add(currentParentId);
-
-    // If we encounter the folder being moved in the parent chain, it's circular
-    if (currentParentId === folderId) {
-      return true;
-    }
-
-    // Get the parent of the current folder
-    const { data: parentFolder } = await supabase.from('folders').select('parent').eq('id', currentParentId).single();
-
-    currentParentId = parentFolder?.parent;
+  while (current && !visited.has(current)) {
+    if (current === folderId) return true;
+    visited.add(current);
+    current = parentOf.get(current) ?? null;
   }
-
   return false;
 }

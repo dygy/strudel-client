@@ -143,7 +143,10 @@
     "importFailed": "Error al importar archivo",
     "exportFailed": "Error al exportar archivo",
     "saveFailed": "Error al guardar pista",
-    "renameFailed": "Error al renombrar elemento"
+    "renameFailed": "Error al renombrar elemento",
+    "folderNameEmpty": "El nombre de la carpeta no puede estar vacío",
+    "folderNameSlash": "El nombre de la carpeta no puede contener \"/\"",
+    "folderNameTaken": "Ya existe una carpeta llamada '{{name}}' aquí"
   },
 
   "success": {

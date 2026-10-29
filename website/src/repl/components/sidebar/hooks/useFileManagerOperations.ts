@@ -1,10 +1,20 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { toastActions } from '@src/stores/toastStore';
-import { tracksActions } from '@src/stores/tracksStore';
+import { tracksActions, tracksSelectors } from '@src/stores/tracksStore';
 import { nanoid } from 'nanoid';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
-import { setActivePattern } from '@src/user_pattern_utils';
+import { getActivePattern, setActivePattern } from '@src/user_pattern_utils';
 import { generateTrackUrlPath, trackNameToSlug } from '@src/lib/slugUtils';
+import {
+  applyRenameToFolders,
+  applyRenameToTracks,
+  findFolderByPathOrId,
+  invertFolderRenamePlan,
+  planFolderRename,
+  renamedTrackUrl,
+  type FolderRenameError,
+  type FolderRenamePlan,
+} from '@src/lib/folderRename';
 import { validateTrackName, generateUniqueTrackName } from '@src/lib/trackValidation';
 import type { Track, TrackStep, Folder } from '../types/fileManager';
 
@@ -47,11 +57,47 @@ interface UseFileManagerOperationsProps {
   isDeletingTrackRef: React.MutableRefObject<boolean>;
   isDeletingFolderRef: React.MutableRefObject<Set<string>>;
   context: any;
-  t: (key: string) => string;
+  t: (key: string, options?: Record<string, unknown>) => string;
   // API functions
   deleteTrack?: (trackId: string) => Promise<boolean>;
+  /**
+   * PUT /api/folders/update (useSupabaseFileManager). Resolves falsy after it has reported the
+   * failure, or `{ rollbackIncomplete: true }` when the server could not undo a partial rename.
+   */
+  updateFolder?: (
+    folderId: string,
+    updates: { parent?: string | null; name?: string },
+  ) => Promise<{ id: string; name: string; path: string } | { rollbackIncomplete: true } | null | void>;
+  /** Reload tracks and folders from Supabase (useSupabaseFileManager). */
+  refreshFromSupabase?: () => Promise<void>;
   // Read-only mode (for admin viewing other users' repls)
   readOnly?: boolean;
+}
+
+const FOLDER_RENAME_ERROR_KEYS: Record<FolderRenameError, string> = {
+  notFound: 'files:errors.renameFailed',
+  empty: 'files:errors.folderNameEmpty',
+  slash: 'files:errors.folderNameSlash',
+  duplicate: 'files:errors.folderNameTaken',
+};
+
+/** Mirror a folder rename into the global tracks store (URL routing reads it). */
+function syncRenameToTracksStore(plan: FolderRenamePlan) {
+  for (const change of plan.pathChanges) {
+    const stored = tracksSelectors.getFolder(change.id);
+    if (stored) {
+      tracksActions.addFolder({
+        ...stored,
+        path: change.newPath,
+        ...(change.id === plan.folderId ? { name: plan.newName } : {}),
+      });
+    }
+  }
+  const remap = new Map(plan.trackFolderRemaps.map((r) => [r.oldPath, r.newPath]));
+  for (const track of tracksSelectors.getTracks()) {
+    const next = track.folder ? remap.get(track.folder) : undefined;
+    if (next) tracksActions.updateTrack(track.id, { folder: next });
+  }
 }
 
 export function useFileManagerOperations({
@@ -95,8 +141,13 @@ export function useFileManagerOperations({
   context,
   t,
   deleteTrack: deleteTrackAPI,
+  updateFolder: updateFolderAPI,
+  refreshFromSupabase,
   readOnly = false,
 }: UseFileManagerOperationsProps) {
+  // Enter and the input's blur can both finish the same rename; only the first one counts.
+  const folderRenameInFlightRef = useRef(false);
+
   const createNewTrack = useCallback(
     (parentPath?: string) => {
       if (!newTrackName.trim()) return;
@@ -475,9 +526,11 @@ export function useFileManagerOperations({
   );
 
   const handleFolderRename = useCallback(
-    (folderPath: string) => {
-      setRenamingFolder(folderPath);
-      setRenameValue(folders[folderPath]?.name || '');
+    (folderPathOrId: string) => {
+      // The tree identifies the folder by path (it shows the input where renamingFolder ===
+      // node.path); the folders map is keyed by id, so resolve either.
+      setRenamingFolder(folderPathOrId);
+      setRenameValue(findFolderByPathOrId(folders, folderPathOrId)?.name || '');
     },
     [setRenamingFolder, setRenameValue, folders],
   );
@@ -550,26 +603,115 @@ export function useFileManagerOperations({
     setRenameValue('');
   }, [renamingTrack, renameValue, tracks, setTracks, setRenamingTrack, setRenameValue, t]);
 
-  const finishRenameFolder = useCallback(() => {
-    if (renamingFolder && renameValue.trim()) {
-      const folder = folders[renamingFolder];
-      if (folder && renameValue.trim() !== folder.name) {
-        const newPath = folder.parent ? `${folder.parent}/${renameValue.trim()}` : renameValue.trim();
+  const finishRenameFolder = useCallback(async () => {
+    if (readOnly || !renamingFolder || folderRenameInFlightRef.current) return;
 
-        const updatedFolder = { ...folder, name: renameValue.trim(), path: newPath };
-        setFolders((prev) => {
-          const newFolders = { ...prev };
-          delete newFolders[renamingFolder];
-          newFolders[newPath] = updatedFolder;
-          return newFolders;
-        });
+    const closeInput = () => {
+      setRenamingFolder(null);
+      setRenameValue('');
+    };
 
-        toastActions.success(t('files:folderRenamed'));
-      }
+    const folder = findFolderByPathOrId(folders, renamingFolder);
+    const newName = renameValue.trim();
+    if (!folder) {
+      closeInput();
+      toastActions.error(t('files:errors.renameFailed'));
+      return;
     }
-    setRenamingFolder(null);
-    setRenameValue('');
-  }, [renamingFolder, renameValue, folders, setFolders, setRenamingFolder, setRenameValue, t]);
+    if (newName === folder.name) {
+      closeInput();
+      return;
+    }
+
+    const result = planFolderRename(Object.values(folders), folder.id, newName);
+    if ('error' in result) {
+      // Keep the input open so the name can be corrected.
+      toastActions.error(t(FOLDER_RENAME_ERROR_KEYS[result.error], { name: newName }));
+      return;
+    }
+    const plan = result.plan;
+
+    folderRenameInFlightRef.current = true;
+    closeInput();
+
+    // The open track's URL carries the folder slug, and the autosave guard resolves the open
+    // track from the URL — move the URL along with the folder or autosave silently stops.
+    const nextFolders = applyRenameToFolders(folders, plan);
+    const nextTracks = applyRenameToTracks(tracks, plan);
+    const oldUrl = typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : '';
+    const oldActivePattern = getActivePattern();
+    const newUrl =
+      typeof window !== 'undefined'
+        ? renamedTrackUrl(window.location, { tracks, folders }, { tracks: nextTracks, folders: nextFolders }, plan)
+        : null;
+
+    const applyLocally = (p: FolderRenamePlan, url: string | null, activePattern: string | null) => {
+      setFolders((prev) => applyRenameToFolders(prev, p));
+      setTracks((prev) => applyRenameToTracks(prev, p));
+      syncRenameToTracksStore(p);
+      if (url) {
+        // replaceState: same track, same audio — no navigation, no reload.
+        window.history.replaceState(window.history.state, '', url);
+        if (activePattern !== null) setActivePattern(activePattern);
+      }
+    };
+
+    applyLocally(plan, newUrl, newUrl ? newUrl.replace(/^\/repl\//, '') : null);
+
+    try {
+      const saved = updateFolderAPI ? await updateFolderAPI(folder.id, { name: plan.newName }) : null;
+      if (saved && 'rollbackIncomplete' in saved) {
+        // The server state is unknown: put the URL back and reload what the server has
+        // rather than guessing locally. updateFolder has already shown the toast.
+        revertUrl();
+        await refreshFromSupabase?.();
+        return;
+      }
+      if (!saved) {
+        if (!updateFolderAPI) toastActions.error(t('files:errors.renameFailed'));
+        // Otherwise updateFolder has already reported why.
+        revert();
+        return;
+      }
+      toastActions.success(t('files:folderRenamed'));
+    } catch (error: unknown) {
+      console.error('FileManager - folder rename failed:', error);
+      toastActions.error(t('files:errors.renameFailed'));
+      revert();
+    } finally {
+      folderRenameInFlightRef.current = false;
+    }
+
+    // Only undo the URL if nothing navigated away from it meanwhile.
+    function urlToRestore(): string | null {
+      return newUrl !== null && `${window.location.pathname}${window.location.search}` === newUrl ? oldUrl : null;
+    }
+
+    function revert() {
+      const url = urlToRestore();
+      applyLocally(invertFolderRenamePlan(plan), url, url ? oldActivePattern : null);
+    }
+
+    function revertUrl() {
+      const url = urlToRestore();
+      if (!url) return;
+      window.history.replaceState(window.history.state, '', url);
+      setActivePattern(oldActivePattern);
+    }
+  }, [
+    readOnly,
+    renamingFolder,
+    renameValue,
+    folders,
+    tracks,
+    setFolders,
+    setTracks,
+    setRenamingFolder,
+    setRenameValue,
+    updateFolderAPI,
+    refreshFromSupabase,
+    t,
+  ]);
 
   const handleMoveItem = useCallback(
     async (itemId: string, itemType: 'track' | 'folder', targetId: string) => {
