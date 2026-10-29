@@ -5,7 +5,7 @@ import { Repl } from '../../repl/Repl';
 import { I18nProvider } from '../../components/I18nProvider';
 import { createClient } from '@supabase/supabase-js';
 import { TreeDataTransformer } from '../../lib/TreeDataTransformer';
-import { parseTrackUrlPath, trackNameToSlug } from '../../lib/slugUtils';
+import { parseTrackUrlPath, findTrackByFolderAndSlug } from '../../lib/slugUtils';
 
 import type { SSRData } from '../../types/ssr';
 import { serverEnv } from '../../lib/server-env';
@@ -102,16 +102,14 @@ try {
             user_id: folder.user_id,
           }));
 
+          const foldersMap = Object.fromEntries(folders.map(folder => [folder.id, folder]));
+
           // Find track by folder path and track slug (if provided)
           let targetTrack = null;
           
           if (trackSlug) {
-            // Match tracks by folder PATH (not ID) since tracks now store folder paths
-            targetTrack = tracks.find(track => {
-              const trackMatches = trackNameToSlug(track.name) === trackSlug;
-              const folderMatches = (track.folder || null) === (folderPath || null);
-              return trackMatches && folderMatches;
-            }) || null;
+            // track.folder is a folder id or a folder path; the URL carries the folder slug
+            targetTrack = findTrackByFolderAndSlug(tracks, folderPath || null, trackSlug, folders);
             
             console.log('REPL SSR - Track search result:', {
               trackSlug,
@@ -132,7 +130,7 @@ try {
             // Redirect to a random track
             const randomTrack = tracks[Math.floor(Math.random() * tracks.length)];
             const { generateTrackUrlPath, trackNameToSlug: slugify } = await import('../../lib/slugUtils');
-            let trackUrl = generateTrackUrlPath(randomTrack.name, randomTrack.folder);
+            let trackUrl = generateTrackUrlPath(randomTrack.name, randomTrack.folder, foldersMap);
             
             // If multitrack, add first step to URL
             if (randomTrack.isMultitrack && randomTrack.steps && randomTrack.steps.length > 0) {
@@ -156,7 +154,7 @@ try {
               // If no step parameter, redirect to include the first step
               if (!stepParam) {
                 const { generateTrackUrlPath, trackNameToSlug: slugify } = await import('../../lib/slugUtils');
-                let trackUrl = generateTrackUrlPath(targetTrack.name, targetTrack.folder);
+                let trackUrl = generateTrackUrlPath(targetTrack.name, targetTrack.folder, foldersMap);
                 const firstStepSlug = slugify(targetTrack.steps[0].name);
                 trackUrl = `${trackUrl}?step=${firstStepSlug}`;
                 
@@ -170,7 +168,7 @@ try {
               
               if (stepParam) {
                 const { generateTrackUrlPath } = await import('../../lib/slugUtils');
-                const trackUrl = generateTrackUrlPath(targetTrack.name, targetTrack.folder);
+                const trackUrl = generateTrackUrlPath(targetTrack.name, targetTrack.folder, foldersMap);
                 
                 console.log('REPL SSR - Regular track with step parameter, redirecting to remove it:', trackUrl);
                 return Astro.redirect(trackUrl);

@@ -43,37 +43,8 @@ const getCurrentTrackIdFromURL = (
   // Find the track by slug and folder path
   const tracks = Object.values(tracksMap);
 
-  // Try to find track by matching slug and folder
-  const track = tracks.find((t) => {
-    const tSlug = trackNameToSlug(t.name);
-    const slugMatch = tSlug === trackSlug;
-
-    if (!slugMatch) return false;
-
-    // If no folder in URL, match tracks with no folder
-    if (!urlFolderPath) {
-      return !t.folder || t.folder === 'root';
-    }
-
-    // Check if track.folder matches the URL folder path
-    // Case 1: track.folder is already a path (new format)
-    if (t.folder === urlFolderPath) {
-      return true;
-    }
-
-    // Case 2: track.folder is a UUID (legacy format) - need to look up the folder's path
-    const folder = foldersMap[t.folder];
-    if (folder && folder.path === urlFolderPath) {
-      return true;
-    }
-
-    // Case 3: URL might contain a folder UUID (legacy URL format)
-    if (t.folder === urlFolderPath) {
-      return true;
-    }
-
-    return false;
-  });
+  // track.folder is a folder id or a folder path; the URL carries the folder slug
+  const track = findTrackByFolderAndSlug(tracks, urlFolderPath, trackSlug, Object.values(foldersMap));
 
   // Only log if track not found and we have tracks loaded (to help debug issues)
   if (!track && tracks.length > 0) {
@@ -671,7 +642,7 @@ export function useSupabaseFileManager(
     const folderPath = segments.length > 0 ? segments.join('/') : null;
 
     const tracksArray = Object.values(tracks);
-    targetTrack = findTrackByFolderAndSlug(tracksArray, folderPath, trackSlug);
+    targetTrack = findTrackByFolderAndSlug(tracksArray, folderPath, trackSlug, Object.values(folders));
 
     // Parse step parameter if present
     let stepName: string | null = null;
@@ -737,6 +708,7 @@ export function useSupabaseFileManager(
     selectedTrack,
     loadTrack,
     tracks,
+    folders,
     user,
     selectedStepTrack,
     setSelectedStepTrack,

@@ -6,7 +6,7 @@ import { Repl } from '../../../repl/Repl';
 import { I18nProvider } from '../../../components/I18nProvider';
 import { createClient } from '@supabase/supabase-js';
 import { TreeDataTransformer } from '../../../lib/TreeDataTransformer';
-import { parseTrackUrlPath, trackNameToSlug } from '../../../lib/slugUtils';
+import { parseTrackUrlPath, trackNameToSlug, findTrackByFolderAndSlug } from '../../../lib/slugUtils';
 import { isAdmin } from '../../../lib/adminAuth';
 
 import type { SSRData } from '../../../types/ssr';
@@ -132,22 +132,8 @@ try {
     let targetTrack = null;
 
     if (trackSlug) {
-      targetTrack = tracks.find(track => {
-        const trackMatches = trackNameToSlug(track.name) === trackSlug;
-        // Handle folder ID vs path - look up folder by ID to get its path
-        let trackFolderPath: string | null = null;
-        if (track.folder) {
-          const folder = folders.find(f => f.id === track.folder);
-          if (folder) {
-            trackFolderPath = folder.path;
-          } else {
-            // Fallback: track.folder might already be a path
-            trackFolderPath = track.folder;
-          }
-        }
-        const folderMatches = trackFolderPath === (folderPath || null);
-        return trackMatches && folderMatches;
-      }) || null;
+      // track.folder is a folder id or a folder path; the URL carries the folder slug
+      targetTrack = findTrackByFolderAndSlug(tracks, folderPath || null, trackSlug, folders);
 
       console.log('Admin REPL SSR - Track search result:', {
         trackSlug,

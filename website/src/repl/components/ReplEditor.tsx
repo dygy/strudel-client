@@ -17,6 +17,7 @@ import { nanoid } from 'nanoid';
 import { useState, useEffect, memo, useRef } from 'react';
 import { getPendingCode, clearPendingCode, getEditorInstance, setPendingCode } from '../../stores/editorStore';
 import { globalSaveManager } from '../globalSaveManager';
+import { findTrackByFolderAndSlug } from '@src/lib/slugUtils';
 
 interface ReplContext {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -353,16 +354,13 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
           const folderPath = segments.length > 0 ? segments.join('/') : null;
 
           // Find the track by folder and slug
-          const track = tracks.find((t: any) => {
-            const trackMatches =
-              t.name
-                .toLowerCase()
-                .trim()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/^-+|-+$/g, '') === trackSlug;
-            const folderMatches = (t.folder || null) === folderPath;
-            return trackMatches && folderMatches;
-          });
+          // track.folder is a folder id or a folder path; the URL carries the folder slug
+          const track = findTrackByFolderAndSlug(
+            tracks as any[],
+            folderPath,
+            trackSlug || '',
+            Object.values(fileManagerHook.folders || {}) as any[],
+          );
 
           if (track) {
             console.log('ReplEditor: Found track for browser navigation:', (track as any).name);

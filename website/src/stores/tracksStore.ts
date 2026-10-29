@@ -6,6 +6,7 @@
 
 import { atom } from 'nanostores';
 import { secureApi } from '../lib/secureApi';
+import { findTrackByFolderAndSlug } from '../lib/slugUtils';
 
 // Types
 export interface Track {
@@ -405,19 +406,17 @@ export const tracksActions = {
       if (targetTrackSlug) {
         const updatedState = tracksStore.get();
 
-        // Find track by slug and folder path
-        const tracks = Object.values(updatedState.tracks);
+        // Prefer the track the server already resolved; otherwise match the URL, whose
+        // folder segment is a slug while track.folder here is the raw folder path
+        const serverTrack = ssrData?.targetTrackId ? updatedState.tracks[ssrData.targetTrackId] : undefined;
         targetTrack =
-          tracks.find((track) => {
-            const trackSlug = track.name
-              .toLowerCase()
-              .trim()
-              .replace(/[^a-z0-9]+/g, '-')
-              .replace(/^-+|-+$/g, '');
-            const trackMatches = trackSlug === targetTrackSlug;
-            const folderMatches = (track.folder || null) === (targetFolderPath || null);
-            return trackMatches && folderMatches;
-          }) || null;
+          serverTrack ||
+          findTrackByFolderAndSlug(
+            Object.values(updatedState.tracks),
+            targetFolderPath || null,
+            targetTrackSlug,
+            Object.values(updatedState.folders),
+          );
 
         if (targetTrack) {
           console.log('TracksStore: Loading specific track from path:', targetTrack.name, 'ID:', targetTrack.id);

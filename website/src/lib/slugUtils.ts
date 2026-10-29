@@ -137,21 +137,41 @@ export function slugToDisplayName(slug: string): string {
 }
 
 /**
+ * Check whether a track is the one a URL's folder path and track slug point at.
+ *
+ * `track.folder` holds either a folder id or a folder path, while the URL holds the
+ * slugified folder path (see generateTrackUrlPath), so both sides are resolved to a
+ * slug before comparing. A legacy URL carrying the raw folder value still matches.
+ */
+export function trackMatchesUrlPath(
+  track: { name: string; folder?: string | null },
+  urlFolderPath: string | null,
+  trackSlug: string,
+  folders: Array<{ id: string; path: string }> = [],
+): boolean {
+  if (trackNameToSlug(track.name) !== trackSlug) return false;
+
+  const folderValue = track.folder && track.folder !== 'root' ? track.folder : null;
+  if (!urlFolderPath) return folderValue === null;
+  if (!folderValue) return false;
+  if (folderValue === urlFolderPath) return true;
+
+  const resolvedPath = folders.find((f) => f.id === folderValue)?.path ?? folderValue;
+  return folderPathToSlug(resolvedPath) === folderPathToSlug(urlFolderPath);
+}
+
+/**
  * Find a track by folder path and track slug
  */
-export function findTrackByFolderAndSlug(
-  tracks: Array<{ id: string; name: string; folder?: string | null }>,
+export function findTrackByFolderAndSlug<T extends { id: string; name: string; folder?: string | null }>(
+  tracks: T[],
   folderPath: string | null,
   trackSlug: string,
-): { id: string; name: string; folder?: string | null } | null {
+  folders: Array<{ id: string; path: string }> = [],
+): T | null {
   console.log('findTrackByFolderAndSlug: Looking for track:', { folderPath, trackSlug });
 
-  const candidates = tracks.filter((track) => {
-    const trackMatches = trackNameToSlug(track.name) === trackSlug;
-    const folderMatches = (track.folder || null) === folderPath;
-
-    return trackMatches && folderMatches;
-  });
+  const candidates = tracks.filter((track) => trackMatchesUrlPath(track, folderPath, trackSlug, folders));
 
   if (candidates.length === 1) {
     return candidates[0];
