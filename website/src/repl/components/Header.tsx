@@ -3,7 +3,8 @@ import PlayCircleIcon from '@heroicons/react/20/solid/PlayCircleIcon';
 import StopCircleIcon from '@heroicons/react/20/solid/StopCircleIcon';
 import { Bars3Icon, ArrowPathIcon, EyeIcon, MicrophoneIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 import cx from '@src/cx';
-import { useSettings, setIsFileManagerOpen } from '../../settings';
+import { useSettings } from '../../settings';
+import { usePanelLayout } from './panel/panelLayout';
 import { AuthButton } from '../../components/auth/AuthButton';
 import { formatElapsedTime } from '../recording/formatUtils';
 import '../Repl.css';
@@ -189,7 +190,9 @@ function RecordPopover({
 /*  Main Header                                                       */
 /* ------------------------------------------------------------------ */
 export function Header({ context, embedded }: HeaderProps) {
-  const { isZen, isFileManagerOpen } = useSettings();
+  const { isZen } = useSettings();
+  // On phones the file sidebar and the panel sheet are mutually exclusive (session-only hides).
+  const { filesOpen: isFileManagerOpen, toggleFileManager } = usePanelLayout();
   const [recordPopoverOpen, setRecordPopoverOpen] = useState(false);
   const recordBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -237,7 +240,7 @@ export function Header({ context, embedded }: HeaderProps) {
 
         {/* Files toggle */}
         <IconBtn
-          onClick={() => setIsFileManagerOpen(!isFileManagerOpen)}
+          onClick={toggleFileManager}
           title={isFileManagerOpen ? 'Hide files' : 'Show files'}
           active={isFileManagerOpen}
           glow="blue"

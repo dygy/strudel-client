@@ -1,8 +1,12 @@
 {
   "close": "Cerrar",
+  "closePanel": "Cerrar panel",
+  "openPanel": "Abrir panel",
+  "pinPanel": "Fijar panel",
+  "menuPanel": "Panel de menú",
   "cancel": "Cancelar",
   "confirm": "Confirmar",
-  "save": "Guardar", 
+  "save": "Guardar",
   "delete": "Eliminar",
   "edit": "Editar",
   "loading": "Cargando...",

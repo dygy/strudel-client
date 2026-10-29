@@ -1,6 +1,10 @@
 {
   "close": "닫기",
-  "cancel": "취소", 
+  "closePanel": "패널 닫기",
+  "openPanel": "패널 열기",
+  "pinPanel": "패널 고정",
+  "menuPanel": "메뉴 패널",
+  "cancel": "취소",
   "confirm": "확인",
   "save": "저장",
   "delete": "삭제",

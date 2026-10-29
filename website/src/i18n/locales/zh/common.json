@@ -1,6 +1,10 @@
 {
   "close": "关闭",
-  "cancel": "取消", 
+  "closePanel": "关闭面板",
+  "openPanel": "打开面板",
+  "pinPanel": "固定面板",
+  "menuPanel": "菜单面板",
+  "cancel": "取消",
   "confirm": "确认",
   "save": "保存",
   "delete": "删除",

@@ -2,6 +2,7 @@ import Loader from '@src/repl/components/Loader';
 import { ExportDialog } from './ExportDialog';
 import { getAudioContext } from '@strudel/webaudio';
 import { HorizontalPanel, VerticalPanel } from '@src/repl/components/panel/Panel';
+import { usePanelLayout } from '@src/repl/components/panel/panelLayout';
 import { Code } from '@src/repl/components/Code';
 import UserFacingErrorMessage from '@src/repl/components/UserFacingErrorMessage';
 import { Header } from './Header';
@@ -53,7 +54,8 @@ interface ReplEditorProps extends React.HTMLAttributes<HTMLDivElement> {
 function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer, ...editorProps }: ReplEditorProps) {
   const { containerRef, editorRef, error, init, pending } = context;
   const settings = useSettings();
-  const { panelPosition, isZen, isFileManagerOpen } = settings;
+  const { panelPosition, isZen } = settings;
+  const { filesOpen: isFileManagerOpen } = usePanelLayout();
 
   // Use the tracks store instead of complex state management
   const tracks = useTracks();

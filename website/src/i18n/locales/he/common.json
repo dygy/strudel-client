@@ -1,5 +1,9 @@
 {
   "close": "סגור",
+  "closePanel": "סגור את הפאנל",
+  "openPanel": "פתח את הפאנל",
+  "pinPanel": "הצמד את הפאנל",
+  "menuPanel": "פאנל תפריט",
   "cancel": "ביטול",
   "confirm": "אישור",
   "save": "שמור",

@@ -1,7 +1,11 @@
 {
   "close": "Fermer",
+  "closePanel": "Fermer le panneau",
+  "openPanel": "Ouvrir le panneau",
+  "pinPanel": "Épingler le panneau",
+  "menuPanel": "Panneau de menu",
   "cancel": "Annuler",
-  "confirm": "Confirmer", 
+  "confirm": "Confirmer",
   "save": "Enregistrer",
   "delete": "Supprimer",
   "edit": "Modifier",

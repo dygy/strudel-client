@@ -47,6 +47,7 @@ Last surveyed: 2026-10-08.
 | Feature | Origin | Code | Spec | Tests | Owner |
 |---|---|---|---|---|---|
 | REPL shell and panels | U | `website/src/repl/{Repl.tsx,useReplContext.tsx,panel/*}` | none | none | web |
+| Settings panel on phones and tablets: a full-width sheet with a fixed close button, hidden on a narrow load (not persisted), exclusive with the file sidebar | F | `website/src/repl/components/panel/{Panel.tsx,panelViewport.ts,panelLayout.ts}`; `Header.tsx`; `ReplEditor.tsx` | none (full responsive layout is a /ship follow-up) | `repl/__tests__/panelViewport`; `panel/__tests__/Panel-compact` (jsdom render) | web |
 | Authenticated REPL, welcome screen, toasts and tooltips, burger and context menus | F | `website/src/repl/{useAuthenticatedReplContext.tsx,AuthenticatedReplEditor.tsx,WelcomeScreen.tsx}`; `stores/{toastStore,tooltipStore}.ts` | none | `stores/__tests__/toastStore.test.ts` (5-toast cap, trimmed toasts can show again, de-dup) | web |
 | Global save manager and emergency save | F | `website/src/repl/globalSaveManager.ts`; `hooks/useEmergencySave.ts` | none | `repl/__tests__/globalSaveManager.test.ts` | web |
 | i18n: 9 locales, lazy loading, RTL | F | `website/src/i18n/*`; `I18nProvider.tsx`; `LanguageSelector.tsx` | none | `i18n/__tests__/localeCompleteness.test.ts` (every locale has every en key, non-empty, same placeholders) | web |

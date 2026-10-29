@@ -1,5 +1,9 @@
 {
   "close": "إغلاق",
+  "closePanel": "إغلاق اللوحة",
+  "openPanel": "فتح اللوحة",
+  "pinPanel": "تثبيت اللوحة",
+  "menuPanel": "لوحة القائمة",
   "cancel": "إلغاء",
   "confirm": "تأكيد",
   "save": "حفظ",

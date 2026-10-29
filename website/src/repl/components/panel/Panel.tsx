@@ -1,5 +1,5 @@
 import cx from '@src/cx';
-import { setPanelPinned, setActiveFooter as setTab, setIsPanelOpened, useSettings } from '../../../settings';
+import { setPanelPinned, setActiveFooter as setTab, useSettings } from '../../../settings';
 import { ConsoleTab } from './ConsoleTab';
 import { FilesTab } from './FilesTab';
 import { EnhancedReference } from './EnhancedReference';
@@ -14,6 +14,8 @@ import { useTranslation } from '@src/i18n';
 import { useState, useRef, useEffect, createContext, useContext } from 'react';
 import React from 'react';
 import { toastActions } from '@src/stores/toastStore';
+import { clampPanelWidth, resolvePanelTrigger } from './panelViewport';
+import { usePanelLayout } from './panelLayout';
 
 // Toast context for sharing toast actions across panel components
 const ToastContext = createContext<typeof toastActions | null>(null);
@@ -58,16 +60,25 @@ interface Settings {
 }
 
 export function HorizontalPanel({ context }: PanelProps) {
-  const settings = useSettings();
-  const { isPanelOpen, activeFooter: tab } = settings;
+  const rawSettings = useSettings();
+  const { activeFooter: tab } = rawSettings;
+  const { compact, canHover, panelOpen: isPanelOpen, openPanel, closePanel } = usePanelLayout();
+  const settings = {
+    ...rawSettings,
+    isPanelOpen,
+    togglePanelTrigger: resolvePanelTrigger(rawSettings.togglePanelTrigger, { canHover, compact }),
+  };
 
   return (
     <ToastContext.Provider value={toastActions}>
       <PanelNav
         settings={settings}
+        onOpen={openPanel}
+        onClose={closePanel}
         className="overflow-hidden flex flex-col"
         style={{
-          height: isPanelOpen ? 360 : 48,
+          // On a phone the open bottom sheet leaves at least half the screen to the editor.
+          height: isPanelOpen ? (compact ? 'min(360px, 50vh)' : 360) : 48,
           transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
@@ -77,11 +88,11 @@ export function HorizontalPanel({ context }: PanelProps) {
           </div>
         )}
 
-        <div className="absolute right-4 pt-4">
-          <PanelActionButton settings={settings} />
+        <div className={cx('absolute', compact ? 'end-4 pt-0.5' : 'right-4 pt-4')}>
+          <PanelActionButton settings={settings} onClose={closePanel} large={compact} />
         </div>
 
-        <div className="flex  justify-between min-h-12 max-h-12 grid-cols-2 items-center">
+        <div className={cx('flex  justify-between min-h-12 max-h-12 grid-cols-2 items-center', compact && 'pe-16')}>
           <Tabs setTab={setTab} tab={tab} />
         </div>
       </PanelNav>
@@ -90,9 +101,16 @@ export function HorizontalPanel({ context }: PanelProps) {
 }
 
 export function VerticalPanel({ context }: PanelProps) {
-  const settings = useSettings();
-  const { activeFooter: tab, isPanelOpen } = settings;
+  const rawSettings = useSettings();
+  const { activeFooter: tab } = rawSettings;
   const { i18n } = useTranslation();
+  const { t } = useTranslation('common');
+  const { compact, canHover, viewportWidth, panelOpen: isPanelOpen, openPanel, closePanel } = usePanelLayout();
+  const settings = {
+    ...rawSettings,
+    isPanelOpen,
+    togglePanelTrigger: resolvePanelTrigger(rawSettings.togglePanelTrigger, { canHover, compact }),
+  };
   const [width, setWidth] = useState(600);
   const [isResizing, setIsResizing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -100,15 +118,18 @@ export function VerticalPanel({ context }: PanelProps) {
   const startWidth = useRef(0);
 
   const minWidth = 400;
-  const maxWidth = Math.min(1200, typeof window !== 'undefined' ? window.innerWidth * 0.8 : 1200);
+  const maxWidth = Math.min(1200, viewportWidth * 0.8);
 
   // Check if current language is RTL
   const isRTL = ['ar', 'he'].includes(i18n.language);
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Start from the width actually drawn: after a window shrink the stored width can be larger.
+    const drawnWidth = clampPanelWidth(width, viewportWidth, minWidth);
+    setWidth(drawnWidth);
     setIsResizing(true);
     startX.current = e.clientX;
-    startWidth.current = width;
+    startWidth.current = drawnWidth;
 
     // Prevent text selection during resize
     document.body.style.userSelect = 'none';
@@ -146,13 +167,44 @@ export function VerticalPanel({ context }: PanelProps) {
     };
   }, [isResizing, minWidth, maxWidth, isRTL]);
 
+  // Phones: the open panel is a full-width sheet over the editor area with a fixed header holding
+  // the close button; the tab row scrolls on its own. Closed, it is the same 48px strip as desktop.
+  if (compact && isPanelOpen) {
+    return (
+      <ToastContext.Provider value={toastActions}>
+        {/* lineHighlight is translucent; an opaque underlay keeps the code from showing through.
+            z-[15]: above the editor (.cm-editor is z-index 11 in Repl.css) and below the header
+            (relative z-20), so header popovers such as the record menu stay on top. */}
+        <div className="absolute inset-0 z-[15] bg-background" data-panel-sheet="">
+          <PanelNav
+            settings={settings}
+            onOpen={openPanel}
+            onClose={closePanel}
+            className="h-full w-full flex flex-col overflow-hidden"
+            ref={panelRef}
+          >
+            <div className="flex items-center shrink-0 gap-1 border-b border-lineBackground">
+              <Tabs setTab={setTab} tab={tab} className="flex-1 min-w-0 overflow-x-auto pb-0" />
+              <PanelActionButton settings={settings} onClose={closePanel} large />
+            </div>
+            <div className="overflow-auto flex-1 min-h-0">
+              <PanelContent context={context} tab={tab} />
+            </div>
+          </PanelNav>
+        </div>
+      </ToastContext.Provider>
+    );
+  }
+
   return (
     <ToastContext.Provider value={toastActions}>
       <PanelNav
         settings={settings}
+        onOpen={openPanel}
+        onClose={closePanel}
         className={cx('relative flex-shrink-0 overflow-hidden')}
         style={{
-          width: isPanelOpen ? width : 48,
+          width: isPanelOpen ? clampPanelWidth(width, viewportWidth, minWidth) : 48,
           transition: isResizing ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
         ref={panelRef}
@@ -171,8 +223,8 @@ export function VerticalPanel({ context }: PanelProps) {
 
             <div className={cx('flex flex-col h-full', isRTL ? 'pr-1' : 'pl-1')}>
               <div className="flex justify-between w-full ">
-                <Tabs setTab={setTab} tab={tab} />
-                <PanelActionButton settings={settings} />
+                <Tabs setTab={setTab} tab={tab} className="min-w-0" />
+                <PanelActionButton settings={settings} onClose={closePanel} />
               </div>
 
               <div className="overflow-auto h-full">
@@ -182,10 +234,9 @@ export function VerticalPanel({ context }: PanelProps) {
           </>
         ) : (
           <button
-            onClick={(e) => {
-              setIsPanelOpened(true);
-            }}
-            aria-label="open menu panel"
+            onClick={() => openPanel()}
+            aria-label={t('openPanel')}
+            data-panel-open=""
             className={cx(
               'flex flex-col hover:bg-lineBackground items-center cursor-pointer justify-center w-full h-full',
               'transition-colors duration-200',
@@ -227,32 +278,35 @@ interface PanelNavProps {
   children: React.ReactNode;
   className?: string;
   settings: Settings;
+  onOpen: () => void;
+  onClose: () => void;
   style?: React.CSSProperties;
   [key: string]: any;
 }
 
 const PanelNav = React.forwardRef<HTMLElement, PanelNavProps>(
-  ({ children, className, settings, style, ...props }, ref) => {
+  ({ children, className, settings, onOpen, onClose, style, ...props }, ref) => {
     const isHoverBehavior = settings.togglePanelTrigger === 'hover';
+    const { t } = useTranslation('common');
     return (
       <nav
         ref={ref}
         onClick={() => {
           if (!settings.isPanelOpen) {
-            setIsPanelOpened(true);
+            onOpen();
           }
         }}
         onMouseEnter={() => {
           if (isHoverBehavior && !settings.isPanelOpen) {
-            setIsPanelOpened(true);
+            onOpen();
           }
         }}
         onMouseLeave={() => {
           if (isHoverBehavior && !settings.isPanelPinned) {
-            setIsPanelOpened(false);
+            onClose();
           }
         }}
-        aria-label="Menu Panel"
+        aria-label={t('menuPanel')}
         className={cx('bg-lineHighlight group overflow-x-auto', className)}
         style={style}
         {...props}
@@ -341,7 +395,7 @@ function PanelTab({ label, isSelected, onClick }: PanelTabProps) {
     <button
       onClick={onClick}
       className={cx(
-        'relative h-8 px-2 text-foreground cursor-pointer flex items-center space-x-1',
+        'relative h-8 px-2 text-foreground cursor-pointer flex items-center space-x-1 shrink-0 whitespace-nowrap',
         'transition-all duration-200 ease-out',
         isSelected ? 'opacity-100' : 'opacity-50 hover:opacity-75',
       )}
@@ -380,9 +434,12 @@ function Tabs({ setTab, tab, className }: TabsProps) {
 
 interface PanelActionButtonProps {
   settings: Settings;
+  onClose: () => void;
+  /** Touch-sized (44px) close control for compact viewports. */
+  large?: boolean;
 }
 
-function PanelActionButton({ settings }: PanelActionButtonProps) {
+function PanelActionButton({ settings, onClose, large = false }: PanelActionButtonProps) {
   const { togglePanelTrigger, isPanelPinned, isPanelOpen } = settings;
   const isHoverBehavior = togglePanelTrigger === 'hover';
   if (!isPanelOpen) {
@@ -392,7 +449,7 @@ function PanelActionButton({ settings }: PanelActionButtonProps) {
   if (isHoverBehavior) {
     return <PinButton pinned={isPanelPinned} />;
   }
-  return <CloseButton onClick={() => setIsPanelOpened(false)} />;
+  return <CloseButton onClick={onClose} large={large} />;
 }
 
 interface PinButtonProps {
@@ -400,6 +457,7 @@ interface PinButtonProps {
 }
 
 function PinButton({ pinned }: PinButtonProps) {
+  const { t } = useTranslation('common');
   return (
     <button
       onClick={() => setPanelPinned(!pinned)}
@@ -407,7 +465,7 @@ function PinButton({ pinned }: PinButtonProps) {
         'text-foreground max-h-8 min-h-8 max-w-8 min-w-8 items-center justify-center p-1.5 group-hover:flex',
         pinned ? 'flex' : 'hidden',
       )}
-      aria-label="Pin Menu Panel"
+      aria-label={t('pinPanel')}
     >
       <svg
         stroke="currentColor"
@@ -426,18 +484,22 @@ function PinButton({ pinned }: PinButtonProps) {
 
 interface CloseButtonProps {
   onClick: () => void;
+  large?: boolean;
 }
 
-function CloseButton({ onClick }: CloseButtonProps) {
+function CloseButton({ onClick, large = false }: CloseButtonProps) {
+  const { t } = useTranslation('common');
   return (
     <button
       onClick={onClick}
       className={cx(
-        'text-foreground max-h-8 min-h-8 max-w-8 min-w-8 items-center justify-center p-1.5 group-hover:flex hover:opacity-70 transition-opacity',
+        'text-foreground items-center justify-center group-hover:flex hover:opacity-70 transition-opacity',
+        large ? 'flex shrink-0 h-11 w-11 min-h-11 min-w-11 p-2' : 'max-h-8 min-h-8 max-w-8 min-w-8 p-1.5 flex-shrink-0',
       )}
-      aria-label="Close Menu"
+      aria-label={t('closePanel')}
+      data-panel-close=""
     >
-      <span className="text-lg font-normal leading-none">×</span>
+      <span className={cx('font-normal leading-none', large ? 'text-3xl' : 'text-lg')}>×</span>
     </button>
   );
 }

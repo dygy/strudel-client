@@ -1,6 +1,10 @@
 // Type definitions for i18n resources
 export interface CommonTranslations {
   close: string;
+  closePanel: string;
+  openPanel: string;
+  pinPanel: string;
+  menuPanel: string;
   cancel: string;
   confirm: string;
   save: string;
