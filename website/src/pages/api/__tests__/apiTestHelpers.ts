@@ -120,6 +120,11 @@ function queryBuilder(table: string) {
   return builder;
 }
 
+/** The fake's normal `from`. Tests that override it restore this, not getMockImplementation(). */
+export function defaultFrom(table: string) {
+  return queryBuilder(table);
+}
+
 export const supabaseFake = {
   auth: {
     getUser: vi.fn(async (token: string) => {
@@ -137,7 +142,7 @@ export const supabaseFake = {
       listUsers: vi.fn(async () => ({ data: { users: state.authUsers }, error: null })),
     },
   },
-  from: vi.fn((table: string) => queryBuilder(table)),
+  from: vi.fn(defaultFrom),
 };
 
 export const createClientMock = vi.fn((..._args: unknown[]) => supabaseFake);
@@ -153,7 +158,10 @@ export function resetSupabaseFake(): void {
   state.failUpdate = undefined;
   supabaseFake.auth.getUser.mockClear();
   supabaseFake.auth.admin.listUsers.mockClear();
+  // The config runs files with isolate:false, so an override left by one file would leak into
+  // the next; always put the normal implementation back.
   supabaseFake.from.mockClear();
+  supabaseFake.from.mockImplementation(defaultFrom);
   createClientMock.mockClear();
 }
 

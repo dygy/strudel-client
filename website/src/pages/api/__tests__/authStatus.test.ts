@@ -12,6 +12,7 @@ import {
   clearTestEnv,
   fakeState,
   resetSupabaseFake,
+  defaultFrom,
   signIn,
   supabaseFake,
   useTestEnv,
@@ -114,7 +115,6 @@ describe.each(handlers)('$name: session handling', (h) => {
   // client refresh the session and retry for nothing).
   it('a non-auth failure after sign-in answers 500, whatever its message says', async () => {
     signIn(TOKEN, USER);
-    const original = supabaseFake.from.getMockImplementation();
     supabaseFake.from.mockImplementation(() => {
       throw new Error('Authentication token column missing in query');
     });
@@ -123,7 +123,7 @@ describe.each(handlers)('$name: session handling', (h) => {
 
       expect(res.status).toBe(500);
     } finally {
-      supabaseFake.from.mockImplementation(original!);
+      supabaseFake.from.mockImplementation(defaultFrom);
     }
   });
 

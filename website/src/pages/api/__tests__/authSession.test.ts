@@ -15,6 +15,7 @@ import {
   clearTestEnv,
   createClientMock,
   resetSupabaseFake,
+  defaultFrom,
   signIn,
   supabaseFake,
   useTestEnv,
@@ -226,9 +227,8 @@ describe('no server route refreshes the session', () => {
   });
 
   it('GET /api/filesystem/tree: a valid Bearer token queries as that user, with no shared session', async () => {
-    const original = supabaseFake.from.getMockImplementation();
     supabaseFake.from.mockImplementation((table: string) => {
-      const builder = original!(table);
+      const builder = defaultFrom(table);
       builder.order = vi.fn(() => builder);
       return builder;
     });
@@ -240,7 +240,7 @@ describe('no server route refreshes the session', () => {
       const options = createClientMock.mock.calls.at(-1)?.[2] as { global?: { headers?: Record<string, string> } };
       expect(options?.global?.headers?.Authorization).toBe(`Bearer ${FRESH}`);
     } finally {
-      supabaseFake.from.mockImplementation(original!);
+      supabaseFake.from.mockImplementation(defaultFrom);
     }
   });
 
