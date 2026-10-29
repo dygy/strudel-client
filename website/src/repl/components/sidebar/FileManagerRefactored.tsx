@@ -1205,7 +1205,6 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
 
       <div className="flex-1 overflow-hidden mb-16">
         <FileTree
-          key={`${Object.keys(fileManagerState.tracks).length}-${Object.keys(fileManagerState.folders).length}`}
           tracks={fileManagerState.tracks}
           folders={fileManagerState.folders}
           selectedTrack={fileManagerState.selectedTrack}
