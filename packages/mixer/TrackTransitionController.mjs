@@ -25,6 +25,7 @@
 
 import { buildTransition, isOverlapping, transitionTiming, TRANSITION_TYPES } from './transitions/buildTransition.mjs';
 import { applyTrim, computeTrim, LoudnessMeter } from './transitions/loudness.mjs';
+import { getActiveSoundIds, releaseSounds } from 'superdough';
 
 /** A transition starts at least this many cycles after "now" (the scheduler queries ahead). */
 export const SAFETY_MARGIN = 0.25;
@@ -51,6 +52,15 @@ export const DEFAULT_TRANSITION_SETTINGS = Object.freeze({
   snap: 0,
   glide: false,
   matchLoudness: false,
+});
+
+/** Cut, Off and Echo-out end the old track's held voices with a ramp this long (seconds) at T. */
+export const SHORT_RELEASE = 0.03;
+
+/** The main engine's voices in superdough (fork additions, spec 017). */
+const SUPERDOUGH_VOICES = Object.freeze({
+  getActiveSoundIds: () => getActiveSoundIds(),
+  releaseSounds,
 });
 
 /** Types that always wait for at least the next cycle boundary. */
@@ -125,6 +135,8 @@ export class TrackTransitionController {
    * @param {number} [options.targetVolume=1] master level after a Dip or a restore
    * @param {Function} [options.setTimeout] timer functions (default: the global ones, looked up per call)
    * @param {Function} [options.clearTimeout]
+   * @param {{getActiveSoundIds: Function, releaseSounds: Function}} [options.voices] the main engine's
+   *   sounding voices (default: superdough's, filtered to the main engine's controller)
    */
   constructor({
     repl,
@@ -136,6 +148,7 @@ export class TrackTransitionController {
     targetVolume = 1,
     setTimeout: setTimeoutFn,
     clearTimeout: clearTimeoutFn,
+    voices = SUPERDOUGH_VOICES,
   } = {}) {
     this.repl = repl;
     this.audioContext = audioContext;
@@ -146,6 +159,7 @@ export class TrackTransitionController {
     this.targetVolume = targetVolume;
     this._setTimeout = setTimeoutFn;
     this._clearTimeout = clearTimeoutFn;
+    this.voices = voices;
 
     this.origin = 0; // cycle where the playing track's cycle 0 sits on the scheduler grid
     this.trimState = null; // the playing track's loudness trim ({ start, value }), if matched
@@ -229,6 +243,10 @@ export class TrackTransitionController {
       newPat,
       layers: sw.useLayers ? this.repl?.state?.layers : undefined,
       echoFrom: Math.max(now, T - 1),
+      // Every voice sounding now belongs to the old track (the new pattern isn't scheduled yet).
+      // Notes queried from here on are cut by the pattern; these were handed out before and
+      // keep their full length unless released (spec 2.5: nothing old after the end).
+      oldVoiceIds: this._snapshotVoices(),
       phase: 'armed',
       lastCps: sw.oldCps,
     };
@@ -375,6 +393,7 @@ export class TrackTransitionController {
       if (a.buildType === 'dip') {
         this._scheduleDip(a);
       }
+      this._releaseOldVoices(a);
       const now = this._now();
       if (now < a.T) {
         a.phase = 'waiting';
@@ -426,6 +445,48 @@ export class TrackTransitionController {
     return capture;
   }
 
+  _snapshotVoices() {
+    try {
+      return this.voices?.getActiveSoundIds?.() ?? [];
+    } catch (error) {
+      console.warn('[TrackTransitionController] could not list active voices:', error);
+      return [];
+    }
+  }
+
+  /** AudioContext time at which cycle T sounds (the old tempo holds until T). */
+  _ctxTimeOfT(a) {
+    const latency = this.scheduler?.latency ?? 0;
+    return this.audioContext.currentTime + Math.max(0, a.T - this._now()) / a.oldCps + latency;
+  }
+
+  /**
+   * Fade the old track's voices that were already sounding at the switch so they are silent by
+   * the old track's end: T+L for the overlapping types (at the faster of both tempos, so the
+   * glide can't make it late), the end of the fade-down for Dip, a short ramp at T for Cut, Off
+   * and Echo-out (only the voices: the echo bus tails ring on).
+   */
+  _releaseOldVoices(a) {
+    const ids = a.oldVoiceIds;
+    if (!ids?.length || !this.audioContext || !this.voices?.releaseSounds) {
+      return;
+    }
+    const start = this._ctxTimeOfT(a);
+    let seconds;
+    if (a.buildType === 'dip') {
+      seconds = a.L / a.oldCps;
+    } else if (isOverlapping(a.buildType)) {
+      seconds = a.L / Math.max(a.oldCps, a.newCps);
+    } else {
+      seconds = SHORT_RELEASE;
+    }
+    try {
+      this.voices.releaseSounds(ids, start + seconds, start);
+    } catch (error) {
+      console.warn('[TrackTransitionController] releasing the old voices failed:', error);
+    }
+  }
+
   /** Dip: hold, ramp to silence over [T, T+L] at the old tempo, back up over [T+L, T+2L] at the new one. */
   _scheduleDip(a) {
     const gain = this.destinationGain?.gain;
@@ -434,8 +495,7 @@ export class TrackTransitionController {
       return;
     }
     const ctxNow = this.audioContext.currentTime;
-    const latency = this.scheduler?.latency ?? 0;
-    const down = ctxNow + Math.max(0, a.T - this._now()) / a.oldCps + latency;
+    const down = this._ctxTimeOfT(a);
     const silent = down + a.L / a.oldCps;
     const up = silent + a.L / a.newCps;
     try {
@@ -636,6 +696,32 @@ export class TrackTransitionController {
     this._cancelMeasure();
     this._restoreGain();
     this._dropQueue();
+  }
+
+  /**
+   * Point the controller at the main engine's current output. superdough's
+   * `resetGlobalEffects()` (run by the website's instant-switch reset) replaces
+   * `destinationGain`, so Dip ramps and the loudness tap must follow it. Call it before a
+   * switch. Nothing happens while a switch is in flight (its ramps live on the old node) or when
+   * the output is unchanged; otherwise the loudness tap on the old node is disconnected.
+   * @param {Object} output
+   * @param {AudioContext} [output.audioContext]
+   * @param {GainNode} [output.destinationGain]
+   * @returns {boolean} whether the output was replaced
+   */
+  setOutput({ audioContext, destinationGain } = {}) {
+    const ctx = audioContext ?? this.audioContext;
+    const gain = destinationGain ?? this.destinationGain;
+    if (this.busy || (ctx === this.audioContext && gain === this.destinationGain)) {
+      return false;
+    }
+    this._cancelMeasure();
+    this.meter?.destroy();
+    this.meter = null;
+    this.gainAutomated = false;
+    this.audioContext = ctx;
+    this.destinationGain = gain;
+    return true;
   }
 
   /** What the controller is doing, for the UI. */

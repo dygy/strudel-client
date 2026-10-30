@@ -4,7 +4,8 @@
  * - `LoudnessMeter`: a read-only AnalyserNode tap on the master output (`destinationGain`),
  *   created lazily on the first reading and disconnected on `destroy`. Readings are stamped
  *   with a cycle position, so windows can be asked for in cycles.
- * - `computeTrim`: the gain that brings the new track to the old one's level, clamped ±9 dB.
+ * - `computeTrim`: the gain that brings the new track to the old one's level: a louder new
+ *   track is turned down by up to 24 dB, a quieter one boosted by at most 9 dB (more would clip).
  * - `trimFactorAt` / `applyTrim`: the trim as a `velocity` multiplier on the new track, phased
  *   in over one cycle in 4 steps (no Web Audio node, so no click and nothing to disconnect).
  *
@@ -14,8 +15,10 @@
 
 import { mapControls, onsetOf, scaleVelocity } from './envelopes.mjs';
 
-/** The trim never moves the level by more than this. */
-export const MAX_TRIM_DB = 9;
+/** A louder new track is turned down by at most this many dB... */
+export const MAX_CUT_DB = 24;
+/** ...a quieter one boosted by at most this many dB: boosting further risks clipping. */
+export const MAX_BOOST_DB = 9;
 /** RMS below this is treated as silence: no trim is computed from it. */
 export const SILENCE_RMS = 1e-4;
 /** The trim is phased in over this many cycles... */
@@ -27,15 +30,14 @@ export const dbToGain = (db) => Math.pow(10, db / 20);
 export const gainToDb = (gain) => 20 * Math.log10(gain);
 
 /**
- * The gain that brings `newRms` to `oldRms`, clamped to ±`maxDb`. 1 (no change) when either
- * level is missing or silent: a silent stretch says nothing about how loud a track is.
+ * The gain that brings `newRms` to `oldRms`, clamped to [−maxCutDb, +maxBoostDb]. 1 (no change)
+ * when either level is missing or silent: a silent stretch says nothing about how loud a track is.
  */
-export function computeTrim(oldRms, newRms, maxDb = MAX_TRIM_DB) {
+export function computeTrim(oldRms, newRms, { maxCutDb = MAX_CUT_DB, maxBoostDb = MAX_BOOST_DB } = {}) {
   if (!(oldRms > SILENCE_RMS) || !(newRms > SILENCE_RMS)) {
     return 1;
   }
-  const limit = dbToGain(maxDb);
-  return Math.min(limit, Math.max(1 / limit, oldRms / newRms));
+  return Math.min(dbToGain(maxBoostDb), Math.max(dbToGain(-maxCutDb), oldRms / newRms));
 }
 
 /** Root mean square of a block of samples. */

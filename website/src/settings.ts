@@ -4,6 +4,15 @@ import { register } from '@strudel/core';
 import { isUdels } from './repl/util';
 import type { Language } from './i18n';
 import i18n from './i18n/i18n';
+import {
+  DEFAULT_TRANSITION,
+  migrateLegacySmoothTransitions,
+  parseTransitionSettings,
+  type TransitionLength,
+  type TransitionSettings,
+  type TransitionSnap,
+  type TransitionType,
+} from './repl/transitionSettings';
 
 // Type definitions for settings
 export type AudioEngineTarget = 'webaudio' | 'osc';
@@ -90,6 +99,12 @@ export interface Settings {
   prettierBracketSpacing: boolean;
   prettierArrowParens: PrettierArrowParens;
   prettierPrintWidth: number;
+  // Track transitions (spec 017)
+  transitionType: TransitionType;
+  transitionLength: TransitionLength;
+  transitionSnap: TransitionSnap;
+  transitionGlide: boolean;
+  transitionMatchLoudness: boolean;
 }
 
 // Raw settings interface (as stored, with string values for booleans)
@@ -144,6 +159,12 @@ export interface RawSettings {
   prettierBracketSpacing: boolean | string;
   prettierArrowParens: PrettierArrowParens;
   prettierPrintWidth: number | string;
+  // Track transitions (spec 017)
+  transitionType: string;
+  transitionLength: number | string;
+  transitionSnap: number | string;
+  transitionGlide: boolean | string;
+  transitionMatchLoudness: boolean | string;
 }
 
 export const audioEngineTargets = {
@@ -213,6 +234,12 @@ export const defaultSettings: RawSettings = {
   prettierBracketSpacing: true,
   prettierArrowParens: 'always',
   prettierPrintWidth: 80,
+  // Track transitions (spec 017)
+  transitionType: DEFAULT_TRANSITION.type,
+  transitionLength: DEFAULT_TRANSITION.length,
+  transitionSnap: DEFAULT_TRANSITION.snap,
+  transitionGlide: DEFAULT_TRANSITION.glide,
+  transitionMatchLoudness: DEFAULT_TRANSITION.matchLoudness,
 };
 
 let search: URLSearchParams | null = null;
@@ -326,6 +353,18 @@ if (typeof window !== 'undefined') {
   // Run migration after a short delay to ensure everything is initialized
   setTimeout(runMigration, 0);
 
+  // Spec 017: the old smooth-transitions on/off + seconds become a transition type + cycles.
+  // Synchronous, so the first render already shows the migrated choice.
+  try {
+    migrateLegacySmoothTransitions({
+      storage: localStorage,
+      settingsPrefix: settings_key,
+      setKey: (key, value) => settingsMap.setKey(key, value),
+    });
+  } catch (error: unknown) {
+    console.warn('[settings] smooth-transitions migration failed:', error);
+  }
+
   // Sync language from i18next localStorage to settings store
   const syncLanguageFromI18n = () => {
     const i18nLanguage = localStorage.getItem('strudel-language');
@@ -418,7 +457,42 @@ export function useSettings(): Settings {
     prettierBracketSpacing: parseBoolean(state.prettierBracketSpacing),
     prettierArrowParens: (state.prettierArrowParens || 'always') as PrettierArrowParens,
     prettierPrintWidth: Number(state.prettierPrintWidth),
+    ...transitionFields(parseTransitionSettings(state)),
   };
+}
+
+const transitionFields = (t: TransitionSettings) => ({
+  transitionType: t.type,
+  transitionLength: t.length,
+  transitionSnap: t.snap,
+  transitionGlide: t.glide,
+  transitionMatchLoudness: t.matchLoudness,
+});
+
+/** The transition settings in force right now (read when a track switch begins). */
+export const getTransitionSettings = (): TransitionSettings => parseTransitionSettings(settingsMap.get());
+
+/** Change some transition settings; Mixer Settings and the picker both write through here. */
+export function setTransitionSettings(update: Partial<TransitionSettings>): void {
+  const keys: { [K in keyof TransitionSettings]: keyof RawSettings } = {
+    type: 'transitionType',
+    length: 'transitionLength',
+    snap: 'transitionSnap',
+    glide: 'transitionGlide',
+    matchLoudness: 'transitionMatchLoudness',
+  };
+  for (const field of Object.keys(update) as (keyof TransitionSettings)[]) {
+    const value = update[field];
+    if (value !== undefined) {
+      settingsMap.setKey(keys[field], value);
+    }
+  }
+}
+
+/** The transition settings as a hook (re-renders on change). */
+export function useTransitionSettings(): TransitionSettings {
+  const state = useStore(settingsMap);
+  return parseTransitionSettings(state);
 }
 
 // Settings update functions

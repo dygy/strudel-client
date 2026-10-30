@@ -3,12 +3,13 @@
  *
  * Regression (spec 015 finding 2, fixed 2026-10-10): a failed smooth track transition restored
  * the volume and fell back to an instant switch, but nothing told the user. The manager's
- * error event had no listener.
+ * error event had no listener. Spec 017: the event now comes from TrackTransitionController,
+ * and a broken new track leaves the old one playing (so the message says so).
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SmoothTransitionManager } from '../../../../packages/mixer/SmoothTransitionManager.mjs';
+import { TrackTransitionController } from '../../../../packages/mixer/TrackTransitionController.mjs';
 import { listenForSmoothTransitionErrors, SMOOTH_TRANSITION_ERROR_EVENT } from '../smoothTransitionNotifier';
 
 // The old descriptions said transitions happen "when updating code". Since 2026-10-09 Update on
@@ -61,7 +62,7 @@ describe('a failed smooth track transition is shown to the user', () => {
     );
   });
 
-  it('a new track whose code fails says so (the old track was stopped), not "switched without a fade"', () => {
+  it('a new track whose code fails says the old track keeps playing, not "switched without a fade"', () => {
     const { warn, translate } = listen();
 
     window.dispatchEvent(
@@ -70,47 +71,31 @@ describe('a failed smooth track transition is shown to the user', () => {
       }),
     );
 
-    expect(translate).toHaveBeenCalledWith('settings:smoothTransitionNewTrackFailed');
+    expect(translate).toHaveBeenCalledWith('settings:transitionNewTrackFailed');
     expect(translate).not.toHaveBeenCalledWith('settings:smoothTransitionFailed');
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith(
-      't(settings:smoothTransitionNewTrackFailed)',
+      't(settings:transitionNewTrackFailed)',
       undefined,
       undefined,
       'smooth-transition-new-track-error',
     );
   });
 
-  it('end to end: a restarted track that fails to evaluate raises the new-track message', async () => {
-    vi.useFakeTimers();
-    try {
-      const { translate } = listen();
-      const gain = {
-        value: 1,
-        cancelScheduledValues: vi.fn(),
-        setValueAtTime: vi.fn(),
-        linearRampToValueAtTime: vi.fn(),
-      };
-      // Like the real repl: stop() stops the scheduler; a broken evaluate resolves without starting it.
-      const scheduler = { started: true };
-      const repl = { scheduler, stop: vi.fn(() => (scheduler.started = false)), evaluate: vi.fn(async () => {}) };
-      vi.spyOn(console, 'log').mockImplementation(() => {});
-      vi.spyOn(console, 'error').mockImplementation(() => {});
-      const manager = new SmoothTransitionManager({ currentTime: 0, state: 'running' }, repl, {
-        destinationGain: { gain },
-        enabled: true,
-        duration: 0.5,
-      });
+  it('end to end: a new track that fails to evaluate raises the new-track message', async () => {
+    const { translate } = listen();
+    const scheduler = { started: true, cps: 0.5, pattern: {}, now: () => 9.5, setCps: vi.fn() };
+    // Like the real repl: a broken evaluate resolves without ever calling setPattern.
+    const repl = { scheduler, state: {}, evaluate: vi.fn(async () => {}), setPattern: vi.fn() };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const controller = new TrackTransitionController({ repl });
 
-      const transition = manager.executeTransition('s("bd").nope()', { restart: true }).catch((e) => e);
-      await vi.advanceTimersByTimeAsync(5000);
-      const err = await transition;
+    const err = await controller.switchTo('s("bd").nope()', { type: 'crossfade' }).catch((e: unknown) => e);
 
-      expect(err.evaluateFailed).toBe(true);
-      expect(translate).toHaveBeenCalledWith('settings:smoothTransitionNewTrackFailed');
-    } finally {
-      vi.useRealTimers();
-    }
+    expect((err as { evaluateFailed?: boolean }).evaluateFailed).toBe(true);
+    expect(repl.setPattern).not.toHaveBeenCalled();
+    expect(translate).toHaveBeenCalledWith('settings:transitionNewTrackFailed');
+    controller.destroy();
   });
 
   it('shows nothing when no transition fails, and nothing after it stops listening', () => {
@@ -125,7 +110,7 @@ describe('a failed smooth track transition is shown to the user', () => {
   });
 
   // The failure that really happens: the audio output is stuck suspended, resume() never
-  // settles, and the manager gives up after its 5 s timeout. (repl.evaluate never throws: it
+  // settles, and the controller gives up after its 5 s timeout. (repl.evaluate never throws: it
   // reports pattern errors in the editor itself, so a broken pattern is not this path.)
   it('end to end: audio stuck suspended times out, the volume is restored and the warning shows', async () => {
     vi.useFakeTimers();
@@ -141,13 +126,13 @@ describe('a failed smooth track transition is shown to the user', () => {
       vi.spyOn(console, 'log').mockImplementation(() => {});
       vi.spyOn(console, 'error').mockImplementation(() => {});
       const stuck = { currentTime: 0, state: 'suspended', resume: () => new Promise(() => {}) };
-      const manager = new SmoothTransitionManager(stuck, repl, {
-        destinationGain: { gain },
-        enabled: true,
-        duration: 0.5,
+      const controller = new TrackTransitionController({
+        repl,
+        audioContext: stuck as unknown as AudioContext,
+        destinationGain: { gain } as unknown as GainNode,
       });
 
-      const transition = manager.executeTransition('s("bd")');
+      const transition = controller.switchTo('s("bd")', { type: 'dip' });
       const outcome = expect(transition).rejects.toThrow('AudioContext resume timeout');
       await vi.advanceTimersByTimeAsync(5000);
       await outcome;
@@ -164,20 +149,26 @@ describe('a failed smooth track transition is shown to the user', () => {
 });
 
 describe('locales', () => {
-  it.each(LOCALES)('%s has the failure message and a description that no longer says "updating code"', (locale) => {
+  it.each(LOCALES)('%s has both failure messages, and they differ', (locale) => {
     const settings = settingsOf(locale);
 
     expect(typeof settings.smoothTransitionFailed).toBe('string');
     expect(settings.smoothTransitionFailed.length).toBeGreaterThan(0);
-    expect(typeof settings.smoothTransitionNewTrackFailed).toBe('string');
-    expect(settings.smoothTransitionNewTrackFailed.length).toBeGreaterThan(0);
-    expect(settings.smoothTransitionNewTrackFailed).not.toBe(settings.smoothTransitionFailed);
-    expect(settings.smoothTransitionsDescription).toBeTruthy();
-    expect(settings.smoothTransitionsDescription).not.toBe(OLD_DESCRIPTIONS[locale]);
+    expect(typeof settings.transitionNewTrackFailed).toBe('string');
+    expect(settings.transitionNewTrackFailed.length).toBeGreaterThan(0);
+    expect(settings.transitionNewTrackFailed).not.toBe(settings.smoothTransitionFailed);
   });
 
-  it('the English description says transitions apply when switching tracks, not when updating code', () => {
-    expect(settingsOf('en').smoothTransitionsDescription).toMatch(/switching tracks/);
-    expect(settingsOf('en').smoothTransitionsDescription).not.toMatch(/updating code/);
+  it.each(LOCALES)('%s no longer has the on/off switch strings or the old "track was stopped" message', (locale) => {
+    const settings = settingsOf(locale);
+
+    expect(settings.smoothTransitions).toBeUndefined();
+    expect(settings.smoothTransitionsDescription).toBeUndefined();
+    expect(settings.smoothTransitionNewTrackFailed).toBeUndefined();
+    expect(Object.values(settings)).not.toContain(OLD_DESCRIPTIONS[locale]);
+  });
+
+  it('the English message says the previous track keeps playing', () => {
+    expect(settingsOf('en').transitionNewTrackFailed).toMatch(/keeps playing/);
   });
 });

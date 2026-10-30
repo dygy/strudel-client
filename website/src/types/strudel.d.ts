@@ -146,6 +146,7 @@ declare module '@strudel/draw' {
   export function getDrawContext(): any;
   export function colorMap(): any;
   export function getPunchcardPainter(options?: any): (ctx: any, time: number, haps: any[], drawTime: any) => void;
+  export function cleanupDraw(clearScreen?: boolean, id?: string): void;
   // Add other exports as needed
 }
 
@@ -264,4 +265,41 @@ declare module '@strudel/mixer' {
     constructor();
     [key: string]: any;
   }
+
+  /** Settings for one track switch (spec 017); see packages/mixer/TrackTransitionController.mjs. */
+  export interface TrackTransitionSettings {
+    type?: string;
+    length?: number;
+    snap?: number;
+    glide?: boolean;
+    matchLoudness?: boolean;
+  }
+
+  export class TrackTransitionController {
+    constructor(options: {
+      repl: any;
+      audioContext?: AudioContext;
+      destinationGain?: GainNode;
+      getSettings?: () => TrackTransitionSettings;
+      cleanupCanvases?: () => void;
+      eventTarget?: EventTarget;
+      targetVolume?: number;
+    });
+    repl: any;
+    readonly busy: boolean;
+    editPattern(pattern: any): any;
+    switchTo(
+      code: string,
+      settings?: TrackTransitionSettings,
+      options?: { prepare?: () => Promise<void> },
+    ): Promise<Record<string, unknown>>;
+    setOutput(output: { audioContext?: AudioContext; destinationGain?: GainNode }): boolean;
+    stopped(): void;
+    getState(): { phase: string; type?: string; T?: number; end?: number; origin: number; queued: boolean };
+    destroy(): void;
+  }
+
+  export const TRANSITION_TYPES: readonly string[];
+  export const TRANSITION_LENGTHS: readonly number[];
+  export const TRANSITION_SNAPS: readonly number[];
 }

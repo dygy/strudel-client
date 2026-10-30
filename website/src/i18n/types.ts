@@ -204,6 +204,39 @@ export interface SettingsTranslations {
   autosaveEnabled: string;
   autosaveInterval: string;
   autosaveDescription: string;
+  // Track transitions (spec 017)
+  smoothTransitionFailed: string;
+  transition: string;
+  transitionTypeOff: string;
+  transitionTypeDip: string;
+  transitionTypeCut: string;
+  transitionTypeCrossfade: string;
+  transitionTypeFilterSweep: string;
+  transitionTypeBassSwap: string;
+  transitionTypeEchoOut: string;
+  transitionTypeLayeredIntro: string;
+  transitionDescOff: string;
+  transitionDescDip: string;
+  transitionDescCut: string;
+  transitionDescCrossfade: string;
+  transitionDescFilterSweep: string;
+  transitionDescBassSwap: string;
+  transitionDescEchoOut: string;
+  transitionDescLayeredIntro: string;
+  transitionLength: string;
+  transitionSnap: string;
+  transitionSnapOff: string;
+  transitionSnapNext1: string;
+  transitionSnapNext4: string;
+  transitionSnapNext8: string;
+  transitionGlide: string;
+  transitionGlideDescription: string;
+  transitionMatchLoudness: string;
+  transitionMatchLoudnessDescription: string;
+  transitionPicker: string;
+  transitionPickerLength: string;
+  transitionWaiting: string;
+  transitionNewTrackFailed: string;
 }
 
 export interface TabsTranslations {

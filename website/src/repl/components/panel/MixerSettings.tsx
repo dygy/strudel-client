@@ -3,34 +3,21 @@ import { useTranslation } from '@src/i18n';
 import { getAudioDevices } from '@strudel/webaudio';
 import { EqualizerUI } from './EqualizerUI';
 import { usePanelViewport } from './panelViewport';
+import { TransitionSettingsSection } from './TransitionSettingsSection';
 
 const PREVIEW_DEVICE_KEY = 'strudel-preview-device';
 
 interface MixerSettingsProps {
   mixer: any; // PreviewEngine instance
   isDisabled?: boolean;
-  smoothTransitionManager?: any; // SmoothTransitionManager instance
 }
 
-export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManager }: MixerSettingsProps) {
+export function MixerSettings({ mixer, isDisabled = false }: MixerSettingsProps) {
   const { t } = useTranslation('settings');
   const { compact } = usePanelViewport();
   const [devices, setDevices] = useState<Map<string, string>>(new Map());
   const [previewDeviceId, setPreviewDeviceId] = useState<string>('');
   const [devicesLoaded, setDevicesLoaded] = useState(false);
-
-  // Smooth transition settings
-  const [smoothTransitionsEnabled, setSmoothTransitionsEnabled] = useState(false);
-  const [transitionDuration, setTransitionDuration] = useState(2.0);
-
-  // Load smooth transition settings on mount
-  useEffect(() => {
-    if (smoothTransitionManager) {
-      const settings = smoothTransitionManager.getSettings();
-      setSmoothTransitionsEnabled(settings.enabled);
-      setTransitionDuration(settings.duration);
-    }
-  }, [smoothTransitionManager]);
 
   const loadDevices = useCallback(async () => {
     try {
@@ -104,33 +91,22 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
     }
   };
 
-  const handleSmoothTransitionsToggle = (enabled: boolean) => {
-    setSmoothTransitionsEnabled(enabled);
-    if (smoothTransitionManager) {
-      smoothTransitionManager.updateSettings({ enabled });
-    }
-  };
-
-  const handleTransitionDurationChange = (duration: number) => {
-    setTransitionDuration(duration);
-    if (smoothTransitionManager) {
-      smoothTransitionManager.updateSettings({ duration });
-    }
-  };
-
   if (!mixer) {
     return (
-      <div className="p-4 bg-lineHighlight rounded-lg">
-        <div className="flex items-center gap-2 text-foreground opacity-70">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
-          <span className="text-sm">{t('mixerNotAvailable')}</span>
+      <div className="space-y-4">
+        <TransitionSettingsSection />
+        <div className="p-4 bg-lineHighlight rounded-lg">
+          <div className="flex items-center gap-2 text-foreground opacity-70">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <span className="text-sm">{t('mixerNotAvailable')}</span>
+          </div>
         </div>
       </div>
     );
@@ -153,57 +129,8 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
         </div>
       )}
 
-      {/* Smooth Track Transitions */}
-      {smoothTransitionManager && (
-        <div className="p-4 bg-background border border-lineHighlight rounded-lg space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-foreground">{t('smoothTransitions')}</label>
-              <label
-                className={`relative inline-flex items-center cursor-pointer${compact ? ' min-h-11 min-w-11 justify-center' : ''}`}
-              >
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={smoothTransitionsEnabled}
-                  onChange={(e) => handleSmoothTransitionsToggle(e.target.checked)}
-                  disabled={isDisabled}
-                />
-                <div className="w-11 h-6 bg-lineHighlight peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-foreground rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:border-gray-300 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-foreground peer-checked:after:bg-background peer-checked:after:border-background"></div>
-              </label>
-            </div>
-            <p className="text-xs text-foreground opacity-70">{t('smoothTransitionsDescription')}</p>
-          </div>
-
-          {smoothTransitionsEnabled && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-foreground">{t('transitionDuration')}</label>
-                <span className="text-sm text-foreground opacity-70">{transitionDuration.toFixed(1)}s</span>
-              </div>
-              <input
-                type="range"
-                min="0.5"
-                max="10"
-                step="0.5"
-                value={transitionDuration}
-                onChange={(e) => handleTransitionDurationChange(parseFloat(e.target.value))}
-                disabled={isDisabled}
-                aria-label={compact ? t('transitionDuration') : undefined}
-                className={
-                  compact
-                    ? 'w-full h-11 bg-transparent cursor-pointer accent-foreground touch-none'
-                    : 'w-full h-2 bg-lineHighlight rounded-lg appearance-none cursor-pointer accent-foreground'
-                }
-              />
-              <div className="flex justify-between text-xs text-foreground opacity-50 mt-1">
-                <span>0.5s</span>
-                <span>10s</span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Track transitions (spec 017): usable while playing, so never isDisabled */}
+      <TransitionSettingsSection />
 
       <div>
         <label className="block text-sm font-medium text-foreground mb-2">{t('mixerPreviewDevice')}</label>

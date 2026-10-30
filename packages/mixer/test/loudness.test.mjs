@@ -8,7 +8,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { s, sequence } from '@strudel/core';
 import {
   LoudnessMeter,
-  MAX_TRIM_DB,
+  MAX_BOOST_DB,
+  MAX_CUT_DB,
   applyTrim,
   computeTrim,
   dbToGain,
@@ -32,10 +33,20 @@ describe('computeTrim', () => {
     expect(computeTrim(0.2, 0.1)).toBeCloseTo(2, 12);
   });
 
-  it('is clamped to ±9 dB', () => {
-    expect(gainToDb(computeTrim(0.01, 1))).toBeCloseTo(-MAX_TRIM_DB, 10);
-    expect(gainToDb(computeTrim(1, 0.01))).toBeCloseTo(MAX_TRIM_DB, 10);
-    expect(computeTrim(0.1, 0.12)).toBeCloseTo(0.1 / 0.12, 12); // inside the clamp: exact
+  it('a new track 20 dB louder is turned down fully (within 3 dB of the old level)', () => {
+    const trim = computeTrim(0.1, 0.1 * dbToGain(20));
+    expect(gainToDb(trim)).toBeCloseTo(-20, 10);
+    expect(Math.abs(gainToDb(0.1 * dbToGain(20) * trim) - gainToDb(0.1))).toBeLessThanOrEqual(3);
+  });
+
+  it('a new track 20 dB quieter is boosted by exactly +9 dB, no more (more would clip)', () => {
+    expect(gainToDb(computeTrim(0.1, 0.1 * dbToGain(-20)))).toBeCloseTo(MAX_BOOST_DB, 10);
+  });
+
+  it('attenuation stops at −24 dB', () => {
+    expect(MAX_CUT_DB).toBe(24);
+    expect(gainToDb(computeTrim(0.001, 1))).toBeCloseTo(-MAX_CUT_DB, 10);
+    expect(computeTrim(0.1, 0.12)).toBeCloseTo(0.1 / 0.12, 12); // inside the limits: exact
   });
 
   it('changes nothing when either side is silent or unmeasured', () => {
@@ -239,13 +250,24 @@ describe('Match loudness through the controller', () => {
     expect(v(start + 1, start + 2).every((x) => Math.abs(x - 0.5) < 1e-9)).toBe(true);
   });
 
-  it('a much louder new track is trimmed by at most 9 dB', async () => {
+  it('a new track 20 dB louder ends up within 3 dB of the old level (spec 2.3)', async () => {
     const t = setup();
-    t.setLevel(levels(t.sch, { T: 9.75, end: 11.75 }, 0.01, 1));
+    const loud = 0.05 * dbToGain(20);
+    t.setLevel(levels(t.sch, { T: 9.75, end: 11.75 }, 0.05, loud));
     const done = t.controller.switchTo('B');
     await untilCycle(t.sch, 13.5);
     await done;
-    expect(gainToDb(t.controller.trimState.value)).toBeCloseTo(-9, 6);
+    const trim = t.controller.trimState.value;
+    expect(Math.abs(gainToDb(loud * trim) - gainToDb(0.05))).toBeLessThanOrEqual(3);
+  });
+
+  it('a new track 20 dB quieter is boosted by +9 dB only', async () => {
+    const t = setup();
+    t.setLevel(levels(t.sch, { T: 9.75, end: 11.75 }, 0.1, 0.1 * dbToGain(-20)));
+    const done = t.controller.switchTo('B');
+    await untilCycle(t.sch, 13.5);
+    await done;
+    expect(gainToDb(t.controller.trimState.value)).toBeCloseTo(9, 6);
   });
 
   it('with Match loudness off nothing is measured and no analyser is created', async () => {

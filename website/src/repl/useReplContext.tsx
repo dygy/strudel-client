@@ -19,12 +19,12 @@ import {
   SuperdoughAudioController,
   getSuperdoughAudioController,
 } from '@strudel/webaudio';
-import { PreviewEngine, SmoothTransitionManager } from '@strudel/mixer';
+import { PreviewEngine, TrackTransitionController } from '@strudel/mixer';
 import { setVersionDefaultsFrom } from './util';
 import { StrudelMirror, defaultSettings } from '@strudel/codemirror';
 import { clearHydra } from '@strudel/hydra';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { parseBoolean, settingsMap, useSettings } from '../settings';
+import { getTransitionSettings, parseBoolean, settingsMap, useSettings } from '../settings';
 import {
   setActivePattern,
   getActivePattern,
@@ -56,6 +56,7 @@ import { useAudioRecorder } from './recording/useAudioRecorder';
 import { useScreenRecorder } from './recording/useScreenRecorder';
 import { listenForSmoothTransitionErrors } from './smoothTransitionNotifier';
 import { createTrackSwitchController } from './trackSwitch';
+import { settingsForSwitch, switchPath } from './transitionSettings';
 
 // Type definitions
 interface ReplState {
@@ -96,7 +97,8 @@ interface ReplContext {
   isPreviewing?: boolean;
   handlePreviewToggle?: () => Promise<void>;
   previewEngine?: PreviewEngine | null;
-  smoothTransitionManager?: any;
+  /** Switches the speakers between tracks with the selected transition type (spec 017). */
+  transitionController?: TrackTransitionController | null;
   /** The editor now holds track `id` without going through handleUpdate (e.g. same code already loaded). */
   setEditorTrackId?: (id: string | null | undefined) => void;
   isRecording?: boolean;
@@ -247,6 +249,9 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
       root: containerRef.current,
       initialCode,
       pattern: silence,
+      // Spec 017: every setPattern passes through the transition controller (a pure pass-through
+      // until the first switch; then the track origin shift, or the combined transition pattern).
+      editPattern: (pattern: any) => transitionControllerRef.current?.editPattern(pattern) ?? pattern,
       drawTime,
       drawContext,
       readOnly,
@@ -261,6 +266,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
 
           // Nothing is playing on the speakers any more.
           trackSwitch.stopped();
+          // The next start is at cycle 0: drop the track origin, cancel a running transition.
+          transitionControllerRef.current?.stopped();
 
           // Reset CPS to default to prevent BPM from carrying over between tracks
           if (editor?.repl?.setCps) {
@@ -270,8 +277,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
 
           clearHydra();
 
-          // IMPORTANT: Don't clean up canvases during smooth transitions
-          // The transition manager handles the lifecycle properly
+          // IMPORTANT: Don't clean up canvases when the instant switch restarts the scheduler:
+          // evaluateNewTrack runs its own (awaited) cleanup right after.
           if (!isSmoothTransitioningRef.current) {
             // Clean up canvas elements when stopping
             cleanupCanvasElements().catch((error) => {
@@ -387,7 +394,10 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   const editorRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mixerRef = useRef<PreviewEngine | null>(null);
-  const smoothTransitionManagerRef = useRef<any>(null);
+  // Created on the first track switch (getTransitionController), after the editor's repl exists.
+  const transitionControllerRef = useRef<TrackTransitionController | null>(null);
+  const cleanupDrawCanvasesRef = useRef<(() => void) | null>(null);
+  // Set while the instant switch stops the scheduler, so onToggle(false) skips its own cleanup.
   const isSmoothTransitioningRef = useRef<boolean>(false);
   // Which track the main (speakers) repl is playing, which is in the editor, and whether a
   // switch is in flight: tells a track switch from an in-place update (see trackSwitch.ts).
@@ -458,45 +468,24 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     };
   }, []);
 
-  // Initialize SmoothTransitionManager for smooth track transitions
+  // Track transitions (spec 017). The controller itself is created on the first switch
+  // (getTransitionController); here: its visuals cleanup and the error toasts.
   useEffect(() => {
-    const initSmoothTransitions = async () => {
-      try {
-        const audioContext = getAudioContext();
-        if (!audioContext) {
-          console.warn('[SmoothTransitionManager] AudioContext not available');
-          return;
-        }
-
-        // Wait for editor and repl to be ready
-        if (!editorRef.current?.repl) {
-          console.log('[SmoothTransitionManager] Waiting for repl to initialize');
-          return;
-        }
-
-        // Get destinationGain from SuperdoughAudioController
-        const controller = getSuperdoughAudioController();
-        const destinationGain = controller?.output?.destinationGain;
-
-        if (!destinationGain) {
-          console.warn('[SmoothTransitionManager] destinationGain not available');
-          return;
-        }
-
-        // Import cleanupDraw to pass as a dependency
-        const { cleanupDraw } = await import('@strudel/draw');
-
-        // Create a specialized cleanup function that only cleans draw canvases (not Hydra)
+    let cancelled = false;
+    import('@strudel/draw')
+      .then(({ cleanupDraw }) => {
+        if (cancelled) return;
+        // A specialized cleanup function that only cleans draw canvases (not Hydra)
         const cleanupDrawCanvases = () => {
-          console.log('[SmoothTransition-cleanup] Cleaning draw canvases only');
+          console.log('[TrackTransition-cleanup] Cleaning draw canvases only');
 
           // 0. Clear Hydra. This used to happen implicitly via repl.stop() -> onToggle(false);
-          // the transition no longer stops (that restarted from cycle 0), so do it here,
-          // at the same moment (after fade-down, before evaluate), like the instant path.
+          // a transition never stops the scheduler, so do it here, just before the new
+          // code evaluates (the controller's cleanupCanvases step).
           try {
             clearHydra();
           } catch (error) {
-            console.warn('[SmoothTransition-cleanup] Error clearing hydra:', error);
+            console.warn('[TrackTransition-cleanup] Error clearing hydra:', error);
           }
 
           // 1. Cancel global animation frame
@@ -517,7 +506,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
           const testCanvases = document.querySelectorAll('canvas[id="test-canvas"]');
           if (testCanvases.length > 1) {
             for (let i = 1; i < testCanvases.length; i++) {
-              console.log(`[SmoothTransition-cleanup] Removing duplicate test-canvas #${i}`);
+              console.log(`[TrackTransition-cleanup] Removing duplicate test-canvas #${i}`);
               testCanvases[i].remove();
             }
           }
@@ -532,38 +521,25 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
           orphanedSelectors.forEach((selector) => {
             const elements = document.querySelectorAll(selector);
             elements.forEach((element) => {
-              console.log(`[SmoothTransition-cleanup] Removing orphaned canvas: ${element.id || element.className}`);
+              console.log(`[TrackTransition-cleanup] Removing orphaned canvas: ${element.id || element.className}`);
               element.remove();
             });
           });
 
-          console.log('[SmoothTransition-cleanup] Draw canvas cleanup complete');
+          console.log('[TrackTransition-cleanup] Draw canvas cleanup complete');
         };
 
-        const manager = new SmoothTransitionManager(audioContext, editorRef.current.repl, {
-          destinationGain,
-          cleanupCanvases: cleanupDrawCanvases, // Pass specialized cleanup function
-        });
-
-        smoothTransitionManagerRef.current = manager;
-        console.log('[SmoothTransitionManager] Initialized');
-      } catch (err) {
-        console.error('[SmoothTransitionManager] Failed to initialize:', err);
-      }
-    };
-
-    // Delay initialization to ensure audio context and repl are ready
-    const timer = setTimeout(initSmoothTransitions, 1000);
-    // Show the user when a smooth track transition fails (it falls back to an instant switch).
+        cleanupDrawCanvasesRef.current = cleanupDrawCanvases;
+      })
+      .catch((error: unknown) => console.warn('[TrackTransition] draw cleanup unavailable:', error));
+    // Show the user when a track switch fails (broken new code, or a fallback to an instant switch).
     const stopListeningForTransitionErrors = listenForSmoothTransitionErrors();
 
     return () => {
-      clearTimeout(timer);
+      cancelled = true;
       stopListeningForTransitionErrors();
-      if (smoothTransitionManagerRef.current) {
-        smoothTransitionManagerRef.current.destroy();
-        smoothTransitionManagerRef.current = null;
-      }
+      transitionControllerRef.current?.destroy();
+      transitionControllerRef.current = null;
     };
   }, []);
 
@@ -771,65 +747,99 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     await runUpdate();
   };
 
-  // Switch to a DIFFERENT track's `code`: smooth crossfade when enabled, otherwise clean up the
-  // old track's canvases and evaluate. With `restart`, playback restarts at cycle 0 — in the
-  // smooth path only once the old track has faded to silence. `prepare` (resetEditor) runs in
-  // the silent phase, after the restart and before evaluate.
+  // The transition controller on the main repl, created on first use. It follows a replaced
+  // repl (init re-ran) and superdough's output, which resetGlobalEffects() rebuilds.
+  const getTransitionController = (): TrackTransitionController | null => {
+    const repl = editorRef.current?.repl;
+    if (!repl) return null;
+    const audioContext = getAudioContext();
+    const destinationGain = getSuperdoughAudioController()?.output?.destinationGain ?? undefined;
+    let controller = transitionControllerRef.current;
+    if (controller && controller.repl !== repl && !controller.busy) {
+      controller.destroy();
+      controller = null;
+    }
+    if (!controller) {
+      controller = new TrackTransitionController({
+        repl,
+        audioContext,
+        destinationGain,
+        getSettings: getTransitionSettings,
+        cleanupCanvases: () => cleanupDrawCanvasesRef.current?.(),
+      });
+      transitionControllerRef.current = controller;
+    } else {
+      controller.setOutput({ audioContext, destinationGain });
+    }
+    return controller;
+  };
+
+  // The reset before a transition's evaluate. The old track keeps sounding until the transition
+  // ends, so unlike resetEditor this keeps superdough's output (resetGlobalEffects would cut every
+  // sounding note and replace destinationGain), the loaded sounds and the tempo (captured anyway).
+  // Canvases and Hydra are cleaned by the controller's cleanupCanvases step.
+  const resetBeforeTransition = async (): Promise<void> => {
+    (await getModule('@strudel/tonal'))?.resetVoicings();
+    resetDefaults();
+  };
+
+  // Switch to a DIFFERENT track's `code` (spec 017). The transition settings are read once, now,
+  // as the switch begins:
+  // - Off, or nothing playing: the instant path. Restart (stop), reset, clean up, evaluate from
+  //   cycle 0.
+  // - any other type while playing: TrackTransitionController.switchTo. The old track keeps
+  //   playing until the transition is done; a broken new track never replaces it. While a
+  //   transition runs, every switch (also Off) goes to the controller, which queues the latest.
   const evaluateNewTrack = async (
     code: string,
     { restart = false, prepare }: { restart?: boolean; prepare?: () => Promise<void> } = {},
   ): Promise<void> => {
-    const manager = smoothTransitionManagerRef.current;
     const repl = editorRef.current?.repl;
     if (!repl) return;
-    // Only stop a running scheduler; stopping an idle one would just re-run onToggle(false).
-    const shouldRestart = restart && Boolean(repl.scheduler?.started);
+    const settings = getTransitionSettings();
+    const playing = Boolean(repl.scheduler?.started);
+    const busy = Boolean(transitionControllerRef.current?.busy);
 
-    if (manager && manager.getSettings().enabled) {
-      // Set flag to prevent onToggle (fired by the restart's repl.stop()) from cleaning up
-      // canvases: the manager's own cleanup runs at the right moment.
-      isSmoothTransitioningRef.current = true;
-      console.log('[SmoothTransitionManager] Using smooth transition for track change', { restart: shouldRestart });
-      try {
-        await manager.executeTransition(code, { restart: shouldRestart, prepare });
-      } catch (error: any) {
-        if (error?.evaluateFailed) {
-          // The new track has an error: the repl shows it, the manager restored the volume and
-          // raised the transition-error toast. Evaluating it again would only fail again.
-          console.warn('[SmoothTransitionManager] New track failed to evaluate; not retrying');
-        } else {
-          console.error('[SmoothTransitionManager] Transition failed, falling back to instant:', error);
-          // Fallback to instant evaluation with cleanup
-          await cleanupCanvasElements();
-          editorRef.current?.flash?.();
-          repl.evaluate(code);
-        }
-      } finally {
-        // A call that only queued returns while the running transition (which will play the
-        // queued code and may restart) is still going; leave the flag to that call.
-        if (!manager.getSettings().isTransitioning) {
-          isSmoothTransitioningRef.current = false;
-        }
-      }
-    } else {
-      // Instant switch: restart first (onToggle's own cleanup is skipped; the awaited one
-      // below runs instead), reset, clean up, then evaluate from cycle 0.
-      if (shouldRestart) {
-        isSmoothTransitioningRef.current = true;
+    if (switchPath({ type: settings.type, playing, busy }) === 'transition') {
+      const controller = getTransitionController();
+      if (controller) {
+        editorRef.current?.flash?.();
         try {
-          repl.stop();
-        } finally {
-          isSmoothTransitioningRef.current = false;
+          await controller.switchTo(code, settingsForSwitch(settings, controller.busy), {
+            prepare: prepare ? resetBeforeTransition : undefined,
+          });
+          return;
+        } catch (error: unknown) {
+          if ((error as { evaluateFailed?: boolean } | null)?.evaluateFailed) {
+            // The new track has an error: the repl shows it, the old track keeps playing untouched
+            // and the notifier raised the toast. Evaluating it again would only fail again.
+            console.warn('[TrackTransition] New track failed to evaluate; the old track keeps playing');
+            return;
+          }
+          console.error('[TrackTransition] Transition failed, falling back to an instant switch:', error);
         }
       }
-      if (prepare) {
-        await prepare();
-      }
-      await cleanupCanvasElements();
-      editorRef.current?.flash?.();
-      repl.evaluate(code);
     }
+
+    // Instant switch: restart first (onToggle's own cleanup is skipped; the awaited one below
+    // runs instead), reset, clean up, then evaluate from cycle 0.
+    const shouldRestart = restart && Boolean(repl.scheduler?.started);
+    if (shouldRestart) {
+      isSmoothTransitioningRef.current = true;
+      try {
+        repl.stop();
+      } finally {
+        isSmoothTransitioningRef.current = false;
+      }
+    }
+    if (prepare) {
+      await prepare();
+    }
+    await cleanupCanvasElements();
+    editorRef.current?.flash?.();
+    repl.evaluate(code);
   };
+
 
   const handleShuffle = async (): Promise<void> => {
     const patternData = await getRandomTune();
@@ -954,7 +964,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     isPreviewing,
     handlePreviewToggle,
     previewEngine: mixer,
-    smoothTransitionManager: smoothTransitionManagerRef.current,
+    transitionController: transitionControllerRef.current,
     setEditorTrackId: trackSwitch.setEditorTrack,
     isRecording: audioRecorder.isRecording,
     recordingElapsedSeconds: audioRecorder.elapsedSeconds,

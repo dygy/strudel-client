@@ -161,4 +161,4 @@ Three extra options sit under the Transition group. Each one is off by default, 
 
 ## Change Log
 
-_Leave empty until the first amendment._
+- 2026-10-30: **Match loudness** turns a louder new track down by up to 24 dB, but boosts a quieter new track by at most +9 dB, to avoid clipping. So a much quieter new track can stay below the old track's level.

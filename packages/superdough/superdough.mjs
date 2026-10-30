@@ -360,6 +360,81 @@ export function resetGlobalEffects() {
 }
 
 let activeSoundSources = new Map();
+// fork addition (strudel-client spec 017, used by @strudel/mixer transitions): the controller each
+// active voice plays through (the main engine's, or e.g. the headphone preview's, which shares the
+// AudioContext), so a track transition on the main engine releases only its own voices.
+const activeSoundOwners = new WeakMap();
+
+/**
+ * Fork addition (strudel-client spec 017). Ids of the voices that are sounding (or scheduled)
+ * through `owner`, by default the main engine's controller. Pass them to `releaseSounds` later.
+ * @param {Object} [owner] a SuperdoughAudioController
+ * @returns {number[]}
+ * @noAutocomplete
+ */
+export function getActiveSoundIds(owner = controller) {
+  const ids = [];
+  if (owner == null) {
+    return ids;
+  }
+  for (const [id, handle] of activeSoundSources) {
+    if (activeSoundOwners.get(handle) === owner) {
+      ids.push(id);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Fork addition (strudel-client spec 017). Fade one voice to silence over [startTime, endTime]
+ * (AudioContext seconds) and stop it at endTime. Never a jump: with cancelAndHoldAtTime the
+ * envelope is held at its value at startTime and ramped linearly to 0; without it (Firefox),
+ * setTargetAtTime decays from whatever the value is at startTime. Never throws.
+ * @noAutocomplete
+ */
+export function releaseSoundHandle(handle, startTime, endTime) {
+  const end = Math.max(endTime, startTime + 0.005);
+  const gain = handle?.node?.gain;
+  try {
+    if (gain && typeof gain.cancelAndHoldAtTime === 'function') {
+      gain.cancelAndHoldAtTime(startTime);
+      gain.linearRampToValueAtTime(0, end);
+    } else if (gain && typeof gain.setTargetAtTime === 'function') {
+      gain.setTargetAtTime(0, startTime, (end - startTime) / 6);
+    }
+  } catch (err) {
+    logger(`[superdough] release ramp failed: ${err.message}`);
+  }
+  try {
+    handle?.stop?.(end);
+  } catch (err) {
+    logger(`[superdough] release stop failed: ${err.message}`);
+  }
+}
+
+/**
+ * Fork addition (strudel-client spec 017). Release the given voices (see `getActiveSoundIds`)
+ * so they are silent by `endTime`. Ids that have already ended are skipped.
+ * @param {number[]} ids
+ * @param {number} endTime AudioContext seconds by which the voices are silent
+ * @param {number} [startTime] when the fade begins (default: now)
+ * @returns {number} how many voices were released
+ * @noAutocomplete
+ */
+export function releaseSounds(ids, endTime, startTime) {
+  const start = startTime ?? endTime - 0.03;
+  let released = 0;
+  for (const id of ids ?? []) {
+    const handle = activeSoundSources.get(id);
+    if (!handle) {
+      continue;
+    }
+    releaseSoundHandle(handle, start, endTime);
+    activeSoundSources.delete(id);
+    released++;
+  }
+  return released;
+}
 //music programs/audio gear usually increments inputs/outputs from 1, we need to subtract 1 from the input because the webaudio API channels start at 0
 
 function mapChannelNumbers(channels) {
@@ -544,6 +619,7 @@ export const superdough = async (value, t, hapDuration, cps = 0.5, cycle = 0.5, 
     if (soundHandle) {
       sourceNode = soundHandle.node;
       activeSoundSources.set(chainID, soundHandle);
+      activeSoundOwners.set(soundHandle, audioController); // fork addition (spec 017)
     }
   } else {
     throw new Error(`sound ${s} not found! Is it loaded?`);

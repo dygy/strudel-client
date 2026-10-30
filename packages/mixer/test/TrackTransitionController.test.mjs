@@ -125,7 +125,28 @@ function createFakeRepl(scheduler, programs) {
   return repl;
 }
 
-function setup({ programs = {}, settings = {}, cycle = 9.5, cps = CPS_120, playing = true, neo = false } = {}) {
+/**
+ * superdough's active voices (fork additions getActiveSoundIds / releaseSounds), faked: `sounding`
+ * is what superdough holds right now; releaseSounds records its calls.
+ */
+function createFakeVoices(ids = []) {
+  const voices = {
+    sounding: new Set(ids),
+    getActiveSoundIds: vi.fn(() => [...voices.sounding]),
+    releaseSounds: vi.fn((released) => released.filter((id) => voices.sounding.has(id)).length),
+  };
+  return voices;
+}
+
+function setup({
+  programs = {},
+  settings = {},
+  cycle = 9.5,
+  cps = CPS_120,
+  playing = true,
+  neo = false,
+  voices = createFakeVoices(),
+} = {}) {
   const sch = (neo ? createNeoScheduler : createFakeScheduler)({ cycle, cps, started: playing });
   const repl = createFakeRepl(sch, { A: { pattern: NEW }, ...programs });
   const ctx = new MockAudioContext();
@@ -145,6 +166,7 @@ function setup({ programs = {}, settings = {}, cycle = 9.5, cps = CPS_120, playi
     getSettings: () => current,
     cleanupCanvases,
     eventTarget: target,
+    voices,
   });
   repl.editPattern = controller.editPattern;
   if (playing) {
@@ -158,6 +180,7 @@ function setup({ programs = {}, settings = {}, cycle = 9.5, cps = CPS_120, playi
     gain: destinationGain.gain,
     destinationGain,
     controller,
+    voices,
     events,
     cleanupCanvases,
     setSettings: (next) => (current = { ...current, ...next }),
@@ -785,6 +808,141 @@ describe('settings', () => {
 });
 
 // ---------------------------------------------------------------------------
+describe('old voices already handed to superdough are released (spec 2.5: nothing old after the end)', () => {
+  /** The scheduler hands the new pattern's first notes to superdough as soon as it gets it. */
+  function startsNewVoicesOnSetPattern(sch, voices) {
+    const setPattern = sch.setPattern;
+    sch.setPattern = async (pattern, autostart) => {
+      await setPattern(pattern, autostart);
+      voices.sounding.add('new-1');
+    };
+  }
+
+  it('snapshots the voices at the switch and releases only those, not the new track’s', async () => {
+    const voices = createFakeVoices(['pad', 'hat']);
+    const { controller, sch } = setup({ voices });
+    startsNewVoicesOnSetPattern(sch, voices);
+    controller.switchTo('A');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(voices.releaseSounds).toHaveBeenCalledTimes(1);
+    expect(voices.releaseSounds.mock.calls[0][0]).toEqual(['pad', 'hat']);
+  });
+
+  it('Crossfade: the fade starts at T and the voices are silent by T+L (AudioContext seconds)', async () => {
+    const voices = createFakeVoices(['pad']);
+    const { controller } = setup({ voices, settings: { type: 'crossfade', length: 2 } });
+    controller.switchTo('A');
+    await vi.advanceTimersByTimeAsync(1);
+    // now ≈ 9.5, T = 9.75 at 0.5 cps → T is 0.5 s ahead of currentTime 100; 2 cycles = 4 s.
+    const [, end, start] = voices.releaseSounds.mock.calls[0];
+    expect(start).toBeCloseTo(100.5, 2);
+    expect(end).toBeCloseTo(104.5, 2);
+  });
+
+  it('a faster new tempo makes T+L sooner: the release ends by then', async () => {
+    const voices = createFakeVoices(['pad']);
+    const { controller } = setup({
+      voices,
+      programs: { A: { pattern: NEW, cps: 1 } },
+      settings: { type: 'crossfade', length: 2 },
+    });
+    controller.switchTo('A');
+    await vi.advanceTimersByTimeAsync(1);
+    const [, end, start] = voices.releaseSounds.mock.calls[0];
+    expect(end - start).toBeCloseTo(2, 6); // 2 cycles at 1 cps
+  });
+
+  it('Dip: silent by the end of the fade-down, whatever the new tempo', async () => {
+    const voices = createFakeVoices(['pad']);
+    const { controller, gain } = setup({
+      voices,
+      programs: { A: { pattern: NEW, cps: 1 } },
+      settings: { type: 'dip', length: 2 },
+    });
+    controller.switchTo('A');
+    await vi.advanceTimersByTimeAsync(1);
+    const [, end, start] = voices.releaseSounds.mock.calls[0];
+    const silent = gain.calls.find(([m, v]) => m === 'linearRampToValueAtTime' && v === 0)[2];
+    expect(end).toBeCloseTo(silent, 6);
+    expect(end - start).toBeCloseTo(4, 6);
+  });
+
+  it.each(['cut', 'echoOut'])('%s: a short ramp (~30 ms) at T, never a jump', async (type) => {
+    const voices = createFakeVoices(['pad']);
+    const { controller } = setup({ voices, settings: { type } });
+    controller.switchTo('A');
+    await vi.advanceTimersByTimeAsync(1);
+    const [, end, start] = voices.releaseSounds.mock.calls[0];
+    expect(start).toBeCloseTo(101, 2); // T = 10: 0.5 cycles = 1 s ahead
+    expect(end - start).toBeCloseTo(0.03, 6);
+  });
+
+  it('a new track that fails releases nothing (the old track keeps playing in full)', async () => {
+    const voices = createFakeVoices(['pad']);
+    const { controller } = setup({ voices });
+    await controller.switchTo('broken(').catch(() => {});
+    expect(voices.releaseSounds).not.toHaveBeenCalled();
+  });
+
+  it('starting with nothing playing releases nothing', async () => {
+    const voices = createFakeVoices(['preview-voice']);
+    const { controller } = setup({ voices, playing: false });
+    await settle(controller.switchTo('A'));
+    expect(voices.releaseSounds).not.toHaveBeenCalled();
+  });
+
+  it('a voice list or release that throws does not break the switch', async () => {
+    const voices = createFakeVoices(['pad']);
+    voices.releaseSounds.mockImplementation(() => {
+      throw new Error('gone');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { controller, sch } = setup({ voices });
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 12);
+    await expect(done).resolves.toMatchObject({ type: 'crossfade' });
+    warn.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('setOutput: following a replaced master output (superdough resetGlobalEffects)', () => {
+  it('a Dip after the output was replaced ramps the new destinationGain, not the dead one', async () => {
+    const { controller, ctx, gain: oldGain } = setup({ settings: { type: 'dip' } });
+    const fresh = ctx.createGain();
+
+    expect(controller.setOutput({ destinationGain: fresh })).toBe(true);
+    controller.switchTo('A');
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(fresh.gain.calls.some(([m]) => m === 'linearRampToValueAtTime')).toBe(true);
+    expect(oldGain.calls.some(([m]) => m === 'linearRampToValueAtTime')).toBe(false);
+  });
+
+  it('the loudness tap on the old output is disconnected', () => {
+    const { controller, destinationGain } = setup();
+    controller._sampleLoudness(); // creates the tap on the current output
+    const analyser = controller.meter.analyser;
+    expect(destinationGain.connections).toContain(analyser);
+
+    controller.setOutput({ destinationGain: new MockAudioContext().createGain() });
+
+    expect(controller.meter).toBeNull();
+    expect(destinationGain.connections).not.toContain(analyser);
+  });
+
+  it('does nothing when the output is unchanged, or while a switch is in flight', async () => {
+    const { controller, ctx, destinationGain } = setup({ settings: { type: 'dip' } });
+    expect(controller.setOutput({ audioContext: ctx, destinationGain })).toBe(false);
+
+    controller.switchTo('A');
+    await vi.advanceTimersByTimeAsync(10);
+    expect(controller.busy).toBe(true);
+    expect(controller.setOutput({ destinationGain: ctx.createGain() })).toBe(false);
+    expect(controller.destinationGain).toBe(destinationGain);
+  });
+});
+
 describe('real @strudel/core repl + Cyclist', () => {
   beforeAll(async () => {
     await evalScope(core);

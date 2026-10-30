@@ -64,7 +64,14 @@ Research facts this relies on, all verified in the code:
 
 ### 2.3 Per-type envelopes (`buildTransition`)
 
-Every envelope is sampled at the event's `whole.begin` (onset). Old-track events with an onset `≥ T + L` are dropped. Old events whose `whole.end > T + L` are **truncated** to end at `T + L`. This ends long pads and held notes, so no master-gain backup is needed. Samples need `clip` set for that; this is a risk, see 3.
+Every envelope is sampled at the event's `whole.begin` (onset). Old-track events with an onset `≥ T + L` are dropped. Old events whose `whole.end > T + L` are **truncated** to end at `T + L`, with `clip` lowered so samples are cut too. Truncation only reaches notes queried **after** the switch is armed.
+
+**Voice release.** Notes the scheduler handed to superdough before the switch keep their full length; a 16-cycle pad measured ~0.10 RMS after the end of a crossfade. So when the switch is armed (in the `editPattern` hook, before `T`), the controller snapshots the main engine's active superdough voices; all of them belong to the old track, because the new pattern isn't scheduled yet. Once the new tempo is known it releases them: a fade on each voice's output gain, then `stop`, so they are silent:
+- overlapping types: from `T` to `T + L`, in AudioContext seconds at the faster of the two tempos, so a glide can't make it late;
+- Dip: from `T` to the end of the master fade-down;
+- Cut, Off, Echo-out: a 30 ms ramp at `T`. Echo-out releases only the sources; the echo bus tails ring on.
+
+The fade never jumps: `cancelAndHoldAtTime(start)` plus a linear ramp to 0 where supported, otherwise `setTargetAtTime(0, start, …)` (Firefox), which decays from the value at `start`. Voices of the headphone preview share the AudioContext but play through another controller and are never released. A failed evaluate releases nothing.
 
 | Type | Old track | New track |
 |---|---|---|
@@ -80,7 +87,7 @@ Controls use the canonical names superdough reads (`cutoff`, `hcutoff`, `velocit
 
 ### 2.4 Engine change (upstream impact)
 
-The one-line additive change in `packages/core/repl.mjs` makes `evaluate` call `updateState({ layers })` before `setPattern`, where `layers` is the `$:` list it already builds. That is a new optional state field. No public function or behaviour changes, and upstream stays mergeable. The flow log records the divergence. No other `@strudel/*` behaviour changes. `@strudel/mixer` is fork-only.
+The one-line additive change in `packages/core/repl.mjs` makes `evaluate` call `updateState({ layers })` before `setPattern`, where `layers` is the `$:` list it already builds. That is a new optional state field. No public function or behaviour changes, and upstream stays mergeable. The flow log records the divergence. `superdough` gains three additive fork exports for the voice release (2.3, 2.8). No other `@strudel/*` behaviour changes. `@strudel/mixer` is fork-only.
 
 ### 2.5 Data
 
@@ -109,9 +116,17 @@ Everything runs in the browser. No Worker, SSR, API, env var or secret changes. 
 | `destinationGain` (existing) | — | — | Dip: `linearRampToValueAtTime` 1→0→1. A failure restores with an 80 ms ramp. Never `setValueAtTime` jumps except to anchor the current value. |
 | Loudness `AnalyserNode` | lazily, once, tapped from `destinationGain` (a read-only fan-out) | on controller `destroy` | none |
 | Echo orbit bus | by superdough's own orbit cache on the first echo send | superdough's lifecycle (as with any orbit) | the delay tail decays by feedback |
-| Loudness trim | **no node**: the trim is a `velocity` multiplier on the new track, applied through the origin wrapper and stepped per cycle | — | stepped over 1 cycle in 4 steps, clamped to ±9 dB, reset on the next switch |
+| Loudness trim | **no node**: the trim is a `velocity` multiplier on the new track, applied through the origin wrapper and stepped per cycle | — | stepped over 1 cycle in 4 steps, clamped to −24 dB … +9 dB (asymmetric: a louder new track is turned down fully, a quieter one is boosted by at most 9 dB because more would clip), reset on the next switch |
+| Old-track voices (superdough sources) | by superdough | superdough's own `onended`; the release `stop`s them | released when the switch arms: `cancelAndHoldAtTime` + linear ramp to 0 (fallback `setTargetAtTime`), silent by `T+L` (Dip: end of fade-down; Cut/Off/Echo-out: 30 ms at `T`) |
 
-**Loudness algorithm:** RMS of the master output over the last 2 s before `T`, then RMS over 1 cycle after the transition ends (only the new track is playing). The trim is `clamp(oldRMS/newRMS)` and fades in over the next cycle. *Assumption:* the trim therefore settles about 2 cycles **after** the transition ends, not "once it ends" as the spec's criterion says. The criterion will be amended to "within 2 cycles after the transition ends". Measuring the new track while it overlaps the old one is not separable.
+**Loudness algorithm:** RMS of the master output over the last 2 s before `T`, then RMS over 1 cycle after the transition ends (only the new track is playing). The trim is `oldRMS/newRMS` clamped to [−24 dB, +9 dB] and fades in over the next cycle. *Assumption:* the trim therefore settles about 2 cycles **after** the transition ends, not "once it ends" as the spec's criterion says. The criterion will be amended to "within 2 cycles after the transition ends". Measuring the new track while it overlaps the old one is not separable.
+
+**superdough divergence (fork addition, upstream stays mergeable):** `packages/superdough/superdough.mjs` gets three additive exports, each commented as a fork addition for spec 017:
+- `getActiveSoundIds(owner = main controller)` lists the ids of `activeSoundSources` whose voice plays through that controller. A `WeakMap` records the owner beside the existing `activeSoundSources.set`.
+- `releaseSounds(ids, endTime, startTime)` releases the ids still present and skips ended ones.
+- `releaseSoundHandle(handle, start, end)` does the per-voice ramp and stop, and never throws.
+
+No existing code path changes: the voice-stealing loop is untouched.
 
 **Preview engine:** it has its own `AudioContext` and repl, and is never given `editPattern` or the controller. Preview → Update goes through `runUpdate` as today, so it is a transition only when it is a real switch.
 
@@ -123,7 +138,7 @@ Everything runs in the browser. No Worker, SSR, API, env var or secret changes. 
 
 | Risk | Mitigation |
 |---|---|
-| Samples ignore event duration, so truncation won't end a long sample and the old track rings past `T+L`. | Set `clip: 1` on truncated old sample events. A test asserts truncated events carry `clip`. Measure in the browser with an analyser after `T+L` (Verify step). |
+| Samples ignore event duration, so truncation won't end a long sample and the old track rings past `T+L`. | Set `clip` on truncated old events (tests assert it), and release the voices that were already sounding when the switch armed (2.3, voice release). Measure in the browser with an analyser after `T+L` (Verify step). |
 | The new code's `setcps` leaks to the old track during async `samples()` loading. | The instance-level `setCps` wrapper is active for the whole evaluate (2.2 step 2). |
 | `resetDefaults` / `resetGlobalEffects` before evaluate change the *old* track's sound during an overlap. | Accepted known limit: it is only audible for tracks that set global defaults or effects. It is listed in the spec's known limits after verify. |
 | The cost of querying two patterns, with layered intro and filter math. | Limited to `L ≤ 16` cycles. The old pattern is dropped at the end via `setPattern(newPat)`. |

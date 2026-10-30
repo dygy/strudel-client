@@ -3,6 +3,9 @@ import PlayCircleIcon from '@heroicons/react/20/solid/PlayCircleIcon';
 import StopCircleIcon from '@heroicons/react/20/solid/StopCircleIcon';
 import { Bars3Icon, ArrowPathIcon, EyeIcon, MicrophoneIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 import cx from '@src/cx';
+import { useTranslation } from '@src/i18n';
+import { useTransitionPhase } from '../transitionPhase';
+import { TransitionPicker } from './TransitionPicker';
 import { useSettings } from '../../settings';
 import { usePanelLayout } from './panel/panelLayout';
 import { AuthButton } from '../../components/auth/AuthButton';
@@ -190,6 +193,25 @@ function RecordPopover({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Update, with the waiting state of a snapped switch (spec 017)     */
+/* ------------------------------------------------------------------ */
+export function UpdateButton({ context }: { context: ReplContext }) {
+  const { t } = useTranslation('settings');
+  const waiting = useTransitionPhase() === 'waiting';
+  return (
+    <IconBtn
+      onClick={() => context.handleEvaluate()}
+      title={waiting ? `Update (Ctrl+U) — ${t('transitionWaiting')}` : 'Update (Ctrl+U)'}
+      active={context.isDirty || waiting}
+      glow={waiting ? 'blue' : context.isDirty ? 'orange' : undefined}
+      pulse={waiting}
+    >
+      <ArrowPathIcon className="w-4 h-4 text-foreground opacity-70" />
+    </IconBtn>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main Header                                                       */
 /* ------------------------------------------------------------------ */
 export function Header({ context, embedded, trackName }: HeaderProps) {
@@ -273,15 +295,13 @@ export function Header({ context, embedded, trackName }: HeaderProps) {
           )}
         </IconBtn>
 
-        {/* Update / Evaluate */}
-        <IconBtn
-          onClick={() => context.handleEvaluate()}
-          title="Update (Ctrl+U)"
-          active={context.isDirty}
-          glow={context.isDirty ? 'orange' : undefined}
-        >
-          <ArrowPathIcon className="w-4 h-4 text-foreground opacity-70" />
-        </IconBtn>
+        {/* Update / Evaluate, and the transition the next track switch uses */}
+        <UpdateButton context={context} />
+        {/* Too wide for a phone header: there, Mixer Settings has the same choices (spec 016's
+            compact bar is where the picker goes on phones). */}
+        <div className="hidden sm:block">
+          <TransitionPicker />
+        </div>
 
         {/* Preview (headphones) — only when mixer is available */}
         {context.mixer && (
