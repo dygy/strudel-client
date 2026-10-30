@@ -840,7 +840,6 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     repl.evaluate(code);
   };
 
-
   const handleShuffle = async (): Promise<void> => {
     const patternData = await getRandomTune();
     if (!patternData || !patternData.id) return;

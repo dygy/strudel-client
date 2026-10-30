@@ -172,6 +172,7 @@ export class TrackTransitionController {
     this.meter = null;
     this.timer = null;
     this.gainAutomated = false; // a Dip has scheduled ramps on destinationGain
+    this._capture = null; // the setcps capture of the switch being evaluated
 
     this.editPattern = this.editPattern.bind(this);
     this._tick = this._tick.bind(this);
@@ -203,11 +204,20 @@ export class TrackTransitionController {
       if (sw.immediate) {
         this.origin = 0;
         this.trimState = null;
+        // Stopped while evaluating: it starts like a fresh track. Its own setcps wins, else the
+        // reset tempo, applied before the scheduler restarts.
+        sw.capture?.apply(sw.capture.recorded ?? DEFAULT_CPS);
         return pattern;
       }
       return this._arm(sw, pattern);
     }
     if (this.active) {
+      // The incoming track was re-evaluated (e.g. Ctrl+Enter) during the transition: its setcps
+      // becomes the tempo the transition heads for, instead of being overwritten by the plan.
+      if (this.active.requestedCps !== undefined) {
+        this._retarget(this.active, this.active.requestedCps);
+        this.active.requestedCps = undefined;
+      }
       this.active.newPat = pattern;
       this.active.layers = this.active.useLayers ? this.repl?.state?.layers : undefined;
       return this._build(this.active);
@@ -360,21 +370,27 @@ export class TrackTransitionController {
       // Nothing playing: the code starts as usual, its own setcps applies directly.
       if (!sw.immediate) {
         capture = this._captureCps();
+        sw.capture = capture;
+        this._capture = capture;
       }
-      this._safely('cleanupCanvases', () => this.cleanupCanvases?.());
-      if (prepare) {
-        try {
-          await prepare();
-        } catch (error) {
-          console.warn('[TrackTransitionController] prepare() failed:', error);
-        }
-      }
+      // Armed before prepare: a Stop from here on makes the switch start like a fresh track.
       this.armed = sw;
       try {
+        this._safely('cleanupCanvases', () => this.cleanupCanvases?.());
+        if (prepare) {
+          try {
+            await prepare();
+          } catch (error) {
+            console.warn('[TrackTransitionController] prepare() failed:', error);
+          }
+        }
         await this.repl.evaluate(code);
       } finally {
         if (this.armed === sw) {
           this.armed = null;
+        }
+        if (this._capture === capture) {
+          this._capture = null;
         }
         capture?.restore();
       }
@@ -390,6 +406,9 @@ export class TrackTransitionController {
 
       const a = this.active;
       a.newCps = capture.recorded ?? DEFAULT_CPS;
+      a.glideFrom = a.oldCps;
+      a.glideStart = a.T;
+      this._holdTempo(a);
       if (a.buildType === 'dip') {
         this._scheduleDip(a);
       }
@@ -423,15 +442,37 @@ export class TrackTransitionController {
 
   /** While the new code evaluates, its setcps/setcpm (and prepare's tempo reset) are recorded, not applied. */
   _captureCps() {
+    const capture = { recorded: undefined, resetting: false };
+    const wrap = this._wrapSetCps((cps) => {
+      if (capture.resetting) {
+        return; // onToggle(false)'s tempo reset right after stopped(): the new track's setcps wins
+      }
+      capture.recorded = cps ?? DEFAULT_CPS;
+    });
+    capture.apply = wrap.apply;
+    capture.restore = wrap.restore;
+    return capture;
+  }
+
+  /**
+   * Route the scheduler's setCps (what setcps/setcpm call) to `onRequest` instead of the clock.
+   * Returns `apply` (the real setCps) and `restore` (puts it back; idempotent).
+   */
+  _wrapSetCps(onRequest) {
     const scheduler = this.scheduler;
     if (!scheduler) {
-      return { recorded: undefined, restore() {} };
+      return { apply() {}, restore() {} };
     }
     const own = Object.prototype.hasOwnProperty.call(scheduler, 'setCps');
     const original = scheduler.setCps;
-    const capture = {
-      recorded: undefined,
+    const wrapper = (cps) => onRequest(cps);
+    scheduler.setCps = wrapper;
+    return {
+      apply: (cps) => original.call(scheduler, cps),
       restore() {
+        if (scheduler.setCps !== wrapper) {
+          return;
+        }
         if (own) {
           scheduler.setCps = original;
         } else {
@@ -439,10 +480,29 @@ export class TrackTransitionController {
         }
       },
     };
-    scheduler.setCps = (cps) => {
-      capture.recorded = cps ?? DEFAULT_CPS;
-    };
-    return capture;
+  }
+
+  /**
+   * While a transition waits or runs, the tempo belongs to its plan: a setcps from a re-evaluate
+   * of the incoming track is recorded (adopted in editPattern once that evaluate succeeds), not
+   * applied, so the old track never jumps tempo before T and the plan never overwrites it.
+   */
+  _holdTempo(a) {
+    const wrap = this._wrapSetCps((cps) => {
+      a.requestedCps = cps ?? DEFAULT_CPS;
+    });
+    a.applyCps = wrap.apply;
+    a.releaseTempo = wrap.restore;
+  }
+
+  /** Head for a new target tempo; a running glide continues from where it is now. */
+  _retarget(a, cps) {
+    const now = this._now();
+    if (a.phase === 'running' && now > a.glideStart) {
+      a.glideFrom = a.lastCps;
+      a.glideStart = Math.min(now, a.end);
+    }
+    a.newCps = cps;
   }
 
   _snapshotVoices() {
@@ -534,7 +594,11 @@ export class TrackTransitionController {
       return;
     }
     a.lastCps = cps;
-    this.scheduler?.setCps(cps);
+    if (a.applyCps) {
+      a.applyCps(cps);
+    } else {
+      this.scheduler?.setCps(cps);
+    }
   }
 
   /** The tempo plan (tech §2.2 step 6) at cycle `now`. */
@@ -547,7 +611,8 @@ export class TrackTransitionController {
       return;
     }
     if (a.settings.glide && isOverlapping(a.buildType)) {
-      this._setCps(a, glideCps(now, { T: a.T, L: a.L, oldCps: a.oldCps, newCps: a.newCps }));
+      const from = a.glideStart ?? a.T;
+      this._setCps(a, glideCps(now, { T: from, L: a.end - from, oldCps: a.glideFrom ?? a.oldCps, newCps: a.newCps }));
       return;
     }
     if (now >= a.T) {
@@ -589,6 +654,7 @@ export class TrackTransitionController {
   _finish(a) {
     this.active = null;
     this._setCps(a, a.newCps);
+    a.releaseTempo?.();
     if (this.gainAutomated && a.buildType === 'dip') {
       this.gainAutomated = false; // the ramps have run their course
     }
@@ -687,8 +753,16 @@ export class TrackTransitionController {
     if (this.armed) {
       this.armed.immediate = true;
     }
+    const capture = this._capture;
+    if (capture) {
+      // onToggle(false) resets the tempo synchronously after this call; don't let that reset
+      // replace a setcps the new code already made.
+      capture.resetting = true;
+      Promise.resolve().then(() => (capture.resetting = false));
+    }
     const a = this.active;
     if (a) {
+      a.releaseTempo?.();
       this.active = null;
       this._emit('end', { type: a.type, T: a.T, end: a.end, cancelled: true });
       a.resolve({ type: a.type, T: a.T, end: a.end, cancelled: true });
@@ -778,6 +852,7 @@ export class TrackTransitionController {
     this._clearTimer();
     const a = this.active;
     this.active = null;
+    a?.releaseTempo?.();
     a?.resolve({ cancelled: true });
     this.armed = null;
     this._dropQueue();

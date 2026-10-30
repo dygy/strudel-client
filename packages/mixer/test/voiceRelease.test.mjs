@@ -31,9 +31,40 @@ describe('releaseSoundHandle', () => {
     param.setTargetAtTime = vi.fn((v, t, tau) => param.calls.push(['setTargetAtTime', v, t, tau]));
     const voice = handle(param);
     releaseSoundHandle(voice, 10, 16);
-    expect(param.calls).toEqual([['setTargetAtTime', 0, 10, 1]]);
+    expect(param.calls).toEqual([
+      ['cancelScheduledValues', 10],
+      ['setTargetAtTime', 0, 10, 1],
+    ]);
     expect(param.calls.filter(([m]) => m === 'setValueAtTime' || m === 'value=')).toEqual([]);
     expect(voice.stop).toHaveBeenCalledWith(16);
+  });
+
+  it('without cancelAndHoldAtTime, the envelope’s pending sustain step at the note end is cancelled', () => {
+    // A timeline param: events sorted by time; cancelScheduledValues(t) drops those at or after t.
+    const events = [];
+    const param = {
+      value: 0,
+      setValueAtTime: (v, t) => events.push(['set', v, t]),
+      linearRampToValueAtTime: (v, t) => events.push(['ramp', v, t]),
+      setTargetAtTime: (v, t, tau) => events.push(['target', v, t, tau]),
+      cancelScheduledValues: (t) => events.splice(0, events.length, ...events.filter(([, , time]) => time < t)),
+    };
+    // getParamADSR for a note from 0 to 20 s: attack, decay, sustain step at the end, release.
+    param.setValueAtTime(0, 0);
+    param.linearRampToValueAtTime(1, 0.01);
+    param.linearRampToValueAtTime(0.6, 0.1);
+    param.setValueAtTime(0.6, 20);
+    param.linearRampToValueAtTime(0, 20.5);
+
+    releaseSoundHandle(handle(param), 10, 16);
+
+    const fromStart = events.filter(([, , t]) => t >= 10);
+    expect(fromStart).toEqual([['target', 0, 10, 1]]); // nothing can step the gain back up
+    expect(events.slice(0, 3)).toEqual([
+      ['set', 0, 0],
+      ['ramp', 1, 0.01],
+      ['ramp', 0.6, 0.1],
+    ]); // the past is untouched
   });
 
   it('never throws: a voice that already ended (stop throws) or has no gain is fine', () => {

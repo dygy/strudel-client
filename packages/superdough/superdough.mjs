@@ -389,7 +389,9 @@ export function getActiveSoundIds(owner = controller) {
  * Fork addition (strudel-client spec 017). Fade one voice to silence over [startTime, endTime]
  * (AudioContext seconds) and stop it at endTime. Never a jump: with cancelAndHoldAtTime the
  * envelope is held at its value at startTime and ramped linearly to 0; without it (Firefox),
- * setTargetAtTime decays from whatever the value is at startTime. Never throws.
+ * the envelope's events from startTime on are cancelled and setTargetAtTime decays from the value
+ * at startTime (a voice still in its attack/decay ramp at startTime holds that ramp's start
+ * value instead: an accepted edge). Never throws.
  * @noAutocomplete
  */
 export function releaseSoundHandle(handle, startTime, endTime) {
@@ -400,6 +402,9 @@ export function releaseSoundHandle(handle, startTime, endTime) {
       gain.cancelAndHoldAtTime(startTime);
       gain.linearRampToValueAtTime(0, end);
     } else if (gain && typeof gain.setTargetAtTime === 'function') {
+      // Drop the envelope's pending events (its sustain setValueAtTime at the note end would
+      // step the gain back up), then decay from whatever value the gain has at startTime.
+      gain.cancelScheduledValues?.(startTime);
       gain.setTargetAtTime(0, startTime, (end - startTime) / 6);
     }
   } catch (err) {

@@ -350,14 +350,15 @@ describe('the new code’s tempo is captured, not applied, during evaluate', () 
     expect(sch.cps).toBe(0.5);
   });
 
-  it('the scheduler’s own setCps is put back after evaluate, also after a failure', async () => {
+  it('the scheduler’s own setCps is put back when the transition ends, and after a failure', async () => {
     const { controller, sch } = setup();
     const original = sch.setCps;
     const done = controller.switchTo('A');
     await vi.advanceTimersByTimeAsync(1);
-    expect(sch.setCps).toBe(original);
+    expect(sch.setCps).not.toBe(original); // held by the transition's tempo plan
     await untilCycle(sch, 12);
     await done;
+    expect(sch.setCps).toBe(original);
     await controller.switchTo('broken(').catch(() => {});
     expect(sch.setCps).toBe(original);
   });
@@ -804,6 +805,116 @@ describe('settings', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(names(sch.pattern, 9.75, 10)).toEqual(['new']);
     expect(names(sch.pattern, 9.5, 9.75)).toEqual(['old']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('re-evaluating the incoming track during a transition (Ctrl+Enter, not a switch)', () => {
+  const CPS_70 = 70 / 60; // setcpm(70)
+
+  it('crossfade with glide: a setcpm(70) mid-transition becomes the target, and the transition ends at 70', async () => {
+    const { controller, sch, repl } = setup({
+      programs: { A: { pattern: NEW, cps: CPS_140 }, A2: { pattern: NEW, cps: CPS_70 } },
+      settings: { type: 'crossfade', length: 4, glide: true },
+    });
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 11.75); // halfway through [9.75, 13.75]
+    const before = sch.cps;
+    expect(before).toBeGreaterThan(CPS_120);
+    expect(before).toBeLessThan(CPS_140);
+    await settle(repl.evaluate('A2'));
+    expect(sch.cps).toBe(before); // not applied in one step: the glide carries on from here
+    await untilCycle(sch, 12.75);
+    expect(sch.cps).toBeGreaterThan(before);
+    expect(sch.cps).toBeLessThan(CPS_70);
+    await untilCycle(sch, 14);
+    await done;
+    expect(sch.cps).toBe(CPS_70);
+    const afterRetarget = sch.cpsLog.filter(([at]) => at >= 11.75).map(([, v]) => v);
+    afterRetarget.slice(1).forEach((v, i) => expect(v).toBeGreaterThanOrEqual(afterRetarget[i]));
+    await untilCycle(sch, 15);
+    expect(sch.cps).toBe(CPS_70); // nothing overwrites it after the end
+  });
+
+  it('while the switch waits for T (glide off): the old tempo holds until T, then 70', async () => {
+    const { controller, sch, repl } = setup({
+      programs: { A: { pattern: NEW, cps: CPS_140 }, A2: { pattern: NEW, cps: CPS_70 } },
+      settings: { type: 'crossfade', length: 2, snap: 4 },
+    });
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 10.5);
+    await settle(repl.evaluate('A2'));
+    expect(sch.cps).toBe(CPS_120); // the old track does not jump tempo before T
+    await untilCycle(sch, 11.95);
+    expect(sch.cps).toBe(CPS_120);
+    await untilCycle(sch, 12.1);
+    expect(sch.cps).toBe(CPS_70);
+    await untilCycle(sch, 14.2);
+    await done;
+    expect(sch.cps).toBe(CPS_70);
+    expect(sch.cpsLog.map(([, v]) => v)).toEqual([CPS_70]);
+  });
+
+  it('a re-evaluate without setcps keeps the planned tempo', async () => {
+    const { controller, sch, repl } = setup({
+      programs: { A: { pattern: NEW, cps: CPS_140 }, A2: { pattern: NEW } },
+      settings: { type: 'crossfade', length: 2 },
+    });
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 10.5);
+    await settle(repl.evaluate('A2'));
+    await untilCycle(sch, 12);
+    await done;
+    expect(sch.cps).toBe(CPS_140);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('Stop while a switch is evaluating', () => {
+  /** Stop as the website does it: onToggle(false) → controller.stopped(), then setCps(0.5). */
+  function stop(controller, repl, sch) {
+    sch.stop();
+    controller.stopped();
+    repl.setCps(0.5);
+  }
+
+  it('the new track starts like a fresh track at its own setcps (not the old tempo)', async () => {
+    const { controller, sch, repl } = setup({
+      cps: 0.8,
+      programs: { A: { pattern: NEW, cps: 0.7, loadMs: 200 } },
+    });
+    const done = controller.switchTo('A');
+    await vi.advanceTimersByTimeAsync(50); // setcps(0.7) recorded, samples still loading
+    stop(controller, repl, sch);
+    await vi.advanceTimersByTimeAsync(300);
+    await expect(done).resolves.toEqual({ immediate: true });
+    expect(sch.cps).toBe(0.7);
+    expect(sch.pattern).toBe(NEW); // from cycle 0, no transition
+  });
+
+  it('a new track without setcps starts at the reset tempo 0.5', async () => {
+    const { controller, sch, repl } = setup({ cps: 0.8, programs: { A: { pattern: NEW, loadMs: 200 } } });
+    const done = controller.switchTo('A');
+    await vi.advanceTimersByTimeAsync(50);
+    stop(controller, repl, sch);
+    await vi.advanceTimersByTimeAsync(300);
+    await done;
+    expect(sch.cps).toBe(0.5);
+  });
+
+  it('a Stop during prepare: no transition is built after it (the new track starts on its own)', async () => {
+    const { controller, sch, repl, events } = setup();
+    let release;
+    const prepare = () => new Promise((resolve) => (release = resolve));
+    const done = controller.switchTo('A', undefined, { prepare });
+    await vi.advanceTimersByTimeAsync(1);
+    stop(controller, repl, sch);
+    release();
+    await settle(done);
+    await expect(done).resolves.toEqual({ immediate: true });
+    expect(sch.pattern).toBe(NEW);
+    expect(controller.getState()).toMatchObject({ phase: 'idle', origin: 0 });
+    expect(eventNames(events)).not.toContain('waiting');
   });
 });
 

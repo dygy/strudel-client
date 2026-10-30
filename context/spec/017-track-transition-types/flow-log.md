@@ -62,3 +62,23 @@
 - Open for browser verification: short un-clipped samples ringing past T+L; `.cpm()` against the old tempo during evaluate; `setGainCurve` bending the fades.
 - Verified by the orchestrator: full suite in the worktree, `Test Files 61 passed (61)`, `Tests 1526 passed (1526)`.
 - Next: when 016 lands, rebase the branch onto main, then the web phase (slices 1, 2.3, 2.4, 6) plus the browser verifies.
+
+## 2026-10-30 — web phase, browser verify, review
+- Deviation: the web phase ran in the worktree before 016 landed, to keep moving (owner: "do it yourself"). Conflicts with 016 in `MixerSettings.tsx`, `Header.tsx` and `i18n/types.ts` get resolved at the rebase. The picker is hidden below `sm` until it moves into 016's compact bar.
+- Browser measurements (Node + Chromium on the worktree dev server :4322 with a temporary hook; the hook is removed now). Two spec misses, both fixed by the audio agent:
+  - **Held pad after a crossfade.** RMS 0.10 → **0.0000** after T+L. Fix: superdough `getActiveSoundIds` / `releaseSounds`, additive.
+  - **Match loudness on a 20 dB jump.** +11 dB → **−1.0 dB**. Fix: asymmetric limits, cut 24 dB, boost 9 dB.
+- Other measurements:
+  - nodes stable over 10 switches (17 → 17);
+  - a broken new track: the old one keeps playing at gain 1;
+  - Snap 4 starts exactly on 4.000;
+  - glide is linear from 30 to 35 cpm;
+  - layered intro onsets go 4, 8, 12, 16.
+- Build: worker 1.87 MiB. The disk was nearly full (125 MB); deleting the worktree's `dist` freed space.
+- Review: `review/017-track-transition-types.md`, 4 findings, all kept. Findings 1–3 went back to the audio agent.
+- Commits on the branch: `c19472c` (engine + audio), `b6e54bf` (web + superdough voice release).
+- Review findings 1–3 fixed by the audio agent: incoming-track re-evaluate retargets the tempo; the Firefox release cancels pending ADSR events; Stop during evaluate applies the captured cps and is armed before `prepare`. Each RED→GREEN. Finding 4: logged here.
+- Slice 7 (test engineer): 3 files, 51 acceptance tests on the real repl + Cyclist + controller, 15 RED proofs; every criterion maps to a test or a named browser-only check.
+- Known gap, not fixed: `packages/mixer`'s own `vitest.config.js` can't load superdough (`AudioWorkletProcessor`). The root config, which is the gate, is fine. A follow-up would add `vite-plugin-bundle-audioworklet` as a mixer devDependency.
+- Gates in the worktree (orchestrator): vitest `Test Files 67 passed (67)`, `Tests 1626 passed (1626)`; format-check clean; lint exit 0.
+- Next: rebase onto main once 016 lands, move the picker into 016's compact bar, bookkeeping, push gate.
