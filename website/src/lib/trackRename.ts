@@ -19,7 +19,7 @@ export interface PathedFolder {
   path: string;
 }
 
-/** What `trackNameToSlug` returns for a name with no Latin letters or digits. */
+/** What `trackNameToSlug` returns for a name with no letters or digits. */
 const UNSLUGGABLE = 'untitled';
 
 /** The folder a `tracks.folder` value points at, as its path ('' for the root). */
@@ -31,7 +31,7 @@ export function resolveTrackFolder(folder: string | null | undefined, folders: P
 /**
  * Would `name` clash with another track in `folder`? Same trimmed name (case-insensitive), or the
  * same real slug: two such tracks would share one URL, and the URL picks the track autosave
- * writes to. Names without a Latin slug ('untitled') only clash by name.
+ * writes to. Names with no letters or digits ('untitled') only clash by name.
  */
 export function trackNameClashes(
   name: string,

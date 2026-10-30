@@ -3,22 +3,33 @@
  */
 
 /**
- * Convert a track name to a URL-safe slug
+ * Convert a track name to a URL-safe slug: lowercase letters and digits of any script, runs of
+ * anything else turned into one hyphen, percent-encoded ("Бит 1" → "%D0%B1%D0%B8%D1%82-1").
+ *
+ * Encoding keeps every URL plain ASCII, so a slug compares equal to the same segment of
+ * `location.pathname` and can go into a `Location` header. Latin names give the same slugs as
+ * before (a-z, 0-9). A name with no letters or digits at all is "untitled".
  */
 export function trackNameToSlug(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .trim()
-      // Replace spaces and special characters with hyphens
-      .replace(/[^a-z0-9]+/g, '-')
-      // Remove leading/trailing hyphens
-      .replace(/^-+|-+$/g, '')
-      // Collapse multiple hyphens
-      .replace(/-+/g, '-') ||
-    // Ensure it's not empty
-    'untitled'
-  );
+  const slug = name
+    .normalize('NFC')
+    .toLowerCase()
+    .trim()
+    // Replace spaces and special characters with hyphens (collapsing runs)
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    // Remove leading/trailing hyphens
+    .replace(/^-+|-+$/g, '');
+  // Ensure it's not empty
+  return slug ? encodeURIComponent(slug) : 'untitled';
+}
+
+/** A URL segment decoded, or as it is when it is not valid percent-encoding. */
+function decodeSegment(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
 }
 
 /**
@@ -87,13 +98,15 @@ export function parseTrackUrlPath(urlPath: string): { folderPath: string | null;
   const match = pathWithoutQuery.match(/^\/repl\/(.+)$/);
   if (!match) return null;
 
-  const segments = match[1].split('/');
+  // Decoded, so an encoded path (location.pathname) and a decoded one (route params) read alike
+  const segments = match[1].split('/').map(decodeSegment);
   const trackSlug = segments.pop(); // Last segment is always the track
   const folderPath = segments.length > 0 ? segments.join('/') : null;
 
   return {
     folderPath,
-    trackSlug: trackSlug || '',
+    // In the slug's own (encoded) form, to compare with trackNameToSlug(name)
+    trackSlug: trackSlug ? encodeURIComponent(trackSlug) : '',
   };
 }
 
@@ -116,7 +129,9 @@ export function extractStepFromUrl(urlPath: string): string | null {
 export function findStepIndexByName(track: { steps?: Array<{ name: string }> }, stepName: string): number | null {
   if (!track.steps || track.steps.length === 0) return null;
 
-  const index = track.steps.findIndex((step) => trackNameToSlug(step.name) === trackNameToSlug(stepName));
+  // stepName is a ?step= value: decoded by URLSearchParams, or still encoded when cut from a URL
+  const wanted = trackNameToSlug(decodeSegment(stepName));
+  const index = track.steps.findIndex((step) => trackNameToSlug(step.name) === wanted);
 
   return index >= 0 ? index : null;
 }
@@ -149,7 +164,9 @@ export function trackMatchesUrlPath(
   trackSlug: string,
   folders: Array<{ id: string; path: string }> = [],
 ): boolean {
-  if (trackNameToSlug(track.name) !== trackSlug) return false;
+  // Callers pass URL parts encoded (location.pathname) or decoded (route params): read both alike
+  if (trackNameToSlug(track.name) !== encodeURIComponent(decodeSegment(trackSlug))) return false;
+  urlFolderPath = urlFolderPath ? urlFolderPath.split('/').map(decodeSegment).join('/') : urlFolderPath;
 
   const folderValue = track.folder && track.folder !== 'root' ? track.folder : null;
   if (!urlFolderPath) return folderValue === null;

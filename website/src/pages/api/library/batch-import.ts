@@ -11,7 +11,7 @@ export const prerender = false;
 const json = (body: unknown, status: number) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-/** What `trackNameToSlug` returns for a name with no Latin letters or digits. */
+/** What `trackNameToSlug` returns for a name with no letters or digits. */
 const UNSLUGGABLE = 'untitled';
 
 type ImportFolder = { path: string };

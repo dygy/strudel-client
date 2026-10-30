@@ -75,8 +75,8 @@ describe('validateFolderName', () => {
     expect(validateFolderName('TEST', folders[TEST], all)).toBeNull();
   });
 
-  // trackNameToSlug() turns non-Latin and symbol-only names into 'untitled'; that is not a clash.
-  describe('names without a Latin slug', () => {
+  // Different names in any script have different slugs; symbol-only names are 'untitled', not a clash.
+  describe('non-Latin and symbol-only names', () => {
     const sib = (name: string) => ({ id: `sib-${name}`, name, path: name, parent: null });
     const self = { id: 'self', name: 'Drums', path: 'Drums', parent: null };
 

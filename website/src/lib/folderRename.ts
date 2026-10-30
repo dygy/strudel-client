@@ -51,7 +51,7 @@ export interface FolderRenamePlan {
 
 export type FolderRenameResult = { ok: true; plan: FolderRenamePlan } | { ok: false; error: FolderRenameError };
 
-/** What `trackNameToSlug` returns for a name with no Latin letters or digits. */
+/** What `trackNameToSlug` returns for a name with no letters or digits. */
 const UNSLUGGABLE = 'untitled';
 
 const parentKey = (parent: string | null | undefined): string | null => (parent ? parent : null);
@@ -84,8 +84,8 @@ export function findFolderByPathOrId<F extends RenamableFolder>(
  * (same parent) with the same name (trimmed, case-insensitive) or whose name slugs the same —
  * two such folders would share one URL.
  *
- * The slug comparison only counts real slugs: `trackNameToSlug` turns every non-Latin or
- * symbol-only name into 'untitled', and "Ударные" next to "Бас" is not a clash.
+ * The slug comparison only counts real slugs: `trackNameToSlug` turns every symbol-only name
+ * into 'untitled', and "★" next to "♪" is not a clash.
  */
 export function validateFolderName(
   rawName: string,

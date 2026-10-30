@@ -32,7 +32,7 @@ describe('trackNameClashes', () => {
     expect(trackNameClashes(name, TEST, 'a', tracks, folders)).toBe(clash);
   });
 
-  it('names without a Latin slug clash only by name', () => {
+  it('non-Latin names clash by name or slug, not with other names', () => {
     expect(trackNameClashes('Ударные', null, 'd', tracks, folders)).toBe(false);
     expect(trackNameClashes('бас', null, 'd', tracks, folders)).toBe(true);
   });

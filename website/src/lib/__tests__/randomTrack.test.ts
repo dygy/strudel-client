@@ -7,9 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { randomTrackUrl } from '../randomTrack';
 import { findTrackByFolderAndSlug, parseTrackUrlPath } from '../slugUtils';
 
-// A folder whose name has no Latin letters or digits gets no URL segment, so its tracks' URLs
+// A folder whose name has no letters or digits at all gets no URL segment, so its tracks' URLs
 // point at the root, where they are not (a known gap of folder URLs).
-const UNREACHABLE_FOLDER = { id: 'Vh3kQ9xZp2LmT8rB1cYwA', name: 'Музыка', path: 'Музыка' };
+const UNREACHABLE_FOLDER = { id: 'Vh3kQ9xZp2LmT8rB1cYwA', name: '♪♪♪', path: '♪♪♪' };
 const DRUMS = { id: 'Dr0mS5kQ9xZp2LmT8rB1c', name: 'Drums', path: 'Drums' };
 const folders = [UNREACHABLE_FOLDER, DRUMS];
 
