@@ -72,7 +72,7 @@ export function ResizableSidebar({
   return (
     <div
       ref={sidebarRef}
-      className={cx('relative flex-shrink-0 overflow-hidden', className)}
+      className={cx('relative flex-shrink-0 overflow-hidden h-full', className)}
       style={{
         width: `${width}px`,
         transition: isResizing ? 'none' : 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
