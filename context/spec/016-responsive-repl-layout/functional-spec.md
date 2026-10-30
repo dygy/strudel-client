@@ -64,12 +64,12 @@ The first step has already shipped: on small screens, the settings panel opens a
 - **As a** performer on a phone or tablet, **I want** to use the mixer, the EQ and headphone preview with my fingers, **so that** I can cue and shape the sound without a mouse.
   - In the settings sheet, every mixer and EQ control (sliders, knobs, toggles, preset choices, the preview button, the output device choice) is at least 44 points tall or wide where the user touches it.
   - Sliders can be dragged with a finger without scrolling the sheet by accident, and their current value is shown while dragging.
-  - On a compact screen the EQ shows the **whole curve on top, fitting the screen width, and the controls of one selected band below it**. Tapping a point on the curve (or a band number) selects that band; its gain, frequency and width are adjusted with large sliders. The EQ on/off switch and presets stay available.
+  - On a compact screen the EQ shows the **whole curve on top, fitting the screen width, and the controls of one selected band below it**. Tapping a point on the curve (or a band number) selects that band; the band's frequency is shown, and its gain is adjusted with a large slider (the same control the desktop has for each band). The EQ on/off switch and presets stay available.
   - **Acceptance Criteria:**
     - [ ] Given a 390 × 844 phone with the settings sheet on the mixer tab, when the user inspects any control, then its touch area is at least 44 points in its smallest direction.
     - [ ] Given the mixer on a phone, when the user drags a volume slider with a finger, then the value changes and is shown while dragging, and the sheet itself does not scroll.
     - [ ] Given the EQ on a phone, when the user opens it, then the whole curve is visible without sideways scrolling, with the controls of one band below it.
-    - [ ] Given the EQ on a phone, when the user taps a point on the curve, then that band becomes selected and its gain, frequency and width sliders appear, and when the user changes one, then the sound and the curve change exactly as with the desktop control.
+    - [ ] Given the EQ on a phone, when the user taps a point on the curve, then that band becomes selected with its frequency shown and its gain slider below, and when the user changes the gain, then the sound and the curve change exactly as with the desktop control.
     - [ ] Given music is playing, when the user starts and stops headphone preview from the sheet, then preview behaves exactly as on the desktop.
 
 ### 2.4 Tablets and landscape
@@ -77,12 +77,12 @@ The first step has already shipped: on small screens, the settings panel opens a
 - **As a** performer on a tablet or a phone held sideways, **I want** a layout that suits the shape of the screen, **so that** neither orientation wastes space or hides the code.
   - A tablet held upright (narrower than 1024 points) uses the compact layout from 2.1–2.3.
   - A tablet held sideways at 1024 points or wider uses the desktop layout unchanged.
-  - A phone held sideways uses the compact layout. The title bar and the bottom control bar together take no more than 25% of the screen height, so the code keeps most of the screen.
+  - A phone held sideways uses the compact layout. The title bar and the bottom control bar together take no more than 25% of the screen height, not counting the strips the phone reserves for its notch or home indicator (controls never sit in those strips), so the code keeps most of the screen.
   - Rotating the device switches between layouts immediately, without reloading the page.
   - **Acceptance Criteria:**
     - [ ] Given an 820 × 1180 tablet held upright, when the REPL opens, then it shows the compact layout with the code at full width.
     - [ ] Given a 1180 × 820 tablet held sideways, when the REPL opens, then it shows the same layout as a laptop.
-    - [ ] Given an 844 × 390 phone held sideways, when the REPL opens, then the title bar and the control bar together take no more than 25% of the screen height (about 97 points) and the code fills the rest.
+    - [ ] Given an 844 × 390 phone held sideways, when the REPL opens, then the title bar and the control bar together take no more than 25% of the screen height (about 97 points, not counting the phone's notch or home-indicator strip) and the code fills the rest.
     - [ ] Given music is playing on a tablet, when the user rotates it, then the layout changes without a reload and the music keeps playing without a gap or click.
 
 ### 2.5 Things that must not change
@@ -136,3 +136,5 @@ The first step has already shipped: on small screens, the settings panel opens a
 ## Change Log
 
 _Dated amendments made after the spec was first written — typically by `/awos:spec` in Update Mode when a bug fix changed documented behavior. Each entry records the date, the source reference (bug id or fix description), and what behavior changed and why. Leave empty until the first amendment._
+- 2026-10-30 — implementation of §2.3 — the phone EQ adjusts only the selected band's gain and shows its frequency. Frequency and width sliders were dropped: band centres are fixed and the desktop has no width control, so they would be phone-only features (out of scope, §3).
+- 2026-10-30 — review finding 5 (safe areas) — the 25% landscape limit excludes the system notch and home-indicator strips; controls are kept out of them (on an iPhone with a home indicator the bars measure about 113 points including that strip).
