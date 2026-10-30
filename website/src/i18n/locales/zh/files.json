@@ -80,7 +80,7 @@
   "libraryExported": "库导出为 ZIP 成功！",
   "libraryImported": "库导入成功！",
   "invalidLibraryFile": "无效的库文件格式",
-  "dropToImport": "拖放 .js、.txt 或 .zip 文件到此处导入",
+  "dropToImport": "拖放 .js、.txt 或 .zip 文件或多轨文件夹到此处导入",
   "folderImportNotSupported": "不支持导入普通文件夹。只能导入多轨文件夹（包含 metadata.json）。",
   "trackImported": "音轨 '{{name}}' 导入成功！",
   "invalidFileType": "请只拖放 .js 或 .txt 文件",
@@ -112,7 +112,6 @@
   "allTracksDeleted": "所有音轨删除成功！",
   "allFoldersDeleted": "所有文件夹删除成功！",
   "allTracksAndFoldersDeleted": "所有音轨和文件夹删除成功！",
-  "noTracksToExport": "没有音轨可导出",
 
   "importConflict": {
     "title": "导入冲突",

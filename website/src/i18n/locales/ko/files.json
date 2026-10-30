@@ -80,7 +80,7 @@
   "libraryExported": "라이브러리가 ZIP으로 성공적으로 내보내졌습니다!",
   "libraryImported": "라이브러리가 성공적으로 가져와졌습니다!",
   "invalidLibraryFile": "유효하지 않은 라이브러리 파일 형식입니다",
-  "dropToImport": ".js, .txt 또는 .zip 파일을 여기에 드롭하여 가져오세요",
+  "dropToImport": ".js, .txt, .zip 파일이나 멀티트랙 폴더를 여기에 드롭하여 가져오세요",
   "folderImportNotSupported": "일반 폴더 가져오기는 지원되지 않습니다. 멀티트랙 폴더(metadata.json 포함)만 가져올 수 있습니다.",
   "trackImported": "트랙 '{{name}}'이 성공적으로 가져와졌습니다!",
   "invalidFileType": ".js 또는 .txt 파일만 드롭해 주세요",
@@ -112,7 +112,6 @@
   "allTracksDeleted": "모든 트랙이 성공적으로 삭제되었습니다!",
   "allFoldersDeleted": "모든 폴더가 성공적으로 삭제되었습니다!",
   "allTracksAndFoldersDeleted": "모든 트랙과 폴더가 성공적으로 삭제되었습니다!",
-  "noTracksToExport": "내보낼 트랙이 없습니다",
 
   "importConflict": {
     "title": "가져오기 충돌",

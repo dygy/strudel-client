@@ -60,10 +60,10 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
 - [x] **`tree/*` routes answer 500 instead of 401 for an expired or missing session.** All tree routes now use the shared `api/_auth.ts`, which also reads the Bearer header, and map a typed `AuthError` to 401. The `tracks/*` routes no longer guess the status from message text. `tree/validate` no longer fails for every user (wrong `TreeManager` construction). Fixed 2026-10-10.
 - [x] **Toast store can block a toast for the rest of the session.** Trimmed, dismissed and cleared toasts now release their key, and the exit-animation timer is cleared on unmount (fixed 2026-10-10).
 - [x] **Some locales are missing strings.** 138 keys were added across 8 locales; `localeCompleteness.test.ts` keeps every locale complete (fixed 2026-10-10).
-- [ ] **Locale quality issues** found while filling the gaps:
-  - `sr/auth.json` is in Latin script; the rest of `sr` is Cyrillic.
-  - `files.dropToImport` in all 8 locales doesn't mention multitrack folders.
-  - `ko` and `zh` `files.json` each have a duplicate `noTracksToExport` key (same value both times).
+- [x] **Locale quality issues** found while filling the gaps (fixed 2026-10-30):
+  - `sr/auth.json` was in Latin script; it is Cyrillic now, like the rest of `sr` (folder = фасцикла).
+  - `files.dropToImport` in all 8 locales now mentions multitrack folders, in each locale's word for multitrack.
+  - The duplicate `noTracksToExport` key in `ko` and `zh` `files.json` is gone.
 - [x] **`packages/mondo` tests depend on their order.** The SICP walkthrough suite deliberately builds on earlier steps, so its order is now pinned with `{ shuffle: false }`; production evaluations always start from a fresh scope (fixed 2026-10-10).
 
 ### Phase 5 — Debt and decisions (later)

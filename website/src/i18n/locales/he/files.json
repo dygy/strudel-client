@@ -80,7 +80,7 @@
   "libraryImported": "הספרייה יובאה בהצלחה!",
   "invalidLibraryFile": "פורמט קובץ ספרייה לא תקין",
   "downloadFolder": "הורד תיקייה",
-  "dropToImport": "גרור קבצים .js, .txt או .zip לכאן לייבוא",
+  "dropToImport": "גרור לכאן קבצי .js, .txt או .zip, או תיקיות של רצועה מרובה, לייבוא",
   "folderImportNotSupported": "ייבוא תיקייה רגילה אינו נתמך. ניתן לייבא רק תיקיות של רצועה מרובה (עם metadata.json).",
   "trackImported": "רצועה '{{name}}' יובאה בהצלחה!",
   "invalidFileType": "אנא גרור רק קבצי .js או .txt",

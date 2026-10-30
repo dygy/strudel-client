@@ -80,7 +80,7 @@
   "libraryImported": "Библиотека је успешно увезена!",
   "invalidLibraryFile": "Неисправан формат фајла библиотеке",
   "downloadFolder": "Преузми Фасциклу",
-  "dropToImport": "Превуци .js, .txt или .zip фајлове овде за увоз",
+  "dropToImport": "Превуци овде .js, .txt или .zip фајлове или фасцикле мултинумера за увоз",
   "folderImportNotSupported": "Увоз обичних фасцикли није подржан. Могу се увести само фасцикле мултинумера (са metadata.json).",
   "trackImported": "Нумера '{{name}}' је успешно увезена!",
   "invalidFileType": "Молимо превуците само .js или .txt фајлове",
