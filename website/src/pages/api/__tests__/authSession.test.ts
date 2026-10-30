@@ -26,7 +26,6 @@ import { GET as authStatus } from '../auth/status';
 import { POST as authRefresh } from '../auth/refresh';
 import { GET as filesystemTree } from '../filesystem/tree';
 import { DELETE as trackDelete } from '../tracks/delete';
-import { GET as treeStats } from '../tree/stats';
 import { POST as trackCreate } from '../tracks/create';
 import { PUT as trackUpdate } from '../tracks/update';
 import { PUT as folderUpdate } from '../folders/update';
@@ -173,7 +172,6 @@ describe('GET /api/auth/user', () => {
 // Routes map auth failures by type (AuthError -> 401, else 500). A transient auth-service failure
 // must be a 500, not a 401 (which tells the client its session is gone).
 describe.each([
-  { name: 'GET tree/stats', handler: treeStats, method: 'GET', body: undefined },
   { name: 'POST tracks/create', handler: trackCreate, method: 'POST', body: { name: 'Beat', code: 's("bd")' } },
   { name: 'PUT tracks/update', handler: trackUpdate, method: 'PUT', body: { trackId: 't1', updates: { code: 'x' } } },
   {

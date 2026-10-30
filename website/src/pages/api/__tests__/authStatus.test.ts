@@ -3,7 +3,7 @@
  * the session and retries (secureApi.ts) — and a valid session must be accepted from the
  * `Authorization: Bearer` header the client sends, not only from the cookie.
  *
- * Regression (2026-10-10): the tree routes had their own cookie-only auth whose errors were
+ * Regression (2026-10-10): the tree routes (removed since) had their own cookie-only auth whose errors were
  * mapped to 401 only if the message contained "authorization", so every auth failure was a 500.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -18,16 +18,6 @@ import {
   useTestEnv,
 } from './apiTestHelpers';
 
-import { POST as treeMove } from '../tree/move';
-import {
-  GET as treeNodesGet,
-  POST as treeNodesCreate,
-  PUT as treeNodesUpdate,
-  DELETE as treeNodesDelete,
-} from '../tree/nodes';
-import { GET as treeSearchGet, POST as treeSearch } from '../tree/search';
-import { GET as treeStats } from '../tree/stats';
-import { GET as treeValidate } from '../tree/validate';
 import { POST as trackCreate } from '../tracks/create';
 import { PUT as trackUpdate } from '../tracks/update';
 import { DELETE as trackDelete } from '../tracks/delete';
@@ -43,15 +33,6 @@ const USER = { id: 'user-session', email: 'someone@example.test' };
 const TOKEN = 'eyJ.test.token';
 
 const handlers = [
-  { name: 'POST tree/move', handler: treeMove, method: 'POST', body: { nodeId: 'n1', newParentId: null } },
-  { name: 'GET tree/nodes', handler: treeNodesGet, method: 'GET' },
-  { name: 'POST tree/nodes', handler: treeNodesCreate, method: 'POST', body: { name: 'A', type: 'folder' } },
-  { name: 'PUT tree/nodes', handler: treeNodesUpdate, method: 'PUT', body: { nodeId: 'n1', name: 'B' } },
-  { name: 'DELETE tree/nodes', handler: treeNodesDelete, method: 'DELETE', body: { nodeId: 'n1' } },
-  { name: 'GET tree/search', handler: treeSearchGet, method: 'GET' },
-  { name: 'POST tree/search', handler: treeSearch, method: 'POST', body: { query: 'beat' } },
-  { name: 'GET tree/stats', handler: treeStats, method: 'GET' },
-  { name: 'GET tree/validate', handler: treeValidate, method: 'GET' },
   { name: 'POST tracks/create', handler: trackCreate, method: 'POST', body: { name: 'Beat', code: 's("bd")' } },
   { name: 'PUT tracks/update', handler: trackUpdate, method: 'PUT', body: { trackId: 't1', updates: { code: 'x' } } },
   { name: 'DELETE tracks/delete', handler: trackDelete, method: 'DELETE', body: { trackId: 't1' } },

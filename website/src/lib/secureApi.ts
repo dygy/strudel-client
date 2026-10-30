@@ -191,27 +191,9 @@ class SecureApiClient {
     return this.request('/folders/list');
   }
 
-  async createFolder(data: { name: string; path: string }): Promise<{ folder: Folder }> {
-    return this.request('/folders/create', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
   async deleteAllFolders(): Promise<{ success: boolean }> {
     return this.request('/folders/delete-all', {
       method: 'DELETE',
-    });
-  }
-
-  // Migration
-  async checkMigrationStatus(): Promise<{ hasMigrated: boolean }> {
-    return this.request('/migration/status');
-  }
-
-  async performMigration(): Promise<{ success: boolean; message: string }> {
-    return this.request('/migration/migrate', {
-      method: 'POST',
     });
   }
 
@@ -229,104 +211,6 @@ class SecureApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
-  }
-
-  // Database setup
-  async setupDatabase(): Promise<{ success: boolean; message: string }> {
-    return this.request('/database/migrate', {
-      method: 'POST',
-    });
-  }
-
-  // Tree API - File system operations
-  async getTreeNodes(parentId?: string | null): Promise<{ success: boolean; nodes: any[] }> {
-    const params = new URLSearchParams();
-    if (parentId !== undefined) {
-      params.set('parent', parentId === null ? 'null' : parentId);
-    }
-    return this.request(`/tree/nodes?${params.toString()}`);
-  }
-
-  async createTreeNode(data: {
-    name: string;
-    type: 'folder' | 'track';
-    parentId?: string | null;
-    code?: string;
-    isMultitrack?: boolean;
-    steps?: any;
-    activeStep?: number;
-    metadata?: Record<string, any>;
-  }): Promise<{ success: boolean; node: any }> {
-    return this.request('/tree/nodes', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateTreeNode(
-    nodeId: string,
-    updates: {
-      name?: string;
-      parentId?: string | null;
-      code?: string;
-      isMultitrack?: boolean;
-      steps?: any;
-      activeStep?: number;
-      metadata?: Record<string, any>;
-    },
-  ): Promise<{ success: boolean; node: any }> {
-    return this.request('/tree/nodes', {
-      method: 'PUT',
-      body: JSON.stringify({ nodeId, ...updates }),
-    });
-  }
-
-  async deleteTreeNode(nodeId: string, cascade: boolean = true): Promise<{ success: boolean; message: string }> {
-    return this.request('/tree/nodes', {
-      method: 'DELETE',
-      body: JSON.stringify({ nodeId, cascade }),
-    });
-  }
-
-  async moveTreeNode(
-    nodeId: string,
-    newParentId: string | null,
-  ): Promise<{ success: boolean; node: any; message: string }> {
-    return this.request('/tree/move', {
-      method: 'POST',
-      body: JSON.stringify({ nodeId, newParentId }),
-    });
-  }
-
-  async searchTreeNodes(query: {
-    term?: string;
-    type?: 'folder' | 'track';
-    parentId?: string | null;
-    tags?: string[];
-    pattern?: string;
-    maxDepth?: number;
-    includeMetadata?: boolean;
-  }): Promise<{ success: boolean; result: any }> {
-    const params = new URLSearchParams();
-    if (query.term) params.set('term', query.term);
-    if (query.type) params.set('type', query.type);
-    if (query.parentId !== undefined) params.set('parentId', query.parentId === null ? 'null' : query.parentId);
-    if (query.tags) params.set('tags', query.tags.join(','));
-    if (query.pattern) params.set('pattern', query.pattern);
-    if (query.maxDepth) params.set('maxDepth', query.maxDepth.toString());
-    if (query.includeMetadata) params.set('includeMetadata', 'true');
-
-    return this.request(`/tree/search?${params.toString()}`);
-  }
-
-  async getTreeStats(nodeId?: string): Promise<{ success: boolean; treeStats?: any; nodeStats?: any }> {
-    const params = new URLSearchParams();
-    if (nodeId) params.set('nodeId', nodeId);
-    return this.request(`/tree/stats?${params.toString()}`);
-  }
-
-  async validateTree(): Promise<{ success: boolean; validation: any }> {
-    return this.request('/tree/validate');
   }
 }
 
@@ -379,14 +263,6 @@ export const db = {
       const result = await secureApi.getFolders();
       return { data: result.folders, error: null };
     },
-    create: async (folder: { name: string; path: string }) => {
-      try {
-        const result = await secureApi.createFolder(folder);
-        return { data: result.folder, error: null };
-      } catch (error) {
-        return { data: null, error };
-      }
-    },
     deleteAll: async () => {
       try {
         await secureApi.deleteAllFolders();
@@ -406,28 +282,6 @@ export const batch = {
       return { data: result, error: null };
     } catch (error) {
       return { data: null, error };
-    }
-  },
-};
-
-// Migration helper
-export const migration = {
-  hasMigrated: async () => {
-    try {
-      const result = await secureApi.checkMigrationStatus();
-      return result.hasMigrated;
-    } catch (error) {
-      console.error('Error checking migration status:', error);
-      return false;
-    }
-  },
-  migrate: async () => {
-    try {
-      const result = await secureApi.performMigration();
-      return result;
-    } catch (error) {
-      console.error('Error performing migration:', error);
-      return { success: false, message: 'Migration failed' };
     }
   },
 };

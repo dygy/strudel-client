@@ -1,5 +1,5 @@
 > **Migrated from** `.kiro/specs/scalable-tree-filesystem` on 2026-10-08 (Kiro format, not the AWOS template).
-> **Status:** Partial — tree layer built but API reverted to the tracks table (d8b4bdf, 4d671f2); finish-or-remove decision on roadmap Phase 5
+> **Status:** Removed (2026-10-30) — the API reverted to the tracks table (d8b4bdf, 4d671f2); `/api/tree/*`, `TreeManager` and `TreeSystem` had no callers and were deleted. The `tree_*` tables stay.
 
 # Requirements Document
 

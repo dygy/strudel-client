@@ -8,7 +8,6 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useSettings } from '@src/settings';
-import { migration } from '@src/lib/secureApi.ts';
 
 interface StrictAutosaveIntegrationOptions {
   fileManagerHook: any; // The existing file manager hook

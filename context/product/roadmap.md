@@ -66,8 +66,6 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
 
 ### Phase 5 — Debt and decisions (later)
 
-- [ ] **Tree filesystem: finish or remove.** The `tree_*` tables and `/api/tree/*` exist, but the API reverted to `tracks` ([002](../spec/002-scalable-tree-filesystem/)). No UI calls the tree API today. If it's finished, two things must change first:
-  - `tree/{move,nodes,search,stats}` query with the anon key and never pass the user's token, so RLS sees no user: reads come back empty and writes fail.
-  - `tree/validate` uses the service-role key outside `/api/admin/*`. It's isolated today only by an explicit `user_id` filter.
+- [x] **Tree filesystem: finish or remove.** Removed. No UI called `/api/tree/*` ([002](../spec/002-scalable-tree-filesystem/)), and the routes queried with the anon key without the user's token, so RLS left their reads empty. The routes, `TreeManager`, `TreeSystem` and the unused `secureApi` wrappers (tree, migration, database setup, `createFolder`) were deleted on 2026-10-30. The `tree_*` tables and `lib/database/{tree-schema.sql,migrate-to-tree.ts}` stay; dropping the tables would be its own approved migration.
 - [ ] **Admin identity:** replace the hardcoded admin email with a role.
 - [ ] **Remove the Heroku leftovers:** `Dockerfile`, `server.js`.

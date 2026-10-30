@@ -11,9 +11,6 @@ import { PUT as folderUpdate } from '../folders/update';
 import { POST as trackCreate } from '../tracks/create';
 import { DELETE as trackDelete } from '../tracks/delete';
 import { PUT as trackUpdate } from '../tracks/update';
-import { POST as treeMove } from '../tree/move';
-import { POST as treeNodesCreate, PUT as treeNodesUpdate, DELETE as treeNodesDelete } from '../tree/nodes';
-import { POST as treeSearch } from '../tree/search';
 
 vi.mock('@supabase/supabase-js', async () => {
   const helpers = await import('./apiTestHelpers');
@@ -46,11 +43,6 @@ const routes = [
     method: 'PUT',
     ok: { trackId: 't1', updates: { code: 's("bd")' } },
   },
-  { name: 'POST tree/move', handler: treeMove, method: 'POST', ok: { nodeId: 'n1', newParentId: null } },
-  { name: 'POST tree/nodes', handler: treeNodesCreate, method: 'POST', ok: { name: 'A', type: 'folder' } },
-  { name: 'PUT tree/nodes', handler: treeNodesUpdate, method: 'PUT', ok: { nodeId: 'n1', name: 'B' } },
-  { name: 'DELETE tree/nodes', handler: treeNodesDelete, method: 'DELETE', ok: { nodeId: 'n1' } },
-  { name: 'POST tree/search', handler: treeSearch, method: 'POST', ok: { query: 'beat' } },
 ] as const;
 
 const url = 'http://test/api/route';
