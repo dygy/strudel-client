@@ -20,6 +20,7 @@ import { ImportConflictModal } from '../ui/ImportConflictModal';
 import type { ImportConflict } from '../ui/ImportConflictModal.types';
 import type { Track } from './types/fileManager';
 import { nanoid } from 'nanoid';
+import { isZipJunk } from '@src/lib/zipJunk';
 
 interface ReplContext {
   activeCode?: string;
@@ -682,6 +683,11 @@ export function FileManagerRefactored({
       const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
       const zipContent = await zip.loadAsync(file);
+      // macOS Finder ZIPs carry __MACOSX/._name AppleDouble files (and .DS_Store): binary junk
+      // that matches *.js and would be imported as tracks (their NUL bytes fail the insert).
+      for (const name of Object.keys(zipContent.files)) {
+        if (isZipJunk(name)) delete zipContent.files[name];
+      }
 
       // Debug: Log all files in the ZIP
       const allFiles = Object.keys(zipContent.files);

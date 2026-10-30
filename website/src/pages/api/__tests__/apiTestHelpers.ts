@@ -111,7 +111,9 @@ function queryBuilder(table: string) {
       return builder;
     }),
     delete: vi.fn(() => {
-      state.mutations.push({ table, op: 'delete' });
+      // Records the eq/in filters chained after it, like update (the rows stay: tests read them).
+      mutation = { table, op: 'delete', filters: [] };
+      state.mutations.push(mutation);
       return builder;
     }),
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>

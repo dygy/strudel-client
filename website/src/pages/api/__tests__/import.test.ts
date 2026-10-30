@@ -25,7 +25,7 @@ vi.mock('@supabase/supabase-js', async () => {
 
 const USER = { id: 'user-session', email: 'someone@example.test' };
 const OTHER_USER_ID = 'user-victim';
-const TOKEN = 'valid-token';
+const TOKEN = 'eyJ.valid.token'; // JWT-shaped: api/_auth.ts only accepts a cookie value with a dot
 
 const routes = [
   { name: 'batch-import', url: 'http://test/api/library/batch-import', handler: batchImport },

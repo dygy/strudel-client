@@ -1152,11 +1152,15 @@ export function useFileManagerOperations({
         const zip = new JSZip();
 
         // Get all tracks in this folder and its subfolders, or all tracks if folderPath is empty
+        // track.folder holds a folder id on most rows (a raw path on older ones): export by path,
+        // or the ZIP gets id-named directories and an import puts the tracks in junk folders.
+        const folderList = Object.values(folders);
+        const pathOf = (track: Track) => resolveTrackFolder(track.folder, folderList);
         const folderTracks =
           folderPath === ''
             ? Object.values(tracks) // Export all tracks
             : Object.values(tracks).filter(
-                (track) => track.folder === folderPath || track.folder?.startsWith(`${folderPath}/`),
+                (track) => pathOf(track) === folderPath || pathOf(track).startsWith(`${folderPath}/`),
               );
 
         if (folderTracks.length === 0) {
@@ -1166,12 +1170,11 @@ export function useFileManagerOperations({
 
         // Add each track to the ZIP
         folderTracks.forEach((track) => {
+          const trackFolderPath = pathOf(track);
           const relativePath =
             folderPath === ''
-              ? track.folder || '' // Keep full folder structure for export all
-              : track.folder
-                ? track.folder.replace(folderPath, '').replace(/^\//, '')
-                : '';
+              ? trackFolderPath // Keep full folder structure for export all
+              : trackFolderPath.slice(folderPath.length).replace(/^\//, '');
           const trackPath = relativePath ? `${relativePath}/` : '';
 
           if (track.isMultitrack && track.steps) {
@@ -1224,7 +1227,7 @@ export function useFileManagerOperations({
         toastActions.error('Folder download failed');
       }
     },
-    [tracks, t],
+    [tracks, folders, t],
   );
 
   const deleteFolder = useCallback(
