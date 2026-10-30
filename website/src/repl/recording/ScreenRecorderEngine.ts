@@ -109,12 +109,13 @@ export class ScreenRecorderEngine {
         audio: false,
       } as DisplayMediaStreamOptions);
     } catch (err) {
-      // Req 1.3: Permission denied or user cancelled
-      const message =
-        err instanceof DOMException && err.name === 'NotAllowedError'
-          ? 'Screen capture permission is required to record. Please allow access and try again.'
-          : `Failed to start screen capture: ${err instanceof Error ? err.message : String(err)}`;
-      this.updateState({ error: message });
+      // Req 1.3: browsers report a cancelled picker and a denied permission the same way
+      // (NotAllowedError). Both are the user's own choice: no recording starts and nothing is
+      // reported, so the record button is simply ready again (spec 015 §4 finding 4).
+      if (err instanceof DOMException && err.name === 'NotAllowedError') return;
+      this.updateState({
+        error: `Failed to start screen capture: ${err instanceof Error ? err.message : String(err)}`,
+      });
       return;
     }
 

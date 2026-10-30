@@ -40,16 +40,16 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
 
 ### Phase 4 — Make it safe to change (next)
 
-- [ ] **A test suite that can gate deploys**
+- [x] **A test suite that can gate deploys**
   - [x] **Fix the routing tests:** `@src` alias added to the root vitest config; tests moved to the `/repl/<slug>` contract (2026-10-09, `da9ca9d`).
   - [x] **Fix the mixer and save-manager tests:** mixer Web Audio mock caught up with the EQ; save manager was the alias (2026-10-09).
   - [x] **Fix `xen`:** it was a `window` stub leaking between files under `isolate: false`; fixed with `unstubGlobals` (2026-10-09). `known-red-tests.txt` is empty.
   - [x] **Gate the deploy:** format, lint and tests all block the deploy (`needs: check`, 2026-10-09).
 - [x] **Coverage for untested fork features:** smooth transitions, EQ, screen recorder, import, admin ([015](../spec/015-fork-feature-test-coverage/), 106 tests, 2026-10-09).
-- [ ] **Fix what the coverage found** ([015 §4 Findings](../spec/015-fork-feature-test-coverage/functional-spec.md#4-findings)). Each one has a check waiting to go green:
+- [x] **Fix what the coverage found** ([015 §4 Findings](../spec/015-fork-feature-test-coverage/functional-spec.md#4-findings)). Each one has a check waiting to go green:
   - [x] **EQ is audible while switched off** after a reload, when moved while off, or when a saved state is restored (fixed 2026-10-09).
   - [x] **Damaged EQ settings break the EQ panel** (empty bands or non-numeric gains pass the loader). They now fall back to flat (fixed 2026-10-09).
-  - [ ] **Screen picker cancel message:** decide on the wording for cancel versus deny.
+  - [x] **Screen picker cancel message:** browsers report cancel and deny alike (`NotAllowedError`); decided that neither is an error, as the spec says: no recording starts, nothing is shown, the button is ready again. Other capture failures still report "Failed to start screen capture" (fixed 2026-10-30).
   - [x] **Malformed imports get the wrong answer.** All three import routes now refuse an unreadable or non-object body, or a non-list track or folder list, with 400 "Invalid data format" (fixed 2026-10-09).
   - [x] **Import doesn't check individual tracks.** The ZIP import (`library/batch-import`) now validates every item before saving anything: a track with no name, or a folder with no usable path, gets 400; a track with no code is imported empty. A failed track insert removes the folders that import created (fixed 2026-10-30). The import also places subfolders of existing folders under them, reuses a same-named or same-slug sibling instead of creating a twin, and runs as the user (RLS).
   - [x] **Multitrack steps swapped after export and re-import.** Import paired the step names in `metadata.json` with the step files in alphabetical order, so "Verse" and "Chorus" swapped code (and `step_10` came before `step_2`). A single multitrack exported with custom step names was not recognised at all. Files beside the steps (`notes.md`) were stored in a folder that was never created. Now each step finds its own file (`lib/multitrackZip.ts`), export names files uniquely, and other files go next to the multitrack (fixed 2026-10-30).
@@ -70,4 +70,4 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
 
 - [x] **Tree filesystem: finish or remove.** Removed. No UI called `/api/tree/*` ([002](../spec/002-scalable-tree-filesystem/)), and the routes queried with the anon key without the user's token, so RLS left their reads empty. The routes, `TreeManager`, `TreeSystem` and the unused `secureApi` wrappers (tree, migration, database setup, `createFolder`) were deleted on 2026-10-30. The `tree_*` tables and `lib/database/{tree-schema.sql,migrate-to-tree.ts}` stay; dropping the tables would be its own approved migration.
 - [ ] **Admin identity:** replace the hardcoded admin email with a role.
-- [ ] **Remove the Heroku leftovers:** `Dockerfile`, `server.js`.
+- [x] **Remove the Heroku leftovers:** `Dockerfile`, `server.js` and the `express` dependency only `server.js` used (removed 2026-10-30).

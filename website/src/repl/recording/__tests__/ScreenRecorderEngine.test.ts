@@ -163,11 +163,9 @@ describe('ScreenRecorderEngine (spec 015 §2.3)', () => {
       expect(t.engine.getState().isRecording).toBe(true);
     });
 
-    // FINDING (spec 015 §4): a cancelled picker (NotAllowedError) is reported as an error,
-    // "Screen capture permission is required to record…" (ScreenRecorderEngine.ts:113-117),
-    // and useScreenRecorder shows any state.error (useScreenRecorder.ts:65). The spec says
-    // cancelling the picker shows no error.
-    it.fails('shows no error', async () => {
+    // Spec 015 §4 finding 4, decided 2026-10-30: cancel and deny both arrive as NotAllowedError,
+    // and neither is an error — the picker closing is the answer.
+    it('shows no error (cancelled or denied)', async () => {
       const t = setup();
 
       const started = t.start();
@@ -176,19 +174,6 @@ describe('ScreenRecorderEngine (spec 015 §2.3)', () => {
 
       expect(t.engine.getState().error).toBeNull();
       expect(t.states.every((s) => s.error === null)).toBe(true);
-    });
-
-    // Pins today's behaviour, which the it.fails above records as a finding. When the finding is
-    // fixed, this test and the it.fails both flip; update them together.
-    it('today a cancel (NotAllowedError) is reported as "permission is required"', async () => {
-      const t = setup();
-
-      const started = t.start();
-      t.cancel(new DOMException('Permission denied', 'NotAllowedError'));
-      await started;
-
-      expect(t.engine.getState().error).toMatch(/permission is required/);
-      expect(t.engine.getState().error).not.toMatch(/Failed to start screen capture/);
     });
 
     it.each([
@@ -206,7 +191,6 @@ describe('ScreenRecorderEngine (spec 015 §2.3)', () => {
         expect(t.engine.getState()).toMatchObject({ isRecording: false });
         expect(t.engine.getState().error).toMatch(/^Failed to start screen capture: /);
         expect(t.engine.getState().error).toMatch(detail);
-        expect(t.engine.getState().error).not.toMatch(/permission is required/);
         expect(recorders).toHaveLength(0);
       },
     );

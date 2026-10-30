@@ -68,7 +68,7 @@ Each requirement describes behaviour the live coder relies on today, and that mu
 - **Recording starts only after the user picks what to share, and stops cleanly.**
   - **Acceptance Criteria:**
     - [ ] When the user starts recording and picks a screen or tab, then recording begins and the recording indicator shows.
-    - [ ] When the user starts recording and cancels the screen picker, then no recording starts, no error is shown, and the record button is ready again.
+    - [x] When the user starts recording and cancels the screen picker, then no recording starts, no error is shown, and the record button is ready again.
     - [ ] When the user stops recording, then a video file is offered for export, and the browser's screen-sharing indicator disappears.
 - **Stopping sharing from the browser's own controls ends the recording properly.**
   - **Acceptance Criteria:**
@@ -132,7 +132,7 @@ Recorded while writing this spec (confirmed by reading the product's behaviour, 
 Found while writing the checks (each guarded by a check that is expected to fail until the follow-up lands):
 
 3. **FIXED 2026-10-09.** **The EQ is audible while switched off.** When the page loads with the EQ saved as off and a shaped curve, the curve is applied anyway while the screen shows the EQ as off. Moving a slider or picking a preset while it is off does the same. **User-audible**, so this is the highest-priority follow-up.
-4. **Cancelling the screen picker shows "Screen capture permission is required…"** The spec says cancelling should show nothing. Browsers report "cancel" and "deny" the same way, so this is a product decision: either keep one message, or word it to cover both.
+4. **FIXED 2026-10-30** (decided: neither cancel nor deny is an error; real capture failures still are). **Cancelling the screen picker shows "Screen capture permission is required…"** The spec says cancelling should show nothing. Browsers report "cancel" and "deny" the same way, so this is a product decision: either keep one message, or word it to cover both.
 5. **FIXED 2026-10-09.** **Some malformed imports get the wrong answer.** An empty-valued track or folder list, or an import that is not a list at all, either reports a generic error or claims success, instead of "invalid data". Nothing is saved in any of these cases, so the user's library is safe; only the message is wrong.
 6. **An unused import route copies whatever fields it is sent onto the saved tracks.** It is not called by the app today, and the owner of each track is still forced to the signed-in user. Remove it or narrow it.
 
