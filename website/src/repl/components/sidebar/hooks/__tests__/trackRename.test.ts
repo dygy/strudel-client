@@ -23,7 +23,11 @@ vi.mock('@src/user_pattern_utils', () => ({
   }),
 }));
 
-import { useFileManagerOperations } from '../useFileManagerOperations';
+// isolate:false shares the module cache across files: a file that ran earlier (e.g. a render
+// test of FileManagerRefactored) may already hold this hook bound to the real toast store and
+// pattern utils, so the mocks above would not apply. Load fresh copies.
+vi.resetModules();
+const { useFileManagerOperations } = await import('../useFileManagerOperations');
 
 const TEST = 'jxldrFutJzzdJcI0FcgSZ';
 const BEATS = 'aB3dEfGhIjKlMnOpQrStU';

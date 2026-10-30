@@ -54,11 +54,19 @@ vi.mock('@src/repl/components/sidebar/FileManagerRefactored', () => ({
   ),
 }));
 
-import React, { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { parseBoolean, setIsFileManagerOpen, setIsPanelOpened, settingsMap } from '@src/settings';
-import ReplEditor from '../../ReplEditor';
-import { resetPanelSession } from '../../panel/panelLayout';
+import type { Root } from 'react-dom/client';
+
+// isolate:false shares the module cache across files: a file that ran earlier may already hold
+// Header / the More menu bound to the real AuthButton (and other modules mocked above), so the
+// mocks would not apply. Load fresh copies — React and react-dom too, so the tree renders with
+// one React.
+vi.resetModules();
+const React = await import('react');
+const { act } = React;
+const { createRoot } = await import('react-dom/client');
+const { parseBoolean, setIsFileManagerOpen, setIsPanelOpened, settingsMap } = await import('@src/settings');
+const { default: ReplEditor } = await import('../../ReplEditor');
+const { resetPanelSession } = await import('../../panel/panelLayout');
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
