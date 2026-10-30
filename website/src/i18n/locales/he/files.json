@@ -147,7 +147,7 @@
     "folderNameEmpty": "שם התיקייה לא יכול להיות ריק",
     "folderNameSlash": "שם התיקייה לא יכול להכיל \"/\"",
     "folderNameTaken": "תיקייה בשם '{{name}}' כבר קיימת כאן",
-    "trackNameTaken": "טראק בשם '{{name}}' כבר קיים כאן"
+    "trackNameTaken": "רצועה בשם '{{name}}' כבר קיימת כאן"
   },
 
   "success": {
