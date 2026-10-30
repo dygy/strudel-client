@@ -8,7 +8,7 @@
  * @spec: 017-track-transition-types
  * @regression
  */
-import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 
 vi.hoisted(() => {
   const jsdomStorage = (globalThis as { jsdom?: { window: Window } }).jsdom?.window.localStorage;
@@ -20,6 +20,7 @@ vi.mock('@src/repl/util', () => ({ isUdels: () => false, isIframe: () => false }
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { setPersistentEngine, windowPersistentEvents } from '@nanostores/persistent';
 import { setActiveFooter, setTransitionSettings, settingsMap } from '@src/settings';
 import { DEFAULT_TRANSITION, TRANSITION_SETTING_KEYS, TRANSITION_TYPE_OPTIONS } from '@src/repl/transitionSettings';
 import { globalSaveManager } from '@src/repl/globalSaveManager';
@@ -49,10 +50,16 @@ const nonTransitionSettings = () => {
 const storageWithoutTransitions = () =>
   JSON.stringify(
     Object.keys(localStorage)
+      // the settings store's keys only: i18n caches the language under its own key, on its own schedule
+      .filter((key) => key.startsWith('strudel-settings'))
       .filter((key) => !TRANSITION_SETTING_KEYS.some((t) => key.endsWith(t)))
       .sort()
       .map((key) => [key, localStorage.getItem(key)]),
   );
+
+// The suite runs with isolate:false, so settings.ts may have been loaded (and its persistent
+// store bound to a storage) by an earlier file's jsdom. Point the store at this file's storage.
+beforeAll(() => setPersistentEngine(localStorage, windowPersistentEvents));
 
 beforeEach(() => {
   setTransitionSettings({ ...DEFAULT_TRANSITION });

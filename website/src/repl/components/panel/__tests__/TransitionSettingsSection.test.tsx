@@ -4,7 +4,7 @@
  * its description, Length in cycles, the modifiers, their greyed-out states, and persistence
  * through the settings store (what a reload reads back).
  */
-import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 
 // Node >= 25 ships its own global `localStorage` (undefined without --localstorage-file), which
 // shadows jsdom's; settings.ts reads it at import time, so point it at jsdom's before imports.
@@ -18,6 +18,7 @@ vi.mock('@src/repl/util', () => ({ isUdels: () => false, isIframe: () => false }
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { setPersistentEngine, windowPersistentEvents } from '@nanostores/persistent';
 import { getTransitionSettings, setTransitionSettings, settingsMap } from '@src/settings';
 import { DEFAULT_TRANSITION, parseTransitionSettings } from '@src/repl/transitionSettings';
 import en from '@src/i18n/locales/en/settings.json';
@@ -44,6 +45,10 @@ const snapFieldset = () => q('[data-transition-snap]')!.closest('fieldset') as H
 const glideBox = () => q('[data-transition-glide]')!.querySelector('input')!;
 const description = () => q('[data-transition-description]')!.textContent;
 const click = (el: HTMLElement) => act(() => el.click());
+
+// The suite runs with isolate:false, so settings.ts may have been loaded (and its persistent
+// store bound to a storage) by an earlier file's jsdom. Point the store at this file's storage.
+beforeAll(() => setPersistentEngine(localStorage, windowPersistentEvents));
 
 beforeEach(() => {
   setTransitionSettings({ ...DEFAULT_TRANSITION });

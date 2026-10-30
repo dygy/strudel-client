@@ -98,3 +98,10 @@
 
   These ship in the same push; the prod-verification note follows locally.
 - Owner pre-approved the push "once 016 lands", provided all gates are green.
+
+## 2026-10-30 — deploy run 41050595729 red, fix forward
+- CI (Node 24.12, 2 vCPU) failed 3 tests in `TransitionSettingsSection.test.tsx` and `TransitionChoice-unsavedWork.test.tsx`; the deploy was skipped, so prod stayed on 016.
+- Cause: the suite runs with `isolate: false`. With few workers, `settings.ts` is first loaded by an earlier file, so its persistent store is bound to that file's jsdom storage. The tests then read a different `localStorage`, and i18n's own language key also showed up.
+- Reproduced locally with `--maxWorkers=2` and with 3 (all 1764 pass at 14 workers).
+- Fix, tests only: `setPersistentEngine(localStorage, windowPersistentEvents)` in `beforeAll`, and the unsaved-work check compares only the settings store's keys.
+- Green at 1, 2 and 3 workers under Node 22, and at default workers under Node 26; format and lint clean. No behaviour change, so per /ship step 10 the fix goes forward without a new push question.
