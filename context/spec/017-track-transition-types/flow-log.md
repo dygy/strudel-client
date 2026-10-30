@@ -105,3 +105,16 @@
 - Reproduced locally with `--maxWorkers=2` and with 3 (all 1764 pass at 14 workers).
 - Fix, tests only: `setPersistentEngine(localStorage, windowPersistentEvents)` in `beforeAll`, and the unsaved-work check compares only the settings store's keys.
 - Green at 1, 2 and 3 workers under Node 22, and at default workers under Node 26; format and lint clean. No behaviour change, so per /ship step 10 the fix goes forward without a new push question.
+
+## 2026-10-30 — deploy and prod verification
+- Deploy run 41051062995 for 31e680c: "Format, lint, test" passed and "Build and deploy to Cloudflare" passed.
+- Prod check: headless Chromium on https://strudel.dygy.app/embed.
+  - The transition picker lists `off, dip, cut, crossfade, filterSweep, bassSwap, echoOut, layeredIntro`.
+  - Selecting crossfade persists (`strudel-settingstransitionType = crossfade`).
+  - No page errors.
+- Not verified on prod: audible switches (the library needs login). They were measured on the dev server, see the browser-measurement entries above.
+- Worktree removed; local `main` reset to origin/main. Agents dispatched: 5 (engine, audio, web, reviewer, test engineer).
+- Flow defects:
+  - Tech §2.3 claimed no master-gain or voice backup was needed (wrong for notes already scheduled).
+  - Tech §2.8 claimed the preview has its own AudioContext (it shares one).
+  - The push gate runs vitest at default workers, so it misses `isolate:false` leaks that CI's 2 workers expose.
