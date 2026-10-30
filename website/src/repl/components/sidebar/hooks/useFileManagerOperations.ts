@@ -20,6 +20,7 @@ import {
 } from '@src/lib/folderRename';
 import { validateTrackName, generateUniqueTrackName } from '@src/lib/trackValidation';
 import { followedTrackUrl, resolveTrackFolder, trackNameClashes } from '@src/lib/trackRename';
+import { stepFileNames } from '@src/lib/multitrackZip';
 import type { Track, TrackStep, Folder } from '../types/fileManager';
 
 interface UseFileManagerOperationsProps {
@@ -1097,9 +1098,9 @@ export function useFileManagerOperations({
         const zip = new JSZip();
 
         // Add each step as a separate file
-        track.steps.forEach((step) => {
-          const fileName = `${step.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
-          zip.file(fileName, step.code);
+        const stepFiles = stepFileNames(track.steps.map((step) => step.name));
+        track.steps.forEach((step, i) => {
+          zip.file(stepFiles[i], step.code);
         });
 
         // Add metadata file
@@ -1182,9 +1183,9 @@ export function useFileManagerOperations({
             const multitrackFolder = zip.folder(`${trackPath}${track.name}`);
 
             // Add each step
-            track.steps.forEach((step) => {
-              const fileName = `${step.name.replace(/[^a-zA-Z0-9]/g, '_')}.js`;
-              multitrackFolder?.file(fileName, step.code);
+            const stepFiles = stepFileNames(track.steps.map((step) => step.name));
+            track.steps.forEach((step, i) => {
+              multitrackFolder?.file(stepFiles[i], step.code);
             });
 
             // Add multitrack metadata

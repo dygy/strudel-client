@@ -21,6 +21,7 @@ import type { ImportConflict } from '../ui/ImportConflictModal.types';
 import type { Track } from './types/fileManager';
 import { nanoid } from 'nanoid';
 import { isZipJunk } from '@src/lib/zipJunk';
+import { folderOutsideMultitracks, orderStepFiles } from '@src/lib/multitrackZip';
 
 interface ReplContext {
   activeCode?: string;
@@ -378,11 +379,12 @@ export function FileManagerRefactored({
 
       const trackName = metadata.name || metadata.trackName || dirEntry.name;
 
-      // Find step files
-      const stepFiles = entries
-        .filter((e) => e.isFile && e.name.match(/\.(js|txt)$/i))
-        .filter((e) => e.name !== 'metadata.json')
-        .sort((a, b) => a.name.localeCompare(b.name));
+      // Find step files, in step order (metadata.json names each step's file)
+      const stepEntries = entries.filter((e) => e.isFile && e.name.match(/\.(js|txt)$/i));
+      const stepFiles = orderStepFiles(
+        stepEntries.map((e) => e.name),
+        metadata.steps,
+      );
 
       if (stepFiles.length === 0) {
         toastActions.error(t('files:noValidStepsFound'));
@@ -392,17 +394,17 @@ export function FileManagerRefactored({
       // Read all step files
       const steps: any[] = [];
       for (let i = 0; i < stepFiles.length; i++) {
-        const stepEntry = stepFiles[i] as FileSystemFileEntry;
+        const { file, meta } = stepFiles[i];
+        const stepEntry = stepEntries.find((e) => e.name === file) as FileSystemFileEntry;
         const stepFile = await getFileFromEntry(stepEntry);
         const stepContent = await stepFile.text();
-        const stepName = metadata.steps?.[i]?.name || `Step ${i + 1}`;
 
         steps.push({
           id: `step_${i}`,
-          name: stepName,
+          name: meta?.name || `Step ${i + 1}`,
           code: stepContent,
-          created: metadata.steps?.[i]?.created || new Date().toISOString(),
-          modified: metadata.steps?.[i]?.modified || new Date().toISOString(),
+          created: meta?.created || new Date().toISOString(),
+          modified: meta?.modified || new Date().toISOString(),
         });
       }
 
@@ -774,20 +776,29 @@ export function FileManagerRefactored({
       const steps: any[] = [];
       const allFiles = Object.keys(zipContent.files);
 
-      // Find step files with different patterns, considering folder prefix
-      let stepFiles = allFiles
-        .filter((filename) => {
-          // Remove folder prefix if it exists
-          const relativePath = folderPrefix ? filename.replace(folderPrefix, '') : filename;
-          return (
-            relativePath.match(/^step_\d+\.js$/) ||
-            relativePath.match(/^Step\s+\d+\.js$/i) ||
-            relativePath.match(/^\d+\.js$/) ||
-            filename.match(/step_\d+\.js$/i) ||
-            filename.match(/Step\s*_?\d+\.js$/i)
-          );
-        })
-        .sort();
+      // Step-like names, considering the folder prefix
+      const isStepLike = (filename: string) => {
+        const relativePath = folderPrefix ? filename.replace(folderPrefix, '') : filename;
+        return (
+          relativePath.match(/^step_\d+\.js$/) ||
+          relativePath.match(/^Step\s+\d+\.js$/i) ||
+          relativePath.match(/^\d+\.js$/) ||
+          filename.match(/step_\d+\.js$/i) ||
+          filename.match(/Step\s*_?\d+\.js$/i)
+        );
+      };
+      // An exported multitrack names its step files after the steps ("Verse.js"): with a steps list
+      // in metadata.json, every .js file beside it is a step.
+      const hasMetadataSteps = Array.isArray(metadata.steps) && metadata.steps.length > 0;
+      const isBesideMetadata = (filename: string) => {
+        if (!filename.startsWith(folderPrefix) || zipContent.files[filename].dir) return false;
+        const relativePath = filename.slice(folderPrefix.length);
+        return !relativePath.includes('/') && /\.js$/i.test(relativePath);
+      };
+      const stepFiles = orderStepFiles(
+        allFiles.filter((f) => (hasMetadataSteps && isBesideMetadata(f)) || isStepLike(f)),
+        metadata.steps,
+      );
 
       console.log('Multitrack Debug - Found step files:', stepFiles);
 
@@ -798,18 +809,18 @@ export function FileManagerRefactored({
       }
 
       // Load all step files
-      for (let i = 0; i < stepFiles.length; i++) {
-        const stepFile = zipContent.file(stepFiles[i]);
+      for (const { file, meta } of stepFiles) {
+        const stepFile = zipContent.file(file);
         if (stepFile) {
           const stepContent = await stepFile.async('text');
-          const stepName = metadata.steps?.[i]?.name || `Step ${i + 1}`;
+          const i = steps.length;
 
           steps.push({
             id: `step_${i}`,
-            name: stepName,
+            name: meta?.name || `Step ${i + 1}`,
             code: stepContent,
-            created: metadata.steps?.[i]?.created || new Date().toISOString(),
-            modified: metadata.steps?.[i]?.modified || new Date().toISOString(),
+            created: meta?.created || new Date().toISOString(),
+            modified: meta?.modified || new Date().toISOString(),
           });
         }
       }
@@ -885,7 +896,7 @@ export function FileManagerRefactored({
       const allFiles = Object.keys(zipContent.files);
 
       // Look for folders that might be multitracks (have metadata.json + multiple JS files)
-      const potentialMultitracks = new Map<string, { metadataPath: string; stepFiles: string[] }>();
+      const potentialMultitracks = new Map<string, { metadataPath: string; stepFiles: string[]; metadata: any }>();
 
       for (const filename of allFiles) {
         if (filename.endsWith('metadata.json') && filename !== 'library-metadata.json') {
@@ -901,17 +912,37 @@ export function FileManagerRefactored({
               (f) => f.match(/\/step_\d+\.js$/i) || f.match(/\/Step\s*_?\d+\.js$/i),
             );
 
-            // If we have traditional step files OR multiple JS files in a folder with metadata, treat as multitrack
-            if (traditionalStepFiles.length > 0 || jsFiles.length > 1) {
+            // Read the metadata now: library metadata must not turn its folder into a multitrack (its
+            // files would be skipped as steps and then dropped), and an exported multitrack says so.
+            let metadata: any = {};
+            try {
+              metadata = JSON.parse(await zipContent.file(filename).async('text')) ?? {};
+            } catch {
+              metadata = {};
+            }
+            if (metadata.tracks || metadata.folders || metadata.exportDate) {
+              console.log('Library Import - Skipping', folderPath, '- appears to be library metadata');
+              continue;
+            }
+
+            // If we have traditional step files OR multiple JS files OR multitrack metadata, treat as multitrack
+            if (
+              traditionalStepFiles.length > 0 ||
+              jsFiles.length > 1 ||
+              (metadata.isMultitrack === true && jsFiles.length > 0)
+            ) {
               potentialMultitracks.set(folderPath, {
                 metadataPath: filename,
                 stepFiles: jsFiles, // Use all JS files as potential steps
+                metadata,
               });
               console.log('Library Import - Found potential multitrack:', folderPath, 'with', jsFiles.length, 'files');
             }
           }
         }
       }
+
+      const multitrackFolders = new Set(potentialMultitracks.keys());
 
       // Second pass: collect all folder paths that need to be created (excluding multitrack folders)
       for (const [filename, file] of Object.entries(zipContent.files)) {
@@ -924,8 +955,8 @@ export function FileManagerRefactored({
             for (let i = 0; i < pathParts.length - 1; i++) {
               currentPath += (currentPath ? '/' : '') + pathParts[i];
 
-              // Don't create folder if it's a multitrack
-              if (!potentialMultitracks.has(currentPath)) {
+              // Don't create a folder that is, or is inside, a multitrack
+              if (folderOutsideMultitracks(currentPath, multitrackFolders) === currentPath) {
                 foldersToCreate.add(currentPath);
               }
             }
@@ -965,40 +996,23 @@ export function FileManagerRefactored({
         try {
           console.log('Library Import - Processing multitrack:', folderPath);
 
-          // Load metadata
-          const metadataFile = zipContent.file(multitrackInfo.metadataPath);
-          let metadata: any = {};
-          let trackName = folderPath.split('/').pop() || 'Imported Multitrack';
+          const { metadata } = multitrackInfo;
+          const trackName = metadata.name || metadata.trackName || folderPath.split('/').pop() || 'Imported Multitrack';
 
-          if (metadataFile) {
-            const metadataContent = await metadataFile.async('text');
-            metadata = JSON.parse(metadataContent);
-
-            // Skip if this looks like library metadata
-            if (metadata.tracks || metadata.folders || metadata.exportDate) {
-              console.log('Library Import - Skipping', folderPath, '- appears to be library metadata');
-              continue;
-            }
-
-            trackName = metadata.name || metadata.trackName || trackName;
-          }
-
-          // Load step files
+          // Load step files, in step order (metadata.json names each step's file)
           const steps: any[] = [];
-          const sortedStepFiles = multitrackInfo.stepFiles.sort();
-
-          for (let i = 0; i < sortedStepFiles.length; i++) {
-            const stepFile = zipContent.file(sortedStepFiles[i]);
+          for (const { file, meta } of orderStepFiles(multitrackInfo.stepFiles, metadata.steps)) {
+            const stepFile = zipContent.file(file);
             if (stepFile) {
               const stepContent = await stepFile.async('text');
-              const stepName = metadata.steps?.[i]?.name || `Step ${i + 1}`;
+              const i = steps.length;
 
               steps.push({
                 id: `step_${i}`,
-                name: stepName,
+                name: meta?.name || `Step ${i + 1}`,
                 code: stepContent,
-                created: metadata.steps?.[i]?.created || new Date().toISOString(),
-                modified: metadata.steps?.[i]?.modified || new Date().toISOString(),
+                created: meta?.created || new Date().toISOString(),
+                modified: meta?.modified || new Date().toISOString(),
               });
             }
           }
@@ -1043,7 +1057,11 @@ export function FileManagerRefactored({
 
           const pathParts = filename.split('/');
           const trackName = pathParts[pathParts.length - 1].replace(/\.(js|txt|md)$/i, '');
-          const folderPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : undefined;
+          // A file in a multitrack's folder that is not a step (notes.md) goes next to the multitrack
+          const folderPath = folderOutsideMultitracks(
+            pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : undefined,
+            multitrackFolders,
+          );
 
           // Create unique key to prevent duplicates
           const trackKey = `${trackName}:${folderPath || 'root'}`;
