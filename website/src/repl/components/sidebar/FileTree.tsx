@@ -568,7 +568,8 @@ export function FileTree({
         {
           label: t('files:newFolder'),
           icon: <FolderIcon className="w-4 h-4" />,
-          onClick: () => onFolderCreate?.(folderPath),
+          // By id: the server builds the path, and two older folders can share one path.
+          onClick: () => onFolderCreate?.(folder.id),
         },
         { separator: true, label: '', onClick: () => {} },
       );

@@ -1,110 +1,95 @@
 import type { APIRoute } from 'astro';
-import { createClient } from '@supabase/supabase-js';
-import { serverEnv } from '../../../lib/server-env';
+import { getAuthenticatedUser, AuthError } from '../_auth';
+import { userClient } from '../_userClient';
 import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
+import { findFolderByPathOrId, validateFolderName, type RenamableFolder } from '../../../lib/folderRename';
 
 export const prerender = false;
 
-export const POST: APIRoute = async ({ request, cookies }) => {
+const json = (body: unknown, status: number) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+const NAME_ERRORS = {
+  empty: { status: 400, error: 'Folder name cannot be empty' },
+  slash: { status: 400, error: 'Folder name cannot contain "/"' },
+  duplicate: { status: 409, error: 'A folder with this name already exists here' },
+} as const;
+
+/** Client-generated ids are nanoid()s. */
+const FOLDER_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * POST /api/folders/create — `{ id, name, parent? }`. `parent` may be a folder id or (as the
+ * sidebar sends it) the parent's path; it is stored as the parent's id. The path is built here
+ * from the parent's path, never taken from the client, and a sibling with the same name or URL
+ * slug is refused with 409 (two such folders would share one URL).
+ */
+export const POST: APIRoute = async ({ request }) => {
   try {
-    console.log('API folders/create - Request received');
+    // Sign-in is checked before the body is read (api/_auth.ts: Bearer header, then cookie).
+    const { user, accessToken } = await getAuthenticatedUser(request);
 
-    // Try to get access token from Astro cookies first (direct API calls)
-    let accessToken = cookies.get('sb-access-token')?.value;
-    console.log('API folders/create - Astro cookie token:', accessToken ? 'present' : 'missing');
-
-    // If not found, try parsing from request headers (frontend fetch calls)
-    if (!accessToken) {
-      const cookieHeader = request.headers.get('cookie') || '';
-      console.log('API folders/create - Cookie header:', cookieHeader.substring(0, 100) + '...');
-
-      const cookieMap = new Map();
-      cookieHeader.split(';').forEach((cookie) => {
-        const [key, value] = cookie.trim().split('=');
-        if (key && value) {
-          cookieMap.set(key, decodeURIComponent(value));
-        }
-      });
-
-      console.log('API folders/create - Parsed cookie keys:', Array.from(cookieMap.keys()));
-      accessToken = cookieMap.get('sb-access-token');
-      console.log('API folders/create - Header token:', accessToken ? 'present' : 'missing');
-    }
-
-    if (!accessToken) {
-      console.log('API folders/create - No access token found anywhere');
-      return new Response(JSON.stringify({ error: 'Not authenticated' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Create Supabase client with service role key for server-side operations
-    const supabase = createClient(serverEnv().supabaseUrl, serverEnv().supabaseServiceKey);
-
-    // Verify the user token
-    console.log('API folders/create - Verifying token...');
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser(accessToken);
-
-    if (userError || !user) {
-      console.log('API folders/create - Token verification failed:', userError?.message || 'No user returned');
-      return new Response(JSON.stringify({ error: 'Invalid token' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    console.log('API folders/create - User verified:', user.id);
-
-    // Parse the request body
     // Unparseable or non-object bodies are refused with 400, not a 500.
-    const folderData = await readJsonObject(request);
-    if (!folderData) {
+    const body = await readJsonObject(request);
+    if (!body) {
       return invalidDataResponse();
     }
-
-    // Validate required fields
-    if (!folderData.name || !folderData.id) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    const { id, name, parent } = body;
+    if (typeof id !== 'string' || !FOLDER_ID.test(id) || typeof name !== 'string') {
+      return json({ error: 'Missing required fields' }, 400);
+    }
+    if (parent !== undefined && parent !== null && typeof parent !== 'string') {
+      return json({ error: 'Parent must be a folder id or path' }, 400);
     }
 
-    // Create the folder in the database
-    const { data, error } = await supabase
+    // As the user, so RLS applies; every query is also scoped by the session user's id.
+    const supabase = userClient(accessToken);
+    const { data: folderRows, error: listError } = await supabase
       .from('folders')
-      .insert({
-        id: folderData.id,
-        user_id: user.id,
-        name: folderData.name,
-        path: folderData.path,
-        parent: folderData.parent || null, // Ensure null instead of undefined for root
-        created: folderData.created || new Date().toISOString(),
-      })
-      .select()
-      .maybeSingle(); // Use maybeSingle() instead of single()
+      .select('id, name, path, parent')
+      .eq('user_id', user.id);
+    if (listError) {
+      console.error('API /folders/create - failed to list folders:', listError);
+      return json({ error: 'Failed to create folder' }, 500);
+    }
+    const folders = (folderRows ?? []) as RenamableFolder[];
 
-    if (error) {
-      console.error('Database error:', error);
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    const parentFolder = parent ? findFolderByPathOrId(folders, parent) : undefined;
+    if (parent && !parentFolder) {
+      return json({ error: 'Parent folder not found or access denied' }, 400);
     }
 
-    return new Response(JSON.stringify({ data }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('API error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const candidate: RenamableFolder = { id, name: name.trim(), path: '', parent: parentFolder?.id ?? null };
+    const nameError = validateFolderName(name, candidate, folders);
+    if (nameError) {
+      const { status, error } = NAME_ERRORS[nameError];
+      return json({ error, code: nameError }, status);
+    }
+
+    const row = {
+      id,
+      user_id: user.id,
+      name: candidate.name,
+      path: parentFolder ? `${parentFolder.path}/${candidate.name}` : candidate.name,
+      parent: candidate.parent,
+      created: new Date().toISOString(),
+    };
+    const { data, error } = await supabase.from('folders').insert(row).select();
+    if (error) {
+      // Primary key taken (an id collision, or a retried create).
+      if ((error as { code?: string }).code === '23505') {
+        return json({ error: 'A folder with this id already exists', code: 'id_taken' }, 409);
+      }
+      console.error('API /folders/create - database error:', error);
+      return json({ error: 'Failed to create folder' }, 500);
+    }
+
+    return json({ data: Array.isArray(data) ? (data[0] ?? row) : (data ?? row) }, 200);
+  } catch (error: unknown) {
+    if (error instanceof AuthError) {
+      return json({ error: 'Not authenticated' }, 401);
+    }
+    console.error('API /folders/create - unexpected error:', error);
+    return json({ error: 'Internal server error' }, 500);
   }
 };

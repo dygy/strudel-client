@@ -4,7 +4,8 @@
  *
  * Data facts this works with:
  * - folders carry `id`, `name`, `path` ("parent/child" names, raw, not slugged) and `parent`
- *   (a folder id, or null/undefined/'' at the root);
+ *   (a folder id; the parent's PATH on rows created from the sidebar context menu before
+ *   2026-10-30; null/undefined/'' at the root) — always read it through `resolveParentId`;
  * - `tracks.folder` is mixed: a folder id (most rows), a raw folder path (older rows) or null.
  *   Tracks holding an id need no change on rename; tracks holding a renamed path string do.
  */
@@ -29,6 +30,11 @@ export interface FolderPathChange {
   id: string;
   oldPath: string;
   newPath: string;
+  /**
+   * Set when the stored `parent` held the parent's path: it is rewritten to the parent's id, or
+   * the folder would lose its parent once that path changes.
+   */
+  parentFix?: { oldParent: string; newParent: string };
 }
 
 export interface FolderRenamePlan {
@@ -49,6 +55,16 @@ export type FolderRenameResult = { ok: true; plan: FolderRenamePlan } | { ok: fa
 const UNSLUGGABLE = 'untitled';
 
 const parentKey = (parent: string | null | undefined): string | null => (parent ? parent : null);
+
+/**
+ * The id of a folder's parent, or null at the root. `parent` holds an id, or (older rows) the
+ * parent's path; a value matching neither is returned as is (an orphan).
+ */
+export function resolveParentId(folder: RenamableFolder, folders: RenamableFolder[]): string | null {
+  const raw = parentKey(folder.parent);
+  if (!raw || folders.some((f) => f.id === raw)) return raw;
+  return folders.find((f) => f.path === raw)?.id ?? raw;
+}
 
 /**
  * Find a folder by its id or by its path. The sidebar tree identifies folders by path,
@@ -82,7 +98,7 @@ export function validateFolderName(
   const lower = name.toLowerCase();
   const slug = trackNameToSlug(name);
   const clash = folders.some((f) => {
-    if (f.id === folder.id || parentKey(f.parent) !== parentKey(folder.parent)) return false;
+    if (f.id === folder.id || resolveParentId(f, folders) !== resolveParentId(folder, folders)) return false;
     const other = (f.name ?? '').trim();
     if (other.toLowerCase() === lower) return true;
     const otherSlug = trackNameToSlug(other);
@@ -112,21 +128,32 @@ export function planFolderRename(folders: RenamableFolder[], folderId: string, r
 
 /** Rebuild the paths of `folder` (renamed to `newName`, under its current `parent`) and its descendants. */
 function planPaths(folders: RenamableFolder[], folder: RenamableFolder, newName: string): FolderRenamePlan {
-  const parent = folder.parent ? folders.find((f) => f.id === folder.parent) : undefined;
-  // An orphan (parent id not found) keeps the directory part of its own stored path.
+  const parentIdOf = new Map(folders.map((f) => [f.id, resolveParentId(f, folders)]));
+  // A `parent` holding a path is rewritten to the id it resolves to.
+  const parentFix = (f: RenamableFolder): Pick<FolderPathChange, 'parentFix'> => {
+    const raw = parentKey(f.parent);
+    const id = parentIdOf.get(f.id) ?? null;
+    return raw && id && raw !== id && folders.some((o) => o.id === id)
+      ? { parentFix: { oldParent: raw, newParent: id } }
+      : {};
+  };
+
+  const parentId = parentIdOf.get(folder.id) ?? null;
+  const parent = parentId ? folders.find((f) => f.id === parentId) : undefined;
+  // An orphan (parent not found) keeps the directory part of its own stored path.
   const parentPath = parent ? parent.path : folder.parent ? dirname(folder.path) : '';
   const newPath = parentPath ? `${parentPath}/${newName}` : newName;
 
-  const pathChanges: FolderPathChange[] = [{ id: folder.id, oldPath: folder.path, newPath }];
+  const pathChanges: FolderPathChange[] = [{ id: folder.id, oldPath: folder.path, newPath, ...parentFix(folder) }];
   const newPathById = new Map<string, string>([[folder.id, newPath]]);
   const queue = [folder.id];
   while (queue.length) {
-    const parentId = queue.shift()!;
+    const current = queue.shift()!;
     for (const child of folders) {
-      if (child.parent !== parentId || newPathById.has(child.id)) continue;
-      const childPath = `${newPathById.get(parentId)}/${child.name}`;
+      if (parentIdOf.get(child.id) !== current || newPathById.has(child.id)) continue;
+      const childPath = `${newPathById.get(current)}/${child.name}`;
       newPathById.set(child.id, childPath);
-      pathChanges.push({ id: child.id, oldPath: child.path, newPath: childPath });
+      pathChanges.push({ id: child.id, oldPath: child.path, newPath: childPath, ...parentFix(child) });
       queue.push(child.id);
     }
   }
@@ -159,7 +186,10 @@ export function planFolderMove(
   const parent = parentKey(newParent);
   const movedFolder = { ...folder, parent };
   const moved = folders.map((f) => (f.id === folderId ? movedFolder : f));
-  if (parent !== parentKey(folder.parent) && validateFolderName(folder.name, movedFolder, moved) === 'duplicate') {
+  if (
+    parent !== resolveParentId(folder, folders) &&
+    validateFolderName(folder.name, movedFolder, moved) === 'duplicate'
+  ) {
     return { ok: false, error: 'duplicate' };
   }
   const plan = planPaths(moved, movedFolder, folder.name);
@@ -184,6 +214,7 @@ export function applyRenameToFolders<F extends RenamableFolder>(
       ...next[key],
       path: change.newPath,
       ...(change.id === plan.folderId ? { name: plan.newName } : {}),
+      ...(change.parentFix ? { parent: change.parentFix.newParent } : {}),
       ...(change.id === plan.folderId && plan.parentChange ? { parent: plan.parentChange.newParent } : {}),
     };
   }
@@ -255,10 +286,28 @@ export function invertFolderRenamePlan(plan: FolderRenamePlan): FolderRenamePlan
     folderId: plan.folderId,
     oldName: plan.newName,
     newName: plan.oldName,
-    pathChanges: plan.pathChanges.map((c) => ({ id: c.id, oldPath: c.newPath, newPath: c.oldPath })),
+    pathChanges: plan.pathChanges.map((c) => ({
+      id: c.id,
+      oldPath: c.newPath,
+      newPath: c.oldPath,
+      ...(c.parentFix ? { parentFix: { oldParent: c.parentFix.newParent, newParent: c.parentFix.oldParent } } : {}),
+    })),
     trackFolderRemaps: plan.trackFolderRemaps.map((r) => ({ oldPath: r.newPath, newPath: r.oldPath })),
     ...(plan.parentChange
       ? { parentChange: { oldParent: plan.parentChange.newParent, newParent: plan.parentChange.oldParent } }
       : {}),
   };
+}
+
+/** Would making `targetParentId` the parent of `folderId` create a cycle? (`parent` may hold ids or paths.) */
+export function wouldCreateCycle(folders: RenamableFolder[], folderId: string, targetParentId: string | null): boolean {
+  const parentOf = new Map(folders.map((f) => [f.id, resolveParentId(f, folders)]));
+  let current: string | null = targetParentId;
+  const visited = new Set<string>();
+  while (current && !visited.has(current)) {
+    if (current === folderId) return true;
+    visited.add(current);
+    current = parentOf.get(current) ?? null;
+  }
+  return false;
 }

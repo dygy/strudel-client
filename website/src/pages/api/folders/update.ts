@@ -6,6 +6,7 @@ import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 import {
   planFolderMove,
   planFolderRename,
+  wouldCreateCycle,
   type FolderRenamePlan,
   type RenamableFolder,
 } from '../../../lib/folderRename';
@@ -75,7 +76,7 @@ export const PUT: APIRoute = async ({ request }) => {
         if (typeof updates.parent !== 'string' || !folders.some((f) => f.id === updates.parent)) {
           return json({ error: 'Parent folder not found or access denied' }, 400);
         }
-        if (isCircular(folders, folderId, updates.parent)) {
+        if (wouldCreateCycle(folders, folderId, updates.parent)) {
           return json({ error: 'Cannot move folder into itself or its descendants' }, 400);
         }
       }
@@ -103,6 +104,10 @@ export const PUT: APIRoute = async ({ request }) => {
       plan = result.plan;
       updateData.name = plan.newName;
       updateData.path = plan.pathChanges[0].newPath;
+      // A `parent` stored as a path is rewritten to the parent's id (see FolderPathChange.parentFix).
+      if (updateData.parent === undefined && plan.pathChanges[0].parentFix) {
+        updateData.parent = plan.pathChanges[0].parentFix.newParent;
+      }
     }
 
     // Tracks that store a renamed raw path (older rows) move by id, never by folder string:
@@ -197,12 +202,20 @@ export const PUT: APIRoute = async ({ request }) => {
     if (plan) {
       // Descendant folders: rebuild their paths below the new one.
       for (const change of plan.pathChanges.slice(1)) {
-        if (change.oldPath === change.newPath) continue;
-        const { error } = await updateRow('folders', ['id', change.id], { path: change.newPath });
+        if (change.oldPath === change.newPath && !change.parentFix) continue;
+        const fix = change.parentFix;
+        const { error } = await updateRow('folders', ['id', change.id], {
+          path: change.newPath,
+          ...(fix ? { parent: fix.newParent } : {}),
+        });
         if (error) return fail('Descendant folder update', error);
         applied.push({
           what: `folder ${change.id}`,
-          undo: () => updateRow('folders', ['id', change.id], { path: change.oldPath }),
+          undo: () =>
+            updateRow('folders', ['id', change.id], {
+              path: change.oldPath,
+              ...(fix ? { parent: fix.oldParent } : {}),
+            }),
         });
       }
 
@@ -241,16 +254,3 @@ export const PUT: APIRoute = async ({ request }) => {
     return json({ error: 'Internal server error' }, 500);
   }
 };
-
-/** Would making `targetParentId` the parent of `folderId` create a cycle? (in-memory, this user's folders only) */
-function isCircular(folders: RenamableFolder[], folderId: string, targetParentId: string): boolean {
-  const parentOf = new Map(folders.map((f) => [f.id, f.parent ?? null]));
-  let current: string | null = targetParentId;
-  const visited = new Set<string>();
-  while (current && !visited.has(current)) {
-    if (current === folderId) return true;
-    visited.add(current);
-    current = parentOf.get(current) ?? null;
-  }
-  return false;
-}

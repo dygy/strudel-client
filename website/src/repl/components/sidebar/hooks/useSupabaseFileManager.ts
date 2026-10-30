@@ -1093,102 +1093,127 @@ export function useSupabaseFileManager(
     };
   }, [user, tracks, createTrack]);
 
+  // A second Enter while a create is in flight would pass the server's sibling check too (both
+  // requests list the folders before either inserts) and create a same-named twin.
+  const folderCreateInFlightRef = useRef(false);
+
   const createFolder = useCallback(
     async (name: string, path: string, parent?: string) => {
       console.log('SupabaseFileManager - createFolder called:', { name, path, parent });
-
-      if (!user) {
-        console.error('SupabaseFileManager - createFolder: not authenticated');
-        toastActions.error(t('auth:errors.notAuthenticated'));
-        return null;
-      }
-
+      if (folderCreateInFlightRef.current) return null;
+      folderCreateInFlightRef.current = true;
       try {
-        // Ensure valid session before creating folder
-        const isValidSession = await checkAuth();
-        if (!isValidSession) {
-          console.error('SupabaseFileManager - createFolder: unable to establish valid session');
-          toastActions.error('Unable to verify authentication. Please try again.');
+        if (!user) {
+          console.error('SupabaseFileManager - createFolder: not authenticated');
+          toastActions.error(t('auth:errors.notAuthenticated'));
           return null;
         }
 
-        // Get the current user from the auth context (checkAuth already set it)
-        if (!user?.id) {
-          console.error('SupabaseFileManager - createFolder: no user available after session validation');
-          toastActions.error('Authentication error: No user found. Please try refreshing the page.');
-          return null;
-        }
-
-        // Validate input parameters
-        if (!name || typeof name !== 'string' || !name.trim()) {
-          console.error('SupabaseFileManager - createFolder: invalid name parameter:', name);
-          toastActions.error('Folder name is required');
-          return null;
-        }
-
-        if (!path || typeof path !== 'string' || !path.trim()) {
-          console.error('SupabaseFileManager - createFolder: invalid path parameter:', path);
-          toastActions.error('Folder path is required');
-          return null;
-        }
-
-        const newFolder = {
-          id: nanoid(), // Use nanoid for proper UUID generation
-          name: name.trim(),
-          path: path.trim(),
-          parent: parent || null,
-          created: new Date().toISOString(),
-          user_id: user.id,
-        };
-
-        console.log('SupabaseFileManager - creating folder via API:', newFolder);
-
-        // Call the API endpoint instead of direct database access
-        const response = await fetch('/api/folders/create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify(newFolder),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('SupabaseFileManager - API error:', errorData);
-
-          // Handle specific error cases
-          if (response.status === 401) {
-            toastActions.error('Authentication failed. Please try refreshing the page.');
+        try {
+          // Ensure valid session before creating folder
+          const isValidSession = await checkAuth();
+          if (!isValidSession) {
+            console.error('SupabaseFileManager - createFolder: unable to establish valid session');
+            toastActions.error('Unable to verify authentication. Please try again.');
             return null;
           }
 
-          throw new Error(errorData.error || errorData.message || 'Failed to create folder');
+          // Get the current user from the auth context (checkAuth already set it)
+          if (!user?.id) {
+            console.error('SupabaseFileManager - createFolder: no user available after session validation');
+            toastActions.error('Authentication error: No user found. Please try refreshing the page.');
+            return null;
+          }
+
+          // Validate input parameters
+          if (!name || typeof name !== 'string' || !name.trim()) {
+            console.error('SupabaseFileManager - createFolder: invalid name parameter:', name);
+            toastActions.error('Folder name is required');
+            return null;
+          }
+
+          if (!path || typeof path !== 'string' || !path.trim()) {
+            console.error('SupabaseFileManager - createFolder: invalid path parameter:', path);
+            toastActions.error('Folder path is required');
+            return null;
+          }
+
+          const newFolder = {
+            id: nanoid(), // Use nanoid for proper UUID generation
+            name: name.trim(),
+            path: path.trim(),
+            parent: parent || null,
+            created: new Date().toISOString(),
+            user_id: user.id,
+          };
+
+          console.log('SupabaseFileManager - creating folder via API:', newFolder);
+
+          // Call the API endpoint instead of direct database access
+          const response = await fetch('/api/folders/create', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify(newFolder),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('SupabaseFileManager - API error:', errorData);
+
+            // Handle specific error cases
+            if (response.status === 401) {
+              toastActions.error('Authentication failed. Please try refreshing the page.');
+              return null;
+            }
+
+            // The server checks the name against the folders already under the same parent.
+            const nameErrorKeys: Record<string, string> = {
+              duplicate: 'files:errors.folderNameTaken',
+              empty: 'files:errors.folderNameEmpty',
+              slash: 'files:errors.folderNameSlash',
+            };
+            if (nameErrorKeys[errorData.code]) {
+              toastActions.error(t(nameErrorKeys[errorData.code], { name: name.trim() }));
+              return null;
+            }
+            // Parent gone (deleted in another tab) or an id clash: no raw server text in the UI.
+            if (response.status === 400 || response.status === 409) {
+              toastActions.error(t('files:errors.createFolderFailed'));
+              return null;
+            }
+
+            throw new Error(errorData.error || errorData.message || 'Failed to create folder');
+          }
+
+          const result = await response.json();
+
+          if (result.data) {
+            // Update local state
+            setFolders((prev) => ({ ...prev, [result.data.id]: result.data }));
+            toastActions.success(
+              t('files:success.folderCreated', { name: result.data.name }) ||
+                `Folder "${result.data.name}" created successfully`,
+            );
+            console.log('SupabaseFileManager - folder created successfully:', result.data);
+            return result.data;
+          }
+
+          return null;
+        } catch (error) {
+          const isNetworkError = error instanceof Error && error.message.includes('fetch');
+          const toastMsg = isNetworkError
+            ? 'Network error. Please check your connection.'
+            : error instanceof Error
+              ? error.message
+              : 'Failed to create folder';
+          handleApiError(error, 'Error creating folder', setSyncError, toastMsg);
+          return null;
         }
-
-        const result = await response.json();
-
-        if (result.data) {
-          // Update local state
-          setFolders((prev) => ({ ...prev, [result.data.id]: result.data }));
-          toastActions.success(
-            t('files:success.folderCreated', { name: result.data.name }) ||
-              `Folder "${result.data.name}" created successfully`,
-          );
-          console.log('SupabaseFileManager - folder created successfully:', result.data);
-          return result.data;
-        }
-
-        return null;
-      } catch (error) {
-        const isNetworkError = error instanceof Error && error.message.includes('fetch');
-        const toastMsg = isNetworkError
-          ? 'Network error. Please check your connection.'
-          : error instanceof Error
-            ? error.message
-            : 'Failed to create folder';
-        handleApiError(error, 'Error creating folder', setSyncError, toastMsg);
-        return null;
+      } finally {
+        folderCreateInFlightRef.current = false;
       }
     },
     [user, t, checkAuth, setFolders],

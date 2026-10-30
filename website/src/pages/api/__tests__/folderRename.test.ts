@@ -282,3 +282,38 @@ describe('folders/update: move cascade', () => {
     expect(folder('f-test')).toMatchObject({ path: 'test', parent: null });
   });
 });
+
+describe('folders/update: parents stored as paths (older rows)', () => {
+  beforeEach(() => {
+    fakeState.tables.folders = [
+      folderRow('f-live', 'Live', 'Live', null),
+      folderRow('f-drums', 'Drums', 'Live/Drums', 'Live'),
+      folderRow('f-kicks', 'Kicks', 'Live/Drums/Kicks', 'Live/Drums'),
+    ];
+  });
+
+  it('a rename rebuilds their paths and rewrites their parent to the id', async () => {
+    expect((await put({ folderId: 'f-live', updates: { name: 'Set' } })).status).toBe(200);
+    expect(folder('f-drums')).toMatchObject({ path: 'Set/Drums', parent: 'f-live' });
+    expect(folder('f-kicks')).toMatchObject({ path: 'Set/Drums/Kicks', parent: 'f-drums' });
+  });
+
+  it('a renamed folder whose own parent is a path gets the parent id', async () => {
+    expect((await put({ folderId: 'f-drums', updates: { name: 'Perc' } })).status).toBe(200);
+    expect(folder('f-drums')).toMatchObject({ path: 'Live/Perc', parent: 'f-live' });
+    expect(folder('f-kicks')).toMatchObject({ path: 'Live/Perc/Kicks', parent: 'f-drums' });
+  });
+
+  it('a failed cascade puts the stored path parents back', async () => {
+    fakeState.failUpdate = (table, data) => (table === 'folders' && data.path === 'Set/Drums/Kicks' ? 'boom' : null);
+
+    expect((await put({ folderId: 'f-live', updates: { name: 'Set' } })).status).toBe(500);
+    expect(folder('f-live')).toMatchObject({ name: 'Live', path: 'Live' });
+    expect(folder('f-drums')).toMatchObject({ path: 'Live/Drums', parent: 'Live' });
+    expect(folder('f-kicks')).toMatchObject({ path: 'Live/Drums/Kicks', parent: 'Live/Drums' });
+  });
+
+  it('refuses a move into a descendant reached through path parents', async () => {
+    expect((await put({ folderId: 'f-live', updates: { parent: 'f-kicks' } })).status).toBe(400);
+  });
+});

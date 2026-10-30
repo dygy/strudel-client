@@ -12,6 +12,8 @@ import {
   invertFolderRenamePlan,
   planFolderMove,
   planFolderRename,
+  resolveParentId,
+  wouldCreateCycle,
   renamedTrackUrl,
   type FolderRenameError,
   type FolderRenamePlan,
@@ -92,6 +94,7 @@ function syncRenameToTracksStore(plan: FolderRenamePlan) {
         ...stored,
         path: change.newPath,
         ...(change.id === plan.folderId ? { name: plan.newName } : {}),
+        ...(change.parentFix ? { parent: change.parentFix.newParent } : {}),
         ...(change.id === plan.folderId && plan.parentChange ? { parent: plan.parentChange.newParent } : {}),
       });
     }
@@ -859,22 +862,17 @@ export function useFileManagerOperations({
           return;
         }
 
-        // Check for circular dependency
-        let currentParent = targetId;
-        while (currentParent) {
-          if (currentParent === itemId) {
-            console.error('handleMoveItem - Circular dependency detected');
-            toastActions.error('Cannot move folder into its own subfolder');
-            return;
-          }
-          const parentFolder = folders[currentParent] || Object.values(folders).find((f) => f.id === currentParent);
-          currentParent = parentFolder?.parent;
+        // Check for circular dependency (`parent` may hold an id or, on older rows, a path)
+        if (wouldCreateCycle(Object.values(folders), itemId, targetId || null)) {
+          console.error('handleMoveItem - Circular dependency detected');
+          toastActions.error('Cannot move folder into its own subfolder');
+          return;
         }
 
         // A move rebuilds the folder's path (and its descendants' and path-holding tracks') under
         // the new parent, exactly like a rename; the open track's URL follows it.
         // Dropped back where it already is: nothing to do.
-        if ((originalFolder.parent || null) === (targetId || null)) return;
+        if (resolveParentId(originalFolder, Object.values(folders)) === (targetId || null)) return;
         if (folderRenameInFlightRef.current) {
           // Another folder rename or move is still saving; say so rather than snap back silently.
           toastActions.error(t('files:errors.moveFailed'));

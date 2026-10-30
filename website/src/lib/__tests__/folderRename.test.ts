@@ -12,7 +12,9 @@ import {
   planFolderMove,
   planFolderRename,
   renamedTrackUrl,
+  resolveParentId,
   validateFolderName,
+  wouldCreateCycle,
   type FolderRenamePlan,
 } from '../folderRename';
 
@@ -235,5 +237,58 @@ describe('planFolderMove', () => {
     expect(renamedTrackUrl({ pathname: '/repl/test/sub-dir/deep/deep-one' }, { tracks, folders }, after, p)).toBe(
       '/repl/deep/deep-one',
     );
+  });
+});
+
+// Regression (2026-10-30): subfolders created from the context menu stored the parent's PATH in
+// `parent`. The cascade looked children up by id only, so renaming or moving the parent left
+// them with stale paths, and the tree (which falls back to matching `parent` by path) dropped
+// them to the root once the parent's path changed.
+describe('folders whose parent is stored as a path', () => {
+  const legacy = [
+    { id: 'p', name: 'Live', path: 'Live', parent: null },
+    { id: 'c', name: 'Drums', path: 'Live/Drums', parent: 'Live' },
+    { id: 'g', name: 'Kicks', path: 'Live/Drums/Kicks', parent: 'Live/Drums' },
+    { id: 'o', name: 'Other', path: 'Other', parent: null },
+  ];
+  const ok = (r: ReturnType<typeof planFolderRename>) => {
+    if ('error' in r) throw new Error(r.error);
+    return r.plan;
+  };
+
+  it('resolveParentId maps a path parent to its id', () => {
+    expect(resolveParentId(legacy[1], legacy)).toBe('p');
+    expect(resolveParentId(legacy[0], legacy)).toBeNull();
+    expect(resolveParentId({ id: 'x', name: 'x', path: 'x', parent: 'gone' }, legacy)).toBe('gone');
+  });
+
+  it('a rename cascades to them and rewrites their parent to the id', () => {
+    const p = ok(planFolderRename(legacy, 'p', 'Set'));
+    const next = applyRenameToFolders(Object.fromEntries(legacy.map((f) => [f.id, f])), p);
+    expect(next.c).toMatchObject({ path: 'Set/Drums', parent: 'p' });
+    expect(next.g).toMatchObject({ path: 'Set/Drums/Kicks', parent: 'c' });
+  });
+
+  it('the inverse restores the stored path parents', () => {
+    const p = ok(planFolderRename(legacy, 'p', 'Set'));
+    const map = Object.fromEntries(legacy.map((f) => [f.id, f]));
+    const back = applyRenameToFolders(applyRenameToFolders(map, p), invertFolderRenamePlan(p));
+    expect(back.c).toMatchObject({ path: 'Live/Drums', parent: 'Live' });
+    expect(back.g).toMatchObject({ path: 'Live/Drums/Kicks', parent: 'Live/Drums' });
+  });
+
+  it('a move cascades to them too', () => {
+    const p = ok(planFolderMove(legacy, 'c', 'o'));
+    expect(p.pathChanges.map((c) => c.newPath)).toEqual(['Other/Drums', 'Other/Drums/Kicks']);
+  });
+
+  it('siblings are found whichever way their parent is stored', () => {
+    const withSibling = [...legacy, { id: 's', name: 'drums', path: 'Live/drums', parent: 'p' }];
+    expect(validateFolderName('Drums', withSibling[4], withSibling)).toBe('duplicate');
+  });
+
+  it('wouldCreateCycle follows path parents', () => {
+    expect(wouldCreateCycle(legacy, 'p', 'g')).toBe(true);
+    expect(wouldCreateCycle(legacy, 'g', 'o')).toBe(false);
   });
 });
