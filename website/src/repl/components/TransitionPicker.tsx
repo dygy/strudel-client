@@ -21,9 +21,10 @@ const selectClass = cx(
 /**
  * The quick transition picker next to Update (spec 017 §2.4): type and length, bound to the same
  * persisted settings as Mixer Settings. Changing it never touches playback; the next switch
- * reads it when it begins.
+ * reads it when it begins. `touch` (spec 016's compact bar): a 44px type select only; Length
+ * stays in Mixer Settings so the bar fits a phone.
  */
-export function TransitionPicker({ className }: { className?: string }) {
+export function TransitionPicker({ className, touch = false }: { className?: string; touch?: boolean }) {
   const { t } = useTranslation('settings');
   const { type, length } = useTransitionSettings();
 
@@ -32,7 +33,7 @@ export function TransitionPicker({ className }: { className?: string }) {
       <select
         aria-label={t('transitionPicker')}
         title={t('transitionPicker')}
-        className={cx(selectClass, 'max-w-[7.5rem]')}
+        className={cx(selectClass, 'max-w-[7.5rem]', touch && 'h-11 text-sm')}
         value={type}
         onChange={(e) => {
           const next = e.target.value;
@@ -45,20 +46,22 @@ export function TransitionPicker({ className }: { className?: string }) {
           </option>
         ))}
       </select>
-      <select
-        aria-label={t('transitionPickerLength')}
-        title={t('transitionPickerLength')}
-        className={selectClass}
-        value={length}
-        disabled={isLengthDisabled(type)}
-        onChange={(e) => setTransitionSettings({ length: Number(e.target.value) as TransitionLength })}
-      >
-        {TRANSITION_LENGTH_OPTIONS.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
+      {!touch && (
+        <select
+          aria-label={t('transitionPickerLength')}
+          title={t('transitionPickerLength')}
+          className={selectClass}
+          value={length}
+          disabled={isLengthDisabled(type)}
+          onChange={(e) => setTransitionSettings({ length: Number(e.target.value) as TransitionLength })}
+        >
+          {TRANSITION_LENGTH_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }

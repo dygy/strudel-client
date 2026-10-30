@@ -82,3 +82,19 @@
 - Known gap, not fixed: `packages/mixer`'s own `vitest.config.js` can't load superdough (`AudioWorkletProcessor`). The root config, which is the gate, is fine. A follow-up would add `vite-plugin-bundle-audioworklet` as a mixer devDependency.
 - Gates in the worktree (orchestrator): vitest `Test Files 67 passed (67)`, `Tests 1626 passed (1626)`; format-check clean; lint exit 0.
 - Next: rebase onto main once 016 lands, move the picker into 016's compact bar, bookkeeping, push gate.
+
+## 2026-10-30: rebase onto 016, gates, bookkeeping
+- 016 landed on origin/main (037d1a1, pushed from the 016 session's branch). The local-only spec commit d52f9fb was not in origin, so the whole 017 branch (spec + 3 commits) was rebased onto origin/main.
+- One conflict, in `MixerSettings.tsx`: kept 016's `usePanelViewport` and replaced the old toggle/slider with `TransitionSettingsSection`, which already sizes for touch on compact screens.
+- Picker on phones: the type select is 44 px and sits in 016's compact bar next to Update (Length stays in Mixer Settings so the bar fits 390 px). The compact Update shows the waiting state. New test `CompactTransitionPicker.test.tsx`, proved red (3/3 failing) then green.
+- 016's `MixerSettings-compact.test.tsx` targeted the removed toggle/slider; rewritten to check the same 44 px / desktop-class rules on the new controls.
+- 016's `LoginPage-compact.test.tsx` failed in the worktree (empty first render: `useTranslation` suspends while i18n is still loading under load). Made it wait for the page to render. Not a product defect.
+- Gates on the rebased branch: vitest `Test Files 80 passed (80)` / `Tests 1764 passed (1764)`; format-check clean; lint exit 0.
+- `pnpm build:cloudflare` passes. `_worker.js` (a directory) totals 1,959,053 bytes, vs 1,958,113 at 016.
+- Bookkeeping:
+  - feature-map row updated (replaces the 009 row);
+  - roadmap ticked;
+  - spec Status set to Completed.
+
+  These ship in the same push; the prod-verification note follows locally.
+- Owner pre-approved the push "once 016 lands", provided all gates are green.

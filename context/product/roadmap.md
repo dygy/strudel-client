@@ -21,6 +21,7 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
 - [x] **Live-set tooling**
   - [x] **Headphone preview and mixer:** cue a change on a second engine before it reaches the speakers ([006](../spec/006-audio-mixer-preview/)).
   - [x] **Smooth transitions:** crossfade on update instead of a hard cut ([009](../spec/009-smooth-track-transitions/)).
+  - [x] **Transition types:** pick how each track switch is mixed while playing: Dip, Cut, Crossfade, Filter sweep, Bass swap, Echo-out, Layered intro, with Snap, Tempo glide and Match loudness ([017](../spec/017-track-transition-types/), 2026-10-30).
   - [x] **10-band EQ:** presets and visualisation ([008](../spec/008-audio-equalizer/)).
 
 ### Phase 3 — Editor and output (shipped)

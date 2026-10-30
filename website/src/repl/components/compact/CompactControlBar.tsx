@@ -4,6 +4,8 @@ import { ArrowPathIcon, Bars3Icon, Cog6ToothIcon } from '@heroicons/react/24/out
 import cx from '@src/cx';
 import { useTranslation } from '@src/i18n';
 import { usePanelLayout } from '../panel/panelLayout';
+import { TransitionPicker } from '../TransitionPicker';
+import { useTransitionPhase } from '../../transitionPhase';
 
 export interface CompactControlBarContext {
   started?: boolean;
@@ -59,6 +61,8 @@ function BarButton({
 export function CompactControlBar({ context }: { context: CompactControlBarContext }) {
   const { t } = useTranslation('common');
   const { filesOpen, panelOpen, openPanel, closePanel, toggleFileManager } = usePanelLayout();
+  // A snapped track switch is waiting for its boundary (spec 017 2.3).
+  const waiting = useTransitionPhase() === 'waiting';
 
   return (
     <nav
@@ -88,11 +92,14 @@ export function CompactControlBar({ context }: { context: CompactControlBarConte
         onClick={() => context.handleEvaluate()}
         label={t('update')}
         text={t('update')}
-        active={context.isDirty}
-        glow="orange"
+        active={context.isDirty || waiting}
+        glow={waiting ? 'blue' : 'orange'}
+        data-bar-update-waiting={waiting ? 'true' : 'false'}
       >
-        <ArrowPathIcon className="w-6 h-6 opacity-80" />
+        <ArrowPathIcon className={cx('w-6 h-6 opacity-80', waiting && 'animate-pulse')} />
       </BarButton>
+      {/* The transition the next track switch uses, next to Update (spec 017 2.4) */}
+      <TransitionPicker touch className="shrink min-w-0" />
       <BarButton
         data-bar-library=""
         onClick={toggleFileManager}

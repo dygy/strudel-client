@@ -9,7 +9,7 @@ Areas:
 
 ---
 
-- [ ] **Slice 1: Choose a transition type in Mixer Settings (Off and Dip work as today)**
+- [x] **Slice 1: Choose a transition type in Mixer Settings (Off and Dip work as today)**
   - [x] 1.1 `website/src/settings.ts`:
     - add `transitionType`, `transitionLength`, `transitionSnap`, `transitionGlide` and `transitionMatchLoudness` with their defaults;
     - add a one-time migration from `localStorage['strudel-smooth-transitions']`: `enabled` maps to dip/off, seconds map to the nearest cycles at 2 s per cycle with ties rounding down, and the old key is removed afterwards.
@@ -38,7 +38,7 @@ Areas:
 
     **[Agent: strudel-web-engineer]**
 
-- [ ] **Slice 2: Pattern-level switching: Cut, Crossfade, Dip, snapping, broken-track safety**
+- [x] **Slice 2: Pattern-level switching: Cut, Crossfade, Dip, snapping, broken-track safety**
   - [x] 2.1 `packages/mixer/transitions/{buildTransition,envelopes}.mjs`:
     - a pure builder for Cut, Crossfade (equal power on `velocity`) and the Dip window;
     - old events dropped at `T+L` and truncated past it, with `clip: 1`;
@@ -79,17 +79,17 @@ Areas:
 
     Delete the artifacts afterwards. **[Agent: strudel-audio-engineer]**
 
-- [ ] **Slice 3: Filter sweep, Bass swap, Echo-out**
+- [x] **Slice 3: Filter sweep, Bass swap, Echo-out**
   - [x] 3.1 Builder: Filter sweep (`hcutoff` up on the old track, `cutoff` opening on the new one, combined with user values by max/min). Bass swap: a midpoint step at 250 Hz, plus the old track's fade over the second half. Echo-out: old events from the switch press to `T` go to `ECHO_ORBIT = 15` with `delay 0.7`, the feedback is derived from L (capped at 0.85), and events `≥ T` are dropped (tech §2.3). **[Agent: strudel-audio-engineer]**
   - [x] 3.2 Tests: the cutoff envelopes are monotonic and respect user values; alias names (`lpf`/`hpf`) resolve to `cutoff`/`hcutoff`; the bass-swap step lands at `T+L/2`; echo events carry the orbit, delay and feedback; nothing old after `T`. **[Agent: strudel-audio-engineer]**
   - [x] 3.3 Verify in Playwright: for each type, RMS has no gap; Echo-out's tail RMS decays to the noise floor by `T+L`. Delete the artifacts afterwards. **[Agent: strudel-audio-engineer]**
 
-- [ ] **Slice 4: Layered intro**
+- [x] **Slice 4: Layered intro**
   - [x] 4.1 `packages/core/repl.mjs` (additive, upstream divergence noted): `evaluate` sets `state.layers = [{id, pattern}]` from its `$:` list before `setPattern`; the list is empty without `$:`. Test in `packages/core/test/`. **[Agent: strudel-engine-engineer]**
   - [x] 4.2 Builder: layer `k` of `n` enters at `T + L·k/n` in `$:` order. It falls back to Crossfade when `n ≤ 1` or when `all()`/`each()` transforms are present. Tests cover 4 layers / 8 cycles giving entries at 0, 2, 4 and 6, plus the single-layer fallback. **[Agent: strudel-audio-engineer]**
   - [x] 4.3 Verify in Playwright with a 4-layer track: the onset counts per layer grow in steps. Delete the artifacts afterwards. **[Agent: strudel-audio-engineer]**
 
-- [ ] **Slice 5: Tempo glide and Match loudness**
+- [x] **Slice 5: Tempo glide and Match loudness**
   - [x] 5.1 Controller tempo plan: with glide on, about 16 linear `setCps` steps per cycle over `[T, T+L]`, overlapping types only; with glide off, `setCps(newCps)` at `T`. **[Agent: strudel-audio-engineer]**
   - [x] 5.2 `transitions/loudness.mjs`:
     - a lazily created AnalyserNode tapped from `destinationGain`;
@@ -101,16 +101,16 @@ Areas:
   - [x] 5.3 Tests: glide from 120 to 140 BPM is monotonic and ends exactly on `newCps`; glide off sets `newCps` at `T`; Dip/Cut ignore glide; the trim math and clamp; reset on the next switch. **[Agent: strudel-audio-engineer]**
   - [x] 5.4 Verify in Playwright: `scheduler.cps` over time during a glide; with a quiet → loud switch, RMS 2 cycles after the end is within 3 dB of before. Delete the artifacts afterwards. **[Agent: strudel-audio-engineer]**
 
-- [ ] **Slice 6: Transition picker next to Update**
+- [x] **Slice 6: Transition picker next to Update**
   - [x] 6.1 `components/TransitionPicker.tsx` (type + length, bound to the settings store) placed beside Update in `Header.tsx`, and wherever 016 puts Update on compact screens. Update shows a waiting state on `track-transition-waiting` until `start`. 9-locale strings. **[Agent: strudel-web-engineer]**
   - [x] 6.2 Tests: picker ↔ Mixer Settings sync both ways; a change mid-transition doesn't alter the running switch (the snapshot is taken at the start); the waiting state appears and clears. **[Agent: strudel-web-engineer]**
   - [x] 6.3 Verify in Playwright at desktop and 390×844: change the type while playing, with no gain change (`destinationGain` steady) and no scheduler restart; screenshots at both sizes plus `he`, deleted afterwards. **[Agent: strudel-web-engineer]**
 
-- [ ] **Slice 7: Feature Testing & Regression**
+- [x] **Slice 7: Feature Testing & Regression**
   > Verifies the whole feature end-to-end against functional-spec.md, run after all implementation slices are complete.
   - [x] Read functional-spec.md acceptance criteria in full. Generate acceptance-level tests that verify the entire feature as a whole — not individual slices. Cover applicable layers (unit for pure logic, integration for service interactions, e2e for user flows) based on the project's testing stack. Write tests with RED validation (must fail before implementation is confirmed done). Annotate each test with `@spec: 017-track-transition-types` and `@regression` if suitable for long-term regression. **[Agent: strudel-test-engineer]**
   - [x] Run all generated tests. All must pass. Fix any failures before proceeding. **[Agent: strudel-test-engineer]**
 
-- [ ] **Slice 8: Bookkeeping**
-  - [ ] 8.1 `context/product/feature-map.md`: update the "Smooth crossfade transitions" row (new paths, spec 017, tests). Drop `SmoothTransitionManager` from it. **[Agent: orchestrator]**
-  - [ ] 8.2 Roadmap item, spec Status set to Completed, flow-log entries, and a memory note (traps: `editPattern` runs on every `setPattern`; the origin offset; `setcps` capture). No migration (no schema change). **[Agent: orchestrator]**
+- [x] **Slice 8: Bookkeeping**
+  - [x] 8.1 `context/product/feature-map.md`: update the "Smooth crossfade transitions" row (new paths, spec 017, tests). Drop `SmoothTransitionManager` from it. **[Agent: orchestrator]**
+  - [x] 8.2 Roadmap item, spec Status set to Completed, flow-log entries, and a memory note (traps: `editPattern` runs on every `setPattern`; the origin offset; `setcps` capture). No migration (no schema change). **[Agent: orchestrator]**

@@ -45,12 +45,18 @@ const originalSize = { width: window.innerWidth, height: window.innerHeight };
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 
-function renderLogin() {
+async function renderLogin() {
   setViewport(390, 844);
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => root!.render(<LoginPage />));
+  // useTranslation suspends until i18n is ready; under load the first commit is empty.
+  for (let i = 0; i < 50 && !container.querySelector('button'); i++) {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+  }
 }
 
 afterEach(() => {
@@ -67,8 +73,8 @@ const googleButton = () =>
 const classes = (el: Element) => el.className.split(/\s+/);
 
 describe('the sign-in page on a 390x844 phone', () => {
-  it('the Google button is full width and at least 44px tall, and still signs in with Google', () => {
-    renderLogin();
+  it('the Google button is full width and at least 44px tall, and still signs in with Google', async () => {
+    await renderLogin();
     const button = googleButton();
     expect(button).toBeDefined();
     expect(classes(button)).toEqual(expect.arrayContaining(['min-h-11', 'w-full', 'justify-center']));
@@ -76,13 +82,13 @@ describe('the sign-in page on a 390x844 phone', () => {
     expect(signInWithOAuth).toHaveBeenCalledWith(expect.objectContaining({ provider: 'google' }));
   });
 
-  it('from sm up the button goes back to its natural width (desktop unchanged)', () => {
-    renderLogin();
+  it('from sm up the button goes back to its natural width (desktop unchanged)', async () => {
+    await renderLogin();
     expect(classes(googleButton())).toContain('sm:w-auto');
   });
 
-  it('the page and the card use the narrow phone padding, not a bare 32px padding that overflows', () => {
-    renderLogin();
+  it('the page and the card use the narrow phone padding, not a bare 32px padding that overflows', async () => {
+    await renderLogin();
     const card = googleButton().closest('.rounded-xl')!;
     const page = card.parentElement!;
     for (const el of [page, card]) {

@@ -297,8 +297,8 @@ export function Header({ context, embedded, trackName }: HeaderProps) {
 
         {/* Update / Evaluate, and the transition the next track switch uses */}
         <UpdateButton context={context} />
-        {/* Too wide for a phone header: there, Mixer Settings has the same choices (spec 016's
-            compact bar is where the picker goes on phones). */}
+        {/* Phones use spec 016's compact bar, which has its own picker; this keeps a narrow embed
+            from overflowing. */}
         <div className="hidden sm:block">
           <TransitionPicker />
         </div>

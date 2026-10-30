@@ -1,7 +1,7 @@
 # Functional Specification: Transition Types for Switching Tracks
 
 - **Roadmap Item:** Not on the roadmap. Requested by the owner in chat on 2026-10-30, in a research session on automatic track mixing. It extends Smooth transitions ([009](../009-smooth-track-transitions/)). No GitHub issue.
-- **Status:** In Review
+- **Status:** Completed
 - **Author:** Claude (for the owner, Dygy)
 
 ---

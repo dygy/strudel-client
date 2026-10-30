@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 /**
  * @spec: 016-responsive-repl-layout (§2.3, tech §2.5)
- * Mixer and output-device controls on a phone: 44px touch targets, sliders that do not scroll the
- * sheet and show their value; on a laptop the classes are exactly the desktop ones.
+ * Mixer and output-device controls on a phone: 44px touch targets; on a laptop the classes are
+ * exactly the desktop ones. Since spec 017 the transition controls are radio groups and checkboxes
+ * (the seconds slider and the on/off toggle are gone).
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
@@ -26,7 +27,6 @@ import { AudioEngineTargetSelector } from '../AudioEngineTargetSelector';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
-const DESKTOP_RANGE = 'w-full h-2 bg-lineHighlight rounded-lg appearance-none cursor-pointer accent-foreground';
 const DESKTOP_DEVICE_SELECT =
   'w-full px-4 py-3 bg-background border border-lineHighlight rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-foreground focus:border-transparent transition-all duration-200 appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
 
@@ -47,19 +47,11 @@ function render(node: React.ReactNode) {
   return container;
 }
 
-const transitions = () => ({
-  getSettings: () => ({ enabled: true, duration: 2 }),
-  updateSettings: vi.fn(),
-});
 const mixer = { isInitialized: true, setDevice: vi.fn(async () => {}) };
 
-function drag(input: HTMLInputElement, to: string) {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-  act(() => {
-    setter.call(input, to);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-}
+const radioLabels = (c: HTMLElement) => [...c.querySelectorAll('input[type="radio"]')].map((r) => r.closest('label')!);
+const previewDeviceSelect = (c: HTMLElement) =>
+  [...c.querySelectorAll('select')].find((sel) => sel.querySelector('option[value=""]'))!;
 
 afterEach(() => {
   act(() => root?.unmount());
@@ -69,24 +61,13 @@ afterEach(() => {
 });
 
 describe('mixer controls on a phone (390x844)', () => {
-  it('the transition slider is a 44px, no-scroll touch target that shows its value while dragged', () => {
+  it('every transition option and the preview device select are 44px tall', () => {
     setViewport(390, 844);
-    const manager = transitions();
-    const c = render(<MixerSettings mixer={mixer} smoothTransitionManager={manager} />);
-    const range = c.querySelector<HTMLInputElement>('input[type="range"]')!;
-    expect(range.className).toMatch(/\bh-11\b/);
-    expect(range.className).toMatch(/\btouch-none\b/);
-
-    drag(range, '4.5');
-    expect(manager.updateSettings).toHaveBeenCalledWith({ duration: 4.5 });
-    expect(c.textContent).toContain('4.5s');
-  });
-
-  it('the toggle and the preview device select are 44px tall', () => {
-    setViewport(390, 844);
-    const c = render(<MixerSettings mixer={mixer} smoothTransitionManager={transitions()} />);
-    expect(c.querySelector('input[type="checkbox"]')!.closest('label')!.className).toMatch(/\bmin-h-11\b/);
-    expect(c.querySelector('select')!.className).toMatch(/\bmin-h-11\b/);
+    const c = render(<MixerSettings mixer={mixer} />);
+    const labels = radioLabels(c);
+    expect(labels.length).toBeGreaterThanOrEqual(8);
+    for (const label of labels) expect(label.className).toMatch(/\bmin-h-11\b/);
+    expect(previewDeviceSelect(c).className).toMatch(/\bmin-h-11\b/);
   });
 
   it('the output device and engine selects get a 44px touch target', () => {
@@ -108,15 +89,14 @@ describe('mixer controls on a laptop (1440x900)', () => {
     setViewport(1440, 900);
     const c = render(
       <>
-        <MixerSettings mixer={mixer} smoothTransitionManager={transitions()} />
+        <MixerSettings mixer={mixer} />
         <AudioDeviceSelector audioDeviceName="" onChange={() => {}} isDisabled={false} />
         <AudioEngineTargetSelector target="webaudio" onChange={() => {}} />
       </>,
     );
-    expect(c.querySelector<HTMLInputElement>('input[type="range"]')!.className).toBe(DESKTOP_RANGE);
-    const [deviceSelect, ...shared] = [...c.querySelectorAll('select')];
-    expect(deviceSelect.className).toBe(DESKTOP_DEVICE_SELECT);
+    for (const label of radioLabels(c)) expect(label.className).not.toMatch(/\bmin-h-11\b/);
+    expect(previewDeviceSelect(c).className).toBe(DESKTOP_DEVICE_SELECT);
     expect(c.innerHTML).not.toMatch(/min-h-11|touch-none/);
-    expect(shared).toHaveLength(2);
+    expect(c.querySelectorAll('select')).toHaveLength(3);
   });
 });
