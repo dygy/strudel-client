@@ -32,7 +32,7 @@
   - Wrangler vars: `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY`.
   - Wrangler secret: `SUPABASE_SERVICE_ROLE_KEY`, with `.dev.vars` locally.
   - GitHub secret: `CLOUDFLARE_API_TOKEN`.
-- **Legacy:** `Dockerfile` and `server.js` are left over from Heroku and are not deployed. `.forgejo/` holds upstream CI and is not used.
+- **Legacy:** `.forgejo/` holds upstream CI and is not used. The Heroku leftovers (`Dockerfile`, `server.js`, the `express` dependency) were removed on 2026-10-30.
 
 ## 4. External Services & APIs
 
