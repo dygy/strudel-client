@@ -16,3 +16,21 @@ export { ErrorNotifier } from './ErrorNotifier.mjs';
 export { KeyboardShortcutManager } from './KeyboardShortcutManager.mjs';
 export { PreviewEngine } from './PreviewEngine.mjs';
 export { SmoothTransitionManager } from './SmoothTransitionManager.mjs';
+export {
+  TrackTransitionController,
+  normalizeTransitionSettings,
+  transitionStart,
+  glideCps,
+  DEFAULT_TRANSITION_SETTINGS,
+  TRANSITION_LENGTHS,
+  TRANSITION_SNAPS,
+} from './TrackTransitionController.mjs';
+export {
+  buildTransition,
+  transitionTiming,
+  stripLocations,
+  isOverlapping,
+  TRANSITION_TYPES,
+  OVERLAPPING_TYPES,
+} from './transitions/buildTransition.mjs';
+export { LoudnessMeter, computeTrim, applyTrim, trimFactorAt } from './transitions/loudness.mjs';

@@ -2,7 +2,7 @@
  * Web Audio boundary mock for @strudel/mixer tests.
  *
  * Covers everything packages/mixer/*.mjs and @strudel/equalizer call on the
- * AudioContext: createGain, createBiquadFilter (10-band EQ),
+ * AudioContext: createGain, createBiquadFilter (10-band EQ), createAnalyser (loudness tap),
  * createMediaStreamDestination, currentTime/state/destination, resume/close,
  * plus HTMLAudioElement (srcObject, paused, play, pause, setSinkId),
  * navigator.mediaDevices.enumerateDevices and localStorage.
@@ -55,8 +55,9 @@ function createNode(extra = {}) {
       this.connections.push(target);
       return target;
     },
-    disconnect() {
-      this.connections = [];
+    // disconnect() drops every connection; disconnect(target) only that one (as in Web Audio).
+    disconnect(target) {
+      this.connections = target === undefined ? [] : this.connections.filter((c) => c !== target);
     },
     ...extra,
   };
@@ -88,6 +89,22 @@ export class MockAudioContext {
       getFrequencyResponse(freqs, mag, phase) {
         mag.fill(1);
         phase.fill(0);
+      },
+    });
+  }
+
+  /**
+   * An AnalyserNode whose time-domain data is a constant `level` (set it on the node or pass a
+   * function of the context time), so RMS readings are predictable: rms === |level|.
+   */
+  createAnalyser() {
+    const ctx = this;
+    return createNode({
+      fftSize: 2048,
+      level: 0,
+      getFloatTimeDomainData(array) {
+        const level = typeof this.level === 'function' ? this.level(ctx.currentTime) : this.level;
+        array.fill(level);
       },
     });
   }

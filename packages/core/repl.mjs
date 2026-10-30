@@ -33,6 +33,8 @@ export function repl({
     widgets: [],
     pending: false,
     started: false,
+    // fork addition (strudel-client spec 017, used by @strudel/mixer transitions): see `evaluate`
+    layers: [],
   };
 
   const transpilerOptions = {
@@ -213,10 +215,15 @@ export function repl({
         code = `mondolang\`${code}\``;
       }
       let { pattern, meta } = await _evaluate(code, transpiler, transpilerOptions);
+      // fork addition (strudel-client spec 017, used by @strudel/mixer transitions):
+      // the per-layer `$:` / `.p(id)` patterns, in stack order, readable from editPattern.
+      const layers = [];
       if (Object.keys(pPatterns).length) {
         let patterns = [];
         for (const [key, value] of Object.entries(pPatterns)) {
-          patterns.push(value.withState((state) => state.setControls({ id: key })));
+          const layer = value.withState((state) => state.setControls({ id: key }));
+          layers.push({ id: key, pattern: layer });
+          patterns.push(layer);
         }
         if (eachTransform) {
           // Explicit lambda so only element (not index and array) are passed
@@ -237,6 +244,7 @@ export function repl({
         throw new Error(message + (typeof evaluated === 'function' ? ', did you forget to call a function?' : '.'));
       }
       logger(`[eval] code updated`);
+      updateState({ layers }); // fork addition (spec 017): set before setPattern so editPattern sees it
       pattern = await setPattern(pattern, autostart);
       updateState({
         miniLocations: meta?.miniLocations || [],

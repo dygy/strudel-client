@@ -39,13 +39,13 @@ Areas:
     **[Agent: strudel-web-engineer]**
 
 - [ ] **Slice 2: Pattern-level switching: Cut, Crossfade, Dip, snapping, broken-track safety**
-  - [ ] 2.1 `packages/mixer/transitions/{buildTransition,envelopes}.mjs`:
+  - [x] 2.1 `packages/mixer/transitions/{buildTransition,envelopes}.mjs`:
     - a pure builder for Cut, Crossfade (equal power on `velocity`) and the Dip window;
     - old events dropped at `T+L` and truncated past it, with `clip: 1`;
     - `stripLocations` on the old pattern.
 
     (tech §2.3) **[Agent: strudel-audio-engineer]**
-  - [ ] 2.2 `packages/mixer/TrackTransitionController.mjs`:
+  - [x] 2.2 `packages/mixer/TrackTransitionController.mjs`:
     - `switchTo(code, settings)`;
     - the `editPattern` hook: armed means compute `T` from snap and margin and build; idle means `late(origin)`, or the identical object when `origin = 0`;
     - `setcps` capture during evaluate (instance wrapper);
@@ -65,7 +65,7 @@ Areas:
     - `smoothTransitionNotifier.ts` listens to `track-transition-error` and adds the "old track keeps playing" message in 9 locales.
 
     **[Agent: strudel-web-engineer]**
-  - [ ] 2.5 Unit tests:
+  - [x] 2.5 Unit tests:
     - `buildTransition.test.mjs` (Cut, Crossfade, Dip window, truncation, `clip`, stripped locations);
     - `TrackTransitionController.test.mjs` (`T` per snap value, Cut's minimum of 1, captured cps, failed-evaluate safety, the queue, the end swap, origin across a hot-swap, idle identity, Dip ramps never jump, `NeoCyclist`-shaped fake).
 
@@ -80,25 +80,25 @@ Areas:
     Delete the artifacts afterwards. **[Agent: strudel-audio-engineer]**
 
 - [ ] **Slice 3: Filter sweep, Bass swap, Echo-out**
-  - [ ] 3.1 Builder: Filter sweep (`hcutoff` up on the old track, `cutoff` opening on the new one, combined with user values by max/min). Bass swap: a midpoint step at 250 Hz, plus the old track's fade over the second half. Echo-out: old events from the switch press to `T` go to `ECHO_ORBIT = 15` with `delay 0.7`, the feedback is derived from L (capped at 0.85), and events `≥ T` are dropped (tech §2.3). **[Agent: strudel-audio-engineer]**
-  - [ ] 3.2 Tests: the cutoff envelopes are monotonic and respect user values; alias names (`lpf`/`hpf`) resolve to `cutoff`/`hcutoff`; the bass-swap step lands at `T+L/2`; echo events carry the orbit, delay and feedback; nothing old after `T`. **[Agent: strudel-audio-engineer]**
+  - [x] 3.1 Builder: Filter sweep (`hcutoff` up on the old track, `cutoff` opening on the new one, combined with user values by max/min). Bass swap: a midpoint step at 250 Hz, plus the old track's fade over the second half. Echo-out: old events from the switch press to `T` go to `ECHO_ORBIT = 15` with `delay 0.7`, the feedback is derived from L (capped at 0.85), and events `≥ T` are dropped (tech §2.3). **[Agent: strudel-audio-engineer]**
+  - [x] 3.2 Tests: the cutoff envelopes are monotonic and respect user values; alias names (`lpf`/`hpf`) resolve to `cutoff`/`hcutoff`; the bass-swap step lands at `T+L/2`; echo events carry the orbit, delay and feedback; nothing old after `T`. **[Agent: strudel-audio-engineer]**
   - [ ] 3.3 Verify in Playwright: for each type, RMS has no gap; Echo-out's tail RMS decays to the noise floor by `T+L`. Delete the artifacts afterwards. **[Agent: strudel-audio-engineer]**
 
 - [ ] **Slice 4: Layered intro**
-  - [ ] 4.1 `packages/core/repl.mjs` (additive, upstream divergence noted): `evaluate` sets `state.layers = [{id, pattern}]` from its `$:` list before `setPattern`; the list is empty without `$:`. Test in `packages/core/test/`. **[Agent: strudel-engine-engineer]**
-  - [ ] 4.2 Builder: layer `k` of `n` enters at `T + L·k/n` in `$:` order. It falls back to Crossfade when `n ≤ 1` or when `all()`/`each()` transforms are present. Tests cover 4 layers / 8 cycles giving entries at 0, 2, 4 and 6, plus the single-layer fallback. **[Agent: strudel-audio-engineer]**
+  - [x] 4.1 `packages/core/repl.mjs` (additive, upstream divergence noted): `evaluate` sets `state.layers = [{id, pattern}]` from its `$:` list before `setPattern`; the list is empty without `$:`. Test in `packages/core/test/`. **[Agent: strudel-engine-engineer]**
+  - [x] 4.2 Builder: layer `k` of `n` enters at `T + L·k/n` in `$:` order. It falls back to Crossfade when `n ≤ 1` or when `all()`/`each()` transforms are present. Tests cover 4 layers / 8 cycles giving entries at 0, 2, 4 and 6, plus the single-layer fallback. **[Agent: strudel-audio-engineer]**
   - [ ] 4.3 Verify in Playwright with a 4-layer track: the onset counts per layer grow in steps. Delete the artifacts afterwards. **[Agent: strudel-audio-engineer]**
 
 - [ ] **Slice 5: Tempo glide and Match loudness**
-  - [ ] 5.1 Controller tempo plan: with glide on, about 16 linear `setCps` steps per cycle over `[T, T+L]`, overlapping types only; with glide off, `setCps(newCps)` at `T`. **[Agent: strudel-audio-engineer]**
-  - [ ] 5.2 `transitions/loudness.mjs`:
+  - [x] 5.1 Controller tempo plan: with glide on, about 16 linear `setCps` steps per cycle over `[T, T+L]`, overlapping types only; with glide off, `setCps(newCps)` at `T`. **[Agent: strudel-audio-engineer]**
+  - [x] 5.2 `transitions/loudness.mjs`:
     - a lazily created AnalyserNode tapped from `destinationGain`;
     - old RMS over 2 s before `T`, new RMS over 1 cycle after the end;
     - the trim (clamped ±9 dB) is applied as a `velocity` multiplier through the origin wrapper, in 4 steps over 1 cycle, and reset on the next switch;
     - the analyser is disconnected on `destroy`.
 
     **[Agent: strudel-audio-engineer]**
-  - [ ] 5.3 Tests: glide from 120 to 140 BPM is monotonic and ends exactly on `newCps`; glide off sets `newCps` at `T`; Dip/Cut ignore glide; the trim math and clamp; reset on the next switch. **[Agent: strudel-audio-engineer]**
+  - [x] 5.3 Tests: glide from 120 to 140 BPM is monotonic and ends exactly on `newCps`; glide off sets `newCps` at `T`; Dip/Cut ignore glide; the trim math and clamp; reset on the next switch. **[Agent: strudel-audio-engineer]**
   - [ ] 5.4 Verify in Playwright: `scheduler.cps` over time during a glide; with a quiet → loud switch, RMS 2 cycles after the end is within 3 dB of before. Delete the artifacts afterwards. **[Agent: strudel-audio-engineer]**
 
 - [ ] **Slice 6: Transition picker next to Update**

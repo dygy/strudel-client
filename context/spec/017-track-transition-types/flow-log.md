@@ -38,3 +38,27 @@
 - Produced `tasks.md` (8 slices; areas: web 1/2.4/6, audio 2–5, engine 4.1). The owner reviewed it ("looks good"), so the not-user-reviewed marker is removed.
 - Committed the spec dir only.
 - **Paused:** implementation (Step 5) starts once spec 016 has landed on `main` and the tree is clean. Resume with `/ship 017-track-transition-types`.
+
+## 2026-10-30 — implement: engine + audio (worktree)
+- Owner: "сам это делай" ("just do it yourself"). So: disjoint engine and audio work now, in worktree `../strudel-client-017` on branch `feat/017-transition-types`; the web phase waits for 016 to land (background watcher on the main tree).
+- Engine agent, task 4.1:
+  - `state.layers` in `packages/core/repl.mjs`. Additive, marked as a fork addition, so the upstream divergence is recorded here.
+  - 7 tests, RED→GREEN.
+- Audio agent, tasks 2.1, 2.2, 2.5, 3.1, 3.2, 4.2, 5.1–5.3:
+  - New: `TrackTransitionController.mjs` and `transitions/{buildTransition,envelopes,loudness}.mjs`.
+  - Tests: 45 + 51 + 19, 7 RED proofs.
+  - `SmoothTransitionManager` is kept until the web phase (task 2.3 deletion is deferred).
+- Accepted deviations from the tech spec, all of them driven by the functional spec:
+  - envelopes are sampled at the middle of each note;
+  - with Snap off, T rounds up to the next quarter cycle (the beat);
+  - Bass swap fades the new track in over the first half;
+  - Echo-out sends only the last cycle before T to the echo;
+  - `oldPat` comes from `scheduler.pattern`;
+  - visuals are cleaned at evaluate, as today;
+  - the controller accepts Off as a 1/16-cycle cut for queued switches;
+  - loudness measures the old track from the switch press;
+  - Length ties go to the shorter value;
+  - Layered intro falls back to crossfade when the code contains `all(` or `each(` (regex).
+- Open for browser verification: short un-clipped samples ringing past T+L; `.cpm()` against the old tempo during evaluate; `setGainCurve` bending the fades.
+- Verified by the orchestrator: full suite in the worktree, `Test Files 61 passed (61)`, `Tests 1526 passed (1526)`.
+- Next: when 016 lands, rebase the branch onto main, then the web phase (slices 1, 2.3, 2.4, 6) plus the browser verifies.
