@@ -1,5 +1,5 @@
 > **Migrated from** `.kiro/specs/random-track-loading-fix` on 2026-10-08 (Kiro format, not the AWOS template).
-> **Status:** Partial — server-side random redirect exists in pages/repl/[...trackPath].astro; most Kiro tasks unticked
+> **Status:** Completed (superseded, 2026-10-30) — the requirement is met by the server: signed-in `/repl` redirects to a random track's URL before the page renders (`pages/repl/[...trackPath].astro`, `lib/randomTrack.ts`), so default code never flashes and nothing races; signed-out users go to login (files require login). The Kiro coordinator tasks below were not built and are not needed. The redirect picks only tracks whose URL opens them, so it cannot loop (`lib/__tests__/randomTrack.test.ts`).
 
 # Design Document: Random Track Loading Fix
 

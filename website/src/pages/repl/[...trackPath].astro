@@ -6,6 +6,7 @@ import { I18nProvider } from '../../components/I18nProvider';
 import { userClient } from '../api/_userClient';
 import { TreeDataTransformer } from '../../lib/TreeDataTransformer';
 import { parseTrackUrlPath, findTrackByFolderAndSlug } from '../../lib/slugUtils';
+import { randomTrackUrl } from '../../lib/randomTrack';
 
 import type { SSRData } from '../../types/ssr';
 import { serverEnv } from '../../lib/server-env';
@@ -122,29 +123,19 @@ try {
             });
           }
 
-          // If no track slug provided or track not found, redirect to a random track
-          if (!targetTrack && tracks.length > 0) {
+          // If no track slug provided or track not found, redirect to a random track whose URL
+          // opens it (never one that would land here again: a redirect loop)
+          const randomUrl = !targetTrack && tracks.length > 0 ? randomTrackUrl(tracks, folders) : null;
+          if (randomUrl) {
             if (trackSlug) {
               console.error('REPL SSR - Requested track not found:', { folderPath, trackSlug });
             } else {
               console.log('REPL SSR - No track specified, selecting random track');
             }
-            
-            // Redirect to a random track
-            const randomTrack = tracks[Math.floor(Math.random() * tracks.length)];
-            const { generateTrackUrlPath, trackNameToSlug: slugify } = await import('../../lib/slugUtils');
-            let trackUrl = generateTrackUrlPath(randomTrack.name, randomTrack.folder, foldersMap);
-            
-            // If multitrack, add first step to URL
-            if (randomTrack.isMultitrack && randomTrack.steps && randomTrack.steps.length > 0) {
-              const firstStepSlug = slugify(randomTrack.steps[0].name);
-              trackUrl = `${trackUrl}?step=${firstStepSlug}`;
-            }
-            
-            console.log('REPL SSR - Redirecting to random track:', randomTrack.name, 'URL:', trackUrl);
-            return Astro.redirect(trackUrl);
-          } else if (!targetTrack && tracks.length === 0) {
-            console.error('REPL SSR - No tracks available');
+            console.log('REPL SSR - Redirecting to random track URL:', randomUrl);
+            return Astro.redirect(randomUrl);
+          } else if (!targetTrack) {
+            console.error('REPL SSR - No track to open:', { tracks: tracks.length });
             // Continue to render empty state
           } else if (targetTrack) {
             console.log('REPL SSR - SUCCESS: Target track found:', targetTrack.name, 'in folder:', targetTrack.folder || 'root', 'ID:', targetTrack.id);
