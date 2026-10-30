@@ -29,7 +29,6 @@ import { DELETE as trackDelete } from '../tracks/delete';
 import { POST as trackCreate } from '../tracks/create';
 import { PUT as trackUpdate } from '../tracks/update';
 import { PUT as folderUpdate } from '../folders/update';
-import { GET as authCallback } from '../auth/callback';
 
 // The real error classes: auth-js getUser RETURNS these (it doesn't throw) on network errors / 5xx.
 const { AuthRetryableFetchError, AuthApiError } =
@@ -247,50 +246,5 @@ describe('no server route refreshes the session', () => {
 
     expect(res.status).toBe(401);
     expectNoServerRefresh();
-  });
-});
-
-// Unused route, but it must not plant an httpOnly access-token cookie: the browser client rewrites
-// that cookie on every refresh and document.cookie can't overwrite an httpOnly one.
-describe('GET /api/auth/callback (server-side code exchange)', () => {
-  type AuthWithExchange = typeof supabaseFake.auth & { exchangeCodeForSession?: ReturnType<typeof vi.fn> };
-  const exchangeAuth = supabaseFake.auth as AuthWithExchange;
-
-  afterEach(() => {
-    delete exchangeAuth.exchangeCodeForSession;
-  });
-
-  function callbackCall(query: string) {
-    const set = vi.fn();
-    const ctx = {
-      url: new URL(`http://test/api/auth/callback?${query}`),
-      cookies: { set, get: () => undefined, delete: vi.fn() },
-      redirect: (path: string) => new Response(null, { status: 302, headers: { Location: path } }),
-    };
-    exchangeAuth.exchangeCodeForSession = vi.fn(async () => ({
-      data: { session: { access_token: FRESH, refresh_token: 'r-secret', user: { ...USER, user_metadata: {} } } },
-      error: null,
-    }));
-    const handler = authCallback as unknown as (c: typeof ctx) => Promise<Response>;
-    return { set, run: () => handler(ctx) };
-  }
-
-  it('sets a non-httpOnly access-token cookie and no refresh-token cookie', async () => {
-    const { set, run } = callbackCall('code=abc');
-
-    await run();
-
-    const access = set.mock.calls.find(([name]) => name === 'sb-access-token');
-    expect(access?.[1]).toBe(FRESH);
-    expect(access?.[2]).toMatchObject({ httpOnly: false, secure: true, sameSite: 'lax', path: '/' });
-    expect(set.mock.calls.some(([name]) => name === 'sb-refresh-token')).toBe(false);
-  });
-
-  it('never redirects off-site through ?state=', async () => {
-    const { run } = callbackCall(`code=abc&state=${encodeURIComponent('https://evil.test/?track=1')}`);
-
-    const res = await run();
-
-    expect(res.headers.get('Location')).toBe('/repl');
   });
 });

@@ -16,7 +16,6 @@ const ALLOWED: Record<string, string> = {
   'pages/api/admin/users.ts': 'admin: lists every user',
   'pages/admin.astro': 'admin dashboard',
   'pages/[userId]/repl/[...trackPath].astro': "admin: reads another user's library after isAdmin()",
-  'pages/api/auth/callback.ts': 'OAuth code exchange (sign-in; not a data query)',
   'lib/database/migrate-to-tree.ts': 'one-off migration script, not served',
 };
 

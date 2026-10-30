@@ -15,7 +15,7 @@
   - `tracks`: the real store for code, folder, multitrack and steps.
   - `folders`, `profiles`, `file_system_nodes`.
   - `tree_nodes`, `tree_relationships`, `tree_metadata`: unused. The tables stay in the database; their API and `TreeManager` were removed on 2026-10-30 (spec 002).
-- **Server access:** Astro API routes under `website/src/pages/api/*`. These are tracks, folders, filesystem (read-only `tree`), library, auth and admin. User routes and the REPL SSR page act as the user through `api/_userClient.ts` (anon key + the user's token), so RLS applies. `SUPABASE_SERVICE_ROLE_KEY` is read only by the admin surfaces and the OAuth callback; `pages/api/__tests__/serviceKeyScope.test.ts` enforces the list. There are no edge functions.
+- **Server access:** Astro API routes under `website/src/pages/api/*`. These are tracks, folders, filesystem (read-only `tree`), library, auth and admin. User routes and the REPL SSR page act as the user through `api/_userClient.ts` (anon key + the user's token), so RLS applies. `SUPABASE_SERVICE_ROLE_KEY` is read only by the admin surfaces; `pages/api/__tests__/serviceKeyScope.test.ts` enforces the list. There are no edge functions.
 - **Client cache:** sample cache settings, and per-browser settings in localStorage. Since autosave became strict, **files require login**: there is no local-only file store.
 
 ## 3. Infrastructure & Deployment
@@ -36,7 +36,7 @@
 
 ## 4. External Services & APIs
 
-- **Auth:** Supabase Auth with Google OAuth. The callback is `/auth/callback`.
+- **Auth:** Supabase Auth with Google OAuth (PKCE). The callback is the `/auth/callback` page: the browser client exchanges the code, since only it holds the code verifier. The unused server-side `/api/auth/callback` and the debug surfaces (`/api/debug/auth`, `/debug-auth`) were removed on 2026-10-30.
 - **Analytics:** a Weaver tracker in `website/src/components/HeadCommon.astro`. The site key is public by design.
 - **Search:** Algolia, for the upstream docs.
 - **Samples:** loaded at runtime from remote sample maps (GitHub/CDN), as in upstream.
