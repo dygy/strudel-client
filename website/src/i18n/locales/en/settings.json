@@ -97,6 +97,7 @@
   "smoothTransitions": "Smooth Track Transitions",
   "smoothTransitionsDescription": "Fade between tracks when switching tracks",
   "smoothTransitionFailed": "Smooth transition failed — switched tracks without a fade.",
+  "smoothTransitionNewTrackFailed": "The new track has an error and couldn't start — the previous track was stopped.",
   "transitionDuration": "Transition Duration",
   "equalizer": "Equalizer",
   "equalizerDescription": "Adjust audio frequencies",

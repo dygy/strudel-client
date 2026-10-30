@@ -97,6 +97,7 @@
   "smoothTransitions": "平滑音轨过渡",
   "smoothTransitionsDescription": "切换音轨时淡入淡出",
   "smoothTransitionFailed": "平滑过渡失败——已切换音轨，但没有淡入淡出。",
+  "smoothTransitionNewTrackFailed": "新音轨有错误，无法开始播放——上一条音轨已停止。",
   "transitionDuration": "过渡时长",
   "equalizer": "均衡器",
   "equalizerDescription": "调整音频频率",

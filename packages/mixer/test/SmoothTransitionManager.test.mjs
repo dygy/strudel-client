@@ -11,6 +11,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SmoothTransitionManager } from '../SmoothTransitionManager.mjs';
 import { MockAudioContext, stubWebAudio, unstubWebAudio } from './webAudioMock.mjs';
 
+/** Length of the failure path's volume-restore ramp (seconds). */
+const RESTORE_RAMP = 0.08;
+
 // A fake repl with the one property that matters: stop() loses the position.
 function createFakeRepl() {
   const repl = {
@@ -94,7 +97,68 @@ describe('SmoothTransitionManager.executeTransition', () => {
     await expect(manager.executeTransition('broken(')).rejects.toThrow('syntax error');
 
     expect(repl.stop).not.toHaveBeenCalled();
-    expect(gain.setValueAtTime).toHaveBeenLastCalledWith(1, 0);
+    expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, RESTORE_RAMP); // short ramp back up
+    expect(manager.getSettings().isTransitioning).toBe(false);
+  });
+
+  // Bug (2026-10-29): switching to a different track and pressing Update continued the new
+  // track from the old track's cycle position, because the transition never restarted.
+  it('a track switch ({ restart: true }) starts the new track at cycle 0', async () => {
+    const { manager } = createManager(repl);
+
+    await manager.executeTransition('s("cp*2")', { restart: true });
+
+    expect(repl.stop).toHaveBeenCalledTimes(1);
+    expect(repl.cycle).toBe(0);
+    expect(repl.started).toBe(true);
+  });
+
+  it('a track switch restarts only once the fade down is done, and fades up after the new pattern is in', async () => {
+    const { manager } = createManager(repl);
+
+    await manager.executeTransition('s("cp*2")', { restart: true });
+
+    expect(repl.calls).toEqual(['fadeDown', 'stop', 'cleanup', 'evaluate:s("cp*2")', 'setPattern', 'fadeUp']);
+  });
+
+  it("a track switch runs the caller's reset (prepare) while silent: after the restart, before evaluate", async () => {
+    const { manager } = createManager(repl);
+    const prepare = vi.fn(async () => repl.calls.push('prepare'));
+
+    await manager.executeTransition('s("cp*2")', { restart: true, prepare });
+
+    expect(repl.calls).toEqual([
+      'fadeDown',
+      'stop',
+      'cleanup',
+      'prepare',
+      'evaluate:s("cp*2")',
+      'setPattern',
+      'fadeUp',
+    ]);
+  });
+
+  it('a new track that fails to evaluate after the restart is not faded up over silence; it reports the failure', async () => {
+    // The real repl.evaluate swallows pattern errors: it resolves, but never starts the scheduler.
+    repl.scheduler = {
+      get started() {
+        return repl.started;
+      },
+    };
+    repl.evaluate.mockImplementation(async (code) => {
+      repl.calls.push(`evaluate:${code}`);
+    });
+    const { manager, gain } = createManager(repl);
+    const emitted = vi.spyOn(manager, 'emitEvent');
+
+    const err = await manager.executeTransition('broken(', { restart: true }).catch((e) => e);
+
+    expect(err).toBeInstanceOf(Error);
+    expect(err.evaluateFailed).toBe(true);
+    expect(repl.calls).not.toContain('fadeUp');
+    expect(emitted).toHaveBeenCalledWith('transition-error', expect.objectContaining({ error: expect.any(String) }));
+    expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, RESTORE_RAMP); // volume restored by a short ramp
+    expect(emitted).toHaveBeenCalledWith('transition-error', expect.objectContaining({ evaluateFailed: true }));
     expect(manager.getSettings().isTransitioning).toBe(false);
   });
 });
@@ -294,7 +358,54 @@ describe('SmoothTransitionManager queue and failure (spec 015 §2.1)', () => {
     expect(repl.evaluate).not.toHaveBeenCalledWith('B');
   });
 
-  it('a new track failing after fade-out restores full volume immediately', async () => {
+  it('a queued track switch keeps its restart even when a later Update replaces its code', async () => {
+    const repl = { evaluate: vi.fn(async () => {}), stop: vi.fn() };
+    const { manager } = createRealFadeManager({ enabled: true, duration: 1 }, repl);
+
+    const first = manager.executeTransition('A');
+    await vi.advanceTimersByTimeAsync(500); // mid fade-out of an in-place transition
+    await manager.executeTransition('B', { restart: true });
+    await manager.executeTransition('C');
+    await vi.advanceTimersByTimeAsync(10_000);
+    await first;
+
+    expect(repl.evaluate.mock.calls.map(([code]) => code)).toEqual(['A', 'C']);
+    // The first transition did not restart; the queued one is still a switch, so it does.
+    expect(repl.stop).toHaveBeenCalledTimes(1);
+    expect(repl.stop.mock.invocationCallOrder[0]).toBeGreaterThan(repl.evaluate.mock.invocationCallOrder[0]);
+    expect(repl.stop.mock.invocationCallOrder[0]).toBeLessThan(repl.evaluate.mock.invocationCallOrder[1]);
+  });
+
+  it('a track switch stops the clock only at silence: ramp to 0, wait the full fade, then restart', async () => {
+    const { manager, ctx, gain, repl } = createRealFadeManager({ enabled: true, duration: 1 });
+    repl.stop = vi.fn(() => gain.calls.push(['repl.stop']));
+    ctx.currentTime = 4;
+
+    const done = manager.executeTransition('s("cp")', { restart: true });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(repl.stop).not.toHaveBeenCalled(); // still fading out
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(repl.stop).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await done;
+
+    const stopAt = gain.calls.findIndex(([m]) => m === 'repl.stop');
+    expect(gain.calls.slice(0, stopAt)).toEqual([
+      ['cancelScheduledValues', 4],
+      ['setValueAtTime', 1, 4],
+      ['linearRampToValueAtTime', 0, 5],
+    ]);
+    // After the restart: anchored at 0 (where the ramp ended) and ramped back up, no jump to 1.
+    expect(gain.calls.slice(stopAt + 1)).toEqual([
+      ['cancelScheduledValues', 4],
+      ['setValueAtTime', 0, 4],
+      ['linearRampToValueAtTime', 1, 5],
+    ]);
+    expect(jumpsTo(gain, 1).filter(([, , t]) => t > 4)).toEqual([]);
+  });
+
+  it('a new track failing after fade-out restores full volume within a short ramp', async () => {
     const repl = {
       evaluate: vi.fn(async () => {
         throw new Error('boom');
@@ -309,10 +420,33 @@ describe('SmoothTransitionManager queue and failure (spec 015 §2.1)', () => {
     const err = await settled;
 
     expect(err).toBeInstanceOf(Error);
-    expect(gain.calls.slice(-2)).toEqual([
+    // A short ramp from where the gain is (silence) back to full, not a one-step jump.
+    expect(gain.calls.slice(-3)).toEqual([
       ['cancelScheduledValues', 2],
-      ['setValueAtTime', 1, 2],
+      ['setValueAtTime', 0, 2],
+      ['linearRampToValueAtTime', 1, 2 + RESTORE_RAMP],
     ]);
+    expect(gain.value).toBe(1);
+  });
+
+  it('a failed transition never jumps the volume back to full in one step (old tails would pop back in)', async () => {
+    const repl = {
+      evaluate: vi.fn(async () => {
+        throw new Error('boom');
+      }),
+    };
+    const { manager, gain } = createRealFadeManager({ enabled: true, duration: 2 }, repl);
+
+    const settled = manager.executeTransition('broken(').catch((e) => e);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await settled;
+
+    // Everything after the fade-out reached silence: no instant write of full volume.
+    const afterFadeOut = gain.calls.slice(
+      gain.calls.findIndex(([m, v]) => m === 'linearRampToValueAtTime' && v === 0) + 1,
+    );
+    expect(afterFadeOut.length).toBeGreaterThan(0);
+    expect(jumpsTo({ calls: afterFadeOut }, 1)).toEqual([]);
     expect(gain.value).toBe(1);
   });
 
@@ -329,7 +463,12 @@ describe('SmoothTransitionManager queue and failure (spec 015 §2.1)', () => {
     await settled;
 
     const ramps = gain.calls.filter(([m]) => m === 'linearRampToValueAtTime');
-    expect(ramps).toEqual([['linearRampToValueAtTime', 0, 2]]); // only the fade-out; no fade-up ramp
+    // The fade-out, then only a short restore ramp (ctx.currentTime stays 0 here): no 2 s fade-up.
+    expect(ramps).toEqual([
+      ['linearRampToValueAtTime', 0, 2],
+      ['linearRampToValueAtTime', 1, RESTORE_RAMP],
+    ]);
+    expect(RESTORE_RAMP).toBeLessThanOrEqual(0.1);
     expect(gain.value).not.toBe(0);
     expect(manager.getSettings().isTransitioning).toBe(false);
   });

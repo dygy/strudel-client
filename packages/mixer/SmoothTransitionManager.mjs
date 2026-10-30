@@ -13,6 +13,9 @@ const DEFAULT_ENABLED = false;
 const DEFAULT_DURATION = 2.0;
 const MIN_DURATION = 0.5;
 const MAX_DURATION = 10.0;
+// A failed transition brings the volume back over this many seconds, never in one step:
+// tails of the old track (reverb, delay) may still be ringing under the silenced output.
+const RESTORE_RAMP = 0.08;
 
 export class SmoothTransitionManager {
   /**
@@ -37,6 +40,8 @@ export class SmoothTransitionManager {
     this.duration = DEFAULT_DURATION;
     this.isTransitioning = false;
     this.queuedCode = null;
+    this.queuedRestart = false;
+    this.queuedPrepare = null;
     this.targetVolume = 1.0;
 
     // Restore settings from localStorage
@@ -153,15 +158,34 @@ export class SmoothTransitionManager {
   }
 
   /**
-   * Execute a smooth transition to new code
+   * Execute a smooth transition to new code: fade down, (optionally restart the clock),
+   * clean up canvases, evaluate, fade up.
+   *
+   * By default the new code is hot-swapped into the running scheduler, keeping its cycle
+   * position and tempo. Pass `{ restart: true }` when switching to a DIFFERENT track: once
+   * the output is silent, `repl.stop()` resets the clock so the new track starts at cycle 0
+   * (and its own `setcps` applies on top of the reset tempo). The restart only ever happens
+   * after the fade down has finished, so it is inaudible.
+   *
+   * If a restarted track fails to evaluate (the repl reports pattern errors itself and does
+   * not throw, so this is detected as "the scheduler did not start"), the transition does
+   * not fade up over silence: it fails like any other transition (volume restored by a short
+   * ramp, `smooth-transition-transition-error` event with `detail.evaluateFailed: true`) and
+   * rejects with an error whose `evaluateFailed` is `true`.
+   *
    * @param {string} newCode - The new pattern code to evaluate
+   * @param {Object} [options]
+   * @param {boolean} [options.restart=false] - Restart playback at cycle 0 while silent (track switch)
+   * @param {Function} [options.prepare] - Async hook awaited while silent, after the restart and
+   *   canvas cleanup and before evaluate (e.g. reset the old track's tempo, effects and sounds
+   *   without the change being heard). Errors are logged and ignored.
    * @returns {Promise<void>}
    */
-  async executeTransition(newCode) {
+  async executeTransition(newCode, { restart = false, prepare } = {}) {
     // If transition already in progress, queue this one
     if (this.isTransitioning) {
       console.log('[SmoothTransitionManager] Transition in progress, queueing update');
-      this.queueTransition(newCode);
+      this.queueTransition(newCode, { restart, prepare });
       return;
     }
 
@@ -175,9 +199,14 @@ export class SmoothTransitionManager {
       console.log('[SmoothTransitionManager] Starting fade down');
       await this.fadeDown(this.duration);
 
-      // Do NOT stop the pattern here. Cyclist.stop() resets the clock, so the
-      // evaluate below would restart from cycle 0 (and onToggle resets cps).
-      // Like the instant path, evaluate hot-swaps at the current position.
+      // Only a track switch stops the pattern. Cyclist.stop() resets the clock, so the
+      // evaluate below starts the new track at cycle 0 (onToggle also resets cps; the new
+      // code's setcps runs during evaluate and wins). An in-place update must NOT stop:
+      // it hot-swaps at the current position. The output is silent here, so no click.
+      if (restart && this.replInstance && this.replInstance.stop) {
+        console.log('[SmoothTransitionManager] Track switch: restarting at cycle 0 while silent');
+        this.replInstance.stop();
+      }
 
       // Phase 2: Clean up OLD canvases (the website callback also clears Hydra)
       // This ensures old draw() canvases are removed before new ones are created
@@ -191,7 +220,16 @@ export class SmoothTransitionManager {
         }
       }
 
-      // Phase 3: Small delay to ensure cleanup completes
+      // Phase 3: Caller's reset, while silent (so e.g. a tempo reset is not heard on the old track)
+      if (prepare) {
+        try {
+          await prepare();
+        } catch (error) {
+          console.warn('[SmoothTransitionManager] prepare() failed:', error);
+        }
+      }
+
+      // Small delay to ensure cleanup completes
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Phase 4: Evaluate new code (hot-swap; this will create new canvases)
@@ -200,6 +238,14 @@ export class SmoothTransitionManager {
         // Await it: repl.evaluate is async (transpile, samples(), setPattern). Fading up
         // before it resolves would ramp the OLD pattern back up, then cut to the new one.
         await this.replInstance.evaluate(newCode);
+
+        // After a restart a successful evaluate autostarts the scheduler. If it is still
+        // stopped, the new track failed: don't fade up over silence.
+        if (restart && this.replInstance.scheduler && this.replInstance.scheduler.started === false) {
+          const error = new Error('The new track failed to evaluate');
+          error.evaluateFailed = true;
+          throw error;
+        }
       }
 
       // Phase 5: Fade up new track
@@ -210,15 +256,19 @@ export class SmoothTransitionManager {
     } catch (error) {
       console.error('[SmoothTransitionManager] Transition failed:', error);
 
-      // Restore volume to prevent muted audio
+      // Restore volume to prevent muted audio: a short ramp from the current level, not a jump.
       if (this.destinationGain) {
+        const gain = this.destinationGain.gain;
         const now = this.audioContext.currentTime;
-        this.destinationGain.gain.cancelScheduledValues(now);
-        this.destinationGain.gain.setValueAtTime(this.targetVolume, now);
+        const current = gain.value; // read before cancelling: the level the ramp starts from
+        gain.cancelScheduledValues(now);
+        gain.setValueAtTime(current, now);
+        gain.linearRampToValueAtTime(this.targetVolume, now + RESTORE_RAMP);
       }
 
-      // Emit error event for UI notification
-      this.emitEvent('transition-error', { error: error.message });
+      // Emit error event for UI notification. `evaluateFailed`: the new track's code is broken
+      // and nothing is playing (vs. the transition itself failing).
+      this.emitEvent('transition-error', { error: error.message, evaluateFailed: Boolean(error.evaluateFailed) });
 
       throw error;
     } finally {
@@ -233,11 +283,19 @@ export class SmoothTransitionManager {
    * Queue a transition for later execution
    * @private
    * @param {string} newCode - Code to queue
+   * @param {Object} [options]
+   * @param {boolean} [options.restart=false] - The queued transition is a track switch
+   * @param {Function} [options.prepare] - See executeTransition
    */
-  queueTransition(newCode) {
-    // Only keep the most recent queued code (replace if multiple)
+  queueTransition(newCode, { restart = false, prepare } = {}) {
+    // Only keep the most recent queued code (replace if multiple). A track switch that was
+    // queued and then superseded is still a switch away from what is playing, so the
+    // restart flag (and a pending reset) is sticky until the queue is drained.
+    const pending = this.queuedCode !== null;
+    this.queuedRestart = pending ? Boolean(this.queuedRestart || restart) : Boolean(restart);
+    this.queuedPrepare = prepare || (pending ? this.queuedPrepare : null);
     this.queuedCode = newCode;
-    console.log('[SmoothTransitionManager] Transition queued');
+    console.log('[SmoothTransitionManager] Transition queued', { restart: this.queuedRestart });
   }
 
   /**
@@ -248,10 +306,14 @@ export class SmoothTransitionManager {
   async processQueue() {
     if (this.queuedCode !== null) {
       const code = this.queuedCode;
+      const restart = this.queuedRestart;
+      const prepare = this.queuedPrepare || undefined;
       this.queuedCode = null;
+      this.queuedRestart = false;
+      this.queuedPrepare = null;
 
       console.log('[SmoothTransitionManager] Processing queued transition');
-      await this.executeTransition(code);
+      await this.executeTransition(code, { restart, prepare });
     }
   }
 
@@ -358,6 +420,8 @@ export class SmoothTransitionManager {
 
     // Clear any queued transitions
     this.queuedCode = null;
+    this.queuedRestart = false;
+    this.queuedPrepare = null;
 
     // Reset state
     this.isTransitioning = false;

@@ -97,6 +97,7 @@
   "smoothTransitions": "מעברים חלקים בין רצועות",
   "smoothTransitionsDescription": "דהייה בין רצועות בעת מעבר בין רצועות",
   "smoothTransitionFailed": "המעבר החלק נכשל — הרצועה הוחלפה ללא דהייה.",
+  "smoothTransitionNewTrackFailed": "ברצועה החדשה יש שגיאה והיא לא הצליחה להתחיל — הרצועה הקודמת נעצרה.",
   "transitionDuration": "משך המעבר",
   "equalizer": "אקולייזר",
   "equalizerDescription": "התאמת תדרי אודיו",

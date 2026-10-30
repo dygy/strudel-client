@@ -1,5 +1,5 @@
 > **Migrated from** `.kiro/specs/smooth-track-transitions` on 2026-10-08 (Kiro format, not the AWOS template).
-> **Status:** Completed — shipped; open Kiro tasks are tests/polish. **Amended 2026-10-09** (/fix: Update restarted from cycle 0): Req 2.3, 2.4, 3.1, 3.2, 3.4 — hot-swap, never stop. Smooth transitions apply to **switching tracks** only; Update/Ctrl+U on the current track is a pure hot-swap (no fade, no canvas/Hydra cleanup) — see Requirement 0.
+> **Status:** Completed — shipped; open Kiro tasks are tests/polish. **Amended 2026-10-09** (/fix: Update restarted from cycle 0): Req 2.3, 2.4, 3.1, 3.2, 3.4 — hot-swap, never stop. Smooth transitions apply to **switching tracks** only; Update/Ctrl+U on the current track is a pure hot-swap (no fade, no canvas/Hydra cleanup) — see Requirement 0. **Amended 2026-10-30** (/fix: switching tracks gave no fade and kept the old timeline): Req 0.3–0.5, 2.3, 2.4, 3.5 — a *different* track is defined; a switch fades down, restarts at cycle 0 while silent, then fades up.
 
 # Requirements Document
 
@@ -40,6 +40,8 @@ This feature adds configurable smooth volume transitions when users update their
 1. WHEN the user triggers Update on the current track, THE System SHALL hot-swap the new code into the running scheduler, keeping its cycle position and tempo, exactly as Ctrl+Enter does
 2. WHEN the user triggers Update on the current track, THE System SHALL NOT fade the volume, clear draw canvases, or clear Hydra, regardless of the smooth transitions setting
 3. Requirements 2–3 (fade down / fade up) apply only WHEN the user switches to a different track
+4. A *different track* means: something is playing on the main engine AND the track loaded in the editor (picked in the library, a pattern, or shuffle) has a different id from the track that is playing. Picking a track only loads its code; the switch happens on the next Update. Switching steps of a multitrack track, renaming the playing track, or an Update while nothing plays is NOT a switch _(added 2026-10-30)_
+5. WHILE a switch to a track is in progress, further Updates for that same track SHALL be ignored (no second fade or restart); key auto-repeat SHALL NOT trigger Update _(added 2026-10-30)_
 
 ### Requirement 2: Fade Down Current Track
 
@@ -49,8 +51,8 @@ This feature adds configurable smooth volume transitions when users update their
 
 1. WHEN smooth transitions are enabled AND the user triggers an update, THE System SHALL fade the current track volume from its current level to 0
 2. WHEN fading down the current track, THE System SHALL complete the fade within the configured Transition_Duration
-3. WHEN the fade down completes, THE System SHALL swap the new code into the running scheduler (hot-swap) and SHALL NOT stop it — playback keeps its cycle position and tempo. _(Amended 2026-10-09: the original "stop the current track" restarted every Update from cycle 0 and reset cps; see `packages/mixer/test/SmoothTransitionManager.test.mjs`.)_
-4. IF smooth transitions are disabled, THEN THE System SHALL hot-swap the new code instantly without fading
+3. WHEN the fade down of a track switch completes, THE System SHALL restart the scheduler at cycle 0 while the output is at volume 0, then evaluate the new track, so the new track starts from its beginning; the new track's own tempo (`setcps`) applies. An Update on the current track never stops the scheduler (Requirement 0). _(Amended 2026-10-09: hot-swap, never stop — that also stopped real switches from restarting. Amended 2026-10-30: a switch restarts at cycle 0, only at silence; see `website/src/repl/trackSwitch.ts`, `packages/mixer/test/SmoothTransitionManager.test.mjs`.)_
+4. IF smooth transitions are disabled, THEN a track switch SHALL clean up the old track's canvases, restart at cycle 0 and evaluate the new track instantly; an Update on the current track hot-swaps
 
 ### Requirement 3: Fade Up New Track
 
@@ -62,6 +64,7 @@ This feature adds configurable smooth volume transitions when users update their
 2. WHEN the new pattern is in place, THE System SHALL fade its volume from 0 to the Target_Volume
 3. WHEN fading up the new track, THE System SHALL complete the fade within the configured Transition_Duration
 4. IF smooth transitions are disabled, THEN THE System SHALL apply the new pattern instantly at Target_Volume
+5. IF the new track fails to evaluate after the restart, THEN THE System SHALL NOT fade up over silence; it SHALL restore the volume with a short ramp (never a jump) and tell the user the new track has an error and the previous one was stopped _(added 2026-10-30)_
 
 ### Requirement 4: Configurable Transition Duration
 

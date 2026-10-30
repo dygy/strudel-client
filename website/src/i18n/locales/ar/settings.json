@@ -97,6 +97,7 @@
   "smoothTransitions": "انتقالات سلسة بين المقاطع",
   "smoothTransitionsDescription": "تلاشي بين المقاطع عند التبديل بينها",
   "smoothTransitionFailed": "فشل الانتقال السلس — تم تبديل المقطع دون تلاشٍ.",
+  "smoothTransitionNewTrackFailed": "يحتوي المقطع الجديد على خطأ ولم يتمكن من البدء — تم إيقاف المقطع السابق.",
   "transitionDuration": "مدة الانتقال",
   "equalizer": "معادل الصوت",
   "equalizerDescription": "ضبط ترددات الصوت",

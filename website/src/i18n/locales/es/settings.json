@@ -97,6 +97,7 @@
   "smoothTransitions": "Transiciones suaves entre pistas",
   "smoothTransitionsDescription": "Fundido al cambiar de pista",
   "smoothTransitionFailed": "La transición suave falló: se cambió de pista sin fundido.",
+  "smoothTransitionNewTrackFailed": "La nueva pista tiene un error y no pudo iniciarse: la pista anterior se detuvo.",
   "transitionDuration": "Duración de transición",
   "equalizer": "Ecualizador",
   "equalizerDescription": "Ajustar frecuencias de audio",

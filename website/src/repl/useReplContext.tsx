@@ -55,6 +55,7 @@ import {
 import { useAudioRecorder } from './recording/useAudioRecorder';
 import { useScreenRecorder } from './recording/useScreenRecorder';
 import { listenForSmoothTransitionErrors } from './smoothTransitionNotifier';
+import { createTrackSwitchController } from './trackSwitch';
 
 // Type definitions
 interface ReplState {
@@ -96,6 +97,8 @@ interface ReplContext {
   handlePreviewToggle?: () => Promise<void>;
   previewEngine?: PreviewEngine | null;
   smoothTransitionManager?: any;
+  /** The editor now holds track `id` without going through handleUpdate (e.g. same code already loaded). */
+  setEditorTrackId?: (id: string | null | undefined) => void;
   isRecording?: boolean;
   recordingElapsedSeconds?: number;
   handleRecordToggle?: () => void;
@@ -256,6 +259,9 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         if (!playing) {
           console.log('[canvas-cleanup] Pattern stopped, cleaning up canvas elements and resetting CPS');
 
+          // Nothing is playing on the speakers any more.
+          trackSwitch.stopped();
+
           // Reset CPS to default to prevent BPM from carrying over between tracks
           if (editor?.repl?.setCps) {
             editor.repl.setCps(0.5);
@@ -281,6 +287,9 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         const { code } = all;
         //post to iframe parent (like Udels) if it exists...
         (window.parent as any)?.postMessage(code);
+
+        // The main repl now plays this code; its track id was captured when the evaluate started.
+        trackSwitch.evaluated(code);
 
         setLatestCode(code);
         setDocumentTitle(code);
@@ -310,6 +319,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
 
     console.log('[repl] StrudelMirror created:', !!editor, 'root element:', !!containerRef.current);
     setEditorInstance(editor);
+    // Capture the editor's track id whenever an evaluate starts (Play, Ctrl+Enter, Update).
+    trackSwitch.attachEditor(editor);
 
     // Store editor in editorRef for component access
     editorRef.current = editor;
@@ -378,6 +389,11 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   const mixerRef = useRef<PreviewEngine | null>(null);
   const smoothTransitionManagerRef = useRef<any>(null);
   const isSmoothTransitioningRef = useRef<boolean>(false);
+  // Which track the main (speakers) repl is playing, which is in the editor, and whether a
+  // switch is in flight: tells a track switch from an in-place update (see trackSwitch.ts).
+  // One instance for the component's life, because handleUpdate is useCallback([]) and
+  // init's callbacks outlive renders.
+  const [trackSwitch] = useState(createTrackSwitchController);
   const [mixer, setMixer] = useState<PreviewEngine | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
 
@@ -682,6 +698,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         ...patternData,
       };
       setViewingPatternData(fullPatternData);
+      trackSwitch.setEditorTrack(patternData.id);
 
       console.log('[repl] handleUpdate called with code:', patternData.code.substring(0, 50) + '...');
 
@@ -710,22 +727,40 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         console.log('[repl] Skipping setCode, code is the same');
       }
 
-      if (reset) {
-        // Clean up canvas elements before resetting
-        await cleanupCanvasElements();
-
-        if (editorRef.current?.repl) {
-          await resetEditor();
-          await evaluateNewTrack();
-        }
+      if (reset && editorRef.current?.repl) {
+        // Loading a track with reset (PatternsTab, strict file manager). A different track is a
+        // switch: reset the old track's tempo/effects/canvases while silent, start at cycle 0.
+        // The track that is already playing is an in-place hot-swap (no reset, no restart).
+        await runUpdate({ reset: true });
       }
     },
     [],
   );
 
-  // Update / Ctrl+U on the CURRENT track: a pure hot-swap, exactly like Ctrl+Enter in the
-  // editor. No fade, no canvas or Hydra cleanup, no stop — the pattern keeps its cycle
-  // position and tempo. Fades and cleanup belong to switching tracks (evaluateNewTrack).
+  // Update / Ctrl+U and handleUpdate(…, true), via the track-switch controller:
+  // - the CURRENT track (or nothing playing, for Update): a pure hot-swap, exactly like
+  //   Ctrl+Enter. No fade, no canvas or Hydra cleanup, no stop: cycle position and tempo carry on.
+  // - a DIFFERENT track while one is playing: a switch (evaluateNewTrack), fading the old track
+  //   out and starting the new one at cycle 0.
+  // - the same switch again while it is still in flight (double press): ignored.
+  const runUpdate = async ({ reset = false }: { reset?: boolean } = {}): Promise<void> => {
+    const outcome = await trackSwitch.update({
+      reset,
+      isPlaying: Boolean(editorRef.current?.repl?.scheduler?.started),
+      code: editorRef.current?.code,
+      hotSwap: async () => {
+        await editorRef.current?.evaluate?.();
+      },
+      switchTrack: (code, { reset: resetOldTrack }) => {
+        console.log('[repl] Update: track switch', { from: trackSwitch.playingTrackId, to: trackSwitch.editorTrackId });
+        return evaluateNewTrack(code, { restart: true, prepare: resetOldTrack ? resetEditor : undefined });
+      },
+    });
+    if (outcome === 'ignored') {
+      console.log('[repl] Update ignored: already switching to this track');
+    }
+  };
+
   const handleEvaluate = async (): Promise<void> => {
     // If previewing, "Update" means: stop preview, push code to live speakers
     if (isPreviewing && mixerRef.current) {
@@ -733,43 +768,66 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
       setIsPreviewing(false);
       console.log('[Preview] Stopped preview, pushing code to live');
     }
-
-    if (editorRef.current && editorRef.current.evaluate) {
-      await editorRef.current.evaluate();
-    }
+    await runUpdate();
   };
 
-  // Loading a DIFFERENT track (handleUpdate with reset): smooth crossfade when enabled,
-  // otherwise clean up the old track's canvases and evaluate.
-  const evaluateNewTrack = async (): Promise<void> => {
-    // Check if smooth transitions are enabled
+  // Switch to a DIFFERENT track's `code`: smooth crossfade when enabled, otherwise clean up the
+  // old track's canvases and evaluate. With `restart`, playback restarts at cycle 0 — in the
+  // smooth path only once the old track has faded to silence. `prepare` (resetEditor) runs in
+  // the silent phase, after the restart and before evaluate.
+  const evaluateNewTrack = async (
+    code: string,
+    { restart = false, prepare }: { restart?: boolean; prepare?: () => Promise<void> } = {},
+  ): Promise<void> => {
     const manager = smoothTransitionManagerRef.current;
-    const code = editorRef.current?.code;
+    const repl = editorRef.current?.repl;
+    if (!repl) return;
+    // Only stop a running scheduler; stopping an idle one would just re-run onToggle(false).
+    const shouldRestart = restart && Boolean(repl.scheduler?.started);
 
-    if (manager && manager.getSettings().enabled && code) {
-      // Use smooth transition WITHOUT canvas cleanup
-      // Set flag to prevent onToggle from cleaning up canvases
+    if (manager && manager.getSettings().enabled) {
+      // Set flag to prevent onToggle (fired by the restart's repl.stop()) from cleaning up
+      // canvases: the manager's own cleanup runs at the right moment.
       isSmoothTransitioningRef.current = true;
-      console.log('[SmoothTransitionManager] Using smooth transition for track change');
+      console.log('[SmoothTransitionManager] Using smooth transition for track change', { restart: shouldRestart });
       try {
-        await manager.executeTransition(code);
-      } catch (error) {
-        console.error('[SmoothTransitionManager] Transition failed, falling back to instant:', error);
-        // Fallback to instant evaluation with cleanup
-        await cleanupCanvasElements();
-        if (editorRef.current && editorRef.current.evaluate) {
-          editorRef.current.evaluate();
+        await manager.executeTransition(code, { restart: shouldRestart, prepare });
+      } catch (error: any) {
+        if (error?.evaluateFailed) {
+          // The new track has an error: the repl shows it, the manager restored the volume and
+          // raised the transition-error toast. Evaluating it again would only fail again.
+          console.warn('[SmoothTransitionManager] New track failed to evaluate; not retrying');
+        } else {
+          console.error('[SmoothTransitionManager] Transition failed, falling back to instant:', error);
+          // Fallback to instant evaluation with cleanup
+          await cleanupCanvasElements();
+          editorRef.current?.flash?.();
+          repl.evaluate(code);
         }
       } finally {
-        // Clear the flag after transition completes
-        isSmoothTransitioningRef.current = false;
+        // A call that only queued returns while the running transition (which will play the
+        // queued code and may restart) is still going; leave the flag to that call.
+        if (!manager.getSettings().isTransitioning) {
+          isSmoothTransitioningRef.current = false;
+        }
       }
     } else {
-      // Use instant transition (current behavior) - cleanup before evaluation
-      await cleanupCanvasElements();
-      if (editorRef.current && editorRef.current.evaluate) {
-        editorRef.current.evaluate();
+      // Instant switch: restart first (onToggle's own cleanup is skipped; the awaited one
+      // below runs instead), reset, clean up, then evaluate from cycle 0.
+      if (shouldRestart) {
+        isSmoothTransitioningRef.current = true;
+        try {
+          repl.stop();
+        } finally {
+          isSmoothTransitioningRef.current = false;
+        }
       }
+      if (prepare) {
+        await prepare();
+      }
+      await cleanupCanvasElements();
+      editorRef.current?.flash?.();
+      repl.evaluate(code);
     }
   };
 
@@ -781,6 +839,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     logger(`[repl] ✨ loading random tune "${patternData.id}"`);
     setActivePattern(patternData.id);
     setViewingPatternData(patternData);
+    trackSwitch.setEditorTrack(patternData.id);
 
     // Clean up canvas elements before loading new pattern
     await cleanupCanvasElements();
@@ -792,6 +851,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
       editorRef.current.setCode(code);
 
       if (editorRef.current.repl && editorRef.current.repl.evaluate) {
+        trackSwitch.evaluationStarted(code, patternData.id);
         editorRef.current.repl.evaluate(code);
       }
     }
@@ -850,6 +910,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         case 'u':
           // Ctrl+U for update/evaluate
           event.preventDefault();
+          // A held Ctrl+U auto-repeats: one Update per press, never a burst of switches.
+          if (event.repeat) break;
           handleEvaluate();
           break;
         case 'p':
@@ -893,6 +955,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     handlePreviewToggle,
     previewEngine: mixer,
     smoothTransitionManager: smoothTransitionManagerRef.current,
+    setEditorTrackId: trackSwitch.setEditorTrack,
     isRecording: audioRecorder.isRecording,
     recordingElapsedSeconds: audioRecorder.elapsedSeconds,
     handleRecordToggle: audioRecorder.handleRecordToggle,

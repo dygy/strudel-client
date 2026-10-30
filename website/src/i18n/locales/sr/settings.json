@@ -97,6 +97,7 @@
   "smoothTransitions": "Глатки прелази између нумера",
   "smoothTransitionsDescription": "Постепено прелажење при промени нумере",
   "smoothTransitionFailed": "Постепени прелаз није успео — нумера је промењена без прелаза.",
+  "smoothTransitionNewTrackFailed": "Нова нумера има грешку и није могла да почне — претходна нумера је заустављена.",
   "transitionDuration": "Трајање прелаза",
   "equalizer": "Еквилајзер",
   "equalizerDescription": "Подешавање аудио фреквенција",

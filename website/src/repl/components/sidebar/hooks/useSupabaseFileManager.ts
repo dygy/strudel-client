@@ -169,6 +169,7 @@ interface ReplContext {
   activeCode?: string;
   editorRef?: React.RefObject<{ code: string; setCode?: (code: string) => void }>;
   handleUpdate: (update: { id?: string; code: string; [key: string]: any }, replace?: boolean) => void;
+  setEditorTrackId?: (id: string | null | undefined) => void;
   trackRouter?: any;
 }
 
@@ -578,6 +579,8 @@ export function useSupabaseFileManager(
         context.handleUpdate({ id: track.id, code: track.code }, false);
       } else {
         console.log('SupabaseFileManager - skipping handleUpdate, code is the same');
+        // Still record which track the editor holds, so Update can tell a switch from an edit.
+        context.setEditorTrackId?.(track.id);
       }
 
       // DIRECT APPROACH: Set code directly in editor without triggering re-renders

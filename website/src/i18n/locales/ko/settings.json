@@ -97,6 +97,7 @@
   "smoothTransitions": "부드러운 트랙 전환",
   "smoothTransitionsDescription": "트랙 전환 시 페이드",
   "smoothTransitionFailed": "부드러운 전환에 실패했습니다 — 페이드 없이 트랙을 전환했습니다.",
+  "smoothTransitionNewTrackFailed": "새 트랙에 오류가 있어 시작할 수 없습니다 — 이전 트랙이 정지되었습니다.",
   "transitionDuration": "전환 시간",
   "equalizer": "이퀄라이저",
   "equalizerDescription": "오디오 주파수 조정",

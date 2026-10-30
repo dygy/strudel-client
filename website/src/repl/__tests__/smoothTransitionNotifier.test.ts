@@ -61,6 +61,58 @@ describe('a failed smooth track transition is shown to the user', () => {
     );
   });
 
+  it('a new track whose code fails says so (the old track was stopped), not "switched without a fade"', () => {
+    const { warn, translate } = listen();
+
+    window.dispatchEvent(
+      new CustomEvent(SMOOTH_TRANSITION_ERROR_EVENT, {
+        detail: { error: 'The new track failed to evaluate', evaluateFailed: true },
+      }),
+    );
+
+    expect(translate).toHaveBeenCalledWith('settings:smoothTransitionNewTrackFailed');
+    expect(translate).not.toHaveBeenCalledWith('settings:smoothTransitionFailed');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      't(settings:smoothTransitionNewTrackFailed)',
+      undefined,
+      undefined,
+      'smooth-transition-new-track-error',
+    );
+  });
+
+  it('end to end: a restarted track that fails to evaluate raises the new-track message', async () => {
+    vi.useFakeTimers();
+    try {
+      const { translate } = listen();
+      const gain = {
+        value: 1,
+        cancelScheduledValues: vi.fn(),
+        setValueAtTime: vi.fn(),
+        linearRampToValueAtTime: vi.fn(),
+      };
+      // Like the real repl: stop() stops the scheduler; a broken evaluate resolves without starting it.
+      const scheduler = { started: true };
+      const repl = { scheduler, stop: vi.fn(() => (scheduler.started = false)), evaluate: vi.fn(async () => {}) };
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const manager = new SmoothTransitionManager({ currentTime: 0, state: 'running' }, repl, {
+        destinationGain: { gain },
+        enabled: true,
+        duration: 0.5,
+      });
+
+      const transition = manager.executeTransition('s("bd").nope()', { restart: true }).catch((e) => e);
+      await vi.advanceTimersByTimeAsync(5000);
+      const err = await transition;
+
+      expect(err.evaluateFailed).toBe(true);
+      expect(translate).toHaveBeenCalledWith('settings:smoothTransitionNewTrackFailed');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows nothing when no transition fails, and nothing after it stops listening', () => {
     const { warn } = listen();
 
@@ -100,7 +152,9 @@ describe('a failed smooth track transition is shown to the user', () => {
       await vi.advanceTimersByTimeAsync(5000);
       await outcome;
 
-      expect(gain.setValueAtTime).toHaveBeenLastCalledWith(1, 0);
+      // Restored by a short ramp from the current level, never a one-step jump to full.
+      expect(gain.setValueAtTime).not.toHaveBeenCalledWith(1, expect.anything());
+      expect(gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, expect.any(Number));
       expect(repl.evaluate).not.toHaveBeenCalled();
       expect(warn).toHaveBeenCalledTimes(1);
     } finally {
@@ -115,6 +169,9 @@ describe('locales', () => {
 
     expect(typeof settings.smoothTransitionFailed).toBe('string');
     expect(settings.smoothTransitionFailed.length).toBeGreaterThan(0);
+    expect(typeof settings.smoothTransitionNewTrackFailed).toBe('string');
+    expect(settings.smoothTransitionNewTrackFailed.length).toBeGreaterThan(0);
+    expect(settings.smoothTransitionNewTrackFailed).not.toBe(settings.smoothTransitionFailed);
     expect(settings.smoothTransitionsDescription).toBeTruthy();
     expect(settings.smoothTransitionsDescription).not.toBe(OLD_DESCRIPTIONS[locale]);
   });

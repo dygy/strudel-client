@@ -97,6 +97,7 @@
   "smoothTransitions": "Плавные переходы между треками",
   "smoothTransitionsDescription": "Затухание при переключении между треками",
   "smoothTransitionFailed": "Плавный переход не удался — трек переключён без затухания.",
+  "smoothTransitionNewTrackFailed": "В новом треке ошибка, и он не запустился — предыдущий трек остановлен.",
   "transitionDuration": "Длительность перехода",
   "equalizer": "Эквалайзер",
   "equalizerDescription": "Настройка частот аудио",
