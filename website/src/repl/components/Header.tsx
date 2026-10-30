@@ -7,12 +7,21 @@ import { useSettings } from '../../settings';
 import { usePanelLayout } from './panel/panelLayout';
 import { AuthButton } from '../../components/auth/AuthButton';
 import { formatElapsedTime } from '../recording/formatUtils';
+import {
+  activeRecordingSeconds,
+  isAnyRecording as anyRecording,
+  isAudioRecordDisabled,
+  isScreenRecordDisabled,
+  toggleAudioRecording,
+  toggleScreenRecording,
+} from './recordActions';
+import { CompactTitleBar } from './compact/CompactTitleBar';
 import '../Repl.css';
 
 const { BASE_URL } = import.meta.env;
 const baseNoTrailing = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
 
-interface ReplContext {
+export interface ReplContext {
   started?: boolean;
   pending?: boolean;
   isDirty?: boolean;
@@ -36,6 +45,8 @@ interface ReplContext {
 interface HeaderProps {
   context: ReplContext;
   embedded?: boolean;
+  /** The open track's name, shown by the compact title bar (spec 016). */
+  trackName?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -130,15 +141,12 @@ function RecordPopover({
     >
       {/* Audio recording */}
       <button
-        onClick={() => {
-          context.handleRecordToggle?.();
-          if (!context.isRecording) onClose();
-        }}
-        disabled={context.isScreenRecording}
+        onClick={() => toggleAudioRecording(context, onClose)}
+        disabled={isAudioRecordDisabled(context)}
         className={cx(
           'w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground',
           'transition-all duration-150',
-          context.isScreenRecording ? 'opacity-30 cursor-not-allowed' : 'hover:bg-lineHighlight cursor-pointer',
+          isAudioRecordDisabled(context) ? 'opacity-30 cursor-not-allowed' : 'hover:bg-lineHighlight cursor-pointer',
           context.isRecording && 'bg-red-500 bg-opacity-10',
         )}
       >
@@ -158,17 +166,12 @@ function RecordPopover({
 
       {/* Screen recording */}
       <button
-        onClick={() => {
-          context.handleScreenRecordToggle?.();
-          if (!context.isScreenRecording) onClose();
-        }}
-        disabled={context.isRecording || !context.isScreenRecordingSupported}
+        onClick={() => toggleScreenRecording(context, onClose)}
+        disabled={isScreenRecordDisabled(context)}
         className={cx(
           'w-full flex items-center gap-3 px-4 py-3 text-sm text-foreground',
           'transition-all duration-150',
-          context.isRecording || !context.isScreenRecordingSupported
-            ? 'opacity-30 cursor-not-allowed'
-            : 'hover:bg-lineHighlight cursor-pointer',
+          isScreenRecordDisabled(context) ? 'opacity-30 cursor-not-allowed' : 'hover:bg-lineHighlight cursor-pointer',
           context.isScreenRecording && 'bg-red-500 bg-opacity-10',
         )}
       >
@@ -189,23 +192,25 @@ function RecordPopover({
 /* ------------------------------------------------------------------ */
 /*  Main Header                                                       */
 /* ------------------------------------------------------------------ */
-export function Header({ context, embedded }: HeaderProps) {
+export function Header({ context, embedded, trackName }: HeaderProps) {
   const { isZen } = useSettings();
   // On phones the file sidebar and the panel sheet are mutually exclusive (session-only hides).
-  const { filesOpen: isFileManagerOpen, toggleFileManager } = usePanelLayout();
+  const { filesOpen: isFileManagerOpen, toggleFileManager, compact } = usePanelLayout();
   const [recordPopoverOpen, setRecordPopoverOpen] = useState(false);
   const recordBtnRef = useRef<HTMLButtonElement>(null);
 
-  const isAnyRecording = context.isRecording || context.isScreenRecording;
-  const recordingSeconds = context.isRecording
-    ? (context.recordingElapsedSeconds ?? 0)
-    : (context.screenRecordingElapsedSeconds ?? 0);
+  const isAnyRecording = anyRecording(context);
+  const recordingSeconds = activeRecordingSeconds(context);
 
   useEffect(() => {
     if (!isAnyRecording) setRecordPopoverOpen(false);
   }, [isAnyRecording]);
 
   if (isZen) return null;
+
+  // Phones and upright tablets: a thin title bar; the main controls live in the bottom bar.
+  // The /embed REPL keeps the desktop header (out of scope for spec 016).
+  if (compact && !embedded) return <CompactTitleBar context={context} trackName={trackName} />;
 
   return (
     <header

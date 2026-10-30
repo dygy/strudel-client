@@ -4,15 +4,21 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  CONTROL_BAR_HEIGHT,
+  CONTROL_BAR_HEIGHT_SHORT,
+  COMPACT_LANDSCAPE_MAX_HEIGHT,
   INITIAL_PANEL_SESSION,
   clampPanelWidth,
   effectivePanelLayout,
   isCompactViewport,
+  isEditableElement,
+  nextStableSize,
   overridesAfterClosePanel,
   overridesAfterCloseFiles,
   overridesAfterLoad,
   overridesAfterOpenFiles,
   overridesAfterOpenPanel,
+  overridesAfterSelectTrack,
   readPanelViewport,
   resolvePanelTrigger,
   type PanelTrigger,
@@ -111,6 +117,98 @@ describe('session-only panel overrides', () => {
     const both = persisted(true, true);
     const o = overridesAfterOpenFiles(overridesAfterOpenPanel(INITIAL_PANEL_SESSION, false), false);
     expect(effectivePanelLayout(both, o, false)).toEqual({ panelOpen: true, filesOpen: true });
+  });
+});
+
+// @spec: 016-responsive-repl-layout (2.2: the library is a drawer, closed on a compact load)
+describe('library drawer session overrides', () => {
+  const persisted = (isFileManagerOpen: boolean) => ({ isPanelOpen: false, isFileManagerOpen });
+
+  it('hides a persisted-open library on a compact load without touching the persisted value', () => {
+    const o = overridesAfterLoad(INITIAL_PANEL_SESSION, { compact: true, isPanelOpen: false, isFileManagerOpen: true });
+    expect(o.filesHidden).toBe(true);
+    expect(effectivePanelLayout(persisted(true), o, true).filesOpen).toBe(false);
+    // the hide is session-only: a wide screen still shows the persisted choice
+    expect(effectivePanelLayout(persisted(true), o, false).filesOpen).toBe(true);
+  });
+
+  it('leaves the library alone on a desktop load', () => {
+    const o = overridesAfterLoad(INITIAL_PANEL_SESSION, {
+      compact: false,
+      isPanelOpen: false,
+      isFileManagerOpen: true,
+    });
+    expect(o.filesHidden).toBe(false);
+    expect(effectivePanelLayout(persisted(true), o, false).filesOpen).toBe(true);
+  });
+
+  it('picking a track closes the drawer on a compact screen only', () => {
+    const opened = overridesAfterOpenFiles(INITIAL_PANEL_SESSION, true);
+    const picked = overridesAfterSelectTrack(opened, true);
+    expect(effectivePanelLayout(persisted(true), picked, true).filesOpen).toBe(false);
+    expect(overridesAfterSelectTrack(opened, false)).toBe(opened);
+  });
+
+  it('the drawer reopens after a track pick', () => {
+    const picked = overridesAfterSelectTrack(INITIAL_PANEL_SESSION, true);
+    expect(effectivePanelLayout(persisted(true), overridesAfterOpenFiles(picked, true), true).filesOpen).toBe(true);
+  });
+
+  it('exports the 56px control bar height', () => {
+    expect(CONTROL_BAR_HEIGHT).toBe(56);
+  });
+
+  it('on a phone held sideways (844x390) the 44px title bar plus the bar take at most 25%', () => {
+    expect(isCompactViewport({ width: 844, height: 390 })).toBe(true);
+    expect(390).toBeLessThan(COMPACT_LANDSCAPE_MAX_HEIGHT);
+    expect(44 + CONTROL_BAR_HEIGHT_SHORT).toBeLessThanOrEqual(390 * 0.25);
+    expect(CONTROL_BAR_HEIGHT_SHORT).toBeGreaterThanOrEqual(44); // still fits the 44px buttons
+  });
+});
+
+// @spec: 016-responsive-repl-layout (review #1: the on-screen keyboard never changes the layout)
+describe('nextStableSize', () => {
+  const tabletPortrait = { width: 820, height: 1180 };
+  const keyboardOpen = { width: 820, height: 700 }; // 480px keyboard; 700 < 820 is no longer portrait
+
+  it('keeps the last size when only the height shrinks while typing', () => {
+    expect(isCompactViewport(keyboardOpen)).toBe(false); // what the raw size would say
+    const kept = nextStableSize(tabletPortrait, keyboardOpen, true);
+    expect(kept).toBe(tabletPortrait);
+    expect(isCompactViewport(kept)).toBe(true);
+  });
+
+  it('takes the new size when nothing editable has focus (a desktop window made shorter)', () => {
+    expect(nextStableSize(tabletPortrait, keyboardOpen, false)).toEqual(keyboardOpen);
+  });
+
+  it('takes a real rotation (the width changes) even while typing', () => {
+    const landscape = { width: 1180, height: 820 };
+    expect(nextStableSize(tabletPortrait, landscape, true)).toEqual(landscape);
+  });
+
+  it('takes the height back when the keyboard closes', () => {
+    expect(nextStableSize(keyboardOpen, tabletPortrait, true)).toEqual(tabletPortrait);
+  });
+
+  it('takes the first measurement as it is', () => {
+    expect(nextStableSize(null, keyboardOpen, true)).toEqual(keyboardOpen);
+  });
+});
+
+describe('isEditableElement', () => {
+  it('recognises what opens the keyboard', () => {
+    const fake = (tagName: string, props: Record<string, unknown> = {}) =>
+      ({ tagName, isContentEditable: false, readOnly: false, type: 'text', ...props }) as unknown as Element;
+    expect(isEditableElement(fake('INPUT'))).toBe(true);
+    expect(isEditableElement(fake('INPUT', { type: 'search' }))).toBe(true);
+    expect(isEditableElement(fake('TEXTAREA'))).toBe(true);
+    expect(isEditableElement(fake('DIV', { isContentEditable: true }))).toBe(true); // CodeMirror
+    expect(isEditableElement(fake('INPUT', { type: 'range' }))).toBe(false);
+    expect(isEditableElement(fake('INPUT', { type: 'checkbox' }))).toBe(false);
+    expect(isEditableElement(fake('INPUT', { readOnly: true }))).toBe(false);
+    expect(isEditableElement(fake('BUTTON'))).toBe(false);
+    expect(isEditableElement(null)).toBe(false);
   });
 });
 

@@ -3,11 +3,22 @@ import '../styles/index.css';
 
 const { BASE_URL } = import.meta.env;
 const baseNoTrailing = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL;
+
+interface Props {
+  /**
+   * Spec 016: let the page draw under the notch and home indicator (`viewport-fit=cover`). Only
+   * for pages that pad themselves with env(safe-area-inset-*), i.e. the REPL's compact bars; the
+   * other pages keep the default, so their content never slides under the notch in landscape.
+   */
+  safeAreaCover?: boolean;
+}
+const { safeAreaCover = false } = Astro.props;
+const viewport = `width=device-width, initial-scale=1, interactive-widget=resizes-content${safeAreaCover ? ', viewport-fit=cover' : ''}`;
 ---
 
 <!-- Global Metadata -->
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width" />
+<meta name="viewport" content={viewport} />
 <meta name="generator" content={Astro.generator} />
 <link rel="alternate" type="application/rss+xml" title={`RSS Feed for strudel.cc`} href="/rss.xml" />
 <link rel="icon" type="image/svg+xml" href={`${baseNoTrailing}/favicon.ico`} />
@@ -64,11 +75,22 @@ const baseNoTrailing = BASE_URL.endsWith('/') ? BASE_URL.slice(0, -1) : BASE_URL
     });
 
     // https://medium.com/quick-code/100vh-problem-with-ios-safari-92ab23c852a8
+    // Spec 016: follow the visual viewport, so with the on-screen keyboard open the REPL (and its
+    // bottom control bar) ends right above the keyboard. iOS Safari ignores the viewport meta's
+    // interactive-widget, and only the visual viewport shrinks there. A pinch zoom shrinks it
+    // too, so it is scaled back: zooming never changes the layout. Smaller gaps (a desktop
+    // scrollbar) are ignored, so without a keyboard this is innerHeight, as before.
+    const KEYBOARD_MIN_HEIGHT = 120;
     const appHeight = () => {
       const doc = document.documentElement;
-      doc.style.setProperty('--app-height', `${window.innerHeight - 1}px`);
+      const vv = window.visualViewport;
+      const visible = vv ? Math.round(vv.height * vv.scale) : window.innerHeight;
+      const height = window.innerHeight - visible >= KEYBOARD_MIN_HEIGHT ? visible : window.innerHeight;
+      doc.style.setProperty('--app-height', `${height - 1}px`);
     };
     window.addEventListener('resize', appHeight);
+    window.visualViewport?.addEventListener('resize', appHeight, { passive: true });
+    window.visualViewport?.addEventListener('scroll', appHeight, { passive: true });
     appHeight();
   }
 </script>

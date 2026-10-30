@@ -26,6 +26,17 @@
   "docs": "DOCS",
   "toggleFileManager": "Пребаци менаџер фајлова",
   "clickAuthButtonToSignIn": "Кликните на дугме за пријаву у горњем десном углу да бисте почели",
+  "more": "Још",
+  "library": "Библиотека",
+  "openLibrary": "Отвори библиотеку",
+  "closeLibrary": "Затвори библиотеку",
+  "settings": "Подешавања",
+  "recordAudio": "Сними звук",
+  "recordScreen": "Сними екран",
+  "share": "Подели",
+  "preview": "Преслушавање на слушалицама",
+  "eqBand": "Опсег {{n}}",
+  "gain": "Појачање",
   "reference": {
     "search": "Претражи функције...",
     "noResults": "Нема резултата"

@@ -26,6 +26,17 @@
   "docs": "DOCS",
   "toggleFileManager": "تبديل مدير الملفات",
   "clickAuthButtonToSignIn": "انقر على زر تسجيل الدخول في الأعلى للبدء",
+  "more": "المزيد",
+  "library": "المكتبة",
+  "openLibrary": "فتح المكتبة",
+  "closeLibrary": "إغلاق المكتبة",
+  "settings": "الإعدادات",
+  "recordAudio": "تسجيل الصوت",
+  "recordScreen": "تسجيل الشاشة",
+  "share": "مشاركة",
+  "preview": "معاينة على سماعات الرأس",
+  "eqBand": "النطاق {{n}}",
+  "gain": "الكسب",
   "reference": {
     "search": "البحث عن الوظائف...",
     "noResults": "لم يتم العثور على نتائج"

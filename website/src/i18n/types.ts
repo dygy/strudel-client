@@ -21,6 +21,22 @@ export interface CommonTranslations {
   files: string;
   docs: string;
   toggleFileManager: string;
+  // Compact (phone/tablet) layout, spec 016
+  more: string;
+  library: string;
+  openLibrary: string;
+  closeLibrary: string;
+  settings: string;
+  recordAudio: string;
+  recordScreen: string;
+  stopRecording: string;
+  share: string;
+  preview: string;
+  playPreview: string;
+  stopPreview: string;
+  /** "Band {{n}}" */
+  eqBand: string;
+  gain: string;
 }
 
 export interface FilesTranslations {

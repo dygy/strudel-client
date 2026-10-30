@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from '@src/i18n';
 import { getAudioDevices } from '@strudel/webaudio';
 import { EqualizerUI } from './EqualizerUI';
+import { usePanelViewport } from './panelViewport';
 
 const PREVIEW_DEVICE_KEY = 'strudel-preview-device';
 
@@ -13,6 +14,7 @@ interface MixerSettingsProps {
 
 export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManager }: MixerSettingsProps) {
   const { t } = useTranslation('settings');
+  const { compact } = usePanelViewport();
   const [devices, setDevices] = useState<Map<string, string>>(new Map());
   const [previewDeviceId, setPreviewDeviceId] = useState<string>('');
   const [devicesLoaded, setDevicesLoaded] = useState(false);
@@ -157,7 +159,9 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-foreground">{t('smoothTransitions')}</label>
-              <label className="relative inline-flex items-center cursor-pointer">
+              <label
+                className={`relative inline-flex items-center cursor-pointer${compact ? ' min-h-11 min-w-11 justify-center' : ''}`}
+              >
                 <input
                   type="checkbox"
                   className="sr-only peer"
@@ -185,7 +189,12 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
                 value={transitionDuration}
                 onChange={(e) => handleTransitionDurationChange(parseFloat(e.target.value))}
                 disabled={isDisabled}
-                className="w-full h-2 bg-lineHighlight rounded-lg appearance-none cursor-pointer accent-foreground"
+                aria-label={compact ? t('transitionDuration') : undefined}
+                className={
+                  compact
+                    ? 'w-full h-11 bg-transparent cursor-pointer accent-foreground touch-none'
+                    : 'w-full h-2 bg-lineHighlight rounded-lg appearance-none cursor-pointer accent-foreground'
+                }
               />
               <div className="flex justify-between text-xs text-foreground opacity-50 mt-1">
                 <span>0.5s</span>
@@ -199,7 +208,9 @@ export function MixerSettings({ mixer, isDisabled = false, smoothTransitionManag
       <div>
         <label className="block text-sm font-medium text-foreground mb-2">{t('mixerPreviewDevice')}</label>
         <select
-          className="w-full px-4 py-3 bg-background border border-lineHighlight rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-foreground focus:border-transparent transition-all duration-200 appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`w-full px-4 py-3 bg-background border border-lineHighlight rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-foreground focus:border-transparent transition-all duration-200 appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed${
+            compact ? ' min-h-11' : ''
+          }`}
           value={previewDeviceId}
           onClick={handleDropdownClick}
           onChange={(e) => handlePreviewDeviceChange(e.target.value)}

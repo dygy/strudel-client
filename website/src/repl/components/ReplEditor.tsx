@@ -2,14 +2,17 @@ import Loader from '@src/repl/components/Loader';
 import { ExportDialog } from './ExportDialog';
 import { getAudioContext } from '@strudel/webaudio';
 import { HorizontalPanel, VerticalPanel } from '@src/repl/components/panel/Panel';
-import { usePanelLayout } from '@src/repl/components/panel/panelLayout';
+import { closeFileManagerAfterSelect, usePanelLayout } from '@src/repl/components/panel/panelLayout';
 import { Code } from '@src/repl/components/Code';
 import UserFacingErrorMessage from '@src/repl/components/UserFacingErrorMessage';
 import { Header } from './Header';
 import { useSettings } from '@src/settings';
+import cx from '@src/cx';
 import { ResizableSidebar } from './sidebar/ResizableSidebar';
 import { FileManagerRefactored as FileManager } from './sidebar/FileManagerRefactored';
 import { WelcomeScreen } from './WelcomeScreen';
+import { LibraryDrawer } from './compact/LibraryDrawer';
+import { CompactControlBar } from './compact/CompactControlBar';
 import { userPattern } from '@src/user_pattern_utils';
 import { useTracks } from '@src/hooks/useTracks';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
@@ -55,7 +58,11 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
   const { containerRef, editorRef, error, init, pending } = context;
   const settings = useSettings();
   const { panelPosition, isZen } = settings;
-  const { filesOpen: isFileManagerOpen } = usePanelLayout();
+  const { filesOpen: isFileManagerOpen, compact, panelOpen } = usePanelLayout();
+  // Spec 016: on a compact screen the closed panel strip gives its width back to the code (the
+  // control bar's Settings button opens the sheet instead).
+  const showPanel = !compact || panelOpen;
+  const closeDrawer = () => closeFileManagerAfterSelect(true);
 
   // Use the tracks store instead of complex state management
   const tracks = useTracks();
@@ -394,12 +401,33 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
   }, [context, fileManagerHook]);
 
   return (
-    <div className="h-full flex flex-col relative" {...editorProps}>
+    <div
+      className={cx(
+        'h-full flex flex-col relative',
+        // Spec 016 review #5: on a phone held sideways, keep the bars and the code out of the notch.
+        // env() is 0 without a notch (and on every desktop), and the class is absent when wide.
+        compact && 'pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]',
+      )}
+      {...editorProps}
+    >
       <Loader active={pending} />
-      <Header context={context} />
+      <Header context={context} trackName={currentTrackName(fileManagerHook)} />
 
       <div className="grow flex relative overflow-hidden">
-        {!isZen && (
+        {/* Spec 016: compact drawer slot, desktop sidebar slot, then the editor. Each slot keeps its
+            position whether it renders or not, so a layout switch (rotation, resize) never
+            remounts the editor (#code); only the library moves between drawer and sidebar. */}
+        {!isZen && compact && (
+          <LibraryDrawer open={isFileManagerOpen} onClose={closeDrawer}>
+            <FileManager
+              context={context}
+              fileManagerHook={fileManagerHook}
+              readOnly={readOnly}
+              onAfterTrackSelect={closeDrawer}
+            />
+          </LibraryDrawer>
+        )}
+        {!isZen && !compact && (
           <div
             className="flex-shrink-0 overflow-hidden"
             style={{
@@ -419,10 +447,11 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
             <Code key={codeComponentKey} containerRef={containerRef} editorRef={editorRef} init={init} />
           </div>
         )}
-        {!isZen && panelPosition === 'right' && <VerticalPanel context={context} />}
+        {!isZen && panelPosition === 'right' && showPanel && <VerticalPanel context={context} />}
       </div>
       <UserFacingErrorMessage error={error} />
-      {!isZen && panelPosition === 'bottom' && <HorizontalPanel context={context} />}
+      {!isZen && panelPosition === 'bottom' && showPanel && <HorizontalPanel context={context} />}
+      {!isZen && compact && <CompactControlBar context={context} />}
 
       {/* Global Toast Container */}
       <GlobalToastContainer />
@@ -440,6 +469,16 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
       )}
     </div>
   );
+}
+
+/** The open track's name for the compact title bar, from the Supabase file manager hook. */
+function currentTrackName(fileManagerHook: unknown): string | undefined {
+  if (!fileManagerHook || typeof fileManagerHook !== 'object') return undefined;
+  const { selectedTrack, tracks } = fileManagerHook as {
+    selectedTrack?: string | null;
+    tracks?: Record<string, { name?: string } | undefined>;
+  };
+  return selectedTrack ? tracks?.[selectedTrack]?.name : undefined;
 }
 
 export default memo(ReplEditor);

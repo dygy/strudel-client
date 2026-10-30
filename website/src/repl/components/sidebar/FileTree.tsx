@@ -15,6 +15,7 @@ import { useTranslation } from '@src/i18n';
 import { WorkingContextMenu } from '../ui/WorkingContextMenu';
 import { BurgerMenuButton } from '../ui/BurgerMenuButton';
 import { tooltipActions } from '@src/stores/tooltipStore';
+import { usePanelViewport } from '../panel/panelViewport';
 
 interface ContextMenuItem {
   label: string;
@@ -71,7 +72,13 @@ interface FileTreeProps {
   folders: Record<string, Folder>;
   selectedTrack: string | null; // Track opened for editing
   activePattern: string; // Track currently playing
-  onTrackSelect: (track: Track) => void;
+  /** May be async: the file manager saves the current track before it switches. */
+  onTrackSelect: (track: Track) => void | Promise<void>;
+  /**
+   * After a pick that doesn't expand a multitrack has finished (save-before-switch included):
+   * the compact drawer closes. Not called when the pick fails, so the drawer stays open.
+   */
+  onAfterTrackSelect?: () => void;
   onTrackRename?: (trackId: string) => void;
   onTrackDelete?: (trackId: string) => void;
   onTrackDuplicate?: (track: Track) => void;
@@ -108,6 +115,7 @@ export function FileTree({
   selectedTrack,
   activePattern,
   onTrackSelect,
+  onAfterTrackSelect,
   onTrackRename,
   onTrackDelete,
   onTrackDuplicate,
@@ -141,6 +149,24 @@ export function FileTree({
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['root'])); // Root is expanded by default
   const [draggedItem, setDraggedItem] = useState<{ id: string; type: 'track' | 'folder' } | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+
+  /** Select a track, then (only once that resolved) let the compact drawer close. */
+  const pickTrack = (track: Track) => {
+    const keepOpen = (error: unknown) =>
+      console.warn('FileTree - track select failed, keeping the library open:', error);
+    let selecting: void | Promise<void>;
+    try {
+      selecting = onTrackSelect(track); // called synchronously, exactly as before
+    } catch (error: unknown) {
+      keepOpen(error);
+      return;
+    }
+    Promise.resolve(selecting).then(() => onAfterTrackSelect?.(), keepOpen);
+  };
+  // Spec 016 review #3: on touch a long press would start a native drag (pointercancel) instead of
+  // opening the row menu, and touch drag-and-drop isn't supported anyway. Desktop drag is unchanged.
+  const { compact, canHover } = usePanelViewport();
+  const touchUi = compact || !canHover;
 
   // Auto-expand parent directories when a track is selected
   React.useEffect(() => {
@@ -435,7 +461,7 @@ export function FileTree({
       {
         label: t('files:load'),
         icon: <DocumentIcon className="w-4 h-4" />,
-        onClick: () => onTrackSelect(track),
+        onClick: () => pickTrack(track),
       },
     ];
 
@@ -673,7 +699,7 @@ export function FileTree({
               dragOverTarget === node.id ? 'bg-blue-600/30 border-2 border-blue-400 border-dashed' : ''
             }`}
             style={{ paddingLeft: `${depth * 16 + 8}px` }}
-            draggable={!isRenaming && !readOnly}
+            draggable={!isRenaming && !readOnly && !touchUi}
             onDragStart={(e) => handleDragStart(e, node)}
             onDragOver={(e) => handleDragOver(e, node)}
             onDragLeave={handleDragLeave}
@@ -686,10 +712,14 @@ export function FileTree({
               if (node.type === 'folder') {
                 toggleFolder(node.id); // Use node ID instead of path
               } else if (node.type === 'track' && !isRenaming) {
-                if ((node.data as Track).isMultitrack && hasSteps) {
+                const expands = !!((node.data as Track).isMultitrack && hasSteps);
+                if (expands) {
                   toggleFolder(node.id); // Use track ID for multitrack expansion
                 }
-                onTrackSelect(node.data as Track);
+                // Expanding a multitrack keeps the drawer open so a step can be picked; any other
+                // pick closes it once onTrackSelect (which awaits save-before-switch) resolved.
+                if (expands) onTrackSelect(node.data as Track);
+                else pickTrack(node.data as Track);
               }
             }}
             onMouseDown={(e) => {

@@ -26,6 +26,17 @@
   "docs": "DOCS",
   "toggleFileManager": "Toggle file manager",
   "clickAuthButtonToSignIn": "Click the sign in button in the top right to get started",
+  "more": "More",
+  "library": "Library",
+  "openLibrary": "Open library",
+  "closeLibrary": "Close library",
+  "settings": "Settings",
+  "recordAudio": "Record audio",
+  "recordScreen": "Record screen",
+  "share": "Share",
+  "preview": "Preview on headphones",
+  "eqBand": "Band {{n}}",
+  "gain": "Gain",
   "reference": {
     "search": "Search functions...",
     "noResults": "No results found"

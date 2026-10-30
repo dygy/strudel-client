@@ -10,6 +10,16 @@ interface CodeProps {
 export const Code = React.memo(function Code({ editorRef, containerRef, init }: CodeProps) {
   // Use a ref to track if we've already initialized
   const hasInitialized = useRef(false);
+  // The post-init check below; cleared on unmount so it never runs after the editor is gone
+  // (in tests it used to fire after jsdom's teardown: "window is not defined").
+  const readyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (readyTimer.current !== null) clearTimeout(readyTimer.current);
+      readyTimer.current = null;
+    },
+    [],
+  );
 
   // Memoize the ref callback to prevent recreation on every render
   const refCallback = useCallback((el: HTMLElement | null) => {
@@ -21,7 +31,8 @@ export const Code = React.memo(function Code({ editorRef, containerRef, init }: 
       init();
 
       // CRITICAL: After initialization, check if there's code that needs to be loaded
-      setTimeout(() => {
+      readyTimer.current = setTimeout(() => {
+        readyTimer.current = null;
         // Check if there's a track that should be loaded
         const activePattern = (window as any).getActivePattern?.();
         if (activePattern) {

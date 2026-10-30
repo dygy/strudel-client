@@ -26,6 +26,17 @@
   "docs": "文档",
   "toggleFileManager": "切换文件管理器",
   "clickAuthButtonToSignIn": "点击右上角的登录按钮开始使用",
+  "more": "更多",
+  "library": "曲库",
+  "openLibrary": "打开曲库",
+  "closeLibrary": "关闭曲库",
+  "settings": "设置",
+  "recordAudio": "录制音频",
+  "recordScreen": "录制屏幕",
+  "share": "分享",
+  "preview": "耳机预听",
+  "eqBand": "频段 {{n}}",
+  "gain": "增益",
   "reference": {
     "search": "搜索函数...",
     "noResults": "未找到结果"

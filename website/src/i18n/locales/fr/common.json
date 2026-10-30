@@ -26,6 +26,17 @@
   "docs": "DOCS",
   "toggleFileManager": "Basculer le gestionnaire de fichiers",
   "clickAuthButtonToSignIn": "Cliquez sur le bouton de connexion en haut à droite pour commencer",
+  "more": "Plus",
+  "library": "Bibliothèque",
+  "openLibrary": "Ouvrir la bibliothèque",
+  "closeLibrary": "Fermer la bibliothèque",
+  "settings": "Réglages",
+  "recordAudio": "Enregistrer l'audio",
+  "recordScreen": "Enregistrer l'écran",
+  "share": "Partager",
+  "preview": "Pré-écoute au casque",
+  "eqBand": "Bande {{n}}",
+  "gain": "Gain",
   "reference": {
     "search": "Rechercher des fonctions...",
     "noResults": "Aucun résultat trouvé"

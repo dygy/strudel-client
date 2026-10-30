@@ -14,6 +14,14 @@ export const COMPACT_MAX_WIDTH = 768;
 export const COMPACT_LANDSCAPE_MAX_HEIGHT = 500;
 export const COMPACT_LANDSCAPE_MAX_WIDTH = 1024;
 
+/** Height (px) of the compact bottom control bar; 44px buttons plus padding (spec 016). */
+export const CONTROL_BAR_HEIGHT = 56;
+/**
+ * On a phone held sideways (shorter than COMPACT_LANDSCAPE_MAX_HEIGHT) the bar is 48px, so the
+ * 44px title bar plus the bar stay within 25% of a 390px-tall screen (spec 016 2.4).
+ */
+export const CONTROL_BAR_HEIGHT_SHORT = 48;
+
 export interface ViewportSize {
   width: number;
   height: number;
@@ -77,13 +85,33 @@ export function effectivePanelLayout(
   };
 }
 
-/** Once per page load: on a phone the panel never opens by itself, whatever was persisted. */
+/**
+ * Once per page load: on a phone neither the panel nor the library drawer opens by itself,
+ * whatever was persisted (the persisted choice is kept for wide screens).
+ */
 export function overridesAfterLoad(
   overrides: PanelSessionOverrides,
-  { compact, isPanelOpen }: { compact: boolean; isPanelOpen: boolean },
+  {
+    compact,
+    isPanelOpen,
+    isFileManagerOpen = false,
+  }: { compact: boolean; isPanelOpen: boolean; isFileManagerOpen?: boolean },
 ): PanelSessionOverrides {
   if (overrides.loadChecked) return overrides;
-  return { ...overrides, loadChecked: true, panelHidden: overrides.panelHidden || (compact && isPanelOpen) };
+  return {
+    ...overrides,
+    loadChecked: true,
+    panelHidden: overrides.panelHidden || (compact && isPanelOpen),
+    filesHidden: overrides.filesHidden || (compact && isFileManagerOpen),
+  };
+}
+
+/**
+ * A single track was picked in the library (or the drawer was dismissed): on a phone the drawer
+ * gets out of the way so the code shows. Session-only; on a wide screen nothing changes.
+ */
+export function overridesAfterSelectTrack(overrides: PanelSessionOverrides, compact: boolean): PanelSessionOverrides {
+  return compact ? { ...overrides, filesHidden: true } : overrides;
 }
 
 /** The user opened the panel: it shows; on a phone the sheet hides the file sidebar for now. */
@@ -124,11 +152,59 @@ const SSR_VIEWPORT: PanelViewport = { compact: false, canHover: true, viewportWi
 export function readPanelViewport(win: Window | undefined): PanelViewport {
   if (!win) return SSR_VIEWPORT;
   const canHover = typeof win.matchMedia === 'function' ? win.matchMedia('(hover: hover)').matches : true;
+  const size = stableViewportSize(win);
   return {
-    compact: isCompactViewport({ width: win.innerWidth, height: win.innerHeight }),
+    compact: isCompactViewport(size),
     canHover,
-    viewportWidth: win.innerWidth,
+    viewportWidth: size.width,
   };
+}
+
+/** An element the on-screen keyboard opens for (text inputs, textareas, CodeMirror). */
+export function isEditableElement(el: Element | null | undefined): boolean {
+  if (!el) return false;
+  if ((el as HTMLElement).isContentEditable) return true;
+  const tag = el.tagName;
+  if (tag === 'TEXTAREA') return !(el as HTMLTextAreaElement).readOnly;
+  if (tag !== 'INPUT') return false;
+  const input = el as HTMLInputElement;
+  const noKeyboard = ['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'range', 'reset', 'submit'];
+  return !input.readOnly && !noKeyboard.includes(input.type);
+}
+
+/**
+ * The size the layout class is decided from (spec 016 review #1). Opening the on-screen keyboard
+ * shrinks only the height (Android with `interactive-widget=resizes-content`), and on an upright
+ * tablet (768-1023 wide) that would flip portrait compact into the desktop layout, which unmounts
+ * the focused input and closes the keyboard again. So while an editable element has focus, a
+ * height-only shrink keeps the last stable size. Any width change (a real rotation or a window
+ * resize) and any growth are taken as they come.
+ */
+export function nextStableSize(
+  previous: ViewportSize | null,
+  measured: ViewportSize,
+  editableFocused: boolean,
+): ViewportSize {
+  if (previous && editableFocused && measured.width === previous.width && measured.height < previous.height) {
+    return previous;
+  }
+  return measured;
+}
+
+// Shared by every usePanelViewport() instance, so a component mounted while the keyboard is open
+// (the settings sheet, the drawer) gets the same class as the rest of the page.
+let lastStableSize: ViewportSize | null = null;
+
+/** Test hook: forget the last stable (non-keyboard) size. */
+export function resetStableViewportSize(): void {
+  lastStableSize = null;
+}
+
+function stableViewportSize(win: Window): ViewportSize {
+  const measured = { width: win.innerWidth, height: win.innerHeight };
+  const focused = isEditableElement(win.document?.activeElement);
+  lastStableSize = nextStableSize(lastStableSize, measured, focused);
+  return lastStableSize;
 }
 
 const getWindow = (): Window | undefined => (typeof window !== 'undefined' ? window : undefined);

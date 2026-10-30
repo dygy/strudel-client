@@ -10,6 +10,15 @@ import {
   gainToY,
   formatFrequency,
 } from '@strudel/equalizer';
+import { usePanelViewport } from './panelViewport';
+import {
+  EqualizerCompact,
+  EQ_GAIN_MAX,
+  EQ_GAIN_MIN,
+  EQ_Q_MAX,
+  EQ_Q_MIN,
+  type CompactBandUpdate,
+} from './EqualizerCompact';
 
 interface EqualizerUIProps {
   mixer: any;
@@ -22,12 +31,30 @@ interface BandControl {
   Q: number;
 }
 
+const CANVAS_WIDTH = 600;
+const CANVAS_HEIGHT = 200;
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+/**
+ * Keeps a band update inside the range the audio graph accepts and the saved-settings loader
+ * validates (an out-of-range save would make the EQ start flat). Non-finite values are dropped.
+ */
+export function clampBandUpdate({ gain, Q }: CompactBandUpdate): CompactBandUpdate {
+  const next: CompactBandUpdate = {};
+  if (gain !== undefined && Number.isFinite(gain)) next.gain = clamp(gain, EQ_GAIN_MIN, EQ_GAIN_MAX);
+  if (Q !== undefined && Number.isFinite(Q)) next.Q = clamp(Q, EQ_Q_MIN, EQ_Q_MAX);
+  return next;
+}
+
 export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
   const { t } = useTranslation('settings');
   const [isEnabled, setIsEnabled] = useState(true);
   const [bands, setBands] = useState<BandControl[]>([]);
   const [activePreset, setActivePreset] = useState('flat');
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { compact } = usePanelViewport();
+  const [selectedBand, setSelectedBand] = useState(0);
 
   const applySettingsToEqualizers = useCallback(
     (settings: any) => {
@@ -74,7 +101,7 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
   // Update frequency response chart when bands change
   useEffect(() => {
     updateFrequencyResponseChart();
-  }, [bands, isEnabled]);
+  }, [bands, isEnabled, compact, selectedBand]);
 
   const updateFrequencyResponseChart = () => {
     if (!canvasRef.current) return;
@@ -200,9 +227,18 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
   };
 
   const drawBandMarkers = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    bands.forEach((band) => {
+    bands.forEach((band, index) => {
       const x = frequencyToX(band.frequency, width);
       const y = gainToY(band.gain, height);
+
+      // Compact only: ring the band the sliders below are editing.
+      if (compact && index === selectedBand) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y, 9, 0, Math.PI * 2);
+        ctx.stroke();
+      }
 
       // Draw marker
       ctx.fillStyle = band.gain === 0 ? 'rgba(255, 255, 255, 0.3)' : '#1db954';
@@ -233,15 +269,21 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
     saveEqualizerSettings({ isEnabled: newEnabled, bands, preset: activePreset });
   };
 
-  const handleBandChange = (index: number, gain: number) => {
+  // The one band setter, used by the desktop grid and the compact sliders. setBand keeps the
+  // "EQ off stays silent" rule: it stores the value and only applies it while the EQ is on.
+  const handleBandChange = (index: number, update: CompactBandUpdate) => {
+    if (index < 0 || index >= bands.length) return;
+    const next = clampBandUpdate(update);
+    if (next.gain === undefined && next.Q === undefined) return;
+
     const newBands = [...bands];
-    newBands[index] = { ...newBands[index], gain };
+    newBands[index] = { ...newBands[index], ...next };
     setBands(newBands);
 
     // Apply to all equalizers
-    mixer?.liveStream?.equalizer?.setBand(index, { gain });
-    mixer?.previewStream?.equalizer?.setBand(index, { gain });
-    previewEngine?.equalizer?.setBand(index, { gain });
+    mixer?.liveStream?.equalizer?.setBand(index, next);
+    mixer?.previewStream?.equalizer?.setBand(index, next);
+    previewEngine?.equalizer?.setBand(index, next);
 
     setActivePreset('custom');
     saveEqualizerSettings({ isEnabled, bands: newBands, preset: 'custom' });
@@ -293,11 +335,12 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
         </div>
         <button
           onClick={handleEnableToggle}
+          aria-pressed={compact ? isEnabled : undefined}
           className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
             isEnabled
               ? 'bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-500/30'
               : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-          }`}
+          }${compact ? ' min-h-11 min-w-11 shrink-0' : ''}`}
         >
           <div className={`w-2 h-2 rounded-full ${isEnabled ? 'bg-white' : 'bg-gray-500'}`}></div>
           {isEnabled ? t('equalizerEnabled') : t('equalizerDisabled')}
@@ -309,7 +352,9 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
         <label className="block text-sm font-medium text-foreground mb-2">{t('equalizerPreset')}</label>
         <div className="relative">
           <select
-            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 cursor-pointer hover:border-gray-600"
+            className={`w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 cursor-pointer hover:border-gray-600${
+              compact ? ' min-h-11' : ''
+            }`}
             value={activePreset}
             onChange={(e) => handlePresetChange(e.target.value)}
           >
@@ -349,115 +394,131 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
         )}
       </div>
 
-      {/* Frequency Response Chart */}
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 hover:border-gray-600 transition-colors">
-        <div className="flex items-center justify-between mb-3">
-          <label className="text-sm font-medium text-foreground">{t('equalizerFrequencyResponse')}</label>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-0.5 bg-green-500"></div>
-              <span>{t('equalizerEQCurve')}</span>
+      {compact ? (
+        <EqualizerCompact
+          bands={bands}
+          selectedBand={selectedBand}
+          onSelectBand={setSelectedBand}
+          onBandChange={handleBandChange}
+          canvasRef={canvasRef}
+          canvasWidth={CANVAS_WIDTH}
+          canvasHeight={CANVAS_HEIGHT}
+        />
+      ) : (
+        <>
+          {/* Frequency Response Chart */}
+          <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 hover:border-gray-600 transition-colors">
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-sm font-medium text-foreground">{t('equalizerFrequencyResponse')}</label>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-0.5 bg-green-500"></div>
+                  <span>{t('equalizerEQCurve')}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                  <span>{t('equalizerBands')}</span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-green-400"></div>
-              <span>{t('equalizerBands')}</span>
+            <canvas
+              ref={canvasRef}
+              width={600}
+              height={200}
+              className="w-full h-auto bg-black rounded border border-gray-800"
+            />
+          </div>
+
+          {/* Band controls */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-foreground">{t('equalizerFrequencyBands')}</label>
+            <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+              {bands.map((band, index) => (
+                <div
+                  key={index}
+                  className="flex flex-col items-center group relative"
+                  title={`${band.frequency}Hz: ${band.gain > 0 ? '+' : ''}${band.gain.toFixed(1)}dB`}
+                >
+                  {/* Frequency label */}
+                  <div className="text-xs text-foreground opacity-70 mb-2 font-mono">
+                    {band.frequency >= 1000
+                      ? `${(band.frequency / 1000).toFixed(band.frequency === 1000 ? 0 : 1)}k`
+                      : `${band.frequency}`}
+                  </div>
+
+                  {/* Vertical slider container with visual feedback */}
+                  <div className="relative h-32 w-8 bg-gray-800 rounded-lg overflow-hidden border border-gray-700 group-hover:border-green-500 transition-colors">
+                    {/* Zero line indicator */}
+                    <div className="absolute left-0 right-0 h-0.5 bg-gray-600 z-10" style={{ top: '50%' }} />
+
+                    {/* Gain level indicator */}
+                    <div
+                      className={`absolute left-0 right-0 transition-all duration-150 ${
+                        band.gain > 0
+                          ? 'bg-gradient-to-t from-green-500/50 to-green-400/30'
+                          : band.gain < 0
+                            ? 'bg-gradient-to-b from-red-500/50 to-red-400/30'
+                            : ''
+                      }`}
+                      style={{
+                        top: band.gain > 0 ? `${50 - (band.gain / 12) * 50}%` : '50%',
+                        bottom: band.gain < 0 ? `${50 - (Math.abs(band.gain) / 12) * 50}%` : '50%',
+                      }}
+                    />
+
+                    {/* Slider input */}
+                    <input
+                      type="range"
+                      min="-12"
+                      max="12"
+                      step="0.5"
+                      value={band.gain}
+                      onChange={(e) => handleBandChange(index, { gain: parseFloat(e.target.value) })}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                      style={{
+                        WebkitAppearance: 'slider-vertical' as any,
+                      }}
+                    />
+
+                    {/* Gain value indicator dot */}
+                    <div
+                      className={`absolute left-1/2 -translate-x-1/2 w-3 h-3 rounded-full z-30 transition-all duration-150 ${
+                        band.gain === 0 ? 'bg-gray-400' : 'bg-green-400 shadow-lg shadow-green-500/50'
+                      }`}
+                      style={{
+                        top: `${50 - (band.gain / 12) * 50}%`,
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                    />
+                  </div>
+
+                  {/* Gain value display */}
+                  <div
+                    className={`text-xs font-mono font-medium mt-2 transition-colors ${
+                      band.gain === 0 ? 'text-gray-500' : band.gain > 0 ? 'text-green-400' : 'text-red-400'
+                    }`}
+                  >
+                    {band.gain > 0 ? '+' : ''}
+                    {band.gain.toFixed(1)}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Info text */}
+            <div className="text-xs text-foreground opacity-50 text-center mt-2">
+              {t('equalizerDragSliders')} • {t('equalizerRange')}
             </div>
           </div>
-        </div>
-        <canvas
-          ref={canvasRef}
-          width={600}
-          height={200}
-          className="w-full h-auto bg-black rounded border border-gray-800"
-        />
-      </div>
-
-      {/* Band controls */}
-      <div className="space-y-3">
-        <label className="block text-sm font-medium text-foreground">{t('equalizerFrequencyBands')}</label>
-        <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
-          {bands.map((band, index) => (
-            <div
-              key={index}
-              className="flex flex-col items-center group relative"
-              title={`${band.frequency}Hz: ${band.gain > 0 ? '+' : ''}${band.gain.toFixed(1)}dB`}
-            >
-              {/* Frequency label */}
-              <div className="text-xs text-foreground opacity-70 mb-2 font-mono">
-                {band.frequency >= 1000
-                  ? `${(band.frequency / 1000).toFixed(band.frequency === 1000 ? 0 : 1)}k`
-                  : `${band.frequency}`}
-              </div>
-
-              {/* Vertical slider container with visual feedback */}
-              <div className="relative h-32 w-8 bg-gray-800 rounded-lg overflow-hidden border border-gray-700 group-hover:border-green-500 transition-colors">
-                {/* Zero line indicator */}
-                <div className="absolute left-0 right-0 h-0.5 bg-gray-600 z-10" style={{ top: '50%' }} />
-
-                {/* Gain level indicator */}
-                <div
-                  className={`absolute left-0 right-0 transition-all duration-150 ${
-                    band.gain > 0
-                      ? 'bg-gradient-to-t from-green-500/50 to-green-400/30'
-                      : band.gain < 0
-                        ? 'bg-gradient-to-b from-red-500/50 to-red-400/30'
-                        : ''
-                  }`}
-                  style={{
-                    top: band.gain > 0 ? `${50 - (band.gain / 12) * 50}%` : '50%',
-                    bottom: band.gain < 0 ? `${50 - (Math.abs(band.gain) / 12) * 50}%` : '50%',
-                  }}
-                />
-
-                {/* Slider input */}
-                <input
-                  type="range"
-                  min="-12"
-                  max="12"
-                  step="0.5"
-                  value={band.gain}
-                  onChange={(e) => handleBandChange(index, parseFloat(e.target.value))}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                  style={{
-                    WebkitAppearance: 'slider-vertical' as any,
-                  }}
-                />
-
-                {/* Gain value indicator dot */}
-                <div
-                  className={`absolute left-1/2 -translate-x-1/2 w-3 h-3 rounded-full z-30 transition-all duration-150 ${
-                    band.gain === 0 ? 'bg-gray-400' : 'bg-green-400 shadow-lg shadow-green-500/50'
-                  }`}
-                  style={{
-                    top: `${50 - (band.gain / 12) * 50}%`,
-                    transform: 'translate(-50%, -50%)',
-                  }}
-                />
-              </div>
-
-              {/* Gain value display */}
-              <div
-                className={`text-xs font-mono font-medium mt-2 transition-colors ${
-                  band.gain === 0 ? 'text-gray-500' : band.gain > 0 ? 'text-green-400' : 'text-red-400'
-                }`}
-              >
-                {band.gain > 0 ? '+' : ''}
-                {band.gain.toFixed(1)}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Info text */}
-        <div className="text-xs text-foreground opacity-50 text-center mt-2">
-          {t('equalizerDragSliders')} • {t('equalizerRange')}
-        </div>
-      </div>
+        </>
+      )}
 
       {/* Reset button */}
       <button
         onClick={handleReset}
-        className="w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-foreground hover:bg-gray-700 hover:border-gray-600 transition-all duration-200 flex items-center justify-center gap-2 group"
+        className={`w-full px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-foreground hover:bg-gray-700 hover:border-gray-600 transition-all duration-200 flex items-center justify-center gap-2 group${
+          compact ? ' min-h-11' : ''
+        }`}
       >
         <svg
           className="w-4 h-4 group-hover:rotate-180 transition-transform duration-300"

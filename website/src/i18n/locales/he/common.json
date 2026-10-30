@@ -26,6 +26,17 @@
   "docs": "DOCS",
   "toggleFileManager": "החלף מנהל קבצים",
   "clickAuthButtonToSignIn": "לחץ על כפתור ההתחברות בחלק העליון כדי להתחיל",
+  "more": "עוד",
+  "library": "ספרייה",
+  "openLibrary": "פתח ספרייה",
+  "closeLibrary": "סגור ספרייה",
+  "settings": "הגדרות",
+  "recordAudio": "הקלט שמע",
+  "recordScreen": "הקלט מסך",
+  "share": "שתף",
+  "preview": "תצוגה מקדימה באוזניות",
+  "eqBand": "רצועה {{n}}",
+  "gain": "הגבר",
   "reference": {
     "search": "חפש פונקציות...",
     "noResults": "לא נמצאו תוצאות"

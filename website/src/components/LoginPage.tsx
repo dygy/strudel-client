@@ -175,8 +175,9 @@ export default function LoginPage({ error, hasTrack }: LoginPageProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="bg-white rounded-xl p-8 shadow-2xl max-w-md text-center text-gray-900">
+      {/* Spec 016: narrower padding on phones, so nothing scrolls sideways at 390px. */}
+      <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
+        <div className="bg-white rounded-xl p-4 sm:p-8 shadow-2xl w-full max-w-md text-center text-gray-900">
           <div className="mb-8">
             <img src="/logo.svg" alt="Strudel Logo" width="64" height="64" className="mx-auto mb-4 text-blue-500" />
             <h1 className="text-3xl font-bold mb-2">{getTranslation('login.welcomeTitle', 'Welcome to Strudel')}</h1>
@@ -206,7 +207,7 @@ export default function LoginPage({ error, hasTrack }: LoginPageProps) {
             </p>
 
             <button
-              className="inline-flex items-center gap-2 bg-blue-500 text-white px-6 py-3 rounded-lg text-base cursor-pointer hover:bg-blue-600 transition-colors"
+              className="inline-flex items-center justify-center gap-2 min-h-11 w-full sm:w-auto bg-blue-500 text-white px-6 py-3 rounded-lg text-base cursor-pointer hover:bg-blue-600 transition-colors"
               onClick={signInWithGoogle}
             >
               <svg width="20" height="20" viewBox="0 0 24 24">

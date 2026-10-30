@@ -26,6 +26,17 @@
   "docs": "DOCS",
   "toggleFileManager": "Переключить файловый менеджер",
   "clickAuthButtonToSignIn": "Нажмите кнопку входа в правом верхнем углу, чтобы начать",
+  "more": "Ещё",
+  "library": "Библиотека",
+  "openLibrary": "Открыть библиотеку",
+  "closeLibrary": "Закрыть библиотеку",
+  "settings": "Настройки",
+  "recordAudio": "Записать звук",
+  "recordScreen": "Записать экран",
+  "share": "Поделиться",
+  "preview": "Предпрослушка в наушниках",
+  "eqBand": "Полоса {{n}}",
+  "gain": "Усиление",
   "reference": {
     "search": "Поиск функций...",
     "noResults": "Результаты не найдены"

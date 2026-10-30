@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { languages, type Language } from '@src/i18n';
+import cx from '@src/cx';
+import { usePanelViewport } from './panelViewport';
 
 interface LanguageSelectorProps {
   currentLanguage?: Language;
@@ -9,6 +11,8 @@ interface LanguageSelectorProps {
 export function LanguageSelector({ currentLanguage, onChange }: LanguageSelectorProps) {
   const { i18n } = useTranslation();
   const activeLanguage = currentLanguage || i18n.language;
+  // Spec 016: a 44px touch target on compact screens; the desktop select is unchanged.
+  const { compact } = usePanelViewport();
 
   const handleLanguageChange = (newLanguage: Language) => {
     // Update i18next
@@ -25,7 +29,7 @@ export function LanguageSelector({ currentLanguage, onChange }: LanguageSelector
 
   return (
     <select
-      className="p-2 bg-background rounded-xl text-foreground border-foreground/50 pe-8"
+      className={cx('p-2 bg-background rounded-xl text-foreground border-foreground/50 pe-8', compact && 'min-h-11')}
       value={activeLanguage}
       onChange={(e) => handleLanguageChange(e.target.value as Language)}
     >

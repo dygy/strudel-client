@@ -32,6 +32,8 @@ interface FileManagerProps {
   context: ReplContext;
   fileManagerHook?: any; // Optional override for the file manager hook (e.g., Supabase version)
   readOnly?: boolean; // When true, hides create/edit/delete actions (for admin viewing)
+  /** Called after a single (non-expanding) track is picked; the compact drawer closes (spec 016). */
+  onAfterTrackSelect?: () => void;
 }
 
 interface PendingImport {
@@ -44,7 +46,12 @@ interface PendingImport {
   activeStep?: number;
 }
 
-export function FileManagerRefactored({ context, fileManagerHook, readOnly = false }: FileManagerProps) {
+export function FileManagerRefactored({
+  context,
+  fileManagerHook,
+  readOnly = false,
+  onAfterTrackSelect,
+}: FileManagerProps) {
   const { t, i18n } = useTranslation(['files', 'common', 'tabs', 'auth']);
 
   // CRITICAL: Call useTracks() at the top level before any conditional returns
@@ -1210,6 +1217,7 @@ export function FileManagerRefactored({ context, fileManagerHook, readOnly = fal
           selectedTrack={fileManagerState.selectedTrack}
           activePattern={fileManagerState.activePattern}
           onTrackSelect={operations.handleTrackSelect}
+          onAfterTrackSelect={onAfterTrackSelect}
           onTrackRename={readOnly ? undefined : operations.handleTrackRename}
           onTrackDelete={readOnly ? undefined : operations.deleteTrack}
           onTrackDuplicate={readOnly ? undefined : operations.duplicateTrack}
