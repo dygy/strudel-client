@@ -10,6 +10,7 @@ import {
   applyRenameToTracks,
   findFolderByPathOrId,
   invertFolderRenamePlan,
+  planFolderMove,
   planFolderRename,
   renamedTrackUrl,
   type FolderRenameError,
@@ -81,7 +82,7 @@ const FOLDER_RENAME_ERROR_KEYS: Record<FolderRenameError, string> = {
   duplicate: 'files:errors.folderNameTaken',
 };
 
-/** Mirror a folder rename into the global tracks store (URL routing reads it). */
+/** Mirror a folder rename or move into the global tracks store (URL routing reads it). */
 function syncRenameToTracksStore(plan: FolderRenamePlan) {
   for (const change of plan.pathChanges) {
     const stored = tracksSelectors.getFolder(change.id);
@@ -90,6 +91,7 @@ function syncRenameToTracksStore(plan: FolderRenamePlan) {
         ...stored,
         path: change.newPath,
         ...(change.id === plan.folderId ? { name: plan.newName } : {}),
+        ...(change.id === plan.folderId && plan.parentChange ? { parent: plan.parentChange.newParent } : {}),
       });
     }
   }
@@ -603,6 +605,87 @@ export function useFileManagerOperations({
     setRenameValue('');
   }, [renamingTrack, renameValue, tracks, setTracks, setRenamingTrack, setRenameValue, t]);
 
+  /**
+   * Persist a folder rename or move: apply it optimistically (folders, path-holding tracks, the
+   * tracks store and the open track's URL), send it, and undo it if the server refuses.
+   */
+  const commitFolderPlan = useCallback(
+    async (
+      plan: FolderRenamePlan,
+      updates: { name?: string; parent?: string | null },
+      successKey: string,
+      failKey: string,
+    ) => {
+      folderRenameInFlightRef.current = true;
+
+      // The open track's URL carries the folder slug, and the autosave guard resolves the open
+      // track from the URL — move the URL along with the folder or autosave silently stops.
+      const nextFolders = applyRenameToFolders(folders, plan);
+      const nextTracks = applyRenameToTracks(tracks, plan);
+      const oldUrl = typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : '';
+      const oldActivePattern = getActivePattern();
+      const newUrl =
+        typeof window !== 'undefined'
+          ? renamedTrackUrl(window.location, { tracks, folders }, { tracks: nextTracks, folders: nextFolders }, plan)
+          : null;
+
+      const applyLocally = (p: FolderRenamePlan, url: string | null, activePattern: string | null) => {
+        setFolders((prev) => applyRenameToFolders(prev, p));
+        setTracks((prev) => applyRenameToTracks(prev, p));
+        syncRenameToTracksStore(p);
+        if (url) {
+          // replaceState: same track, same audio — no navigation, no reload.
+          window.history.replaceState(window.history.state, '', url);
+          if (activePattern !== null) setActivePattern(activePattern);
+        }
+      };
+
+      applyLocally(plan, newUrl, newUrl ? newUrl.replace(/^\/repl\//, '') : null);
+
+      try {
+        const saved = updateFolderAPI ? await updateFolderAPI(plan.folderId, updates) : null;
+        if (saved && 'rollbackIncomplete' in saved) {
+          // The server state is unknown: put the URL back and reload what the server has
+          // rather than guessing locally. updateFolder has already shown the toast.
+          revertUrl();
+          await refreshFromSupabase?.();
+          return;
+        }
+        if (!saved) {
+          if (!updateFolderAPI) toastActions.error(t(failKey));
+          // Otherwise updateFolder has already reported why.
+          revert();
+          return;
+        }
+        toastActions.success(t(successKey));
+      } catch (error: unknown) {
+        console.error('FileManager - folder update failed:', error);
+        toastActions.error(t(failKey));
+        revert();
+      } finally {
+        folderRenameInFlightRef.current = false;
+      }
+
+      // Only undo the URL if nothing navigated away from it meanwhile.
+      function urlToRestore(): string | null {
+        return newUrl !== null && `${window.location.pathname}${window.location.search}` === newUrl ? oldUrl : null;
+      }
+
+      function revert() {
+        const url = urlToRestore();
+        applyLocally(invertFolderRenamePlan(plan), url, url ? oldActivePattern : null);
+      }
+
+      function revertUrl() {
+        const url = urlToRestore();
+        if (!url) return;
+        window.history.replaceState(window.history.state, '', url);
+        setActivePattern(oldActivePattern);
+      }
+    },
+    [folders, tracks, setFolders, setTracks, updateFolderAPI, refreshFromSupabase, t],
+  );
+
   const finishRenameFolder = useCallback(async () => {
     if (readOnly || !renamingFolder || folderRenameInFlightRef.current) return;
 
@@ -631,87 +714,9 @@ export function useFileManagerOperations({
     }
     const plan = result.plan;
 
-    folderRenameInFlightRef.current = true;
     closeInput();
-
-    // The open track's URL carries the folder slug, and the autosave guard resolves the open
-    // track from the URL — move the URL along with the folder or autosave silently stops.
-    const nextFolders = applyRenameToFolders(folders, plan);
-    const nextTracks = applyRenameToTracks(tracks, plan);
-    const oldUrl = typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : '';
-    const oldActivePattern = getActivePattern();
-    const newUrl =
-      typeof window !== 'undefined'
-        ? renamedTrackUrl(window.location, { tracks, folders }, { tracks: nextTracks, folders: nextFolders }, plan)
-        : null;
-
-    const applyLocally = (p: FolderRenamePlan, url: string | null, activePattern: string | null) => {
-      setFolders((prev) => applyRenameToFolders(prev, p));
-      setTracks((prev) => applyRenameToTracks(prev, p));
-      syncRenameToTracksStore(p);
-      if (url) {
-        // replaceState: same track, same audio — no navigation, no reload.
-        window.history.replaceState(window.history.state, '', url);
-        if (activePattern !== null) setActivePattern(activePattern);
-      }
-    };
-
-    applyLocally(plan, newUrl, newUrl ? newUrl.replace(/^\/repl\//, '') : null);
-
-    try {
-      const saved = updateFolderAPI ? await updateFolderAPI(folder.id, { name: plan.newName }) : null;
-      if (saved && 'rollbackIncomplete' in saved) {
-        // The server state is unknown: put the URL back and reload what the server has
-        // rather than guessing locally. updateFolder has already shown the toast.
-        revertUrl();
-        await refreshFromSupabase?.();
-        return;
-      }
-      if (!saved) {
-        if (!updateFolderAPI) toastActions.error(t('files:errors.renameFailed'));
-        // Otherwise updateFolder has already reported why.
-        revert();
-        return;
-      }
-      toastActions.success(t('files:folderRenamed'));
-    } catch (error: unknown) {
-      console.error('FileManager - folder rename failed:', error);
-      toastActions.error(t('files:errors.renameFailed'));
-      revert();
-    } finally {
-      folderRenameInFlightRef.current = false;
-    }
-
-    // Only undo the URL if nothing navigated away from it meanwhile.
-    function urlToRestore(): string | null {
-      return newUrl !== null && `${window.location.pathname}${window.location.search}` === newUrl ? oldUrl : null;
-    }
-
-    function revert() {
-      const url = urlToRestore();
-      applyLocally(invertFolderRenamePlan(plan), url, url ? oldActivePattern : null);
-    }
-
-    function revertUrl() {
-      const url = urlToRestore();
-      if (!url) return;
-      window.history.replaceState(window.history.state, '', url);
-      setActivePattern(oldActivePattern);
-    }
-  }, [
-    readOnly,
-    renamingFolder,
-    renameValue,
-    folders,
-    tracks,
-    setFolders,
-    setTracks,
-    setRenamingFolder,
-    setRenameValue,
-    updateFolderAPI,
-    refreshFromSupabase,
-    t,
-  ]);
+    await commitFolderPlan(plan, { name: plan.newName }, 'files:folderRenamed', 'files:errors.renameFailed');
+  }, [readOnly, renamingFolder, renameValue, folders, setRenamingFolder, setRenameValue, commitFolderPlan, t]);
 
   const handleMoveItem = useCallback(
     async (itemId: string, itemType: 'track' | 'folder', targetId: string) => {
@@ -850,83 +855,30 @@ export function useFileManagerOperations({
           currentParent = parentFolder?.parent;
         }
 
-        // Update local state immediately for responsive UI
-        const originalParent = originalFolder.parent;
-        setFolders((prev) => ({
-          ...prev,
-          [itemId]: {
-            ...prev[itemId],
-            parent: targetId || null,
-          },
-        }));
-
-        // Update the database
-        try {
-          console.log(`handleMoveItem - Updating folder in database: folderId=${itemId}, parent=${targetId || null}`);
-
-          const updateResponse = await fetch('/api/folders/update', {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-              folderId: itemId,
-              updates: {
-                parent: targetId || null,
-              },
-            }),
-          });
-
-          if (!updateResponse.ok) {
-            const errorText = await updateResponse.text();
-            let errorData;
-            try {
-              errorData = JSON.parse(errorText);
-            } catch {
-              errorData = { error: errorText };
-            }
-            console.error('handleMoveItem - Failed to update folder in database:', {
-              status: updateResponse.status,
-              statusText: updateResponse.statusText,
-              error: errorData,
-            });
-
-            // Revert local state on database error
-            setFolders((prev) => ({
-              ...prev,
-              [itemId]: {
-                ...prev[itemId],
-                parent: originalParent,
-              },
-            }));
-
-            toastActions.error('Failed to move folder. Please try again.');
-            return;
-          }
-
-          const result = await updateResponse.json();
-          console.log('handleMoveItem - Folder updated successfully in database:', result);
-          toastActions.success('Folder moved successfully');
-        } catch (error) {
-          console.error('handleMoveItem - Error updating folder in database:', error);
-
-          // Revert local state on error
-          setFolders((prev) => ({
-            ...prev,
-            [itemId]: {
-              ...prev[itemId],
-              parent: originalParent,
-            },
-          }));
-
-          toastActions.error('Failed to move folder. Please try again.');
+        // A move rebuilds the folder's path (and its descendants' and path-holding tracks') under
+        // the new parent, exactly like a rename; the open track's URL follows it.
+        // Dropped back where it already is: nothing to do.
+        if ((originalFolder.parent || null) === (targetId || null)) return;
+        if (folderRenameInFlightRef.current) {
+          // Another folder rename or move is still saving; say so rather than snap back silently.
+          toastActions.error(t('files:errors.moveFailed'));
           return;
         }
+        const result = planFolderMove(Object.values(folders), originalFolder.id, targetId || null);
+        if ('error' in result) {
+          toastActions.error(t(FOLDER_RENAME_ERROR_KEYS[result.error], { name: originalFolder.name }));
+          return;
+        }
+        await commitFolderPlan(
+          result.plan,
+          { parent: result.plan.parentChange!.newParent },
+          'files:folderMoved',
+          'files:errors.moveFailed',
+        );
       }
       // Implementation complete - removed TODO comment
     },
-    [setTracks, setFolders, folders, tracks, t, toastActions],
+    [setTracks, setFolders, folders, tracks, t, toastActions, commitFolderPlan],
   );
 
   const convertToMultitrack = useCallback(

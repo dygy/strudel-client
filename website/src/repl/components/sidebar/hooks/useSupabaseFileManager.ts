@@ -1243,13 +1243,13 @@ export function useSupabaseFileManager(
             return null;
           }
 
-          // A sibling folder already has a name with the same URL slug.
+          // A sibling folder (under the new parent, for a move) already has that name or slug.
           if (response.status === 409) {
             // 'track_conflict': a track would collide with one already at the new path.
             toastActions.error(
               errorData.code === 'track_conflict'
                 ? t('files:errors.renameFailed')
-                : t('files:errors.folderNameTaken', { name: updates.name ?? '' }),
+                : t('files:errors.folderNameTaken', { name: updates.name ?? folders[folderId]?.name ?? '' }),
             );
             return null;
           }
@@ -1292,7 +1292,7 @@ export function useSupabaseFileManager(
         return null;
       }
     },
-    [user, t, checkAuth, setFolders],
+    [user, t, checkAuth, setFolders, folders],
   );
 
   const deleteTrack = useCallback(

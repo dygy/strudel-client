@@ -180,3 +180,90 @@ describe('folder rename from the sidebar', () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 });
+
+// Regression (2026-10-30, "folder move by drag doesn't update its path"): the move only set
+// `parent` locally and on the server, so the path, descendants and the open track URL went stale.
+describe('folder move from the sidebar (drag and drop)', () => {
+  it('persists the new parent through updateFolder and rebuilds the path locally', async () => {
+    const updateFolder = vi.fn(async (id: string) => ({ id, name: 'test', path: 'My Beats/test' }));
+    const { state, ops } = setup('', updateFolder);
+
+    await ops().handleMoveItem(TEST, 'folder', BEATS);
+
+    expect(updateFolder).toHaveBeenCalledWith(TEST, { parent: BEATS });
+    expect(state.folders[TEST]).toMatchObject({ name: 'test', path: 'My Beats/test', parent: BEATS });
+    expect(state.tracks.legacy.folder).toBe('My Beats/test');
+    expect(toast.success).toHaveBeenCalledWith('files:folderMoved');
+  });
+
+  it('moves the open track URL with the folder', async () => {
+    const { ops } = setup(
+      '',
+      vi.fn(async (id: string) => ({ id, name: 'test', path: 'My Beats/test' })),
+    );
+
+    await ops().handleMoveItem(TEST, 'folder', BEATS);
+
+    expect(window.history.replaceState).toHaveBeenCalledWith(
+      { trackId: 'taka' },
+      '',
+      '/repl/my-beats/test/taka?step=intro',
+    );
+    expect(setActivePattern).toHaveBeenCalledWith('my-beats/test/taka?step=intro');
+  });
+
+  it('reverts parent, path, tracks and URL when the server refuses', async () => {
+    const { state, ops } = setup(
+      '',
+      vi.fn(async () => null),
+    );
+
+    await ops().handleMoveItem(TEST, 'folder', BEATS);
+
+    expect(state.folders[TEST]).toMatchObject({ path: 'test' });
+    expect(state.folders[TEST].parent ?? null).toBeNull();
+    expect(state.tracks.legacy.folder).toBe('test');
+    expect(window.location.pathname).toBe('/repl/test/taka');
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('refuses a same-named folder under the target and sends nothing', async () => {
+    const { state, ops, updateFolder } = setup('');
+    state.folders['dup'] = { id: 'dup', name: 'TEST', path: 'My Beats/TEST', parent: BEATS, created: '' };
+
+    await ops().handleMoveItem(TEST, 'folder', BEATS);
+
+    expect(toast.error).toHaveBeenCalledWith('files:errors.folderNameTaken');
+    expect(updateFolder).not.toHaveBeenCalled();
+  });
+
+  it('dropping onto its current parent does nothing, even next to a same-named sibling', async () => {
+    const { state, ops, updateFolder } = setup('');
+    state.folders['dup'] = { id: 'dup', name: 'TEST', path: 'TEST', created: '' };
+
+    await ops().handleMoveItem(TEST, 'folder', '');
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(updateFolder).not.toHaveBeenCalled();
+  });
+
+  it('a drag while another folder update is saving is refused with a toast', async () => {
+    let release!: () => void;
+    const updateFolder = vi.fn(
+      (id: string) =>
+        new Promise<{ id: string; name: string; path: string }>((r) => {
+          release = () => r({ id, name: 'test', path: 'My Beats/test' });
+        }),
+    );
+    const { ops } = setup('', updateFolder);
+    const o = ops();
+
+    const first = o.handleMoveItem(TEST, 'folder', BEATS);
+    await o.handleMoveItem(BEATS, 'folder', TEST);
+    release();
+    await first;
+
+    expect(updateFolder).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith('files:errors.moveFailed');
+  });
+});

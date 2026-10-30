@@ -24,7 +24,11 @@ const supabaseMock = vi.hoisted(() => ({
 
 vi.mock('../../lib/supabase', () => ({ supabase: supabaseMock, auth: supabaseMock.auth }));
 
-import { authActions, authStore } from '../authStore';
+// isolate:false shares the module cache across files: a file that ran earlier (e.g. the sidebar
+// hook tests) may already hold authStore bound to the real supabase client, so the mock above
+// would not apply. Load a fresh copy.
+vi.resetModules();
+const { authActions, authStore } = await import('../authStore');
 
 type FetchInit = { headers?: Record<string, string> };
 let cookieWrites: string[];

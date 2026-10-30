@@ -9,6 +9,7 @@ import {
   applyRenameToTracks,
   findFolderByPathOrId,
   invertFolderRenamePlan,
+  planFolderMove,
   planFolderRename,
   renamedTrackUrl,
   validateFolderName,
@@ -179,5 +180,60 @@ describe('renamedTrackUrl — the open track follows its folder', () => {
     const p = plan(TEST, 'Live');
     expect(renamedTrackUrl({ pathname: '/repl/my-beats/groove' }, { tracks, folders }, after(p), p)).toBeNull();
     expect(renamedTrackUrl({ pathname: '/repl/spiral' }, { tracks, folders }, after(p), p)).toBeNull();
+  });
+});
+
+// Regression (2026-10-30, "folder move by drag doesn't update its path").
+describe('planFolderMove', () => {
+  const move = (id: string, parent: string | null) => {
+    const r = planFolderMove(Object.values(folders), id, parent);
+    if ('error' in r) throw new Error(`unexpected ${r.error}`);
+    return r.plan;
+  };
+
+  it('rebuilds the moved folder and descendant paths below the new parent', () => {
+    expect(move(SUB, OTHER).pathChanges).toEqual([
+      { id: SUB, oldPath: 'test/Sub Dir', newPath: 'My Beats/Sub Dir' },
+      { id: DEEP, oldPath: 'test/Sub Dir/deep', newPath: 'My Beats/Sub Dir/deep' },
+    ]);
+  });
+
+  it('applies the new parent and paths; the name is unchanged', () => {
+    const p = move(SUB, null);
+    const next = applyRenameToFolders(folders, p);
+    expect(next[SUB]).toMatchObject({ name: 'Sub Dir', path: 'Sub Dir', parent: null });
+    expect(next[DEEP].path).toBe('Sub Dir/deep');
+    expect(applyRenameToTracks(tracks, p).subByPath.folder).toBe('Sub Dir');
+  });
+
+  it('inverting restores the old parent and paths', () => {
+    const p = move(SUB, OTHER);
+    const back = applyRenameToFolders(applyRenameToFolders(folders, p), invertFolderRenamePlan(p));
+    expect(back[SUB]).toMatchObject({ path: 'test/Sub Dir', parent: TEST });
+    expect(back[DEEP].path).toBe('test/Sub Dir/deep');
+  });
+
+  it('refuses a same-named sibling under the new parent', () => {
+    const withClash = [
+      ...Object.values(folders),
+      { id: 'x', name: 'sub dir', path: 'My Beats/sub dir', parent: OTHER },
+    ];
+    expect(planFolderMove(withClash, SUB, OTHER)).toEqual({ ok: false, error: 'duplicate' });
+  });
+
+  it('keeps a stored name the rename rules would refuse ("/", surrounding spaces)', () => {
+    const odd = [...Object.values(folders), { id: 'odd', name: ' a/b ', path: ' a/b ', parent: null }];
+    const r = planFolderMove(odd, 'odd', OTHER);
+    if ('error' in r) throw new Error(`unexpected ${r.error}`);
+    expect(r.plan.newName).toBe(' a/b ');
+    expect(r.plan.pathChanges[0].newPath).toBe('My Beats/ a/b ');
+  });
+
+  it('moves the open track URL when its folder moves', () => {
+    const p = move(DEEP, null);
+    const after = { tracks: applyRenameToTracks(tracks, p), folders: applyRenameToFolders(folders, p) };
+    expect(renamedTrackUrl({ pathname: '/repl/test/sub-dir/deep/deep-one' }, { tracks, folders }, after, p)).toBe(
+      '/repl/deep/deep-one',
+    );
   });
 });

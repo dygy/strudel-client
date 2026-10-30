@@ -3,7 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 import { getAuthenticatedUser, AuthError } from '../_auth';
 import { serverEnv } from '../../../lib/server-env';
 import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
-import { planFolderRename, type FolderRenamePlan, type RenamableFolder } from '../../../lib/folderRename';
+import {
+  planFolderMove,
+  planFolderRename,
+  type FolderRenamePlan,
+  type RenamableFolder,
+} from '../../../lib/folderRename';
 
 export const prerender = false;
 
@@ -79,10 +84,18 @@ export const PUT: APIRoute = async ({ request }) => {
     }
 
     // A client-sent `path` is ignored: the path is always derived from the parent's path.
+    // A move (parent only) gets the same cascade to descendants and path-holding tracks as a
+    // rename, keeps the stored name as it is, and is refused only on a clash under the new parent.
     let plan: FolderRenamePlan | null = null;
-    if (typeof updates.name === 'string') {
-      const withParent = folders.map((f) => (f.id === folderId ? { ...f, parent: effectiveParent } : f));
-      const result = planFolderRename(withParent, folderId, updates.name);
+    if (typeof updates.name === 'string' || updates.parent !== undefined) {
+      const result =
+        typeof updates.name === 'string'
+          ? planFolderRename(
+              folders.map((f) => (f.id === folderId ? { ...f, parent: effectiveParent } : f)),
+              folderId,
+              updates.name,
+            )
+          : planFolderMove(folders, folderId, effectiveParent);
       if ('error' in result) {
         const { status, error } = RENAME_ERRORS[result.error];
         return json({ error, code: result.error }, status);

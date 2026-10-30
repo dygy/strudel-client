@@ -39,6 +39,8 @@ export interface FolderRenamePlan {
   pathChanges: FolderPathChange[];
   /** Raw path strings held in `tracks.folder` that must be rewritten old → new. */
   trackFolderRemaps: Array<{ oldPath: string; newPath: string }>;
+  /** Set when the folder moves to another parent (drag and drop); absent for a plain rename. */
+  parentChange?: { oldParent: string | null; newParent: string | null };
 }
 
 export type FolderRenameResult = { ok: true; plan: FolderRenamePlan } | { ok: false; error: FolderRenameError };
@@ -105,7 +107,11 @@ export function planFolderRename(folders: RenamableFolder[], folderId: string, r
   const error = validateFolderName(rawName, folder, folders);
   if (error) return { ok: false, error };
 
-  const newName = rawName.trim();
+  return { ok: true, plan: planPaths(folders, folder, rawName.trim()) };
+}
+
+/** Rebuild the paths of `folder` (renamed to `newName`, under its current `parent`) and its descendants. */
+function planPaths(folders: RenamableFolder[], folder: RenamableFolder, newName: string): FolderRenamePlan {
   const parent = folder.parent ? folders.find((f) => f.id === folder.parent) : undefined;
   // An orphan (parent id not found) keeps the directory part of its own stored path.
   const parentPath = parent ? parent.path : folder.parent ? dirname(folder.path) : '';
@@ -134,13 +140,36 @@ export function planFolderRename(folders: RenamableFolder[], folderId: string, r
     .filter((c) => (seen.has(c.oldPath) ? false : (seen.add(c.oldPath), true)))
     .map(({ oldPath, newPath: np }) => ({ oldPath, newPath: np }));
 
-  return {
-    ok: true,
-    plan: { folderId: folder.id, oldName: folder.name, newName, pathChanges, trackFolderRemaps },
-  };
+  return { folderId: folder.id, oldName: folder.name, newName, pathChanges, trackFolderRemaps };
 }
 
-/** Apply a plan to an id-keyed folders map. Only `name` and `path` change; the map stays id-keyed. */
+/**
+ * Plan moving a folder under `newParent` (a folder id, or null for the root): its path, its
+ * descendants' paths and path-holding tracks are rebuilt as for a rename. The name is kept
+ * exactly as stored (older rows may hold "/" or surrounding spaces); only a clash with a
+ * folder already under the new parent is refused.
+ */
+export function planFolderMove(
+  folders: RenamableFolder[],
+  folderId: string,
+  newParent: string | null,
+): FolderRenameResult {
+  const folder = folders.find((f) => f.id === folderId);
+  if (!folder) return { ok: false, error: 'notFound' };
+  const parent = parentKey(newParent);
+  const movedFolder = { ...folder, parent };
+  const moved = folders.map((f) => (f.id === folderId ? movedFolder : f));
+  if (parent !== parentKey(folder.parent) && validateFolderName(folder.name, movedFolder, moved) === 'duplicate') {
+    return { ok: false, error: 'duplicate' };
+  }
+  const plan = planPaths(moved, movedFolder, folder.name);
+  return { ok: true, plan: { ...plan, parentChange: { oldParent: parentKey(folder.parent), newParent: parent } } };
+}
+
+/**
+ * Apply a plan to an id-keyed folders map. Only `name`, `path` and (for a move) `parent`
+ * change; the map stays id-keyed.
+ */
 export function applyRenameToFolders<F extends RenamableFolder>(
   folders: Record<string, F>,
   plan: FolderRenamePlan,
@@ -155,6 +184,7 @@ export function applyRenameToFolders<F extends RenamableFolder>(
       ...next[key],
       path: change.newPath,
       ...(change.id === plan.folderId ? { name: plan.newName } : {}),
+      ...(change.id === plan.folderId && plan.parentChange ? { parent: plan.parentChange.newParent } : {}),
     };
   }
   return next;
@@ -227,5 +257,8 @@ export function invertFolderRenamePlan(plan: FolderRenamePlan): FolderRenamePlan
     newName: plan.oldName,
     pathChanges: plan.pathChanges.map((c) => ({ id: c.id, oldPath: c.newPath, newPath: c.oldPath })),
     trackFolderRemaps: plan.trackFolderRemaps.map((r) => ({ oldPath: r.newPath, newPath: r.oldPath })),
+    ...(plan.parentChange
+      ? { parentChange: { oldParent: plan.parentChange.newParent, newParent: plan.parentChange.oldParent } }
+      : {}),
   };
 }

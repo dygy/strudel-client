@@ -221,3 +221,64 @@ describe('folders/update: rename validation', () => {
     expect(fakeState.mutations).toEqual([]);
   });
 });
+
+// Regression (2026-10-30, "folder move by drag doesn't update its path"): a parent-only update
+// set `parent` but kept the old `path`, left descendants and path-holding tracks behind, and
+// allowed a second same-named folder under the new parent.
+describe('folders/update: move cascade', () => {
+  it('moves a folder under a new parent with a server-computed path', async () => {
+    const res = await put({ folderId: 'f-sub', updates: { parent: 'f-beats' } });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      folder: { id: 'f-sub', name: 'Sub', path: 'My Beats/Sub', parent: 'f-beats' },
+    });
+    expect(folder('f-sub')).toMatchObject({ path: 'My Beats/Sub', parent: 'f-beats' });
+  });
+
+  it('rewrites descendant folder paths and path-holding tracks', async () => {
+    await put({ folderId: 'f-sub', updates: { parent: 'f-beats' } });
+
+    expect(folder('f-deep')!.path).toBe('My Beats/Sub/deep');
+    expect(track('t-sub-path')!.folder).toBe('My Beats/Sub');
+    expect(track('t-deep-path')!.folder).toBe('My Beats/Sub/deep');
+    expect(track('t-path')!.folder).toBe('test');
+    expect(folder('f-test')!.path).toBe('test');
+  });
+
+  it('moves a nested folder to the root', async () => {
+    await put({ folderId: 'f-sub', updates: { parent: null } });
+
+    expect(folder('f-sub')).toMatchObject({ path: 'Sub', parent: null });
+    expect(folder('f-deep')!.path).toBe('Sub/deep');
+  });
+
+  it('refuses with 409 when the new parent already holds a folder of that name, and writes nothing', async () => {
+    fakeState.tables.folders.push(folderRow('f-beats-sub', 'sub', 'My Beats/sub', 'f-beats'));
+
+    const res = await put({ folderId: 'f-sub', updates: { parent: 'f-beats' } });
+
+    expect(res.status).toBe(409);
+    expect(folder('f-sub')).toMatchObject({ path: 'test/Sub', parent: 'f-test' });
+    expect(mutationsOn('folders')).toHaveLength(0);
+  });
+
+  it('rolls the moved folder back (parent and path) when the descendant cascade fails', async () => {
+    fakeState.failUpdate = (table, data) => (table === 'folders' && data.path === 'My Beats/Sub/deep' ? 'boom' : null);
+
+    const res = await put({ folderId: 'f-sub', updates: { parent: 'f-beats' } });
+
+    expect(res.status).toBe(500);
+    expect(folder('f-sub')).toMatchObject({ name: 'Sub', path: 'test/Sub', parent: 'f-test' });
+    expect(folder('f-deep')!.path).toBe('test/Sub/deep');
+    expect(track('t-sub-path')!.folder).toBe('test/Sub');
+  });
+
+  it('still refuses a move into its own descendant', async () => {
+    const res = await put({ folderId: 'f-test', updates: { parent: 'f-deep' } });
+
+    expect(res.status).toBe(400);
+    expect(folder('f-test')).toMatchObject({ path: 'test', parent: null });
+  });
+});
