@@ -451,8 +451,10 @@ export const tracksActions = {
       resolve();
     });
 
+    // The executor above has already run (synchronously) and loaded the tracks: build on the
+    // store as it is now, not on `currentState`, which predates all of that.
     tracksStore.set({
-      ...currentState,
+      ...tracksStore.get(),
       initializationPromise: initPromise,
     });
   },
