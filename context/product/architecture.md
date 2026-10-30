@@ -15,7 +15,7 @@
   - `tracks`: the real store for code, folder, multitrack and steps.
   - `folders`, `profiles`, `file_system_nodes`.
   - `tree_nodes`, `tree_relationships`, `tree_metadata`: partially wired; see spec 002.
-- **Server access:** Astro API routes under `website/src/pages/api/*`. These are tracks, folders, filesystem, tree, library, auth and admin. Admin routes use `SUPABASE_SERVICE_ROLE_KEY`. There are no edge functions.
+- **Server access:** Astro API routes under `website/src/pages/api/*`. These are tracks, folders, filesystem (read-only `tree`), tree, library, auth and admin. User routes and the REPL SSR page act as the user through `api/_userClient.ts` (anon key + the user's token), so RLS applies. `SUPABASE_SERVICE_ROLE_KEY` is read only by the admin surfaces and the OAuth callback; `pages/api/__tests__/serviceKeyScope.test.ts` enforces the list. There are no edge functions.
 - **Client cache:** sample cache settings, and per-browser settings in localStorage. Since autosave became strict, **files require login**: there is no local-only file store.
 
 ## 3. Infrastructure & Deployment

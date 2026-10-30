@@ -1,8 +1,7 @@
 import type { APIRoute } from 'astro';
-import { createClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
 import { getAuthenticatedUser, AuthError } from '../_auth';
-import { serverEnv } from '../../../lib/server-env';
+import { userClient } from '../_userClient';
 import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 
 export const prerender = false;
@@ -38,7 +37,7 @@ export const POST: APIRoute = async ({ request }) => {
     console.log('API /tracks/create - creating track for user:', user.id, { name: trimmedName, folder, isMultitrack });
 
     // Create the track directly using Supabase service role client
-    const supabaseService = createClient(serverEnv().supabaseUrl, serverEnv().supabaseServiceKey);
+    const supabaseService = userClient(accessToken);
 
     // Check if a track with the same name already exists in the same folder
     const { data: existingTracks, error: checkError } = await supabaseService

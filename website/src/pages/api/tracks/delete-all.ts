@@ -1,34 +1,14 @@
 import type { APIRoute } from 'astro';
-import { createClient } from '@supabase/supabase-js';
-import { serverEnv } from '../../../lib/server-env';
+import { getAuthenticatedUser, AuthError } from '../_auth';
+import { userClient } from '../_userClient';
 
 export const prerender = false;
 
-export const DELETE: APIRoute = async ({ cookies }) => {
+export const DELETE: APIRoute = async ({ request }) => {
   try {
-    // Get the session from cookies
-    const accessToken = cookies.get('sb-access-token')?.value;
-    if (!accessToken) {
-      return new Response(JSON.stringify({ error: 'Not authenticated' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Create Supabase client with service role key for server-side operations
-    const supabase = createClient(serverEnv().supabaseUrl, serverEnv().supabaseServiceKey);
-
-    // Verify the user token
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser(accessToken);
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Invalid token' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    // Bearer header, then cookie (api/_auth.ts); as the user, so RLS applies.
+    const { user, accessToken } = await getAuthenticatedUser(request);
+    const supabase = userClient(accessToken);
 
     // Delete all tracks for the user
     const { error: tracksError } = await supabase.from('tracks').delete().eq('user_id', user.id);
@@ -57,6 +37,12 @@ export const DELETE: APIRoute = async ({ cookies }) => {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return new Response(JSON.stringify({ error: 'Not authenticated' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
     console.error('API error:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,

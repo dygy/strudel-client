@@ -7,7 +7,7 @@
  *   so the fake must stay the same instance and only its state is reset.
  * - `useTestEnv()`: placeholder env via `setRuntimeEnv`. Never real keys, never the network.
  * - `apiContext()`: an APIContext-shaped object carrying the token both as a `cookie` header
- *   (batch-import, admin/users) and through `cookies.get` (bulk-create, admin/users).
+ *   (batch-import, admin/users) and through `cookies.get` (admin/users).
  */
 import { vi } from 'vitest';
 import { setRuntimeEnv } from '../../../lib/server-env';
@@ -116,6 +116,18 @@ function queryBuilder(table: string) {
       state.mutations.push(mutation);
       return builder;
     }),
+    order: vi.fn(() => builder),
+    // Resolve to the first matching row, like PostgREST's single object response.
+    single: vi.fn(async () => {
+      const r = result();
+      const rows = Array.isArray(r.data) ? r.data : r.data ? [r.data] : [];
+      return r.error ? r : { data: rows[0] ?? null, error: null };
+    }),
+    maybeSingle: vi.fn(async () => {
+      const r = result();
+      const rows = Array.isArray(r.data) ? r.data : r.data ? [r.data] : [];
+      return r.error ? r : { data: rows[0] ?? null, error: null };
+    }),
     then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
       Promise.resolve(result()).then(resolve, reject),
   };
@@ -183,7 +195,11 @@ export function insertedInto(table: string): Row[] {
 }
 
 export function useTestEnv(): void {
-  setRuntimeEnv({ PUBLIC_SUPABASE_URL: 'http://test', SUPABASE_SERVICE_ROLE_KEY: 'test-service' });
+  setRuntimeEnv({
+    PUBLIC_SUPABASE_URL: 'http://test',
+    PUBLIC_SUPABASE_ANON_KEY: 'test-anon',
+    SUPABASE_SERVICE_ROLE_KEY: 'test-service',
+  });
 }
 
 /** Drop the placeholder env so it can't leak into other files under `isolate: false`. */

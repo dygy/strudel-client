@@ -1,39 +1,25 @@
 import type { APIRoute } from 'astro';
-import { createClient } from '@supabase/supabase-js';
 import { TreeManager } from '../../../lib/TreeManager';
-import { serverEnv } from '../../../lib/server-env';
 import { getAuthenticatedUser, AuthError } from '../_auth';
+import { userClient } from '../_userClient';
 
 export const prerender = false;
-
-// Cloudflare supplies vars and secrets per request rather than at build
-// time, so the client is created on first use instead of at module scope.
-let supabaseClient: ReturnType<typeof createClient> | undefined;
-function getSupabase() {
-  if (!supabaseClient) {
-    const { supabaseUrl, supabaseServiceKey: supabaseKey } = serverEnv();
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase environment variables');
-    }
-    supabaseClient = createClient(supabaseUrl, supabaseKey);
-  }
-  return supabaseClient;
-}
 
 /**
  * Create TreeManager instance for user
  */
-function createTreeManager(userId: string) {
+function createTreeManager(userId: string, accessToken: string) {
   // TreeManager takes a config object; passing the client positionally left config.supabase
   // undefined, so it fell back to process.env (absent on Workers) and every call was a 500.
-  return new TreeManager({ userId, supabase: getSupabase() });
+  // As the user, so RLS applies (the service-role key belongs to /api/admin/* only).
+  return new TreeManager({ userId, supabase: userClient(accessToken) });
 }
 
 // GET /api/tree/validate - Validate tree integrity
 export const GET: APIRoute = async ({ request }) => {
   try {
-    const { user } = await getAuthenticatedUser(request);
-    const treeManager = createTreeManager(user.id);
+    const { user, accessToken } = await getAuthenticatedUser(request);
+    const treeManager = createTreeManager(user.id, accessToken);
 
     const validation = await treeManager.validateTree();
     const cycles = await treeManager.detectCycles();

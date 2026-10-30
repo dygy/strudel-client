@@ -6,11 +6,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiContext, clearTestEnv, fakeState, resetSupabaseFake, signIn, useTestEnv } from './apiTestHelpers';
 
-import { POST as fsBatchCreate } from '../filesystem/batch-create';
-import { POST as fsCreate } from '../filesystem/create';
-import { DELETE as fsDelete } from '../filesystem/delete';
-import { POST as fsMove } from '../filesystem/move';
-import { PUT as fsUpdate } from '../filesystem/update';
 import { POST as folderCreate } from '../folders/create';
 import { PUT as folderUpdate } from '../folders/update';
 import { POST as trackCreate } from '../tracks/create';
@@ -31,16 +26,6 @@ const TOKEN = 'eyJ.test.token';
 
 // A well-formed body for each route, used only to show it is NOT refused as "Invalid data format".
 const routes = [
-  {
-    name: 'POST filesystem/batch-create',
-    handler: fsBatchCreate,
-    method: 'POST',
-    ok: { nodes: [{ id: 'n1', name: 'A', type: 'folder' }] },
-  },
-  { name: 'POST filesystem/create', handler: fsCreate, method: 'POST', ok: { id: 'n1', name: 'A', type: 'folder' } },
-  { name: 'DELETE filesystem/delete', handler: fsDelete, method: 'DELETE', ok: { id: 'n1' } },
-  { name: 'POST filesystem/move', handler: fsMove, method: 'POST', ok: { nodeId: 'n1', newParentId: null } },
-  { name: 'PUT filesystem/update', handler: fsUpdate, method: 'PUT', ok: { id: 'n1', name: 'B' } },
   {
     name: 'POST folders/create',
     handler: folderCreate,

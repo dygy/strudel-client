@@ -1,6 +1,7 @@
 /**
  * Spec 015 §2.4 — importing a library.
- * Units: `api/library/batch-import.ts` (the import the UI calls) and `api/tracks/bulk-create.ts`.
+ * Unit: `api/library/batch-import.ts` (the import the UI calls). The unused bulk-create routes
+ * were removed on 2026-10-30.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -15,8 +16,6 @@ import {
   useTestEnv,
 } from './apiTestHelpers';
 import { POST as batchImport } from '../library/batch-import';
-import { POST as bulkCreate } from '../tracks/bulk-create';
-import { POST as folderBulkCreate } from '../folders/bulk-create';
 
 vi.mock('@supabase/supabase-js', async () => {
   const helpers = await import('./apiTestHelpers');
@@ -27,10 +26,7 @@ const USER = { id: 'user-session', email: 'someone@example.test' };
 const OTHER_USER_ID = 'user-victim';
 const TOKEN = 'eyJ.valid.token'; // JWT-shaped: api/_auth.ts only accepts a cookie value with a dot
 
-const routes = [
-  { name: 'batch-import', url: 'http://test/api/library/batch-import', handler: batchImport },
-  { name: 'tracks/bulk-create', url: 'http://test/api/tracks/bulk-create', handler: bulkCreate },
-] as const;
+const routes = [{ name: 'batch-import', url: 'http://test/api/library/batch-import', handler: batchImport }] as const;
 
 function post(route: (typeof routes)[number], body: unknown, token?: string) {
   return route.handler(apiContext({ url: route.url, method: 'POST', token, body }));
@@ -171,10 +167,7 @@ describe.each(notAListOfTracksAndFolders)('batch-import: a body that is $label',
 
 // Every import route the app can reach refuses a body it cannot read (unparseable JSON or
 // a JSON null) with 400 "Invalid data format", instead of throwing into a 500.
-const allImportRoutes = [
-  ...routes,
-  { name: 'folders/bulk-create', url: 'http://test/api/folders/bulk-create', handler: folderBulkCreate },
-];
+const allImportRoutes = [...routes];
 
 describe.each(allImportRoutes)('$name: an unreadable body', (route) => {
   beforeEach(() => {
@@ -204,10 +197,8 @@ describe.each(allImportRoutes)('$name: an unreadable body', (route) => {
   });
 
   it('a well-formed body is still accepted', async () => {
-    const key = route.name === 'folders/bulk-create' ? 'folders' : 'tracks';
-    const item = key === 'folders' ? { id: 'f1', name: 'Drums', path: 'Drums' } : { name: 'Beat', code: 'x' };
     const res = await route.handler(
-      apiContext({ url: route.url, method: 'POST', token: TOKEN, body: { [key]: [item] } }),
+      apiContext({ url: route.url, method: 'POST', token: TOKEN, body: { tracks: [{ name: 'Beat', code: 'x' }] } }),
     );
 
     expect(res.status).toBe(200);
@@ -317,9 +308,13 @@ describe('batch-import: an imported track never overwrites an existing one', () 
 });
 
 describe('test harness', () => {
-  it('builds the Supabase client from the placeholder env only', async () => {
+  it('builds the Supabase client from the placeholder env only, as the user', async () => {
     signIn(TOKEN, USER);
-    await post(routes[1], { tracks: [] }, TOKEN);
-    expect(createClientMock).toHaveBeenCalledWith('http://test', 'test-service');
+    await post(routes[0], { tracks: [] }, TOKEN);
+    expect(createClientMock).toHaveBeenCalledWith(
+      'http://test',
+      'test-anon',
+      expect.objectContaining({ global: { headers: { Authorization: `Bearer ${TOKEN}` } } }),
+    );
   });
 });

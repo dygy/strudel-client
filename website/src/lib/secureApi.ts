@@ -198,13 +198,6 @@ class SecureApiClient {
     });
   }
 
-  async createFolders(folders: Array<{ name: string; path: string }>): Promise<{ folders: Folder[] }> {
-    return this.request('/folders/bulk-create', {
-      method: 'POST',
-      body: JSON.stringify({ folders }),
-    });
-  }
-
   async deleteAllFolders(): Promise<{ success: boolean }> {
     return this.request('/folders/delete-all', {
       method: 'DELETE',
@@ -390,14 +383,6 @@ export const db = {
       try {
         const result = await secureApi.createFolder(folder);
         return { data: result.folder, error: null };
-      } catch (error) {
-        return { data: null, error };
-      }
-    },
-    bulkCreate: async (folders: Array<{ name: string; path: string }>) => {
-      try {
-        const result = await secureApi.createFolders(folders);
-        return { data: result.folders, error: null };
       } catch (error) {
         return { data: null, error };
       }

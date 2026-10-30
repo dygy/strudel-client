@@ -1,51 +1,15 @@
 import type { APIRoute } from 'astro';
-import { createClient } from '@supabase/supabase-js';
+import { getAuthenticatedUser, AuthError } from '../_auth';
+import { userClient } from '../_userClient';
 import { TreeDataTransformer } from '../../../lib/TreeDataTransformer';
-import { serverEnv } from '../../../lib/server-env';
 
 export const prerender = false;
 
-export const GET: APIRoute = async ({ cookies, request }) => {
+export const GET: APIRoute = async ({ request }) => {
   try {
-    // Try to get access token from Astro cookies first (direct API calls)
-    let accessToken = cookies.get('sb-access-token')?.value;
-
-    // If not found, try parsing from request headers (SSR calls)
-    if (!accessToken) {
-      const cookieHeader = request.headers.get('cookie') || '';
-      const cookieMap = new Map();
-      cookieHeader.split(';').forEach((cookie) => {
-        const [key, value] = cookie.trim().split('=');
-        if (key && value) {
-          cookieMap.set(key, decodeURIComponent(value));
-        }
-      });
-      accessToken = cookieMap.get('sb-access-token');
-    }
-
-    if (!accessToken) {
-      console.log('API tracks/list - No access token found');
-      return new Response(JSON.stringify({ error: 'Not authenticated' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Create Supabase client with service role key for server-side operations
-    const supabase = createClient(serverEnv().supabaseUrl, serverEnv().supabaseServiceKey);
-
-    // Verify the user token
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser(accessToken);
-    if (userError || !user) {
-      console.log('API tracks/list - User verification failed:', userError?.message || 'No user returned');
-      return new Response(JSON.stringify({ error: 'Invalid token' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    // Bearer header, then cookie (api/_auth.ts); as the user, so RLS applies.
+    const { user, accessToken } = await getAuthenticatedUser(request);
+    const supabase = userClient(accessToken);
 
     console.log('API tracks/list - User verified:', user.id);
 
@@ -137,6 +101,12 @@ export const GET: APIRoute = async ({ cookies, request }) => {
       },
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return new Response(JSON.stringify({ error: 'Not authenticated' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
     console.error('API tracks/list error:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,

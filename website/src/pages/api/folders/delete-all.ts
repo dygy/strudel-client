@@ -1,84 +1,19 @@
 import type { APIRoute } from 'astro';
-import { createClient } from '@supabase/supabase-js';
-import { serverEnv } from '../../../lib/server-env';
+import { getAuthenticatedUser, AuthError } from '../_auth';
+import { userClient } from '../_userClient';
 
 export const prerender = false;
 
-// Cloudflare supplies vars and secrets per request rather than at build
-// time, so the client is created on first use instead of at module scope.
-let supabaseClient: ReturnType<typeof createClient> | undefined;
-function getSupabase() {
-  if (!supabaseClient) {
-    const { supabaseUrl, supabaseServiceKey: supabaseKey } = serverEnv();
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase environment variables');
-    }
-    supabaseClient = createClient(supabaseUrl, supabaseKey);
-  }
-  return supabaseClient;
-}
-
 export const DELETE: APIRoute = async ({ request }) => {
   try {
-    console.log('API /folders/delete-all - Starting delete all folders');
-
-    // Get user from session
-    const cookies = request.headers.get('cookie') || '';
-    console.log('API /folders/delete-all - Cookies received:', cookies ? 'present' : 'none');
-
-    // Parse cookies manually
-    const cookieObj: Record<string, string> = {};
-    if (cookies) {
-      cookies.split(';').forEach((cookie) => {
-        const [key, value] = cookie.trim().split('=');
-        if (key && value) {
-          cookieObj[key] = value;
-        }
-      });
-    }
-
-    const cookieKeys = Object.keys(cookieObj);
-    console.log('API /folders/delete-all - Parsed cookie keys:', cookieKeys);
-
-    // Find access token from cookies
-    let accessToken = '';
-    for (const [key, value] of Object.entries(cookieObj)) {
-      console.log(`API /folders/delete-all - Checking cookie: ${key} ${value.substring(0, 20)}...`);
-      if (key === 'sb-access-token' || key.includes('access-token')) {
-        accessToken = value;
-        console.log(`API /folders/delete-all - Found access token in: ${key}`);
-        break;
-      }
-    }
-
-    if (!accessToken) {
-      console.log('API /folders/delete-all - No access token found');
-      return new Response(JSON.stringify({ error: 'Not authenticated' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
-    console.log('API /folders/delete-all - Attempting to verify access token...');
-
-    // Get user from access token
-    const {
-      data: { user },
-      error: userError,
-    } = await getSupabase().auth.getUser(accessToken);
-
-    if (userError || !user) {
-      console.log('API /folders/delete-all - User verification failed:', userError?.message);
-      return new Response(JSON.stringify({ error: 'Invalid session' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    // Bearer header, then cookie (api/_auth.ts); as the user, so RLS applies.
+    const { user, accessToken } = await getAuthenticatedUser(request);
+    const supabase = userClient(accessToken);
 
     console.log('API /folders/delete-all - User verified:', user.id);
 
     // Delete all folders for this user
-    const { error: deleteError } = await getSupabase().from('folders').delete().eq('user_id', user.id);
+    const { error: deleteError } = await supabase.from('folders').delete().eq('user_id', user.id);
 
     if (deleteError) {
       console.error('API /folders/delete-all - Delete error:', deleteError);
@@ -95,6 +30,12 @@ export const DELETE: APIRoute = async ({ request }) => {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return new Response(JSON.stringify({ error: 'Not authenticated' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
     console.error('API /folders/delete-all - Unexpected error:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,

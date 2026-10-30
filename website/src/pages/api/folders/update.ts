@@ -1,7 +1,6 @@
 import type { APIRoute } from 'astro';
-import { createClient } from '@supabase/supabase-js';
 import { getAuthenticatedUser, AuthError } from '../_auth';
-import { serverEnv } from '../../../lib/server-env';
+import { userClient } from '../_userClient';
 import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 import {
   planFolderMove,
@@ -28,7 +27,7 @@ type FolderRow = RenamableFolder & { user_id?: string; created?: string; updated
 export const PUT: APIRoute = async ({ request }) => {
   try {
     // Sign-in is checked before the body is read (api/_auth.ts: Bearer header, then cookie).
-    const { user } = await getAuthenticatedUser(request);
+    const { user, accessToken } = await getAuthenticatedUser(request);
 
     // Unparseable or non-object bodies are refused with 400, not a 500.
     const body = await readJsonObject(request);
@@ -47,9 +46,8 @@ export const PUT: APIRoute = async ({ request }) => {
       return json({ error: 'Folder name must be a string' }, 400);
     }
 
-    // Service-role client: every query below is scoped by the session user's id.
-    const { supabaseUrl, supabaseServiceKey } = serverEnv();
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // As the user, so RLS applies; every query below is also scoped by the session user's id.
+    const supabase = userClient(accessToken);
 
     // The whole folder list of this user: needed for the ownership check, the sibling-name
     // check, the parent/cycle checks and the descendant cascade.

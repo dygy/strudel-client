@@ -1,7 +1,6 @@
 import type { APIRoute } from 'astro';
-import { createClient } from '@supabase/supabase-js';
 import { getAuthenticatedUser, AuthError } from '../_auth';
-import { serverEnv } from '../../../lib/server-env';
+import { userClient } from '../_userClient';
 import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 import { trackNameClashes, type NamedTrack, type PathedFolder } from '../../../lib/trackRename';
 
@@ -20,7 +19,7 @@ const json = (body: unknown, status: number) =>
 export const PUT: APIRoute = async ({ request }) => {
   try {
     // Sign-in is checked before the body is read (api/_auth.ts: Bearer header, then cookie).
-    const { user } = await getAuthenticatedUser(request);
+    const { user, accessToken } = await getAuthenticatedUser(request);
 
     // Unparseable or non-object bodies are refused with 400, not a 500.
     const body = await readJsonObject(request);
@@ -87,8 +86,8 @@ export const PUT: APIRoute = async ({ request }) => {
       return json({ error: 'Nothing to update' }, 400);
     }
 
-    // Service-role client: every query below is scoped by the session user's id.
-    const supabase = createClient(serverEnv().supabaseUrl, serverEnv().supabaseServiceKey);
+    // As the user, so RLS applies; every query below is also scoped by the session user's id.
+    const supabase = userClient(accessToken);
 
     // A rename or move needs this user's tracks and folders for the sibling check; a plain code
     // save (autosave) does not, and must stay a single query.
