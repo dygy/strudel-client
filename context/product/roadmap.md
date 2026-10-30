@@ -33,6 +33,7 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
   - [x] **Screen and tab recording:** WebM ([014](../spec/014-screen-recorder/)).
   - [x] **Embed REPL for MIDI-grep** ([007](../spec/007-midi-grep-embed-integration/)).
 - [x] **Reach more people:** 9 locales and RTL; Cloudflare Workers hosting; Weaver analytics.
+- [x] **Phones and tablets:** a compact REPL layout for phones, tablets held upright and landscape: a bottom control bar, the library as a drawer, the settings as a sheet, a touch EQ and mixer ([016](../spec/016-responsive-repl-layout/), 4148d63).
 
 ---
 

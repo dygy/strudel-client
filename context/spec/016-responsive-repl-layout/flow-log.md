@@ -56,3 +56,15 @@
 - Orchestrator measured: HEAD 0/6 hangs; current tree 3–5/8 hangs. The bisect points at CompactLayout.test.tsx and LibraryDrawer.test.tsx together (excluding both: 0/8). Not fake timers.
 - Disk full again mid-run (an external consumer, 15 GiB gone). The orchestrator removed website/dist (git-ignored build output, regenerable; CI builds remotely). No other user files touched.
 - Sent back to the web agent: find the root cause, done = 0/15 hangs. A push is blocked until then.
+
+## 2026-10-30 — hang fixed, shipped
+- Root cause of the hang (web agent; orchestrator re-ran it, 0/15): Code.tsx's post-init setTimeout wasn't cleared on unmount, so in tests it fired after jsdom teardown ("window is not defined"), hanging the single worker. Fixed with an unmount cleanup; the Code-timer test is RED→GREEN.
+- Final local checks: vitest 1540/1540 (69 files), format and lint clean; the single-worker bisect shows 0/15 hangs.
+- The local main held another session's unpushed commit d52f9fb (spec 017). So the work was committed on feat/016-responsive (from 5c379c6) and pushed as `HEAD:main`; d52f9fb was not published.
+- Commits: c9ec57e feat(repl) + 4148d63 docs. Deploy run 41004022445: green (check + deploy).
+- Prod check:
+  - /login serves the new viewport meta;
+  - the new `closeLibrary` key is in all 9 locale bundles, so the artifact contains 016.
+  - The logged-in /repl was not exercised: the Chrome extension isn't responding and there is no local Supabase.
+  - Owner checks on a real device: the on-screen keyboard (iOS + Android), native long press vs drag, safe areas in landscape.
+- Agents this run: Explore 1, web 1 (resumed 4×), audio 1 (resumed 1×), test engineer 1, reviewer 1 = 5 dispatches.

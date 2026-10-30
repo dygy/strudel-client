@@ -1,7 +1,7 @@
 # Functional Specification: Responsive REPL Layout for Phones, Tablets and Landscape
 
 - **Roadmap Item:** Not on the roadmap. Requested by the owner in chat on 2026-10-29: on a phone the settings could not be closed and covered all the code, and they want "an adaptive layout at last". No GitHub issue.
-- **Status:** In Review
+- **Status:** Completed — live since 4148d63 (2026-10-30). Checks on a real device (on-screen keyboard, native long press and drag) are owner checks; see flow-log.
 - **Author:** Claude (for the owner, Dygy)
 
 ---

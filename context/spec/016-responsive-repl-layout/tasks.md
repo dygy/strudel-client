@@ -97,6 +97,6 @@ Every task must:
   - [x] 5.1 Read the functional spec's acceptance criteria in full. Fill the gaps not covered by slices 1–4 with acceptance-level jsdom tests (unsaved edit survives drawer, sheet and rotation; admin read-only on compact; login at 390), RED-validated, annotated `@spec: 016-responsive-repl-layout`. **[Agent: strudel-test-engineer]**
   - [x] 5.2 Run the whole suite with default workers and with `--maxWorkers=1`; all green. **[Agent: strudel-test-engineer]**
 
-- [ ] **Slice 6: Bookkeeping**
+- [x] **Slice 6: Bookkeeping**
   - [x] 6.1 `context/product/feature-map.md`: a row for the responsive layout (paths, spec 016, tests); update the settings-panel row to point at 016. **[Agent: orchestrator]**
-  - [ ] 6.2 The spec Status becomes Completed; flow-log entries; a memory note. No migration (no schema change). **[Agent: orchestrator]**
+  - [x] 6.2 The spec Status becomes Completed; flow-log entries; a memory note. No migration (no schema change). **[Agent: orchestrator]**
