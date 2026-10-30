@@ -2,18 +2,17 @@
  * Admin authentication utilities
  */
 
-export const ADMIN_EMAIL = 'a.shvartcman@gmail.com';
-
-/**
- * Check if the given email is an admin email
- */
-export function isAdmin(email: string | undefined | null): boolean {
-  return email === ADMIN_EMAIL;
+/** A user as Supabase auth returns it: only `app_metadata` matters here. */
+export interface RoleCarrier {
+  app_metadata?: Record<string, unknown> | null;
 }
 
 /**
- * Check if the current user (from Supabase auth) is an admin
+ * Is this user an admin? The role is `app_metadata.role === 'admin'`. `app_metadata` can only be
+ * written with the service-role key (Supabase Admin API), never by the user, unlike
+ * `user_metadata`, so it is safe to trust. Grant or revoke it with
+ * `PUT /auth/v1/admin/users/<id>` `{ "app_metadata": { "role": "admin" } }`.
  */
-export function isAdminUser(user: { email?: string | null } | null): boolean {
-  return isAdmin(user?.email);
+export function isAdminUser(user: RoleCarrier | null | undefined): boolean {
+  return user?.app_metadata?.role === 'admin';
 }

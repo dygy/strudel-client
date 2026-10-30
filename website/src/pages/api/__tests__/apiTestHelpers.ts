@@ -17,6 +17,7 @@ export type Row = Record<string, any>;
 export interface FakeUser {
   id: string;
   email?: string | null;
+  app_metadata?: Record<string, unknown>;
 }
 
 interface FakeState {

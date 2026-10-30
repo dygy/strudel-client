@@ -7,7 +7,7 @@ import { I18nProvider } from '../../../components/I18nProvider';
 import { createClient } from '@supabase/supabase-js';
 import { TreeDataTransformer } from '../../../lib/TreeDataTransformer';
 import { parseTrackUrlPath, trackNameToSlug, findTrackByFolderAndSlug } from '../../../lib/slugUtils';
-import { isAdmin } from '../../../lib/adminAuth';
+import { isAdminUser } from '../../../lib/adminAuth';
 
 import type { SSRData } from '../../../types/ssr';
 import { serverEnv } from '../../../lib/server-env';
@@ -86,7 +86,7 @@ try {
   }
 
   // Check if current user is admin
-  if (!isAdmin(currentUser.email)) {
+  if (!isAdminUser(currentUser)) {
     console.log('Admin REPL SSR - Non-admin user attempting to access:', currentUser.email);
     return Astro.redirect('/repl');
   }

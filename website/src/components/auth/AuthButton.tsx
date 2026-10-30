@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTranslation } from 'react-i18next';
-import { isAdmin } from '../../lib/adminAuth';
 
 interface AuthButtonProps {
   className?: string;
@@ -254,7 +253,7 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
           </div>
 
           <div className="p-1">
-            {isAdmin(userInfo.email) && (
+            {user?.isAdmin === true && (
               <a
                 href="/admin"
                 className="w-full text-left px-3 py-2 text-sm text-yellow-400 hover:bg-yellow-900 hover:bg-opacity-20 rounded-md transition-colors duration-200 flex items-center gap-2"

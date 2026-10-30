@@ -69,5 +69,5 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
 ### Phase 5 — Debt and decisions (later)
 
 - [x] **Tree filesystem: finish or remove.** Removed. No UI called `/api/tree/*` ([002](../spec/002-scalable-tree-filesystem/)), and the routes queried with the anon key without the user's token, so RLS left their reads empty. The routes, `TreeManager`, `TreeSystem` and the unused `secureApi` wrappers (tree, migration, database setup, `createFolder`) were deleted on 2026-10-30. The `tree_*` tables and `lib/database/{tree-schema.sql,migrate-to-tree.ts}` stay; dropping the tables would be its own approved migration.
-- [ ] **Admin identity:** replace the hardcoded admin email with a role.
+- [x] **Admin identity:** the hardcoded admin email is replaced by a role, `app_metadata.role === 'admin'`, which only the service role can write (users can edit `user_metadata`, not `app_metadata`). The role was granted on prod to the owner's account before the deploy; grant or revoke it with the Admin API (`PUT /auth/v1/admin/users/<id>`). Done 2026-10-30.
 - [x] **Remove the Heroku leftovers:** `Dockerfile`, `server.js` and the `express` dependency only `server.js` used (removed 2026-10-30).

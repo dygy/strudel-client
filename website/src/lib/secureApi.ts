@@ -32,6 +32,8 @@ export interface User {
   email: string;
   name?: string;
   avatar?: string;
+  /** From /api/auth/user (app_metadata.role); for showing the admin link only. */
+  isAdmin?: boolean;
   user_metadata?: {
     full_name?: string;
     name?: string;

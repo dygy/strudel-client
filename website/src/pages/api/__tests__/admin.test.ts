@@ -1,6 +1,9 @@
 /**
  * Spec 015 §2.5 — admin view.
- * Units: `lib/adminAuth.ts` (`isAdmin`, `isAdminUser`) and `api/admin/users.ts` (GET).
+ * Units: `lib/adminAuth.ts` (`isAdminUser`) and `api/admin/users.ts` (GET).
+ *
+ * Admin is the `app_metadata.role` only the service role can set — never the address (it used to be
+ * one hardcoded email, 2026-10-30) and never `user_metadata`, which users can write themselves.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -12,8 +15,9 @@ import {
   supabaseFake,
   useTestEnv,
 } from './apiTestHelpers';
-import { ADMIN_EMAIL, isAdmin, isAdminUser } from '../../../lib/adminAuth';
+import { isAdminUser } from '../../../lib/adminAuth';
 import { GET as listAdminUsers } from '../admin/users';
+import { GET as authUser } from '../auth/user';
 
 vi.mock('@supabase/supabase-js', async () => {
   const helpers = await import('./apiTestHelpers');
@@ -21,38 +25,29 @@ vi.mock('@supabase/supabase-js', async () => {
 });
 
 const URL_USERS = 'http://test/api/admin/users';
-const ADMIN = { id: 'admin-id', email: ADMIN_EMAIL };
+const ADMIN_ADDRESS = 'owner@example.test';
+const ADMIN = { id: 'admin-id', email: ADMIN_ADDRESS, app_metadata: { role: 'admin' } };
 const NORMAL = { id: 'normal-id', email: 'listener@example.test' };
 
-function swapCase(s: string): string {
-  return [...s].map((c) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase())).join('');
-}
-
-describe('isAdmin: only the exact admin address is admin', () => {
-  it('accepts the exact admin address', () => {
-    expect(isAdmin(ADMIN_EMAIL)).toBe(true);
-    expect(isAdminUser({ email: ADMIN_EMAIL })).toBe(true);
+describe('isAdminUser: only app_metadata.role "admin" is admin', () => {
+  it('accepts the admin role', () => {
+    expect(isAdminUser({ app_metadata: { role: 'admin' } })).toBe(true);
+    expect(isAdminUser({ app_metadata: { provider: 'google', role: 'admin' } })).toBe(true);
   });
 
-  it('refuses a capitalisation variant of the admin address', () => {
-    expect(swapCase(ADMIN_EMAIL)).not.toBe(ADMIN_EMAIL);
-    expect(isAdmin(ADMIN_EMAIL.toUpperCase())).toBe(false);
-    expect(isAdmin(swapCase(ADMIN_EMAIL))).toBe(false);
-    expect(isAdminUser({ email: ADMIN_EMAIL.toUpperCase() })).toBe(false);
+  it('refuses any other role value', () => {
+    for (const role of ['Admin', 'ADMIN', ' admin', 'admin ', 'administrator', '', true, 1, ['admin'], null]) {
+      expect(isAdminUser({ app_metadata: { role } })).toBe(false);
+    }
   });
 
-  it('refuses an address that differs in any other way', () => {
-    expect(isAdmin(` ${ADMIN_EMAIL}`)).toBe(false);
-    expect(isAdmin(`${ADMIN_EMAIL}.evil.test`)).toBe(false);
-    expect(isAdmin('')).toBe(false);
-  });
-
-  it('refuses null and undefined', () => {
-    expect(isAdmin(null)).toBe(false);
-    expect(isAdmin(undefined)).toBe(false);
-    expect(isAdminUser(null)).toBe(false);
+  it('refuses users without the role, whatever their address or user_metadata', () => {
+    expect(isAdminUser({ app_metadata: { provider: 'google' } })).toBe(false);
+    expect(isAdminUser({ app_metadata: null })).toBe(false);
+    expect(isAdminUser({ email: ADMIN_ADDRESS, user_metadata: { role: 'admin' } } as never)).toBe(false);
     expect(isAdminUser({})).toBe(false);
-    expect(isAdminUser({ email: null })).toBe(false);
+    expect(isAdminUser(null)).toBe(false);
+    expect(isAdminUser(undefined)).toBe(false);
   });
 });
 
@@ -109,8 +104,8 @@ describe('GET /api/admin/users: only the admin sees the overview', () => {
     expectNoUserDataRead();
   });
 
-  it('refuses an account whose address is a capitalisation variant of the admin with 403', async () => {
-    signIn('variant-token', { id: 'variant-id', email: ADMIN_EMAIL.toUpperCase() });
+  it('refuses an account with the admin address but no admin role with 403', async () => {
+    signIn('variant-token', { id: 'variant-id', email: ADMIN_ADDRESS });
     const res = await listAdminUsers(apiContext({ url: URL_USERS, token: 'variant-token' }));
     expect(res.status).toBe(403);
     expectNoUserDataRead();
@@ -126,5 +121,26 @@ describe('GET /api/admin/users: only the admin sees the overview', () => {
     expect(counts).toEqual({ [ADMIN.email]: 1, [NORMAL.email]: 2, 'idle@example.test': 0 });
     expect(supabaseFake.auth.admin.listUsers).toHaveBeenCalledTimes(1);
     expect(supabaseFake.from).toHaveBeenCalledWith('tracks');
+  });
+});
+
+describe('GET /api/auth/user: isAdmin follows the role (shows the admin link only)', () => {
+  beforeEach(() => {
+    resetSupabaseFake();
+    useTestEnv();
+  });
+  afterEach(() => clearTestEnv());
+
+  const userFor = async (token: string) =>
+    (await (await authUser(apiContext({ url: 'http://test/api/auth/user', token }))).json()).user;
+
+  it('is true for the admin role and false otherwise', async () => {
+    signIn('eyJ.admin.token', ADMIN);
+    signIn('eyJ.normal.token', NORMAL);
+    signIn('eyJ.address.token', { id: 'address-id', email: ADMIN_ADDRESS });
+
+    expect((await userFor('eyJ.admin.token')).isAdmin).toBe(true);
+    expect((await userFor('eyJ.normal.token')).isAdmin).toBe(false);
+    expect((await userFor('eyJ.address.token')).isAdmin).toBe(false);
   });
 });

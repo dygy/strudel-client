@@ -1,10 +1,10 @@
 ---
 // Admin Dashboard Page
-// Only accessible to admin users (a.shvartcman@gmail.com)
+// Only accessible to admin users (app_metadata.role === "admin", see lib/adminAuth.ts)
 import HeadCommon from '../components/HeadCommon.astro';
 import { AdminDashboard } from '../components/admin/AdminDashboard';
 import { createClient } from '@supabase/supabase-js';
-import { isAdmin } from '../lib/adminAuth';
+import { isAdminUser } from '../lib/adminAuth';
 import { serverEnv } from '../lib/server-env';
 import { loginUrlFor } from '../lib/authRedirect';
 import { isInvalidSessionError } from '../lib/authErrorKind';
@@ -52,7 +52,7 @@ if (!user || userError) {
 }
 
 // Check admin status
-if (!isAdmin(user.email)) {
+if (!isAdminUser(user)) {
   console.log('Admin page - Non-admin access attempt:', user.email);
   return Astro.redirect('/repl');
 }

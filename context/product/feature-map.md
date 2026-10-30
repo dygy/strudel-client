@@ -69,7 +69,7 @@ Last surveyed: 2026-10-08.
 |---|---|---|---|---|---|
 | Google OAuth through Supabase: session restore, refresh, health monitoring | F | `contexts/AuthContext.tsx`; `stores/authStore.ts`; `lib/{supabase,supabaseClient,authUtils,authListener,secureApi,authCookies,authRedirect,authCheck}.ts`; `/api/auth/*`; `/login`; `/auth/callback`. The client supabase-js is the only refresh owner: only the access token is mirrored to a cookie, and no server route refreshes | none | `lib/__tests__/{authCookies,authRedirect}`; `stores/__tests__/authStore-session`; `pages/api/__tests__/authSession` | web |
 | Data model (`profiles`, `tracks`, `folders`, `file_system_nodes`, `tree_*`; RLS by `auth.uid()`) | F | `supabase_schema.sql`; `website/src/lib/database/tree-schema.sql`; types in `website/database.types.ts` | none | none | web |
-| Admin read-only dashboard | F | `pages/admin.astro`; `components/admin/AdminDashboard.tsx`; `/api/admin/users`; `lib/adminAuth.ts` (hardcoded admin email) | none | `pages/api/__tests__/admin.test.ts`: exact-match admin, 401/403/200, no service-role reads before the admin check | web |
+| Admin read-only dashboard | F | `pages/admin.astro`; `components/admin/AdminDashboard.tsx`; `/api/admin/users`; `lib/adminAuth.ts` (admin = `app_metadata.role === 'admin'`, set only via the Admin API) | none | `pages/api/__tests__/admin.test.ts`: exact role match (not the address, not `user_metadata`), 401/403/200, no service-role reads before the admin check | web |
 
 ## Recording and embed
 

@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getAuthenticatedUser, AuthError } from '../_auth';
+import { isAdminUser } from '../../../lib/adminAuth';
 import { ACCESS_TOKEN_COOKIE, SERVER_ACCESS_COOKIE_OPTIONS } from '../../../lib/authCookies';
 
 export const prerender = false;
@@ -53,6 +54,8 @@ export const GET: APIRoute = async ({ request, cookies }) => {
           email: user.email,
           name: typeof metadata.full_name === 'string' ? metadata.full_name : user.email,
           avatar: typeof metadata.avatar_url === 'string' ? metadata.avatar_url : undefined,
+          // Shows the admin link only; every admin surface checks the role itself.
+          isAdmin: isAdminUser(user),
         },
         sessionExpiresAt: jwtExpiry(accessToken),
       },
