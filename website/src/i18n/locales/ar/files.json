@@ -146,7 +146,8 @@
     "renameFailed": "فشل إعادة تسمية العنصر",
     "folderNameEmpty": "لا يمكن أن يكون اسم المجلد فارغًا",
     "folderNameSlash": "لا يمكن أن يحتوي اسم المجلد على \"/\"",
-    "folderNameTaken": "يوجد مجلد باسم '{{name}}' هنا بالفعل"
+    "folderNameTaken": "يوجد مجلد باسم '{{name}}' هنا بالفعل",
+    "trackNameTaken": "يوجد مقطع باسم '{{name}}' هنا بالفعل"
   },
 
   "success": {

@@ -147,7 +147,8 @@
     "renameFailed": "重命名项目失败",
     "folderNameEmpty": "文件夹名称不能为空",
     "folderNameSlash": "文件夹名称不能包含 \"/\"",
-    "folderNameTaken": "此处已存在名为 '{{name}}' 的文件夹"
+    "folderNameTaken": "此处已存在名为 '{{name}}' 的文件夹",
+    "trackNameTaken": "此处已存在名为 '{{name}}' 的音轨"
   },
 
   "success": {

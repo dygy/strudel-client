@@ -147,7 +147,8 @@
     "renameFailed": "항목 이름 변경 실패",
     "folderNameEmpty": "폴더 이름은 비워 둘 수 없습니다",
     "folderNameSlash": "폴더 이름에 \"/\"를 사용할 수 없습니다",
-    "folderNameTaken": "이곳에 '{{name}}' 폴더가 이미 있습니다"
+    "folderNameTaken": "이곳에 '{{name}}' 폴더가 이미 있습니다",
+    "trackNameTaken": "이곳에 '{{name}}' 트랙이 이미 있습니다"
   },
 
   "success": {

@@ -17,6 +17,7 @@ import {
   type FolderRenamePlan,
 } from '@src/lib/folderRename';
 import { validateTrackName, generateUniqueTrackName } from '@src/lib/trackValidation';
+import { followedTrackUrl, resolveTrackFolder, trackNameClashes } from '@src/lib/trackRename';
 import type { Track, TrackStep, Folder } from '../types/fileManager';
 
 interface UseFileManagerOperationsProps {
@@ -149,6 +150,8 @@ export function useFileManagerOperations({
 }: UseFileManagerOperationsProps) {
   // Enter and the input's blur can both finish the same rename; only the first one counts.
   const folderRenameInFlightRef = useRef(false);
+  // Enter then blur both finish a track rename; only the first one is sent.
+  const trackRenameInFlightRef = useRef(false);
 
   const createNewTrack = useCallback(
     (parentPath?: string) => {
@@ -575,35 +578,115 @@ export function useFileManagerOperations({
     setRenameValue('');
   }, [setRenamingTrack, setRenamingFolder, setRenamingStep, setRenameValue]);
 
-  const finishRename = useCallback(() => {
-    if (renamingTrack && renameValue.trim()) {
-      const track = tracks[renamingTrack];
-      const oldName = track?.name;
-      const newName = renameValue.trim();
+  /**
+   * Persist a track rename or move: apply it optimistically (sidebar, tracks store and the open
+   * track's URL — the autosave guard resolves the open track from the URL), send it to
+   * /api/tracks/update, and undo it if the server refuses.
+   */
+  const commitTrackChange = useCallback(
+    async (
+      trackId: string,
+      local: { name?: string; folder?: string },
+      server: { name?: string; folder?: string | null },
+      successKey: string,
+      failKey: string,
+    ) => {
+      const before = tracks[trackId];
+      if (!before) return;
+      const previous = { name: before.name, folder: before.folder };
+      const next = { ...previous, ...local };
 
-      if (track && oldName && oldName !== newName) {
-        // Validate the new track name
-        const validationError = validateTrackName(newName, track.folder, tracks, renamingTrack);
-        if (validationError) {
-          toastActions.error(validationError);
-          return;
+      const oldUrl = typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : '';
+      const oldActivePattern = getActivePattern();
+      const newUrl =
+        typeof window !== 'undefined'
+          ? followedTrackUrl(window.location, Object.values(tracks), Object.values(folders), trackId, next)
+          : null;
+
+      const applyLocally = (values: { name?: string; folder?: string }, url: string | null, pattern: string | null) => {
+        setTracks((prev) =>
+          prev[trackId]
+            ? { ...prev, [trackId]: { ...prev[trackId], ...values, modified: new Date().toISOString() } }
+            : prev,
+        );
+        if (tracksSelectors.getTrack(trackId)) tracksActions.updateTrack(trackId, values);
+        if (url) {
+          // replaceState: same track, same audio — no navigation, no reload.
+          window.history.replaceState(window.history.state, '', url);
+          if (pattern !== null) setActivePattern(pattern);
         }
+      };
 
-        setTracks((prev) => ({
-          ...prev,
-          [renamingTrack]: {
-            ...prev[renamingTrack],
-            name: newName,
-            modified: new Date().toISOString(),
-          },
-        }));
+      applyLocally(local, newUrl, newUrl ? newUrl.replace(/^\/repl\//, '') : null);
 
-        toastActions.success(t('files:trackRenamed'));
+      let failure: 'duplicate' | 'failed' | null = null;
+      try {
+        const response = await fetch('/api/tracks/update', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ trackId, updates: server }),
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          console.error('FileManager - track update refused:', response.status, data);
+          failure = response.status === 409 ? 'duplicate' : 'failed';
+        }
+      } catch (error: unknown) {
+        console.error('FileManager - track update failed:', error);
+        failure = 'failed';
       }
+
+      if (!failure) {
+        toastActions.success(t(successKey));
+        return;
+      }
+      // Only undo the URL if nothing navigated away from it meanwhile.
+      const atNewUrl = newUrl !== null && `${window.location.pathname}${window.location.search}` === newUrl;
+      applyLocally(previous, atNewUrl ? oldUrl : null, atNewUrl ? oldActivePattern : null);
+      toastActions.error(failure === 'duplicate' ? t('files:errors.trackNameTaken', { name: next.name }) : t(failKey));
+    },
+    [tracks, folders, setTracks, t],
+  );
+
+  const finishRename = useCallback(async () => {
+    const trackId = renamingTrack;
+    const newName = renameValue.trim();
+    const track = trackId ? tracks[trackId] : undefined;
+    const closeInput = () => {
+      setRenamingTrack(null);
+      setRenameValue('');
+    };
+    if (trackRenameInFlightRef.current) return;
+    if (readOnly || !trackId || !track || !newName || track.name === newName) {
+      closeInput();
+      return;
     }
-    setRenamingTrack(null);
-    setRenameValue('');
-  }, [renamingTrack, renameValue, tracks, setTracks, setRenamingTrack, setRenameValue, t]);
+
+    // Empty / too long / characters that break URLs, then a sibling with the same name or URL.
+    const error = trackNameClashes(newName, track.folder, trackId, Object.values(tracks), Object.values(folders))
+      ? t('files:errors.trackNameTaken', { name: newName })
+      : validateTrackName(newName, track.folder, tracks, trackId);
+    if (error) {
+      // Keep the input open so the name can be corrected.
+      toastActions.error(error);
+      return;
+    }
+
+    closeInput();
+    trackRenameInFlightRef.current = true;
+    try {
+      await commitTrackChange(
+        trackId,
+        { name: newName },
+        { name: newName },
+        'files:trackRenamed',
+        'files:errors.renameFailed',
+      );
+    } finally {
+      trackRenameInFlightRef.current = false;
+    }
+  }, [readOnly, renamingTrack, renameValue, tracks, folders, setRenamingTrack, setRenameValue, commitTrackChange, t]);
 
   /**
    * Persist a folder rename or move: apply it optimistically (folders, path-holding tracks, the
@@ -734,99 +817,32 @@ export function useFileManagerOperations({
       });
 
       if (itemType === 'track') {
-        // Store original folder for potential revert
         const originalTrack = tracks[itemId];
-        const originalFolder = originalTrack?.folder;
+        if (!originalTrack) return;
 
-        // Convert targetId to folder path for local state (UI expects paths)
-        let targetPath: string | undefined;
-        if (targetId) {
-          // Find the target folder by UUID and get its path
-          const targetFolder = folders[targetId] || Object.values(folders).find((f) => f.id === targetId);
-          if (targetFolder) {
-            targetPath = targetFolder.path;
-            console.log(`handleMoveItem - Found target folder UUID "${targetId}" with path: ${targetPath}`);
-          } else {
-            console.warn(`handleMoveItem - Target folder not found for UUID: ${targetId}`);
-            // If we can't find the folder by UUID, assume targetId is already a path
-            targetPath = targetId;
-          }
+        // The sidebar keeps the folder PATH locally; the database stores the folder id.
+        const targetFolder = targetId
+          ? folders[targetId] || Object.values(folders).find((f) => f.id === targetId)
+          : undefined;
+        const targetPath = targetFolder ? targetFolder.path : targetId || undefined;
+        if (
+          resolveTrackFolder(originalTrack.folder, Object.values(folders)) ===
+          resolveTrackFolder(targetPath, Object.values(folders))
+        ) {
+          return; // dropped where it already is
         }
-
-        // Update local state immediately for responsive UI
-        setTracks((prev) => ({
-          ...prev,
-          [itemId]: {
-            ...prev[itemId],
-            folder: targetPath || undefined,
-            modified: new Date().toISOString(),
-          },
-        }));
-
-        // Update the database using the corrected legacy update endpoint
-        try {
-          console.log(`handleMoveItem - Updating database: trackId=${itemId}, folder=${targetId || null}`);
-
-          const updateResponse = await fetch('/api/tracks/update', {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-              trackId: itemId,
-              updates: {
-                folder: targetId || null, // Use UUID directly for database storage
-                modified: new Date().toISOString(),
-              },
-            }),
-          });
-
-          if (!updateResponse.ok) {
-            const errorText = await updateResponse.text();
-            let errorData;
-            try {
-              errorData = JSON.parse(errorText);
-            } catch {
-              errorData = { error: errorText };
-            }
-            console.error('handleMoveItem - Failed to update track in database:', {
-              status: updateResponse.status,
-              statusText: updateResponse.statusText,
-              error: errorData,
-            });
-
-            // Revert local state on database error
-            setTracks((prev) => ({
-              ...prev,
-              [itemId]: {
-                ...prev[itemId],
-                folder: originalFolder, // Revert to original folder
-              },
-            }));
-
-            toastActions.error('Failed to move track. Please try again.');
-            return;
-          }
-
-          const result = await updateResponse.json();
-          console.log('handleMoveItem - Track updated successfully in database:', result);
-          toastActions.success(t('files:trackMoved'));
-        } catch (error) {
-          console.error('handleMoveItem - Error updating track in database:', error);
-
-          // Revert local state on error
-          setTracks((prev) => ({
-            ...prev,
-            [itemId]: {
-              ...prev[itemId],
-              folder: originalFolder, // Revert to original folder
-            },
-          }));
-
-          toastActions.error('Failed to move track. Please try again.');
+        if (trackNameClashes(originalTrack.name, targetPath, itemId, Object.values(tracks), Object.values(folders))) {
+          toastActions.error(t('files:errors.trackNameTaken', { name: originalTrack.name }));
           return;
         }
+
+        await commitTrackChange(
+          itemId,
+          { folder: targetPath },
+          { folder: targetId || null },
+          'files:trackMoved',
+          'files:errors.moveFailed',
+        );
       } else if (itemType === 'folder') {
         // Handle folder moving
         const originalFolder = folders[itemId];
@@ -878,7 +894,7 @@ export function useFileManagerOperations({
       }
       // Implementation complete - removed TODO comment
     },
-    [setTracks, setFolders, folders, tracks, t, toastActions, commitFolderPlan],
+    [folders, tracks, t, commitFolderPlan, commitTrackChange],
   );
 
   const convertToMultitrack = useCallback(

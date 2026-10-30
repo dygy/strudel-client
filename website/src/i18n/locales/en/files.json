@@ -146,7 +146,8 @@
     "renameFailed": "Failed to rename item",
     "folderNameEmpty": "Folder name cannot be empty",
     "folderNameSlash": "Folder name cannot contain \"/\"",
-    "folderNameTaken": "A folder named '{{name}}' already exists here"
+    "folderNameTaken": "A folder named '{{name}}' already exists here",
+    "trackNameTaken": "A track named '{{name}}' already exists here"
   },
   
   "success": {

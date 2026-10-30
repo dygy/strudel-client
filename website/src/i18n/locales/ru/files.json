@@ -146,7 +146,8 @@
     "renameFailed": "Не удалось переименовать элемент",
     "folderNameEmpty": "Имя папки не может быть пустым",
     "folderNameSlash": "Имя папки не может содержать \"/\"",
-    "folderNameTaken": "Папка с именем '{{name}}' здесь уже есть"
+    "folderNameTaken": "Папка с именем '{{name}}' здесь уже есть",
+    "trackNameTaken": "Трек с именем '{{name}}' здесь уже есть"
   },
 
   "success": {

@@ -146,7 +146,8 @@
     "renameFailed": "שינוי שם הפריט נכשל",
     "folderNameEmpty": "שם התיקייה לא יכול להיות ריק",
     "folderNameSlash": "שם התיקייה לא יכול להכיל \"/\"",
-    "folderNameTaken": "תיקייה בשם '{{name}}' כבר קיימת כאן"
+    "folderNameTaken": "תיקייה בשם '{{name}}' כבר קיימת כאן",
+    "trackNameTaken": "טראק בשם '{{name}}' כבר קיים כאן"
   },
 
   "success": {

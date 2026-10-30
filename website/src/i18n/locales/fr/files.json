@@ -146,7 +146,8 @@
     "renameFailed": "Échec du renommage de l'élément",
     "folderNameEmpty": "Le nom du dossier ne peut pas être vide",
     "folderNameSlash": "Le nom du dossier ne peut pas contenir \"/\"",
-    "folderNameTaken": "Un dossier nommé '{{name}}' existe déjà ici"
+    "folderNameTaken": "Un dossier nommé '{{name}}' existe déjà ici",
+    "trackNameTaken": "Une piste nommée '{{name}}' existe déjà ici"
   },
 
   "success": {

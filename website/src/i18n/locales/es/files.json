@@ -146,7 +146,8 @@
     "renameFailed": "Error al renombrar elemento",
     "folderNameEmpty": "El nombre de la carpeta no puede estar vacío",
     "folderNameSlash": "El nombre de la carpeta no puede contener \"/\"",
-    "folderNameTaken": "Ya existe una carpeta llamada '{{name}}' aquí"
+    "folderNameTaken": "Ya existe una carpeta llamada '{{name}}' aquí",
+    "trackNameTaken": "Ya existe una pista llamada '{{name}}' aquí"
   },
 
   "success": {
