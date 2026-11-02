@@ -6,6 +6,7 @@
 // Import Prettier and plugins
 import * as prettier from 'prettier';
 import * as parserBabel from 'prettier/plugins/babel';
+import { splitGluedAfterNumbers } from './splitGlued.mjs';
 import * as parserTypeScript from 'prettier/plugins/typescript';
 import * as parserEstree from 'prettier/plugins/estree';
 
@@ -159,12 +160,12 @@ function formatStrudelCode(code, options) {
     .replace(/;(await|let|const|var|function)\s/g, ';\n$1 ')
     // Add line breaks after ) followed by any identifier (more general)
     .replace(/\)([a-zA-Z_$][a-zA-Z0-9_$]*)/g, ')\n$1')
-    // Add line breaks after numbers followed by identifiers (like "175let")
-    .replace(/([0-9])([a-zA-Z_$][a-zA-Z0-9_$]*)/g, '$1\n$2')
-    // Add line breaks before Strudel patterns (identifier:) when they follow ) or numbers
-    .replace(/(\)|[0-9])([a-zA-Z_$][a-zA-Z0-9_$]*\s*:)/g, '$1\n$2')
+    // Add line breaks before Strudel patterns (identifier:) when they follow )
+    .replace(/\)([a-zA-Z_$][a-zA-Z0-9_$]*\s*:)/g, ')\n$1')
     // Add line breaks after } followed by identifiers
     .replace(/\}([a-zA-Z_$][a-zA-Z0-9_$]*)/g, '}\n$1');
+  // Add line breaks after numbers followed by a glued statement (like "175let"), never inside a literal
+  preprocessedCode = splitGluedAfterNumbers(preprocessedCode);
 
   // DON'T restore strings yet - keep placeholders through formatting
   const lines = preprocessedCode.split('\n');

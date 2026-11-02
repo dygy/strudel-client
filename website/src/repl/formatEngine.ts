@@ -2,6 +2,7 @@ import * as prettier from 'prettier';
 import * as parserBabel from 'prettier/plugins/babel';
 import * as parserTypeScript from 'prettier/plugins/typescript';
 import * as parserEstree from 'prettier/plugins/estree';
+import { splitGluedAfterNumbers } from '../../../packages/codemirror/splitGlued.mjs';
 
 // Prettier configuration types
 export interface PrettierOptions {
@@ -500,12 +501,12 @@ export class FormatEngine {
       .replace(/;(await|let|const|var|function)\s/g, ';\n$1 ')
       // Add line breaks after ) followed by any identifier (more general)
       .replace(/\)([a-zA-Z_$][a-zA-Z0-9_$]*)/g, ')\n$1')
-      // Add line breaks after numbers followed by identifiers (like "175let")
-      .replace(/([0-9])([a-zA-Z_$][a-zA-Z0-9_$]*)/g, '$1\n$2')
-      // Add line breaks before Strudel patterns (identifier:) when they follow ) or numbers
-      .replace(/(\)|[0-9])([a-zA-Z_$][a-zA-Z0-9_$]*\s*:)/g, '$1\n$2')
+      // Add line breaks before Strudel patterns (identifier:) when they follow )
+      .replace(/\)([a-zA-Z_$][a-zA-Z0-9_$]*\s*:)/g, ')\n$1')
       // Add line breaks after } followed by identifiers
       .replace(/\}([a-zA-Z_$][a-zA-Z0-9_$]*)/g, '}\n$1');
+    // Add line breaks after numbers followed by a glued statement (like "175let"), never inside a literal
+    preprocessedCode = splitGluedAfterNumbers(preprocessedCode);
 
     // Restore global strings after preprocessing
     for (let i = 0; i < globalStringParts.length; i++) {
