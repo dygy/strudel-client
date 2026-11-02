@@ -1,0 +1,21 @@
+---
+// Prerendered, so nothing is added to the Worker bundle; the page is a client-only island.
+// No HeadCommon: its analytics script would receive this URL, with the authorization id in it.
+export const prerender = true;
+
+import '../../styles/index.css';
+import ConsentPage from '../../components/oauth/ConsentPage.tsx';
+---
+
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Strudel</title>
+    <link rel="icon" href="/favicon.ico" />
+</head>
+<body>
+    <ConsentPage client:only="react" />
+</body>
+</html>

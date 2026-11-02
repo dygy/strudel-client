@@ -1,0 +1,6 @@
+# The consent page must not be framed by another site (clickjacking the Allow button), and its URL
+# holds the authorization id, which must not leak through a Referer.
+/oauth/consent*
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'
+  Referrer-Policy: no-referrer
