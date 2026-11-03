@@ -171,6 +171,22 @@ describe('a 409', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('finding 6: a plain save on a row converted to a multitrack elsewhere is a conflict, not a success', async () => {
+    fetchMock.mockResolvedValueOnce(
+      conflict({
+        version: V2,
+        code: 'a',
+        steps: [{ id: 's', name: 'S', code: 'a' }],
+        isMultitrack: true,
+        activeStep: 0,
+      }),
+    );
+    await expect(api.secureApi.updateTrack('t1', { code: 'typed' })).rejects.toBeInstanceOf(
+      versionMod.VersionConflictError,
+    );
+    expect(versionMod.trackVersions.get('t1')?.version).toBe(V1);
+  });
+
   it('holding exactly what this save writes (an answer got lost) is success, not a conflict', async () => {
     fetchMock.mockResolvedValueOnce(conflict({ version: V2, code: 'mine', steps: [] }));
     await expect(api.secureApi.updateTrack('t1', { code: 'mine' })).resolves.toMatchObject({
@@ -203,6 +219,72 @@ describe('force (a chosen overwrite: import)', () => {
     await api.db.tracks.update('t1', { code: 'imported' }, { force: true });
     expect(sentBodies()[0]).not.toHaveProperty('expectedVersion');
     expect(versionMod.trackVersions.get('t1')?.version).toBe(V1);
+  });
+});
+
+describe('saveOnUnload', () => {
+  const answered = () => new Response(JSON.stringify({ success: true, track: row('b', V2) }), { status: 200 });
+
+  it('calls fetch before returning: nothing after an await is sure to run', () => {
+    fetchMock.mockResolvedValue(answered());
+    expect(api.secureApi.saveOnUnload('t1', { code: 'b' })).toBe('sent');
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it('uses keepalive and the cookie, and still names the version', () => {
+    fetchMock.mockResolvedValue(answered());
+    api.secureApi.saveOnUnload('t1', { code: 'b' });
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.keepalive).toBe(true);
+    expect(init.credentials).toBe('include');
+    expect(new Headers(init.headers).has('authorization')).toBe(false);
+    expect(JSON.parse(String(init.body))).toMatchObject({ updates: { code: 'b' }, expectedVersion: V1 });
+  });
+
+  it('refuses a body keepalive would reject, counted in bytes', () => {
+    expect(api.secureApi.saveOnUnload('t1', { code: 'é'.repeat(api.KEEPALIVE_MAX_BYTES / 2 + 1) })).toBe('too-large');
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockResolvedValue(answered());
+    expect(api.secureApi.saveOnUnload('t1', { code: 'a'.repeat(api.KEEPALIVE_MAX_BYTES / 2) })).toBe('sent');
+  });
+
+  it('sends nothing with a save in flight: its version would be stale', async () => {
+    let finish: () => void = () => {};
+    const save = versionMod.trackVersions.serialize('t1', () => new Promise<void>((resolve) => (finish = resolve)));
+    expect(api.secureApi.saveOnUnload('t1', { code: 'b' })).toBe('busy');
+    expect(fetchMock).not.toHaveBeenCalled();
+    finish();
+    await save;
+  });
+
+  it('sends nothing during a conflict', () => {
+    versionMod.trackVersions.pause('t1');
+    expect(api.secureApi.saveOnUnload('t1', { code: 'b' })).toBe('busy');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('if the page stays, the baseline moves, and the next save names the new version', async () => {
+    fetchMock.mockResolvedValueOnce(answered());
+    const saved = new Promise((resolve) => api.secureApi.saveOnUnload('t1', { code: 'b' }, resolve));
+    await saved;
+    expect(versionMod.trackVersions.get('t1')?.version).toBe(V2);
+  });
+
+  it('a version conflict is reported and nothing moves', async () => {
+    fetchMock.mockResolvedValueOnce(conflict({ version: V2, code: 'theirs', steps: [] }));
+    const answer = await new Promise<{ conflict?: unknown }>((resolve) =>
+      api.secureApi.saveOnUnload('t1', { code: 'b' }, resolve),
+    );
+    expect(answer.conflict).toMatchObject({ code: 'theirs' });
+    expect(versionMod.trackVersions.get('t1')?.version).toBe(V1);
+  });
+
+  it('a cancelled request causes no unhandled rejection', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    fetchMock.mockRejectedValueOnce(new TypeError('cancelled'));
+    expect(api.secureApi.saveOnUnload('t1', { code: 'b' })).toBe('sent');
+    await vi.waitFor(() => expect(warn).toHaveBeenCalled());
+    warn.mockRestore();
   });
 });
 

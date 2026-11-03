@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { authActions } from '../stores/authStore';
+import { authActions, protectUnsavedWork } from '../stores/authStore';
 import { syncSessionCookies } from './authCookies';
 
 let authListener: { data: { subscription: { unsubscribe: () => void } } } | null = null;
@@ -17,6 +17,9 @@ export function initializeAuthListener() {
 
   authListener = supabase.auth.onAuthStateChange(async (event, session) => {
     console.log('Auth state change:', event, session ? 'session present' : 'no session');
+
+    // Another tab signed out, or a refresh failed: nobody else stops to protect the text in this tab.
+    if (event === 'SIGNED_OUT') await protectUnsavedWork();
 
     // supabase-js is the only refresh owner; mirror every new access token into the cookie the
     // server reads (SSR pages, /api cookie fallback) and clear it on sign-out.

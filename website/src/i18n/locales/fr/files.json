@@ -133,13 +133,22 @@
   "loadingTracks": "Chargement de vos pistes...",
   "loadingTracksDescription": "Veuillez patienter pendant que nous récupérons vos données depuis le cloud",
 
+  "recoveredStepName": "Modifications récupérées",
+
   "trackConflict": {
+    "unsavedMessage": "Votre dernière modification n'a pas été enregistrée",
 
   
   "message": "Ce morceau a été modifié ailleurs",
 
   
   "detail": "La sauvegarde automatique est en pause pour ce morceau jusqu'à votre choix.",
+
+  
+  "draftExpired": "Un brouillon de « {{name}} » datant de plus de 30 jours a été supprimé.",
+
+  
+  "movedDetail": "Voici votre texte antérieur. Une version plus récente a été enregistrée depuis, et Garder le mien remplace cette version.",
 
   
   "restoredDetail": "Vous avez un texte antérieur non enregistré. La sauvegarde automatique est en pause pour ce morceau jusqu'à votre choix.",

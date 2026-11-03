@@ -4,7 +4,13 @@
  */
 
 import { ensureValidSession } from './authUtils';
-import { sameContent, serverTrackFromRow, trackVersions, VersionConflictError } from '../repl/trackVersion';
+import {
+  sameContent,
+  serverTrackFromRow,
+  trackVersions,
+  VersionConflictError,
+  type ServerTrack,
+} from '../repl/trackVersion';
 
 export interface Track {
   id: string;
@@ -59,6 +65,9 @@ export class ApiError extends Error {
     this.name = 'ApiError';
   }
 }
+
+/** Browsers refuse a keepalive body over 64 KiB, counting other keepalive requests still in flight. */
+export const KEEPALIVE_MAX_BYTES = 60 * 1024;
 
 class SecureApiClient {
   private baseUrl: string;
@@ -227,7 +236,11 @@ class SecureApiClient {
           if (!current) throw new VersionConflictError(trackId, null);
           // The server already holds exactly what this save is writing (an earlier attempt landed
           // and its answer was lost): nothing can be overwritten and nothing is left to do.
-          const merged = { code: updates.code ?? current.code, steps: updates.steps ?? current.steps };
+          const merged = {
+            code: updates.code ?? current.code,
+            steps: updates.steps ?? current.steps,
+            activeStep: updates.activeStep ?? current.activeStep,
+          };
           if (sameContent(merged, current)) {
             trackVersions.set(trackId, current);
             return { track: error.data.current as Track };
@@ -241,6 +254,52 @@ class SecureApiClient {
         }
       }
     });
+  }
+
+  /**
+   * A save for a page that's going away: it starts synchronously, because nothing after the first
+   * await is sure to run, and uses `keepalive`, because an ordinary fetch can be cancelled with the
+   * page. Sign-in comes from the cookie, since getting a fresh token would need an await. The version
+   * check still applies. Returns what happened to the request; anything but 'sent' means the caller's
+   * draft is all there is.
+   */
+  saveOnUnload(
+    trackId: string,
+    updates: Partial<Track>,
+    /** Always called once, if it was sent: with neither field when no useful answer came. */
+    onAnswer: (answer: { saved?: Track; conflict?: ServerTrack | null }) => void = () => {},
+  ): 'sent' | 'too-large' | 'busy' {
+    if (trackVersions.isBusy(trackId) || trackVersions.isPaused(trackId)) return 'busy';
+    const expectedVersion = trackVersions.get(trackId)?.version;
+    const body = JSON.stringify({ trackId, updates, ...(expectedVersion ? { expectedVersion } : {}) });
+    if (new TextEncoder().encode(body).length > KEEPALIVE_MAX_BYTES) return 'too-large';
+
+    void trackVersions
+      .serialize(trackId, async () => {
+        const response = await fetch(`${this.baseUrl}/api/tracks/update`, {
+          method: 'PUT',
+          keepalive: true,
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+        });
+        const data = await response.json().catch(() => ({}));
+        // Only reached if the page stayed (a hidden tab), so it has to keep its baseline right.
+        if (response.ok) {
+          const saved = serverTrackFromRow(data.track);
+          if (saved) trackVersions.set(trackId, saved);
+          onAnswer({ saved: data.track });
+        } else if (response.status === 409 && data.code === 'version_conflict') {
+          onAnswer({ conflict: serverTrackFromRow(data.current) });
+        } else {
+          onAnswer({});
+        }
+      })
+      .catch((error: unknown) => {
+        console.warn('SecureApi - save on unload failed:', error);
+        onAnswer({});
+      });
+    return 'sent';
   }
 
   async deleteTrack(trackId: string): Promise<{ success: boolean }> {

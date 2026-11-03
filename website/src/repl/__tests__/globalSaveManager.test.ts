@@ -1,190 +1,127 @@
 /**
- * Tests for Global Save Manager - URL-Based Version
+ * The page-exit handlers and what they ask of the file manager.
  * @vitest-environment jsdom
+ *
+ * Regression (data loss): this was keyed on the URL, and only ever worked in a test that named the
+ * URL segment after a track id. `hasUnsavedChanges()` was false on every real URL, so nothing saved.
+ * The real hook is in sidebar/hooks/__tests__/useSupabaseFileManager-unload.test.tsx; here it's the wiring.
  */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// isolate:false: the module attaches its page listeners when it loads, to the window of that moment,
+// which may be another file's. A fresh copy listens to this file's window. Each test gets one, and
+// the old copies are unregistered, so they do nothing when the events reach them too.
+let globalSaveManager: typeof import('../globalSaveManager').globalSaveManager;
+let createTrackConflictController: typeof import('../trackConflict').createTrackConflictController;
+let setActiveTrackConflictController: typeof import('../trackConflict').setActiveTrackConflictController;
+let trackConflictStore: typeof import('../trackConflict').trackConflictStore;
+let createTrackVersions: typeof import('../trackVersion').createTrackVersions;
 
-// Mock window.location for URL-based tests
-const mockLocation = {
-  pathname: '/repl/track-1',
-  search: '',
-  href: 'http://localhost/repl/track-1',
-};
+beforeEach(async () => {
+  vi.resetModules();
+  ({ globalSaveManager } = await import('../globalSaveManager'));
+  ({ createTrackConflictController, setActiveTrackConflictController, trackConflictStore } =
+    await import('../trackConflict'));
+  ({ createTrackVersions } = await import('../trackVersion'));
+});
 
-// Mock the global save manager by importing it after setting up mocks
-const mockFileManagerHook = {
-  selectedTrack: 'track-1', // This is now ignored in favor of URL
-  tracks: {
-    'track-1': {
-      id: 'track-1',
-      name: 'Test Track',
-      code: '// original code',
-    },
-  },
-  saveCurrentTrack: vi.fn(),
-  saveSpecificTrack: vi.fn(),
-};
+const saver = (overrides = {}) => ({ hasUnsavedEdits: () => true, saveForUnload: vi.fn(() => true), ...overrides });
 
-const mockContext = {
-  editorRef: {
-    current: {
-      code: '// modified code',
-    },
-  },
-  activeCode: '// modified code',
-};
+afterEach(() => {
+  globalSaveManager.unregister();
+  setActiveTrackConflictController(null);
+  trackConflictStore.set(null);
+});
 
 describe('GlobalSaveManager', () => {
-  let globalSaveManager: any;
-  let originalLocation: any;
-
-  beforeEach(async () => {
-    vi.clearAllMocks();
-
-    // Mock window.location
-    originalLocation = window.location;
-    delete (window as any).location;
-    window.location = mockLocation as any;
-
-    // Reset the module
-    vi.resetModules();
-
-    // Import after mocks are set up
-    const module = await import('../globalSaveManager');
-    globalSaveManager = module.globalSaveManager;
-
-    // Reset the manager state
-    globalSaveManager.unregister();
-  });
-
-  afterEach(() => {
-    globalSaveManager.unregister();
-
-    // Restore window.location
-    window.location = originalLocation;
-  });
-
-  it('should detect unsaved changes', () => {
-    // Set URL to track-1
-    window.location.pathname = '/repl/track-1';
-
-    globalSaveManager.register(mockFileManagerHook, mockContext);
-
+  it('reads the file manager through its getter, so it never sees an old hook', () => {
+    let current = saver({ hasUnsavedEdits: () => false });
+    globalSaveManager.register(() => current);
+    expect(globalSaveManager.hasUnsavedChanges()).toBe(false);
+    current = saver();
     expect(globalSaveManager.hasUnsavedChanges()).toBe(true);
+    expect(globalSaveManager.protectUnsavedWork()).toBe(true);
+    expect(current.saveForUnload).toHaveBeenCalledOnce();
   });
 
-  it('should not detect changes when code is the same', () => {
-    // Set URL to track-1
-    window.location.pathname = '/repl/track-1';
+  it('with nothing registered (embed) or no saver (signed out) nothing is at risk', () => {
+    expect(globalSaveManager.hasUnsavedChanges()).toBe(false);
+    expect(globalSaveManager.protectUnsavedWork()).toBe(true);
+    globalSaveManager.register(() => ({}));
+    expect(globalSaveManager.hasUnsavedChanges()).toBe(false);
+    expect(globalSaveManager.protectUnsavedWork()).toBe(true);
+    globalSaveManager.register(() => null);
+    expect(globalSaveManager.protectUnsavedWork()).toBe(true);
+  });
 
-    const sameCodeContext = {
-      editorRef: {
-        current: {
-          code: '// original code',
+  it('reports the work at risk if protecting it throws', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    globalSaveManager.register(() =>
+      saver({
+        saveForUnload: () => {
+          throw new Error('boom');
         },
-      },
+      }),
+    );
+    expect(globalSaveManager.protectUnsavedWork()).toBe(false);
+    vi.restoreAllMocks();
+  });
+
+  describe('the page events', () => {
+    const fire = (name: string, target: EventTarget = window) => {
+      const event = new Event(name, { cancelable: true });
+      target.dispatchEvent(event);
+      return event;
     };
 
-    globalSaveManager.register(mockFileManagerHook, sameCodeContext);
+    it('pagehide protects the work, and says the page is leaving', () => {
+      const current = saver();
+      globalSaveManager.register(() => current);
+      fire('pagehide');
+      expect(current.saveForUnload).toHaveBeenCalledWith({ leaving: true });
+    });
 
-    expect(globalSaveManager.hasUnsavedChanges()).toBe(false);
-  });
+    it('visibilitychange protects it when hidden, and not when visible', () => {
+      const current = saver();
+      globalSaveManager.register(() => current);
+      const state = vi.spyOn(document, 'visibilityState', 'get');
+      state.mockReturnValue('visible');
+      fire('visibilitychange', document);
+      expect(current.saveForUnload).not.toHaveBeenCalled();
+      state.mockReturnValue('hidden');
+      fire('visibilitychange', document);
+      expect(current.saveForUnload).toHaveBeenCalledWith({ leaving: false });
+      state.mockRestore();
+    });
 
-  it('should perform emergency save successfully', async () => {
-    // Set URL to track-1
-    window.location.pathname = '/repl/track-1';
+    it('beforeunload asks nothing when the text is safe', () => {
+      globalSaveManager.register(() => saver());
+      expect(fire('beforeunload').defaultPrevented).toBe(false);
+    });
 
-    mockFileManagerHook.saveSpecificTrack.mockResolvedValue(true);
-
-    globalSaveManager.register(mockFileManagerHook, mockContext);
-
-    const result = await globalSaveManager.performEmergencySave();
-
-    expect(result).toBe(true);
-    expect(mockFileManagerHook.saveSpecificTrack).toHaveBeenCalledWith('track-1', false);
-  });
-
-  it('should handle save failure gracefully', async () => {
-    // Set URL to track-1
-    window.location.pathname = '/repl/track-1';
-
-    mockFileManagerHook.saveSpecificTrack.mockResolvedValue(false);
-
-    globalSaveManager.register(mockFileManagerHook, mockContext);
-
-    const result = await globalSaveManager.performEmergencySave();
-
-    expect(result).toBe(false);
-    expect(mockFileManagerHook.saveSpecificTrack).toHaveBeenCalledWith('track-1', false);
-  });
-
-  it('should return false when not registered', async () => {
-    const result = await globalSaveManager.performEmergencySave();
-
-    expect(result).toBe(false);
-  });
-
-  it('should provide correct status', () => {
-    // Not registered
-    let status = globalSaveManager.getStatus();
-    expect(status.isRegistered).toBe(false);
-    expect(status.hasUnsavedChanges).toBe(false);
-
-    // Registered with URL track
-    window.location.pathname = '/repl/track-1';
-    globalSaveManager.register(mockFileManagerHook, mockContext);
-    status = globalSaveManager.getStatus();
-    expect(status.isRegistered).toBe(true);
-    expect(status.hasUnsavedChanges).toBe(true);
-    expect(status.currentTrackId).toBe('track-1');
-    expect(status.source).toBe('URL-based');
-  });
-
-  it('should handle missing track gracefully', () => {
-    // Set URL to non-existent track
-    window.location.pathname = '/repl/non-existent-track';
-
-    globalSaveManager.register(mockFileManagerHook, mockContext);
-
-    expect(globalSaveManager.hasUnsavedChanges()).toBe(false);
-  });
-
-  it('should handle missing code gracefully', () => {
-    // Set URL to track-1
-    window.location.pathname = '/repl/track-1';
-
-    const noCodeContext = {
-      editorRef: {
-        current: {
-          code: '',
-        },
-      },
-    };
-
-    globalSaveManager.register(mockFileManagerHook, noCodeContext);
-
-    expect(globalSaveManager.hasUnsavedChanges()).toBe(false);
+    it('beforeunload asks the user only when it could not be kept anywhere', () => {
+      globalSaveManager.register(() => saver({ saveForUnload: () => false }));
+      expect(fire('beforeunload').defaultPrevented).toBe(true);
+    });
   });
 
   describe('during a track conflict (spec 018)', () => {
-    /** A conflict open on the track in the editor, through the same module the manager reads. */
-    async function openConflict() {
-      const { createTrackConflictController, setActiveTrackConflictController, trackConflictStore } =
-        await import('../trackConflict');
-      const { createTrackVersions } = await import('../trackVersion');
+    function openConflict() {
       const versions = createTrackVersions();
       versions.setOpenTrack('track-1');
       const storage = new Map<string, string>();
       const controller = createTrackConflictController({
         userId: 'u1',
+        tabId: 'tab-1',
         versions,
         storage: {
           getItem: (k: string) => storage.get(k) ?? null,
           setItem: (k: string, v: string) => void storage.set(k, v),
           removeItem: (k: string) => void storage.delete(k),
-          key: () => null,
-          length: 0,
+          key: (i: number) => [...storage.keys()][i] ?? null,
+          get length() {
+            return storage.size;
+          },
         },
         readVersion: async () => ({ status: 'unknown' }),
         readTrack: async () => ({ status: 'unknown' }),
@@ -192,6 +129,7 @@ describe('GlobalSaveManager', () => {
         getLastSavedCode: () => '// original code',
         getLocalTrack: () => ({ name: 'Test Track', folder: null, isMultitrack: false, steps: [], activeStep: 0 }),
         setEditorCode: () => {},
+        showDraft: () => {},
         saveCode: async () => {},
         applySynced: () => {},
         recreate: async () => false,
@@ -202,71 +140,27 @@ describe('GlobalSaveManager', () => {
         trackId: 'track-1',
         trackName: 'Test Track',
         kind: 'changed',
-        restored: false,
         busy: false,
         failed: false,
       });
-      return {
-        storage,
-        cleanup: () => {
-          setActiveTrackConflictController(null);
-          trackConflictStore.set(null);
-        },
-      };
+      return storage;
     }
 
-    it('an emergency save writes nothing to the server, and keeps the text as a draft', async () => {
-      window.location.pathname = '/repl/track-1';
-      globalSaveManager.register(mockFileManagerHook, mockContext);
-      const { storage, cleanup } = await openConflict();
-
-      await expect(globalSaveManager.performEmergencySave()).resolves.toBe(true);
-
-      expect(mockFileManagerHook.saveSpecificTrack).not.toHaveBeenCalled();
-      expect(mockFileManagerHook.saveCurrentTrack).not.toHaveBeenCalled();
-      expect(JSON.parse(storage.get('strudel-conflict-draft:track-1')!).code).toBe('// typed during the conflict');
-      cleanup();
+    it('protecting the work asks the file manager for nothing, and keeps the text as a draft', () => {
+      const current = saver();
+      globalSaveManager.register(() => current);
+      const storage = openConflict();
+      expect(globalSaveManager.protectUnsavedWork()).toBe(true);
+      expect(current.saveForUnload).not.toHaveBeenCalled();
+      expect(JSON.parse(storage.get('strudel-conflict-draft:track-1:tab-1')!).code).toBe(
+        '// typed during the conflict',
+      );
     });
 
-    it('reports no unsaved changes: the draft holds them, so leaving asks nothing', async () => {
-      window.location.pathname = '/repl/track-1';
-      globalSaveManager.register(mockFileManagerHook, mockContext);
-      const { cleanup } = await openConflict();
+    it('reports no unsaved changes: the draft holds them', () => {
+      globalSaveManager.register(() => saver());
+      openConflict();
       expect(globalSaveManager.hasUnsavedChanges()).toBe(false);
-      cleanup();
-      expect(globalSaveManager.hasUnsavedChanges()).toBe(true);
     });
-
-    it('leaving the page stores the draft, even though no save would run', async () => {
-      window.location.pathname = '/repl/track-1';
-      globalSaveManager.register(mockFileManagerHook, mockContext);
-      const { storage, cleanup } = await openConflict();
-      window.dispatchEvent(new Event('pagehide'));
-      expect(storage.get('strudel-conflict-draft:track-1')).toBeDefined();
-      expect(mockFileManagerHook.saveSpecificTrack).not.toHaveBeenCalled();
-      cleanup();
-    });
-  });
-
-  it('should prevent concurrent saves', async () => {
-    // Set URL to track-1
-    window.location.pathname = '/repl/track-1';
-
-    mockFileManagerHook.saveSpecificTrack.mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve(true), 100)),
-    );
-
-    globalSaveManager.register(mockFileManagerHook, mockContext);
-
-    // Start two saves concurrently
-    const save1 = globalSaveManager.performEmergencySave();
-    const save2 = globalSaveManager.performEmergencySave();
-
-    const [result1, result2] = await Promise.all([save1, save2]);
-
-    // Only one should succeed (the first one)
-    expect(result1).toBe(true);
-    expect(result2).toBe(false);
-    expect(mockFileManagerHook.saveSpecificTrack).toHaveBeenCalledTimes(1);
   });
 });

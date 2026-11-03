@@ -77,6 +77,8 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
   const { user, signInWithGoogle, signOut, loading } = useAuth();
   const { t } = useTranslation(['auth', 'common']);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  // Sign-out first waits for any unsaved text to be saved, up to 2 s.
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -104,11 +106,15 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
   };
 
   const handleSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
     try {
       await signOut();
       setShowDropdown(false);
     } catch (error) {
       console.error('Sign out failed:', error);
+    } finally {
+      setIsSigningOut(false);
     }
   };
 
@@ -199,13 +205,14 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
     return (
       <button
         onClick={handleSignOut}
+        disabled={isSigningOut}
         className={`
           px-3 py-1.5 text-sm font-medium text-red-400 hover:text-red-300
           hover:bg-red-900 hover:bg-opacity-20 rounded-md transition-all duration-200
           ${className}
         `}
       >
-        {t('auth:signOut')}
+        {isSigningOut ? t('auth:signingOut') : t('auth:signOut')}
       </button>
     );
   }
@@ -279,6 +286,7 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
 
             <button
               onClick={handleSignOut}
+              disabled={isSigningOut}
               className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-900 hover:bg-opacity-20 rounded-md transition-colors duration-200 flex items-center gap-2 cursor-pointer"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -289,7 +297,7 @@ export function AuthButton({ className = '', showProfile = true }: AuthButtonPro
                   d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
                 />
               </svg>
-              {t('auth:signOut')}
+              {isSigningOut ? t('auth:signingOut') : t('auth:signOut')}
             </button>
           </div>
         </div>

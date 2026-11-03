@@ -34,9 +34,32 @@ function handleResume() {
   });
 }
 
+let sessionEndProtection: Promise<void> | null = null;
+
+/**
+ * Every way a session ends comes through here, before the user clears and the file manager empties.
+ * It waits for the save: one that lands removes the draft, so a shared browser keeps no copy of this
+ * user's text. If it can't land (the session is already over) the draft is the only copy, so it stays,
+ * to be offered at this user's next sign-in and never to anyone else.
+ */
+export function protectUnsavedWork(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  // One session ending can arrive more than once (sign-out, then its SIGNED_OUT event): one wait.
+  sessionEndProtection ??= (async () => {
+    try {
+      const { globalSaveManager } = await import('../repl/globalSaveManager');
+      globalSaveManager.protectUnsavedWork();
+      await globalSaveManager.unloadSaveSettled();
+    } catch (error: unknown) {
+      // Never in the way of signing out.
+      console.error('Could not protect unsaved work:', error);
+    }
+  })();
+  return sessionEndProtection;
+}
+
 function redirectToLogin() {
   if (typeof window === 'undefined' || window.location.pathname.includes('/login')) return;
-  // Leaving the page runs the beforeunload/pagehide emergency save in globalSaveManager.
   window.location.href = loginUrlForCurrentLocation();
 }
 
@@ -57,6 +80,9 @@ async function runAuthCheck(): Promise<boolean> {
     }
 
     if (result.status === 'signed-out') {
+      // Clearing the user empties the file manager, so this comes first. The server won't take a
+      // save now, but the draft waits for the next sign-in.
+      await protectUnsavedWork();
       authActions.setUser(null);
       authActions.setSessionInfo(null, false);
       // 403 clears the user but stays put, as before
@@ -78,6 +104,7 @@ async function runAuthCheck(): Promise<boolean> {
 // Auth actions
 export const authActions = {
   setUser(user: User | null) {
+    if (user) sessionEndProtection = null;
     const currentState = authStore.get();
     authStore.set({
       ...currentState,
@@ -150,6 +177,9 @@ export const authActions = {
 
   async signOut() {
     try {
+      // First: while the session is good, and before loading unmounts the editor and the file manager.
+      await protectUnsavedWork();
+
       this.setLoading(true);
 
       // Import supabase dynamically to avoid SSR issues
@@ -178,6 +208,8 @@ export const authActions = {
       }
     } catch (error) {
       console.error('Sign out error:', error);
+      // Still signed in, so the next sign-out has its own text to protect.
+      sessionEndProtection = null;
     } finally {
       this.setLoading(false);
     }

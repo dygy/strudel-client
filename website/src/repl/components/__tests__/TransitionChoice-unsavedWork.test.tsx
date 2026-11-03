@@ -38,6 +38,7 @@ let fileManager: {
   tracks: Record<string, { id: string; name: string; code: string }>;
   saveCurrentTrack: any;
   saveSpecificTrack: any;
+  hasUnsavedEdits: () => boolean;
 };
 let editor: { code: string; setCode: any; evaluate: any };
 
@@ -68,9 +69,10 @@ beforeEach(() => {
     tracks: { 'track-1': { id: 'track-1', name: 'Track 1', code: SAVED } },
     saveCurrentTrack: vi.fn(),
     saveSpecificTrack: vi.fn(),
+    hasUnsavedEdits: () => editor.code !== SAVED,
   };
   editor = { code: EDITED, setCode: vi.fn(), evaluate: vi.fn() };
-  globalSaveManager.register(fileManager, { editorRef: { current: editor }, activeCode: EDITED });
+  globalSaveManager.register(() => fileManager);
 
   container = document.createElement('div');
   document.body.appendChild(container);

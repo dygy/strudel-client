@@ -43,13 +43,22 @@ The first time, a browser page opens. If the user is signed out, they sign in fi
 - [ ] Given no sign-in has happened, when an assistant tries any action at the address, then it is told to sign in and receives no data.
 - [ ] When two different users connect the same assistant application, then each one sees only their own library.
 
-### 2.2 Seeing and ending connections
+### 2.2 Connecting from the app, seeing and ending connections
 
-The user can see which assistants are connected to their account and disconnect any of them, in a **Connected assistants** section of the settings panel. It works in the desktop and the phone layouts.
+The user does everything from one **Connected assistants** section of the settings panel, in the desktop and the phone layouts.
 
+**To connect**, the section shows the address with a **Copy** button, and short steps for each common assistant: Claude on the web and desktop (where to paste the address), and Claude Code (a ready command with its own **Copy** button). A link to the full setup page arrives with task slice 9. Once the package is published (task slice 7), it also shows how to add the local helper, with a ready command and a **Copy** button, and says what the helper adds. Until the tools ship, a short note says this is early access and an assistant can only confirm the connection. When a new assistant finishes connecting, it appears in the list the next time the section is opened, or within 30 seconds while it's open.
+
+The section isn't shown to signed-out users or in the admin view.
+
+- [ ] When the user presses **Copy** next to the address, then the address is on the clipboard and the button confirms it for 2 seconds.
+- [ ] Given the browser refuses clipboard access, when the user presses **Copy**, then the text is selected so they can copy it by hand, and they see a message saying so.
+- [ ] When the user follows the steps shown for Claude Code, then the assistant connects without any other instructions.
+- [ ] Given the section is open, when an assistant finishes connecting, then it appears in the list within 30 seconds without a reload.
 - [ ] When the user opens **Connected assistants**, then they see each connected assistant's name and when it was connected.
 - [ ] When the user presses **Disconnect** on an assistant, then within 1 minute its next action is refused and it has to ask for consent again.
-- [ ] When no assistant is connected, then the section says so and links to the setup instructions.
+- [ ] When no assistant is connected, then the section says so and the connect steps are shown open.
+- [ ] When at least one assistant is connected, then the connect steps are collapsed under **Connect another assistant**.
 
 ### 2.3 Browsing and reading the library
 
@@ -85,6 +94,8 @@ The same protection covers the same track open in two tabs.
 - [ ] Given the message is showing, when the user presses **Keep mine**, then the tab's text is saved and is what the next reader gets.
 - [ ] Given the message is showing and the user has typed since the last save, when they reload the page, then the text they typed is still offered to them and hasn't been lost.
 - [ ] When no assistant is involved, then normal typing and autosave behave as they do today, with no new message.
+
+Text that didn't reach the server is kept in the browser and offered the next time the track is opened, on screen, with the same two buttons. If nobody else changed the track, the message is **"Your last edit was not saved"**. If a newer version was saved after that text was written, the message is **"This track was changed elsewhere"**, and it says that **Keep mine** replaces that version. A deleted track offers **Discard my text** in place of **Load the new version**. Text kept this way that's more than 30 days old is removed, with a message saying so.
 
 ### 2.6 Deleting
 
@@ -184,7 +195,7 @@ A documentation page explains how to connect the common assistants, how to insta
 
 ### In-Scope
 
-- Connecting with Google sign-in and consent; listing and ending connections.
+- Connecting with Google sign-in and consent; a connect section in the app with copyable address and commands; listing and ending connections.
 - Reading, searching, creating, changing, moving and deleting library items.
 - Protection between assistants and open tabs, both ways.
 - Function and sample lookup, pattern checks online up to 8 KB, and larger checks in the local helper.
@@ -209,3 +220,4 @@ A documentation page explains how to connect the common assistants, how to insta
 ## Change Log
 
 - [YYYY-MM-DD] — [source reference] — [what behavior changed and why]
+- 2026-11-03 — review of save protection, owner's decisions — §2.2: the setup link arrives with slice 9, the helper command with slice 7, and an early-access note stays until the tools ship. §2.5: wording for text that didn't reach the server, the 30-day limit on kept text, and **Discard my text** for a deleted track.

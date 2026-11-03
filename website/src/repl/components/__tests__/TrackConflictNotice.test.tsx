@@ -35,7 +35,6 @@ const STATE: ConflictState = {
   trackId: 't1',
   trackName: 'Spiral',
   kind: 'changed',
-  restored: false,
   busy: false,
   failed: false,
 };
@@ -102,9 +101,18 @@ describe('TrackConflictNotice', () => {
     expect(container!.textContent).toContain(en.trackConflict.failed);
   });
 
-  it('after a reload says the text is from earlier', async () => {
-    await render({ ...STATE, restored: true });
+  it('text that never reached the server says that, and only that', async () => {
+    await render({ ...STATE, draftOrigin: 'unsaved' });
+    expect(container!.textContent).toContain(en.trackConflict.unsavedMessage);
     expect(container!.textContent).toContain(en.trackConflict.restoredDetail);
+    expect(container!.textContent).not.toContain(en.trackConflict.message);
+  });
+
+  it('finding 8: text the server moved past says a newer version exists, and what Keep mine does', async () => {
+    await render({ ...STATE, draftOrigin: 'moved' });
+    expect(container!.textContent).toContain(en.trackConflict.message);
+    expect(container!.textContent).toContain(en.trackConflict.movedDetail);
+    expect(container!.textContent).not.toContain(en.trackConflict.unsavedMessage);
   });
 
   it('a deleted track has nothing to load: discard instead, and the name', async () => {

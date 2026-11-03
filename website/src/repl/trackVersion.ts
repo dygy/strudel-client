@@ -3,8 +3,8 @@
  * and the content it last synced with, and the saves it has in flight.
  *
  * A version is an opaque string (the row's `updated_at`, with microseconds): compare it, send it
- * back, never parse it. Content is `code` and `steps`, so a folder move or a rename, which bumps
- * the version and nothing else, is not a conflict.
+ * back, never parse it. Content is `code` or `steps`, so a folder move or a rename, which bumps the
+ * version and nothing else, is not a conflict.
  */
 
 export interface ServerTrack {
@@ -47,8 +47,25 @@ function stepContent(steps: unknown[]): string {
   );
 }
 
-export function sameContent(a: Pick<ServerTrack, 'code' | 'steps'>, b: Pick<ServerTrack, 'code' | 'steps'>): boolean {
-  return a.code === b.code && stepContent(a.steps) === stepContent(b.steps);
+export const sameSteps = (a: unknown[], b: unknown[]) => stepContent(a) === stepContent(b);
+
+/** Does `code` copy the open step, as every save since multitracks were fixed leaves it? */
+function codeFollowsStep(track: ContentFields): boolean {
+  const step = (track.steps[track.activeStep ?? 0] ?? null) as { code?: unknown } | null;
+  return step?.code === track.code;
+}
+
+type ContentFields = Pick<ServerTrack, 'code' | 'steps' | 'activeStep'>;
+
+/**
+ * In a multitrack `steps` is the content and `code` a copy of the open step, so another tab switching
+ * step isn't a change to anyone's work. A `code` that stops being that copy is: it's a save from a tab
+ * still running the old code, which writes `code` alone.
+ */
+export function sameContent(a: ContentFields, b: ContentFields): boolean {
+  if (!sameSteps(a.steps, b.steps)) return false;
+  if (a.code === b.code) return true;
+  return a.steps.length > 0 && codeFollowsStep(a) && codeFollowsStep(b);
 }
 
 /** The server moved on and its content differs. `current` is null when the save never left the tab. */
@@ -118,7 +135,9 @@ export function createTrackVersions() {
     serialize<T>(id: string, save: () => Promise<T>): Promise<T> {
       inFlight.set(id, (inFlight.get(id) ?? 0) + 1);
       bump(id);
-      const run = (queues.get(id) ?? Promise.resolve()).then(save, save);
+      // With nothing ahead of it, a save starts now, not on a later tick: on page unload there's no later.
+      const ahead = queues.get(id);
+      const run = ahead ? ahead.then(save, save) : (async () => save())();
       const settled = run
         .catch(() => undefined)
         .finally(() => {

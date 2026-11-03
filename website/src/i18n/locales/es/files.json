@@ -133,13 +133,22 @@
   "loadingTracks": "Cargando tus pistas...",
   "loadingTracksDescription": "Por favor espera mientras obtenemos tus datos de la nube",
 
+  "recoveredStepName": "Ediciones recuperadas",
+
   "trackConflict": {
+    "unsavedMessage": "Tu última edición no se guardó",
 
   
   "message": "Esta pista se ha cambiado en otro lugar",
 
   
   "detail": "El autoguardado está en pausa para esta pista hasta que elijas.",
+
+  
+  "draftExpired": "Se ha eliminado un borrador de \"{{name}}\" con más de 30 días.",
+
+  
+  "movedDetail": "Este es tu texto anterior. Después se guardó una versión más nueva, y Conservar el mío reemplaza esa versión.",
 
   
   "restoredDetail": "Tienes texto anterior sin guardar. El autoguardado está en pausa para esta pista hasta que elijas.",

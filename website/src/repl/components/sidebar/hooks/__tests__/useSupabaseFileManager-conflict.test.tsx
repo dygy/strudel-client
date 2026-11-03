@@ -19,7 +19,6 @@ const V1 = '2026-11-03T00:09:28.401191+00:00';
 const V2 = '2026-11-03T00:09:29.000002+00:00';
 const V3 = '2026-11-03T00:09:30.000003+00:00';
 const USER = { id: 'user-1', email: 'u@example.test' };
-const DRAFT_KEY = 'strudel-conflict-draft:t1';
 
 const track = (id: string, name: string, code: string, version = V1) => ({
   id,
@@ -60,6 +59,11 @@ function supabaseMock() {
     },
   };
 }
+
+const draftOf = (id: string) => {
+  const key = Object.keys(localStorage).find((k) => k.startsWith(`strudel-conflict-draft:${id}:`));
+  return key ? JSON.parse(localStorage.getItem(key)!) : null;
+};
 
 let useSupabaseFileManager: typeof import('../useSupabaseFileManager').useSupabaseFileManager;
 let trackVersions: typeof import('../../../../trackVersion').trackVersions;
@@ -252,7 +256,7 @@ describe('a save the server refuses', () => {
 
   it('raises the notice instead of an error toast, and keeps the text', () => {
     expect(trackConflictStore.get()).toMatchObject({ trackId: 't1', kind: 'changed' });
-    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).code).toBe('typed');
+    expect(draftOf('t1').code).toBe('typed');
   });
 
   it('then every save path stops: nothing leaves the tab, and the text keeps reaching the draft', async () => {
@@ -261,7 +265,7 @@ describe('a save the server refuses', () => {
     await expect(save()).resolves.toBe(false);
     await expect(hook.saveCurrentTrack(false)).resolves.toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).code).toBe('typed further');
+    expect(draftOf('t1').code).toBe('typed further');
   });
 
   it('Load the new version only changes the editor: no evaluate, no reset, no save', async () => {
@@ -274,7 +278,7 @@ describe('a save the server refuses', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(editor.code).toBe('theirs');
     expect(trackConflictStore.get()).toBeNull();
-    expect(localStorage.getItem(DRAFT_KEY)).toBeNull();
+    expect(draftOf('t1')).toBeNull();
 
     // And autosave doesn't take the new text for typing.
     await expect(save()).resolves.toBe(false);
@@ -309,7 +313,7 @@ describe('a track that was deleted', () => {
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'Track not found' }), { status: 404 }));
     await expect(save()).resolves.toBe(false);
     expect(trackConflictStore.get()).toMatchObject({ kind: 'deleted' });
-    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).code).toBe('typed');
+    expect(draftOf('t1').code).toBe('typed');
   });
 
   it('Keep mine creates it again, in place of the old one', async () => {
@@ -367,7 +371,7 @@ describe('the track switch race', () => {
       await inFlight;
     });
 
-    expect(JSON.parse(localStorage.getItem(DRAFT_KEY)!).code).toBe('typed in one');
+    expect(draftOf('t1').code).toBe('typed in one');
     expect(trackConflictStore.get()).toBeNull();
     expect(trackVersions.isPaused('t1')).toBe(true);
 

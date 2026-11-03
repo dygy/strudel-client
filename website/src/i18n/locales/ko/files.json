@@ -133,13 +133,22 @@
   "loadingTracks": "트랙을 불러오는 중...",
   "loadingTracksDescription": "클라우드에서 데이터를 가져오는 동안 잠시 기다려 주세요",
 
+  "recoveredStepName": "복구된 편집",
+
   "trackConflict": {
+    "unsavedMessage": "마지막 편집이 저장되지 않았습니다",
 
   
   "message": "이 트랙이 다른 곳에서 변경되었습니다",
 
   
   "detail": "선택할 때까지 이 트랙의 자동 저장이 일시 중지됩니다.",
+
+  
+  "draftExpired": "30일이 지난 \"{{name}}\" 초안이 삭제되었습니다.",
+
+  
+  "movedDetail": "이전에 작성한 텍스트입니다. 그 후 더 새로운 버전이 저장되었으며, 내 것 유지를 누르면 그 버전을 대체합니다.",
 
   
   "restoredDetail": "이전에 저장되지 않은 텍스트가 있습니다. 선택할 때까지 이 트랙의 자동 저장이 일시 중지됩니다.",

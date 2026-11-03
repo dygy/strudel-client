@@ -6,6 +6,7 @@ import { formatDateTimeIntl } from '@src/i18n/dateFormat';
 import { useTranslation } from '@src/i18n';
 import { toastActions } from '@src/stores/toastStore';
 import { batch, db } from '@src/lib/secureApi';
+import { consistentNewTrack } from '@src/lib/multitrack';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 import { generateTrackUrlPath } from '@src/lib/slugUtils';
 import { setActivePattern } from '@src/user_pattern_utils';
@@ -534,13 +535,20 @@ export function FileManagerRefactored({
 
       if (existing) {
         // Update existing track
+        // `code` follows the active step, whatever the file said.
+        const fields = consistentNewTrack({
+          code: importData.code,
+          isMultitrack: importData.isMultitrack,
+          steps: importData.steps,
+          activeStep: importData.activeStep,
+        });
         const { data, error } = await db.tracks.update(
           existing.id,
           {
-            code: importData.code,
-            isMultitrack: importData.isMultitrack,
-            steps: importData.steps,
-            activeStep: importData.activeStep,
+            code: fields.code,
+            isMultitrack: fields.isMultitrack,
+            steps: fields.steps,
+            activeStep: fields.activeStep,
             // The user chose to overwrite this track, so there's no version to check.
           },
           { force: true },

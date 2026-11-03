@@ -1,243 +1,93 @@
 /**
- * Global Save Manager - URL-Based Version
+ * Global Save Manager: what the page does with unsaved text as it goes away.
  *
- * Provides a global interface for emergency saves that can be accessed
- * from anywhere in the application, especially beforeunload handlers.
- * Uses URL as the source of truth for track ID instead of state management.
+ * It asks the file manager, through getters, because the hook and its state change on every render
+ * and this is registered once. The open track is the file manager's selected track, not anything read
+ * from the URL: a URL holds slugs and folders, and tracks are keyed by id.
+ *
+ * Everything here is synchronous up to the request: nothing after an await is sure to run on unload.
  */
 
-import { URLParser } from '../routing/URLParser';
 import { flushTrackConflictDraft, hasOpenTrackConflict } from './trackConflict';
 
-interface SaveManager {
-  fileManagerHook: any;
-  context: any;
+/** The part of the file manager hook this needs. Absent when signed out, on the embed page. */
+export interface UnloadSaver {
+  hasUnsavedEdits?: () => boolean;
+  /**
+   * Sends what can be sent and keeps a local copy. True if the text is safe either way. `leaving`: the
+   * page is going, so a save answered from here on says nothing the next page doesn't need to know.
+   */
+  saveForUnload?: (options?: { leaving?: boolean }) => boolean;
+  /** Resolves when the last such save has been answered. */
+  unloadSaveSettled?: () => Promise<void>;
 }
 
+type Getter = () => UnloadSaver | null | undefined;
+
 class GlobalSaveManager {
-  private saveManager: SaveManager | null = null;
-  private isSaving = false;
+  private getFileManager: Getter | null = null;
 
-  /**
-   * Register the current file manager and context
-   */
-  register(fileManagerHook: any, context: any) {
-    this.saveManager = { fileManagerHook, context };
-    console.log('GlobalSaveManager: Registered file manager and context');
+  /** Register once, with a getter for the current file manager hook. */
+  register(getFileManager: Getter) {
+    this.getFileManager = getFileManager;
   }
 
-  /**
-   * Unregister the current save manager
-   */
   unregister() {
-    this.saveManager = null;
-    console.log('GlobalSaveManager: Unregistered save manager');
+    this.getFileManager = null;
   }
 
-  /**
-   * Get current track identifier from URL (source of truth)
-   */
-  private getCurrentTrackIdentifierFromURL(): string | null {
-    if (typeof window === 'undefined') return null;
-    return URLParser.getCurrentTrackIdentifier();
-  }
-
-  /**
-   * Check if there are unsaved changes - URL-based
-   */
   hasUnsavedChanges(): boolean {
-    if (!this.saveManager) return false;
     // A conflict's text is in its draft, and must not be saved over the other version.
     if (hasOpenTrackConflict()) return false;
-
     try {
-      const { fileManagerHook, context } = this.saveManager;
-
-      if (!fileManagerHook || !context) return false;
-
-      // Get track identifier from URL (source of truth)
-      const currentTrackId = this.getCurrentTrackIdentifierFromURL();
-      if (!currentTrackId) return false;
-
-      const currentCode = context.editorRef?.current?.code || context.activeCode || '';
-      if (!currentCode.trim()) return false;
-
-      const currentTracks = fileManagerHook.tracks || {};
-      const trackData = currentTracks[currentTrackId];
-
-      if (!trackData) {
-        // Track not found in state - might be a new track or loading
-        console.log('GlobalSaveManager: Track not found in state:', currentTrackId);
-        return false;
-      }
-
-      const hasChanges = currentCode !== trackData.code;
-
-      if (hasChanges) {
-        console.log('GlobalSaveManager: Unsaved changes detected', {
-          trackId: currentTrackId,
-          trackName: trackData.name,
-          currentLength: currentCode.length,
-          savedLength: trackData.code.length,
-        });
-      }
-
-      return hasChanges;
-    } catch (error) {
+      return this.getFileManager?.()?.hasUnsavedEdits?.() ?? false;
+    } catch (error: unknown) {
       console.error('GlobalSaveManager: Error checking unsaved changes:', error);
       return false;
     }
   }
 
-  /**
-   * Perform emergency save - URL-based
-   */
-  async performEmergencySave(): Promise<boolean> {
-    if (!this.saveManager || this.isSaving) {
-      return false;
-    }
-
-    // During a conflict an emergency save writes nothing: the text goes to the draft instead.
-    if (hasOpenTrackConflict()) {
-      flushTrackConflictDraft();
-      return true;
-    }
-
-    this.isSaving = true;
-
+  /** True when nothing is at risk. Safe to call more than once for one page exit. */
+  protectUnsavedWork({ leaving = false }: { leaving?: boolean } = {}): boolean {
+    flushTrackConflictDraft();
+    if (hasOpenTrackConflict()) return true;
     try {
-      const { fileManagerHook, context } = this.saveManager;
-
-      if (!fileManagerHook || !context) {
-        console.log('GlobalSaveManager: No file manager or context available');
-        return false;
-      }
-
-      // Get track ID from URL (source of truth)
-      const currentTrackId = this.getCurrentTrackIdentifierFromURL();
-      if (!currentTrackId) {
-        console.log('GlobalSaveManager: No track ID in URL');
-        return true; // Not an error, just nothing to save
-      }
-
-      const currentCode = context.editorRef?.current?.code || context.activeCode || '';
-      if (!currentCode.trim()) {
-        console.log('GlobalSaveManager: No code to save');
-        return true; // Not an error, just nothing to save
-      }
-
-      // Check if track exists in state
-      const currentTracks = fileManagerHook.tracks || {};
-      const trackData = currentTracks[currentTrackId];
-
-      if (!trackData) {
-        console.warn('GlobalSaveManager: Track not found in state:', currentTrackId);
-        return false;
-      }
-
-      // Check if code has actually changed
-      if (currentCode === trackData.code) {
-        console.log('GlobalSaveManager: No changes detected');
-        return true; // No changes, success
-      }
-
-      console.log('🚨 GlobalSaveManager: Emergency save in progress', {
-        trackId: currentTrackId,
-        trackName: trackData.name,
-        codeLength: currentCode.length,
-        source: 'URL-based',
-      });
-
-      // Perform the save using URL-based track ID
-      let result = false;
-
-      if (fileManagerHook.saveSpecificTrack) {
-        result = await fileManagerHook.saveSpecificTrack(currentTrackId, false);
-      } else if (fileManagerHook.saveCurrentTrack && fileManagerHook.selectedTrack === currentTrackId) {
-        // Only use saveCurrentTrack if the selected track matches URL
-        result = await fileManagerHook.saveCurrentTrack(false);
-      } else {
-        console.warn('GlobalSaveManager: No suitable save method available');
-        return false;
-      }
-
-      if (result) {
-        console.log('✅ GlobalSaveManager: Emergency save successful (URL-based)');
-      } else {
-        console.error('❌ GlobalSaveManager: Emergency save failed (URL-based)');
-      }
-
-      return result;
-    } catch (error) {
-      console.error('GlobalSaveManager: Emergency save error:', error);
+      return this.getFileManager?.()?.saveForUnload?.({ leaving }) ?? true;
+    } catch (error: unknown) {
+      console.error('GlobalSaveManager: Could not protect unsaved work:', error);
       return false;
-    } finally {
-      this.isSaving = false;
     }
   }
 
-  /**
-   * Get current save status
-   */
+  /** For a sign-out, which outlives the save: resolves when it's answered, or after `timeoutMs`. */
+  async unloadSaveSettled(timeoutMs = 2000): Promise<void> {
+    const settled = this.getFileManager?.()?.unloadSaveSettled?.();
+    if (settled) await Promise.race([settled, new Promise((resolve) => setTimeout(resolve, timeoutMs))]);
+  }
+
   getStatus() {
-    const currentTrackId = this.getCurrentTrackIdentifierFromURL();
     return {
-      isRegistered: !!this.saveManager,
-      isSaving: this.isSaving,
+      isRegistered: !!this.getFileManager,
       hasUnsavedChanges: this.hasUnsavedChanges(),
-      currentTrackId,
-      source: 'URL-based',
     };
   }
 }
 
-// Global instance
 export const globalSaveManager = new GlobalSaveManager();
 
-// Setup global beforeunload handler
 if (typeof window !== 'undefined') {
-  const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-    flushTrackConflictDraft();
-    if (globalSaveManager.hasUnsavedChanges()) {
-      console.log('🚨 Global beforeunload: Unsaved changes detected (URL-based)');
-
-      // Show browser confirmation
-      const message = 'You have unsaved changes. Are you sure you want to leave?';
+  window.addEventListener('beforeunload', (event: BeforeUnloadEvent) => {
+    // The browser's "leave this page?" only when the text is truly at risk, not on every reload.
+    if (!globalSaveManager.protectUnsavedWork({ leaving: true })) {
       event.preventDefault();
-      event.returnValue = message;
-
-      // Attempt emergency save (non-blocking)
-      globalSaveManager
-        .performEmergencySave()
-        .then((success) => {
-          console.log('Global beforeunload: Emergency save result (URL-based):', success);
-        })
-        .catch((error) => {
-          console.error('Global beforeunload: Emergency save error:', error);
-        });
-
-      return message;
+      event.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
     }
-  };
-
-  const handleVisibilityChange = () => {
+  });
+  window.addEventListener('pagehide', () => {
+    globalSaveManager.protectUnsavedWork({ leaving: true });
+  });
+  document.addEventListener('visibilitychange', () => {
     flushTrackConflictDraft();
-    if (document.visibilityState === 'hidden' && globalSaveManager.hasUnsavedChanges()) {
-      console.log('🚨 Global visibilitychange: Performing emergency save (URL-based)');
-      globalSaveManager.performEmergencySave();
-    }
-  };
-
-  const handlePageHide = () => {
-    flushTrackConflictDraft();
-    if (globalSaveManager.hasUnsavedChanges()) {
-      console.log('🚨 Global pagehide: Performing emergency save (URL-based)');
-      globalSaveManager.performEmergencySave();
-    }
-  };
-
-  // Add global event listeners
-  window.addEventListener('beforeunload', handleBeforeUnload);
-  document.addEventListener('visibilitychange', handleVisibilityChange);
-  window.addEventListener('pagehide', handlePageHide);
+    if (document.visibilityState === 'hidden') globalSaveManager.protectUnsavedWork();
+  });
 }

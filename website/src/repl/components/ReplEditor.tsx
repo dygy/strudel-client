@@ -18,6 +18,7 @@ import { useTracks } from '@src/hooks/useTracks';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 import { GlobalToastContainer } from '@src/components/GlobalToastContainer';
 import { TrackConflictNotice } from './TrackConflictNotice';
+import { openingTrack } from '@src/lib/multitrack';
 import { nanoid } from 'nanoid';
 import { useState, useEffect, memo, useRef } from 'react';
 import { getPendingCode, clearPendingCode, getEditorInstance, setPendingCode } from '../../stores/editorStore';
@@ -101,24 +102,26 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
             }
           }
 
-          // Set code immediately
-          if (selectedTrack.code) {
-            setPendingCode(selectedTrack.code);
+          // Set code immediately. For a multitrack that's the step the URL names, or the active one.
+          const openingCode = openingTrack(selectedTrack, (ssrData as any).targetStepName, '').code;
+          if (openingCode) {
+            setPendingCode(openingCode);
 
             if (context.editorRef?.current?.setCode) {
-              context.editorRef.current.setCode(selectedTrack.code);
+              context.editorRef.current.setCode(openingCode);
             }
 
             if (getEditorInstance()?.setCode) {
-              getEditorInstance().setCode(selectedTrack.code);
+              getEditorInstance().setCode(openingCode);
             }
 
             setTimeout(() => {
               const cmEditor = document.querySelector('.cm-editor');
               if (cmEditor) {
                 const cmView = (cmEditor as any).cmView || getEditorInstance()?.editor;
-                if (cmView && cmView.dispatch) {
-                  const changes = { from: 0, to: cmView.state.doc.length, insert: selectedTrack.code };
+                // Only into an empty editor: by now it may hold newer text than this, or typing.
+                if (cmView && cmView.dispatch && cmView.state.doc.length === 0) {
+                  const changes = { from: 0, to: cmView.state.doc.length, insert: openingCode };
                   cmView.dispatch({ changes });
                 }
               }
@@ -298,15 +301,14 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
   const fileManagerRef = useRef(fileManagerHook);
   const contextRef = useRef(context);
 
-  useEffect(() => {
-    fileManagerRef.current = fileManagerHook;
-    contextRef.current = context;
-  }, [fileManagerHook, context]);
+  // During render, not in an effect: a page exit must never see the state from before the last one.
+  fileManagerRef.current = fileManagerHook;
+  contextRef.current = context;
 
   useEffect(() => {
     if (fileManagerRef.current && contextRef.current) {
       console.log('ReplEditor: Registering with global save manager');
-      globalSaveManager.register(fileManagerRef.current, contextRef.current);
+      globalSaveManager.register(() => fileManagerRef.current);
 
       return () => {
         console.log('ReplEditor: Unregistering from global save manager');

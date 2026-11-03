@@ -185,6 +185,10 @@ const makeFileManagerHook = (overrides: Record<string, unknown> = {}) => {
     loadTrack: vi.fn(),
     saveCurrentTrack: vi.fn(async () => true),
     saveSpecificTrack: vi.fn(async () => true),
+    hasUnsavedEdits(this: { selectedTrack: string; tracks: Record<string, { code: string }> }) {
+      return context.editorRef.current!.code !== this.tracks[this.selectedTrack].code;
+    },
+    saveForUnload: vi.fn(() => true),
     createTrack: vi.fn(),
     createFolder: vi.fn(),
     deleteTrack: vi.fn(),
@@ -297,9 +301,8 @@ describe('an unsaved edit on a compact screen (spec 016 2.5)', () => {
 
     // The save path is still wired to the same library and context: it saves track "a".
     expect(globalSaveManager.hasUnsavedChanges()).toBe(true);
-    await expect(globalSaveManager.performEmergencySave()).resolves.toBe(true);
-    expect(hook.saveSpecificTrack).toHaveBeenCalledTimes(1);
-    expect(hook.saveSpecificTrack).toHaveBeenCalledWith('a', false);
+    expect(globalSaveManager.protectUnsavedWork()).toBe(true);
+    expect(hook.saveForUnload).toHaveBeenCalledTimes(1);
   });
 
   it('without an edit there is nothing to save after the same toggles (the check is not vacuous)', async () => {
@@ -310,8 +313,6 @@ describe('an unsaved edit on a compact screen (spec 016 2.5)', () => {
     click('[data-library-close]');
     rotate(844, 390);
     expect(globalSaveManager.hasUnsavedChanges()).toBe(false);
-    await globalSaveManager.performEmergencySave();
-    expect(hook.saveSpecificTrack).not.toHaveBeenCalled();
   });
 });
 

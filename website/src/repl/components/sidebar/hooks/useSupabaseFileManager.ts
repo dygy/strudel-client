@@ -6,12 +6,22 @@ import { useTranslation } from '@src/i18n';
 import { useAuth } from '@src/hooks/useAuth';
 import { ApiError, db, type Folder, type Track, secureApi } from '@src/lib/secureApi.ts';
 import { trackVersions, VersionConflictError } from '../../../trackVersion';
+import {
+  activeStepIndex,
+  consistentNewTrack,
+  hasSteps,
+  openingTrack,
+  reconcileMultitrack,
+  saveFieldsFor,
+  stepsWithText,
+} from '@src/lib/multitrack';
 import { useTrackConflict } from '../../../hooks/useTrackConflict';
 import type { TrackConflictController, TrackDraft } from '../../../trackConflict';
 import { getEditorInstance, setPendingCode } from '@src/stores/editorStore.ts';
 import { tracksStore, tracksActions } from '@src/stores/tracksStore.ts';
 import { nanoid } from 'nanoid';
 import { TreeDataTransformer } from '@src/lib/TreeDataTransformer';
+import { generateUniqueTrackName } from '@src/lib/trackValidation';
 import {
   parseTrackUrlPath,
   findTrackByFolderAndSlug,
@@ -62,6 +72,8 @@ const getCurrentTrackIdFromURL = (
 };
 
 // Helper: Convert array to record keyed by id
+const EDITOR_LOADED_CHECK_MS = 100;
+
 const arrayToRecord = <T extends { id: string }>(items: T[]): Record<string, T> =>
   Object.fromEntries(items.map((item) => [item.id, item]));
 
@@ -250,21 +262,60 @@ export function useSupabaseFileManager(
 
   // Spec 018: set below, once the functions it needs exist. saveSpecificTrack reads it at call time.
   const conflictRef = useRef<TrackConflictController | null>(null);
+  // What's in the editor. Never `activeCode`: that's the last evaluated text, so when the editor is
+  // empty it would save old text over newer.
+  const editorText = () => context.editorRef?.current?.code ?? '';
+
+  // The latest state for timers, in-flight saves and page exits, whose closures may be old. Updated on
+  // render, and straight away by the step operations, whose next read can't wait for one.
+  const tracksRef = useRef(tracks);
+  tracksRef.current = tracks;
+  const selectedTrackRef = useRef(selectedTrack);
+  selectedTrackRef.current = selectedTrack;
+  // The open track, once its text is in the editor. Conflict checks wait for this: what they load
+  // into the editor must not be overwritten by the page's own opening of the track.
+  const [trackInEditor, setTrackInEditor] = useState<string | null>(null);
+  // Step changes the server hasn't confirmed: the next save carries them, whatever the editor holds.
+  const unsavedStepChangesRef = useRef<Set<string>>(new Set());
+  // Counts them, so a save that was built before the latest one can't mark that one as saved.
+  const stepChangeCountRef = useRef<Map<string, number>>(new Map());
+  // The latest save started by a page exit, for a sign-out that has to wait for it.
+  const unloadSaveRef = useRef<Promise<void>>(Promise.resolve());
+  const leavingRef = useRef(false);
+  const unsavedEditForRef = useRef<() => { trackId: string; track: Track; text: string } | null>(() => null);
 
   // Hooks
   const { isAutosaveEnabled, autosaveInterval } = useSettings();
   const activePattern = useActivePattern();
   const { t } = useTranslation(['files', 'common', 'tabs', 'auth']);
 
+  /**
+   * Every load comes through here: the baseline takes the rows as the server has them, and local state
+   * takes them reconciled (lib/multitrack.ts), with no write. The name is stored with the step if it's
+   * ever saved, so it must not be a raw key when the locale hasn't loaded yet.
+   */
+  const ingestLoaded = (rows: Track[]): Record<string, Track> => {
+    trackVersions.seed(rows);
+    const recoveredName = t('files:recoveredStepName', { defaultValue: 'Recovered edits' });
+    const page = ssrData as { targetTrackId?: string | null; targetStepName?: string | null } | null | undefined;
+    return Object.fromEntries(
+      rows.map((track) => [
+        track.id,
+        (track.id === page?.targetTrackId
+          ? openingTrack(track as never, page?.targetStepName, recoveredName)
+          : reconcileMultitrack(track as never, recoveredName)) as unknown as Track,
+      ]),
+    );
+  };
+
   // Load data from Supabase when user is authenticated
   useEffect(() => {
     // In read-only mode (admin viewing another user), ONLY use SSR data
     if (readOnly) {
       if (ssrData) {
-        const tracksObj = arrayToRecord(ssrData.tracks || []);
         const foldersObj = arrayToRecord(ssrData.folders || []);
 
-        setTracks(tracksObj);
+        setTracks(ingestLoaded(ssrData.tracks || []));
         setFolders(foldersObj);
         setIsInitialized(true);
         setHasLoadedData(true);
@@ -317,8 +368,7 @@ export function useSupabaseFileManager(
       const tracksObj = arrayToRecord(ssrData.tracks || []);
       const foldersObj = arrayToRecord(ssrData.folders || []);
 
-      trackVersions.seed(ssrData.tracks || []);
-      setTracks(tracksObj);
+      setTracks(ingestLoaded(ssrData.tracks || []));
       setFolders(foldersObj);
       setIsInitialized(true);
       setHasLoadedData(true);
@@ -367,7 +417,6 @@ export function useSupabaseFileManager(
               user_id: track.user_id,
               version: track.version,
             }));
-            trackVersions.seed(tracks);
 
             const folders = foldersData.map((folder) => ({
               id: folder.id,
@@ -381,7 +430,7 @@ export function useSupabaseFileManager(
             const tracksObj = arrayToRecord(tracks);
             const foldersObj = arrayToRecord(folders);
 
-            setTracks(tracksObj);
+            setTracks(ingestLoaded(tracks));
             setFolders(foldersObj);
             setIsInitialized(true);
             setHasLoadedData(true);
@@ -423,6 +472,7 @@ export function useSupabaseFileManager(
           steps: track.steps || [],
           activeStep: track.activeStep || 0,
           user_id: track.user_id,
+          version: track.version,
         }));
 
         const folders = foldersData.map((folder) => ({
@@ -441,7 +491,7 @@ export function useSupabaseFileManager(
         const tracksObj = arrayToRecord(tracks);
         const foldersObj = arrayToRecord(folders);
 
-        setTracks(tracksObj);
+        setTracks(ingestLoaded(tracks));
         setFolders(foldersObj);
         setIsInitialized(true);
         setHasLoadedData(true);
@@ -474,7 +524,6 @@ export function useSupabaseFileManager(
               user_id: track.user_id,
               version: track.version,
             }));
-            trackVersions.seed(tracks);
 
             const folders = foldersData.map((folder) => ({
               id: folder.id,
@@ -488,7 +537,7 @@ export function useSupabaseFileManager(
             const tracksObj = arrayToRecord(tracks);
             const foldersObj = arrayToRecord(folders);
 
-            setTracks(tracksObj);
+            setTracks(ingestLoaded(tracks));
             setFolders(foldersObj);
             setIsInitialized(true);
             setHasLoadedData(true);
@@ -553,6 +602,13 @@ export function useSupabaseFileManager(
 
   const loadTrack = useCallback(
     (track: Track) => {
+      // Whatever got us here, a failed save-before-switch included: text not on the server stays in a
+      // draft, which is offered on coming back, because the editor is about to replace it.
+      const leftBehind = unsavedEditForRef.current();
+      if (leftBehind && leftBehind.trackId !== track.id) {
+        conflictRef.current?.keepDraft(leftBehind.trackId, leftBehind.text);
+      }
+
       setSelectedTrack(track.id);
 
       // Initialize track-specific autosave context
@@ -585,7 +641,7 @@ export function useSupabaseFileManager(
 
       // CRITICAL: Only call handleUpdate if the code is actually different
       // This prevents unnecessary re-renders that destroy the CodeMirror editor
-      const currentCode = context.editorRef?.current?.code || context.activeCode || '';
+      const currentCode = editorText();
       if (currentCode !== track.code) {
         console.log('SupabaseFileManager - calling handleUpdate because code changed');
         context.handleUpdate({ id: track.id, code: track.code }, false);
@@ -730,6 +786,42 @@ export function useSupabaseFileManager(
     setTracks,
   ]);
 
+  /** Local state and the autosave baseline, after `text` for `stepIndex` reached the server. */
+  const markSaved = useCallback(
+    (trackId: string, text: string, stepIndex: number, sent: { stepChange: number; at: number }) => {
+      const now = new Date().toISOString();
+      const wasActive = (track: Track) => !hasSteps(track as never) || activeStepIndex(track as never) === stepIndex;
+      const saved = tracksRef.current[trackId];
+      // The user may have moved to another step while this was in flight. Then this text belongs in
+      // its step only: the editor and the baseline already hold the other step's.
+      const stillOnIt = saved ? wasActive(saved) : false;
+      setTracks((prev) => {
+        const track = prev[trackId];
+        if (!track) return prev;
+        return {
+          ...prev,
+          [trackId]: {
+            ...track,
+            ...(wasActive(track) ? { code: text } : {}),
+            ...(hasSteps(track as never) ? { steps: stepsWithText(track.steps as never, stepIndex, text, now) } : {}),
+            modified: now,
+          } as Track,
+        };
+      });
+      if (stillOnIt) {
+        const autosaveContext = getTrackAutosaveContext(trackId);
+        autosaveContext.lastSavedCode = text;
+        autosaveContext.lastSavedTimestamp = Date.now();
+        if (selectedTrackRef.current === trackId) lastSavedCodeRef.current = text;
+      }
+      if ((stepChangeCountRef.current.get(trackId) ?? 0) === sent.stepChange) {
+        unsavedStepChangesRef.current.delete(trackId);
+      }
+      conflictRef.current?.textSaved(trackId, text, sent.at, { leaving: leavingRef.current });
+    },
+    [getTrackAutosaveContext],
+  );
+
   const saveSpecificTrack = useCallback(
     async (trackId: string, showToast: boolean = true) => {
       // In read-only mode (admin viewing another user), never save
@@ -744,12 +836,13 @@ export function useSupabaseFileManager(
       }
 
       // STRICT VALIDATION: Ensure we're still on the same track
-      if (selectedTrack !== trackId) {
+      if (selectedTrackRef.current !== trackId) {
         console.log('SupabaseFileManager - saveSpecificTrack: track changed, skipping autosave for:', trackId);
         return false;
       }
 
-      if (!tracks[trackId]) {
+      const trackAtStart = tracksRef.current[trackId];
+      if (!trackAtStart) {
         console.warn('SupabaseFileManager - saveSpecificTrack: track not found:', trackId);
         return false;
       }
@@ -763,7 +856,7 @@ export function useSupabaseFileManager(
         return false;
       }
 
-      let currentCode = context.editorRef?.current?.code || context.activeCode || '';
+      const currentCode = editorText();
 
       // A conflict is open for this track: nothing is written until the user chooses. This is where
       // autosave, Cmd+S, save-before-switch and emergency save all meet, and the text is kept.
@@ -777,18 +870,23 @@ export function useSupabaseFileManager(
         return false;
       }
 
-      // Use track-specific last saved code instead of global reference
-      if (currentCode === autosaveContext.lastSavedCode) {
+      // Use track-specific last saved code instead of global reference. A track opened by the page
+      // load has none yet: the editor holding its text is no change either, and must write nothing.
+      const stepChanges = unsavedStepChangesRef.current.has(trackId);
+      const unchanged =
+        currentCode === autosaveContext.lastSavedCode ||
+        (autosaveContext.lastSavedTimestamp === 0 && currentCode === trackAtStart.code);
+      if (unchanged && !stepChanges) {
         console.log('SupabaseFileManager - saveSpecificTrack: no changes for track:', trackId);
         return false;
       }
 
       // STRICT CODE VALIDATION: Ensure code matches what we expect for this track
-      const expectedCode = tracks[trackId].code;
+      const expectedCode = trackAtStart.code;
       if (autosaveContext.lastSavedCode !== expectedCode && autosaveContext.lastSavedCode !== '') {
         console.error('SupabaseFileManager - saveSpecificTrack: CRITICAL - code mismatch detected!', {
           trackId,
-          trackName: tracks[trackId].name,
+          trackName: trackAtStart.name,
           expectedLength: expectedCode.length,
           contextLength: autosaveContext.lastSavedCode.length,
           currentLength: currentCode.length,
@@ -798,6 +896,9 @@ export function useSupabaseFileManager(
 
       // Mark as autosaving to prevent concurrent operations
       autosaveContext.isAutosaving = true;
+
+      // Which step this text is, before anything below can wait.
+      const stepIndex = activeStepIndex(trackAtStart as never);
 
       // Auto-format on save if enabled
       let codeToSave = currentCode;
@@ -816,9 +917,15 @@ export function useSupabaseFileManager(
           if (formatResult.success && formatResult.formattedCode) {
             codeToSave = formatResult.formattedCode;
 
-            // Update the editor with formatted code if it's different
-            if (codeToSave !== currentCode && context.editorRef?.current?.setCode) {
-              context.editorRef.current.setCode(codeToSave);
+            // Update the editor with formatted code if it's different. Only if it's still this text in
+            // this step: formatting waited, and the user may have typed or moved on.
+            if (
+              codeToSave !== currentCode &&
+              selectedTrackRef.current === trackId &&
+              activeStepIndex(tracksRef.current[trackId] as never) === stepIndex &&
+              context.editorRef?.current?.code === currentCode
+            ) {
+              context.editorRef.current.setCode?.(codeToSave);
             }
 
             console.log('SupabaseFileManager - code auto-formatted successfully');
@@ -838,12 +945,21 @@ export function useSupabaseFileManager(
         }
       }
 
-      console.log('SupabaseFileManager - saving to Supabase:', tracks[trackId]?.name, 'ID:', trackId);
+      // The step or the track may have changed during that wait. A step switch carried this text
+      // itself, so it isn't lost; written now, it would land in the wrong step.
+      const liveTrack = tracksRef.current[trackId];
+      if (!liveTrack || (hasSteps(liveTrack as never) && activeStepIndex(liveTrack as never) !== stepIndex)) {
+        autosaveContext.isAutosaving = false;
+        return false;
+      }
 
+      console.log('SupabaseFileManager - saving to Supabase:', liveTrack.name, 'ID:', trackId);
+
+      const sent = { stepChange: stepChangeCountRef.current.get(trackId) ?? 0, at: Date.now() };
       try {
         // Update in Supabase directly
         const { data, error } = await db.tracks.update(trackId, {
-          code: codeToSave,
+          ...(saveFieldsFor(liveTrack as never, codeToSave, stepIndex) as Partial<Track>),
           modified: new Date().toISOString(),
         });
 
@@ -851,20 +967,7 @@ export function useSupabaseFileManager(
           throw error;
         }
 
-        // Update local state
-        setTracks((prev) => ({
-          ...prev,
-          [trackId]: {
-            ...prev[trackId],
-            code: codeToSave,
-            modified: new Date().toISOString(),
-          },
-        }));
-
-        // Update track-specific context
-        autosaveContext.lastSavedCode = codeToSave;
-        autosaveContext.lastSavedTimestamp = Date.now();
-        lastSavedCodeRef.current = codeToSave;
+        markSaved(trackId, codeToSave, stepIndex, sent);
 
         if (showToast) {
           toastActions.success(t('files:trackSaved'));
@@ -877,11 +980,11 @@ export function useSupabaseFileManager(
       } catch (error) {
         // Not a failed save: the notice takes over, with the text that was being written.
         if (error instanceof VersionConflictError) {
-          conflictRef.current?.saveConflicted(trackId, codeToSave);
+          conflictRef.current?.saveRefused(trackId, 'changed', codeToSave, stepIndex);
           return false;
         }
         if (error instanceof ApiError && error.status === 404) {
-          conflictRef.current?.saveFoundGone(trackId, codeToSave);
+          conflictRef.current?.saveRefused(trackId, 'deleted', codeToSave, stepIndex);
           return false;
         }
         console.error('Error saving track to Supabase:', error);
@@ -895,8 +998,178 @@ export function useSupabaseFileManager(
         autosaveContext.isAutosaving = false;
       }
     },
-    [context, t, selectedTrack, tracks, user, getTrackAutosaveContext, readOnly],
+    [context, t, user, getTrackAutosaveContext, markSaved, readOnly],
   );
+
+  /**
+   * A step operation (switch, add, rename, delete, convert). `change` gets the track with the editor's
+   * text already in its active step, and returns the fields that change. Local state moves at once and
+   * the server follows through the same queue and version check as every other save. Returns the new
+   * track, or null when it's refused: while a conflict is open the track can't change under the choice.
+   */
+  const applyStepChange = useCallback(
+    (trackId: string, change: (track: Track) => Partial<Track>, { quiet = false } = {}): Track | null => {
+      const track = tracksRef.current[trackId];
+      if (!track) return null;
+      if (readOnly) {
+        const next = { ...track, ...change(track) };
+        tracksRef.current = { ...tracksRef.current, [trackId]: next };
+        setTracks(tracksRef.current);
+        return next;
+      }
+      if (trackVersions.isPaused(trackId)) {
+        toastActions.warning(t('files:trackConflict.message'));
+        return null;
+      }
+
+      const isOpen = selectedTrackRef.current === trackId;
+      const typed = editorText();
+      const withText =
+        isOpen && hasSteps(track as never) && typed.trim()
+          ? ({ ...track, ...saveFieldsFor(track as never, typed) } as Track)
+          : track;
+      const next: Track = {
+        ...withText,
+        ...change(withText),
+        ...(quiet ? {} : { modified: new Date().toISOString() }),
+      };
+
+      tracksRef.current = { ...tracksRef.current, [trackId]: next };
+      setTracks((prev) => (prev[trackId] ? { ...prev, [trackId]: next } : prev));
+      if (tracksStore.get().tracks[trackId]) tracksActions.updateTrack(trackId, next);
+
+      if (isOpen) {
+        const autosaveContext = getTrackAutosaveContext(trackId);
+        // Autosave compares the editor with this, so it follows the track's text.
+        autosaveContext.lastSavedCode = next.code;
+        autosaveContext.lastSavedTimestamp = Date.now();
+      }
+
+      if (quiet) return next;
+
+      const changeCount = (stepChangeCountRef.current.get(trackId) ?? 0) + 1;
+      stepChangeCountRef.current.set(trackId, changeCount);
+      unsavedStepChangesRef.current.add(trackId);
+      const fields: Partial<Track> = {
+        code: next.code,
+        steps: next.steps,
+        activeStep: activeStepIndex(next as never),
+        isMultitrack: next.isMultitrack,
+        modified: next.modified,
+      };
+      const sentAt = Date.now();
+      void db.tracks.update(trackId, fields).then(({ error }) => {
+        if (!error) {
+          // Later changes have their own request, which will clear this.
+          if (stepChangeCountRef.current.get(trackId) === changeCount) unsavedStepChangesRef.current.delete(trackId);
+          conflictRef.current?.textSaved(trackId, next.code, sentAt);
+          return;
+        }
+        if (error instanceof VersionConflictError) {
+          conflictRef.current?.saveRefused(trackId, 'changed', next.code);
+        } else if (error instanceof ApiError && error.status === 404) {
+          conflictRef.current?.saveRefused(trackId, 'deleted', next.code);
+        } else {
+          // Kept in unsavedStepChangesRef: the next autosave sends it again.
+          console.error('SupabaseFileManager - step change not saved:', error);
+          toastActions.error(t('files:errors.saveFailed'));
+        }
+      });
+      return next;
+    },
+    [context, readOnly, t, getTrackAutosaveContext],
+  );
+
+  // A page load puts the track in the editor without loadTrack. Page exits only trust a track once the
+  // editor has been seen holding its text; before that it may hold anything, and nothing has been typed.
+  useEffect(() => {
+    if (readOnly || !selectedTrack) return;
+    const autosaveContext = getTrackAutosaveContext(selectedTrack);
+    if (autosaveContext.lastSavedTimestamp) {
+      setTrackInEditor(selectedTrack);
+      return;
+    }
+    const watch = setInterval(() => {
+      const code = context.editorRef?.current?.code;
+      if (code !== undefined && code === tracksRef.current[selectedTrack]?.code) {
+        autosaveContext.lastSavedCode = code;
+        autosaveContext.lastSavedTimestamp = Date.now();
+        setTrackInEditor(selectedTrack);
+        clearInterval(watch);
+      }
+    }, EDITOR_LOADED_CHECK_MS);
+    return () => clearInterval(watch);
+  }, [selectedTrack, readOnly, context, getTrackAutosaveContext]);
+
+  /** The editor's text, if it differs from what the server has for the open track. */
+  const unsavedEditFor = useCallback(() => {
+    const trackId = selectedTrackRef.current;
+    const track = trackId ? tracksRef.current[trackId] : undefined;
+    if (readOnly || !trackId || !track) return null;
+    const autosaveContext = trackAutosaveContextsRef.current.get(trackId);
+    // Only a track that has been loaded into the editor: until then the editor holds something else.
+    if (!autosaveContext?.lastSavedTimestamp) return null;
+    const text = editorText();
+    if (!text.trim()) return null;
+    const changed = text !== autosaveContext.lastSavedCode && text !== track.code;
+    return changed || unsavedStepChangesRef.current.has(trackId) ? { trackId, track, text } : null;
+  }, [context, readOnly]);
+
+  unsavedEditForRef.current = unsavedEditFor;
+
+  const hasUnsavedEdits = useCallback(() => unsavedEditFor() !== null, [unsavedEditFor]);
+
+  /**
+   * The page is going, or may be. Synchronous up to the request, and no auto-format: that imports code
+   * first, which wouldn't finish. A draft goes down before anything is sent, so the text is safe if
+   * the request is cancelled, is too large for keepalive, or is refused; the next open clears the draft
+   * if the server has the text, and offers it if not. True if the text is safe.
+   */
+  const saveForUnload = useCallback(
+    ({ leaving = false }: { leaving?: boolean } = {}): boolean => {
+      const trackId = selectedTrackRef.current;
+      if (readOnly || !trackId) return true;
+      if (leaving) leavingRef.current = true;
+      const text = editorText();
+      if (trackVersions.isPaused(trackId)) {
+        conflictRef.current?.savePaused(trackId, text);
+        return true;
+      }
+      const edit = unsavedEditFor();
+      if (!edit) return true;
+
+      const stepIndex = activeStepIndex(edit.track as never);
+      const stored = conflictRef.current?.keepDraft(trackId, text, { inEditor: true, stepIndex }) ?? false;
+      const sentInfo = { stepChange: stepChangeCountRef.current.get(trackId) ?? 0, at: Date.now() };
+      let settled: () => void = () => {};
+      const answered = new Promise<void>((resolve) => (settled = resolve));
+      const sent = secureApi.saveOnUnload(
+        trackId,
+        {
+          ...(saveFieldsFor(edit.track as never, text, stepIndex) as Partial<Track>),
+          modified: new Date().toISOString(),
+        },
+        ({ saved, conflict }) => {
+          // Only if the page stayed: a hidden tab that came back, or a sign-out waiting for this.
+          if (saved) markSaved(trackId, text, stepIndex, sentInfo);
+          else if (conflict) conflictRef.current?.saveRefused(trackId, 'changed', text, stepIndex);
+          settled();
+        },
+      );
+      if (sent === 'sent') unloadSaveRef.current = answered;
+      return stored || sent === 'sent';
+    },
+    [context, readOnly, unsavedEditFor, markSaved],
+  );
+
+  // A page restored from the back/forward cache is staying after all.
+  useEffect(() => {
+    const staying = () => {
+      leavingRef.current = false;
+    };
+    window.addEventListener('pageshow', staying);
+    return () => window.removeEventListener('pageshow', staying);
+  }, []);
 
   const saveCurrentTrack = useCallback(
     async (showToast: boolean = true) => {
@@ -916,8 +1189,9 @@ export function useSupabaseFileManager(
 
       const autosaveContext = getTrackAutosaveContext(trackId);
 
-      // Clear any existing timer for this track
-      clearTrackAutosaveTimer(trackId);
+      // One is on its way. The check below runs every 2 s, so restarting it here would mean an interval
+      // over 2 s (the default is 30 s) never arrives.
+      if (autosaveContext.timer) return;
 
       // Don't schedule if already autosaving
       if (autosaveContext.isAutosaving) {
@@ -926,8 +1200,9 @@ export function useSupabaseFileManager(
       }
 
       autosaveContext.timer = setTimeout(async () => {
+        autosaveContext.timer = null;
         // Double-check that we're still on the same track when timer fires (URL-based)
-        const currentTrackIdFromURL = getCurrentTrackIdFromURL(tracks, folders);
+        const currentTrackIdFromURL = getCurrentTrackIdFromURL(tracksRef.current, folders);
 
         if (!currentTrackIdFromURL) {
           console.warn('SupabaseFileManager - autosave timer: Could not determine track from URL, skipping save');
@@ -1020,14 +1295,15 @@ export function useSupabaseFileManager(
       });
 
       try {
-        const trackData = {
+        // `code` follows the active step, whatever an imported file said.
+        const trackData = consistentNewTrack({
           name,
           code,
           folder: folder || null, // Convert empty string/undefined to null for root folder
           isMultitrack,
           steps,
           activeStep,
-        };
+        });
 
         console.log('SupabaseFileManager - creating track directly in Supabase:', trackData);
 
@@ -1503,16 +1779,17 @@ export function useSupabaseFileManager(
     if (!isAutosaveEnabled) return;
 
     const checkCodeChanges = () => {
-      const currentTrackId = getCurrentTrackIdFromURL(tracks, folders);
+      const currentTrackId = getCurrentTrackIdFromURL(tracksRef.current, folders);
       if (!currentTrackId) {
         console.warn('SupabaseFileManager - checkCodeChanges: Could not determine track from URL, skipping');
         return;
       }
 
-      const currentCode = context.editorRef?.current?.code || context.activeCode || '';
+      const currentCode = editorText();
       const autosaveContext = getTrackAutosaveContext(currentTrackId);
 
-      if (currentCode !== autosaveContext.lastSavedCode && currentCode.trim()) {
+      const stepChanges = unsavedStepChangesRef.current.has(currentTrackId);
+      if ((currentCode !== autosaveContext.lastSavedCode || stepChanges) && currentCode.trim()) {
         scheduleTrackAutosave(currentTrackId);
       }
     };
@@ -1527,53 +1804,98 @@ export function useSupabaseFileManager(
     () => (isInitialized && hasLoadedData ? new Set(Object.keys(tracks)) : null),
     [isInitialized, hasLoadedData, tracks],
   );
+  // "Load the new version" keeps the user on their step, if it still exists.
+  const localStep = (track: Track, server: { steps: unknown[]; activeStep?: number }) =>
+    (track.activeStep ?? 0) < server.steps.length ? track.activeStep : server.activeStep;
   const trackConflict = useTrackConflict({
     userId: user?.id ?? null,
     enabled: !readOnly,
-    openTrackId: selectedTrack,
+    openTrackId: trackInEditor === selectedTrack ? selectedTrack : null,
     knownTrackIds,
     appDeps: {
-      getEditorCode: () => context.editorRef?.current?.code || context.activeCode || '',
+      getEditorCode: () => editorText(),
       getLastSavedCode: (id) => getTrackAutosaveContext(id).lastSavedCode,
-      getLocalTrack: (id) => tracks[id],
+      onDraftExpired: (draft) => {
+        toastActions.warning(t('files:trackConflict.draftExpired', { name: draft.name }));
+      },
+      getLocalTrack: (id) => tracksRef.current[id],
       setEditorCode: (id, code) => {
         // The same call as opening a track from the library, with no reset: nothing is evaluated.
         void context.handleUpdate({ id, code }, false);
       },
+      showDraft: (id, draft) => {
+        const local = tracksRef.current[id];
+        if (!local) return;
+        const next: Track = {
+          ...local,
+          isMultitrack: draft.isMultitrack,
+          ...(draft.isMultitrack ? { steps: draft.steps as Track['steps'], activeStep: draft.stepIndex } : {}),
+          code: draft.code,
+        };
+        tracksRef.current = { ...tracksRef.current, [id]: next };
+        setTracks(tracksRef.current);
+        void context.handleUpdate({ id, code: draft.code }, false);
+        // A reload opens the step in the URL, so it has to name the step this text belongs to.
+        const step = next.isMultitrack ? (next.steps?.[draft.stepIndex] as { name?: string } | undefined) : undefined;
+        if (step?.name && typeof window !== 'undefined') {
+          const url = `${generateTrackUrlPath(next.name, next.folder, folders)}?step=${trackNameToSlug(step.name)}`;
+          window.history.replaceState(window.history.state, '', url);
+          // The routing effect follows this: left on the old step, it would load that over the draft.
+          setActivePattern(url.replace(/^\/repl\//, ''));
+        }
+      },
       saveCode: async (id, code) => {
-        const { error } = await db.tracks.update(id, { code, modified: new Date().toISOString() });
+        const track = tracksRef.current[id];
+        if (!track) throw new Error('Track not found');
+        const stepIndex = activeStepIndex(track as never);
+        const sent = { stepChange: stepChangeCountRef.current.get(id) ?? 0, at: Date.now() };
+        const { error } = await db.tracks.update(id, {
+          ...(saveFieldsFor(track as never, code, stepIndex) as Partial<Track>),
+          modified: new Date().toISOString(),
+        });
         if (error) throw error;
+        markSaved(id, code, stepIndex, sent);
       },
       applySynced: (id, code, server) => {
-        setTracks((prev) =>
-          prev[id]
-            ? {
-                ...prev,
-                [id]: {
-                  ...prev[id],
-                  code,
-                  ...(server ? { steps: server.steps as Track['steps'], version: server.version } : {}),
-                  modified: new Date().toISOString(),
-                },
-              }
-            : prev,
-        );
+        const local = tracksRef.current[id];
+        if (local) {
+          tracksRef.current = {
+            ...tracksRef.current,
+            [id]: {
+              ...local,
+              code,
+              isMultitrack: Boolean(server.isMultitrack),
+              steps: server.steps as Track['steps'],
+              version: server.version,
+              activeStep: server.isMultitrack ? localStep(local, server) : 0,
+              modified: new Date().toISOString(),
+            },
+          };
+          setTracks(tracksRef.current);
+        }
+        unsavedStepChangesRef.current.delete(id);
         const autosaveContext = getTrackAutosaveContext(id);
         clearTrackAutosaveTimer(id);
         autosaveContext.lastSavedCode = code;
         autosaveContext.lastSavedTimestamp = Date.now();
-        if (selectedTrack === id) lastSavedCodeRef.current = code;
+        if (selectedTrackRef.current === id) lastSavedCodeRef.current = code;
       },
       recreate: async (oldId: string, draft: TrackDraft, open: boolean) => {
         // The folder may have gone with it: the root is better than a folder nobody can see.
         const folderExists = Object.values(folders).some((f) => f.id === draft.folder || f.path === draft.folder);
+        const folder = folderExists && draft.folder ? draft.folder : undefined;
+        // The name may have been taken since. A free one is better than a notice that can't be left.
         const created = await createTrack(
-          draft.name,
+          generateUniqueTrackName(
+            draft.name,
+            folder,
+            Object.fromEntries(Object.entries(tracksRef.current).filter(([id]) => id !== oldId)) as never,
+          ),
           draft.code,
-          folderExists && draft.folder ? draft.folder : undefined,
+          folder,
           draft.isMultitrack,
           draft.steps as Track['steps'],
-          draft.activeStep,
+          draft.stepIndex,
         );
         if (!created) return false;
         cleanupTrackAutosaveContext(oldId);
@@ -1691,6 +2013,10 @@ export function useSupabaseFileManager(
     loadTrack,
     saveCurrentTrack: readOnly ? asyncNoopFalse : saveCurrentTrack,
     saveSpecificTrack: readOnly ? asyncNoopFalse : saveSpecificTrack,
+    hasUnsavedEdits,
+    saveForUnload,
+    unloadSaveSettled: () => unloadSaveRef.current,
+    applyStepChange,
     createTrack: readOnly ? asyncNoopNull : createTrack,
     createFolder: readOnly ? asyncNoopNull : createFolder,
     updateFolder: readOnly ? asyncNoopVoid : updateFolder,

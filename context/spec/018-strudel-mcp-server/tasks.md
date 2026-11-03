@@ -59,6 +59,7 @@ Prod steps below need an explicit yes each: turning on dynamic client registrati
 
 - [ ] **Slice 9: Setup page and deploy pipeline**
   - [ ] `website/src/pages/learn/ai-assistants.mdx`: connect common assistants, install the helper, capabilities, disconnect. Readable signed out. **[Agent: strudel-web-engineer]**
+  - [ ] Connect UI in `panel/ConnectedAssistants.tsx`: address and commands with **Copy** and a clipboard fallback, steps per assistant, helper install, open when empty and collapsed otherwise, list refresh every 30 s while open; 9 locales; desktop, phone, RTL. **[Agent: strudel-web-engineer]**
   - [ ] `.github/workflows/deploy.yml` deploys `strudel-mcp` after `strudel-client`, behind `check`; root scripts for dev and build. **[Agent: strudel-web-engineer]**
   - [ ] Verify: `pnpm build:cloudflare` passes with size reported; `wrangler deploy --dry-run` for the new Worker reports its size; a fresh user follows the page for Claude and connects. Delete artifacts. **[Agent: strudel-web-engineer]**
 

@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { consistentNewTrack, type StepLike } from '../../../lib/multitrack';
 import { nanoid } from 'nanoid';
 import { getAuthenticatedUser, AuthError } from '../_auth';
 import { userClient } from '../_userClient';
@@ -193,17 +194,24 @@ export const POST: APIRoute = async ({ request }) => {
       let name = base;
       for (let n = 2; isTaken(key, name); n++) name = `${base} ${n}`;
       take(key, name);
+      // `code` follows the active step, whatever the file said (lib/multitrack.ts).
+      const consistent = consistentNewTrack({
+        code: track.code ?? '',
+        isMultitrack: track.isMultitrack === true,
+        steps: Array.isArray(track.steps) ? (track.steps as StepLike[]) : [],
+        activeStep: Number.isInteger(track.activeStep) ? track.activeStep : 0,
+      });
       return {
         id: nanoid(), // always a new track: an import never overwrites
         user_id: user.id,
         name,
-        code: track.code ?? '',
+        code: consistent.code,
         created: now,
         modified: now,
         folder,
         is_multitrack: track.isMultitrack === true,
         steps: Array.isArray(track.steps) ? track.steps : [],
-        active_step: Number.isInteger(track.activeStep) ? track.activeStep : 0,
+        active_step: consistent.activeStep ?? 0,
       };
     });
 

@@ -22,9 +22,11 @@ export function TrackConflictNotice({ controller }: { controller: TrackConflictC
   const detail =
     state.kind === 'deleted'
       ? 'trackConflict.deletedDetail'
-      : state.restored
+      : state.draftOrigin === 'unsaved'
         ? 'trackConflict.restoredDetail'
-        : 'trackConflict.detail';
+        : state.draftOrigin === 'moved'
+          ? 'trackConflict.movedDetail'
+          : 'trackConflict.detail';
 
   return (
     <div
@@ -33,7 +35,9 @@ export function TrackConflictNotice({ controller }: { controller: TrackConflictC
       className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 bg-lineHighlight border-b border-foreground text-foreground"
     >
       <div className="flex-1 min-w-[12rem]">
-        <p className="text-sm font-semibold">{t('trackConflict.message')}</p>
+        <p className="text-sm font-semibold">
+          {t(state.draftOrigin === 'unsaved' ? 'trackConflict.unsavedMessage' : 'trackConflict.message')}
+        </p>
         <p className="text-xs opacity-80">{t(detail, { name: state.trackName })}</p>
         {state.failed && <p className="text-xs font-medium">{t('trackConflict.failed')}</p>}
       </div>

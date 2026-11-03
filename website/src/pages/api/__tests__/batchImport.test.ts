@@ -214,3 +214,20 @@ describe('batch-import: all or nothing', () => {
     expect(calls.some(([, , o]) => o?.global?.headers?.Authorization === `Bearer ${TOKEN}`)).toBe(true);
   });
 });
+
+describe('library/batch-import: a multitrack', () => {
+  it('stores code as the active step, which is how the rows that disagree came about', async () => {
+    fakeState.tables.folders = [];
+    fakeState.tables.tracks = [];
+    const steps = [
+      { id: 's1', name: 'A', code: 'aa' },
+      { id: 's2', name: 'B', code: 'bb' },
+    ];
+    const res = await post({
+      tracks: [{ name: 'multi', code: 'aa', isMultitrack: true, steps, activeStep: 1 }],
+      folders: [],
+    });
+    expect(res.status).toBe(200);
+    expect(insertedInto('tracks')[0]).toMatchObject({ code: 'bb', active_step: 1, is_multitrack: true });
+  });
+});

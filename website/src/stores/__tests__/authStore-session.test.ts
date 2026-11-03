@@ -195,4 +195,70 @@ describe('authStore.checkAuth with an expired session cookie', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  describe('unsaved text when the session ends', () => {
+    const order: string[] = [];
+    async function watchSaver() {
+      order.length = 0;
+      const { globalSaveManager } = await import('../../repl/globalSaveManager');
+      globalSaveManager.register(() => ({
+        saveForUnload: () => {
+          // The file manager still has its user, and so knows what's open.
+          // ...and `loading` unmounts the editor, so that has to wait too.
+          order.push(
+            authStore.get().user && !authStore.get().loading ? 'protected, user still set' : 'protected, too late',
+          );
+          return true;
+        },
+      }));
+      return () => globalSaveManager.unregister();
+    }
+
+    it('sign-out protects it first, while the session is still good', async () => {
+      const done = await watchSaver();
+      authActions.setUser(USER as never);
+      authStore.set({ ...authStore.get(), user: USER as never, loading: false });
+      supabaseMock.auth.signOut.mockImplementationOnce(async () => {
+        order.push('signed out');
+        return { error: null };
+      });
+      await authActions.signOut();
+      expect(order).toEqual(['protected, user still set', 'signed out']);
+      done();
+    });
+
+    it('sign-out and its SIGNED_OUT event wait once between them', async () => {
+      const { protectUnsavedWork } = await import('../authStore');
+      const { globalSaveManager } = await import('../../repl/globalSaveManager');
+      const protect = vi.spyOn(globalSaveManager, 'protectUnsavedWork');
+      authStore.set({ ...authStore.get(), user: USER as never, loading: false });
+      authActions.setUser(USER as never);
+      await authActions.signOut();
+      await protectUnsavedWork();
+      expect(protect).toHaveBeenCalledOnce();
+      protect.mockRestore();
+    });
+
+    it('a sign-out that failed lets the next one protect again', async () => {
+      const { globalSaveManager } = await import('../../repl/globalSaveManager');
+      const protect = vi.spyOn(globalSaveManager, 'protectUnsavedWork');
+      authActions.setUser(USER as never);
+      supabaseMock.auth.signOut.mockResolvedValueOnce({ error: new Error('down') } as never);
+      await authActions.signOut();
+      await authActions.signOut();
+      expect(protect).toHaveBeenCalledTimes(2);
+      protect.mockRestore();
+    });
+
+    it('a session found dead protects it before the file manager empties', async () => {
+      const done = await watchSaver();
+      authActions.setUser(USER as never);
+      authStore.set({ ...authStore.get(), user: USER as never, loading: false });
+      supabaseMock.auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
+      await authActions.checkAuth();
+      expect(order).toEqual(['protected, user still set']);
+      expect(authStore.get().user).toBeNull();
+      done();
+    });
+  });
 });

@@ -11,7 +11,9 @@ import {
   type ServerRead,
   type TrackConflictController,
   type TrackConflictDeps,
+  type TrackDraft,
 } from '../trackConflict';
+import { claimTab, isTabAlive } from '../tabIdentity';
 import { serverTrackFromRow, trackVersions, type ServerTrack } from '../trackVersion';
 
 /**
@@ -53,7 +55,10 @@ export async function readServerTrack(trackId: string): Promise<ServerRead<Serve
   }
 }
 
-type AppDeps = Omit<TrackConflictDeps, 'readVersion' | 'readTrack' | 'storage' | 'userId'>;
+type AppDeps = Omit<
+  TrackConflictDeps,
+  'readVersion' | 'readTrack' | 'storage' | 'userId' | 'tabId' | 'isTabAlive' | 'versions' | 'isVisible' | 'sleep'
+> & { onDraftExpired: (draft: TrackDraft) => void };
 
 /**
  * @param userId null while signed out; `enabled` is false for the read-only admin view, whose RLS
@@ -80,29 +85,42 @@ export function useTrackConflict({
 
   useEffect(() => {
     if (!enabled || !userId) return;
-    const created = createTrackConflictController({
-      userId,
-      readVersion: readServerVersion,
-      readTrack: readServerTrack,
-      storage: typeof window !== 'undefined' ? window.localStorage : null,
-      getEditorCode: () => depsRef.current.getEditorCode(),
-      getLastSavedCode: (id) => depsRef.current.getLastSavedCode(id),
-      getLocalTrack: (id) => depsRef.current.getLocalTrack(id),
-      setEditorCode: (id, code) => depsRef.current.setEditorCode(id, code),
-      saveCode: (id, code) => depsRef.current.saveCode(id, code),
-      applySynced: (id, code, server) => depsRef.current.applySynced(id, code, server),
-      recreate: (id, draft, open) => depsRef.current.recreate(id, draft, open),
-      removeLocal: (id) => depsRef.current.removeLocal(id),
+    let stop = () => {};
+    let cancelled = false;
+    void claimTab().then(({ tabId, release }) => {
+      if (cancelled) return release();
+      const created = createTrackConflictController({
+        userId,
+        tabId,
+        isTabAlive,
+        readVersion: readServerVersion,
+        readTrack: readServerTrack,
+        storage: typeof window !== 'undefined' ? window.localStorage : null,
+        getEditorCode: () => depsRef.current.getEditorCode(),
+        getLastSavedCode: (id) => depsRef.current.getLastSavedCode(id),
+        getLocalTrack: (id) => depsRef.current.getLocalTrack(id),
+        setEditorCode: (id, code) => depsRef.current.setEditorCode(id, code),
+        showDraft: (id, draft) => depsRef.current.showDraft(id, draft),
+        saveCode: (id, code) => depsRef.current.saveCode(id, code),
+        applySynced: (id, code, server) => depsRef.current.applySynced(id, code, server),
+        recreate: (id, draft, open) => depsRef.current.recreate(id, draft, open),
+        removeLocal: (id) => depsRef.current.removeLocal(id),
+      });
+      created.startWatching();
+      setActiveTrackConflictController(created);
+      setController(created);
+      stop = () => {
+        created.stopWatching();
+        release();
+        setActiveTrackConflictController(null);
+        setController(null);
+        trackConflictStore.set(null);
+        trackVersions.setOpenTrack(null);
+      };
     });
-    created.startWatching();
-    setActiveTrackConflictController(created);
-    setController(created);
     return () => {
-      created.stopWatching();
-      setActiveTrackConflictController(null);
-      setController(null);
-      trackConflictStore.set(null);
-      trackVersions.setOpenTrack(null);
+      cancelled = true;
+      stop();
     };
   }, [enabled, userId]);
 
@@ -111,7 +129,11 @@ export function useTrackConflict({
   }, [controller, openTrackId, knownTrackIds !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (controller && knownTrackIds) controller.offerOrphanDrafts(knownTrackIds);
+    if (!controller || !knownTrackIds) return;
+    void controller.sweepDrafts().then((expired) => {
+      expired.forEach((draft) => depsRef.current.onDraftExpired(draft));
+      return controller.offerOrphanDrafts(knownTrackIds);
+    });
   }, [controller, knownTrackIds !== null]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return controller;

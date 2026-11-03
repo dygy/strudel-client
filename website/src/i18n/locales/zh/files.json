@@ -133,13 +133,22 @@
   "loadingTracks": "正在加载您的音轨...",
   "loadingTracksDescription": "请稍候，我们正在从云端获取您的数据",
 
+  "recoveredStepName": "已恢复的编辑",
+
   "trackConflict": {
+    "unsavedMessage": "你最后的编辑未保存",
 
   
   "message": "此音轨已在其他地方被更改",
 
   
   "detail": "在你做出选择之前，此音轨的自动保存已暂停。",
+
+  
+  "draftExpired": "“{{name}}”的草稿已超过 30 天，已被删除。",
+
+  
+  "movedDetail": "这是你之前的文本。此后保存了更新的版本，“保留我的”会替换该版本。",
 
   
   "restoredDetail": "你有之前未保存的文本。在你做出选择之前，此音轨的自动保存已暂停。",

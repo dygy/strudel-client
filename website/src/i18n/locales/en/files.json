@@ -133,13 +133,22 @@
   "loadingTracks": "Loading your tracks...",
   "loadingTracksDescription": "Please wait while we fetch your data from the cloud",
   
+  "recoveredStepName": "Recovered edits",
+  
   "trackConflict": {
+    "unsavedMessage": "Your last edit was not saved",
   
     
   "message": "This track was changed elsewhere",
   
     
   "detail": "Autosave is paused for this track until you choose.",
+  
+    
+  "draftExpired": "A draft of \"{{name}}\" was over 30 days old and has been removed.",
+  
+    
+  "movedDetail": "This is your text from earlier. A newer version was saved after it, and Keep mine replaces that version.",
   
     
   "restoredDetail": "You have text from earlier that was not saved. Autosave is paused for this track until you choose.",

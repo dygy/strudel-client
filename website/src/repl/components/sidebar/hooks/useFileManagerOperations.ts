@@ -66,6 +66,12 @@ interface UseFileManagerOperationsProps {
   t: (key: string, options?: Record<string, unknown>) => string;
   // API functions
   deleteTrack?: (trackId: string) => Promise<boolean>;
+  /** A step change that reaches the server: see useSupabaseFileManager. */
+  applyStepChange?: (
+    trackId: string,
+    change: (track: Track) => Partial<Track>,
+    options?: { quiet?: boolean },
+  ) => Track | null;
   /**
    * PUT /api/folders/update (useSupabaseFileManager). Resolves falsy after it has reported the
    * failure, or `{ rollbackIncomplete: true }` when the server could not undo a partial rename.
@@ -149,6 +155,7 @@ export function useFileManagerOperations({
   context,
   t,
   deleteTrack: deleteTrackAPI,
+  applyStepChange,
   updateFolder: updateFolderAPI,
   refreshFromSupabase,
   readOnly = false,
@@ -226,6 +233,10 @@ export function useFileManagerOperations({
   const handleTrackSelect = useCallback(
     async (track: Track) => {
       console.log('FileManager - handleTrackSelect called for:', track.name);
+
+      // Already open: pressing it (a multitrack's row also expands its steps) must not put the last
+      // saved text back over what's been typed.
+      if (selectedTrack === track.id) return;
 
       // Clear step selection when selecting a regular track
       setSelectedStepTrack(null);
@@ -559,21 +570,14 @@ export function useFileManagerOperations({
         modified: new Date().toISOString(),
       };
 
-      setTracks((prev) => ({
-        ...prev,
-        [trackId]: {
-          ...prev[trackId],
-          steps: [...(prev[trackId].steps || []), newStep],
-          modified: new Date().toISOString(),
-        },
-      }));
+      if (!applyStepChange?.(trackId, (current) => ({ steps: [...(current.steps || []), newStep] }))) return;
 
       setNewStepName('');
       setIsCreatingStep(false);
       setSelectedStepTrack(null);
       toastActions.success(t('files:stepAdded'));
     },
-    [tracks, newStepName, setTracks, setNewStepName, setIsCreatingStep, setSelectedStepTrack, t],
+    [tracks, newStepName, applyStepChange, setNewStepName, setIsCreatingStep, setSelectedStepTrack, t],
   );
 
   const cancelRename = useCallback(() => {
@@ -919,10 +923,11 @@ export function useFileManagerOperations({
         modified: new Date().toISOString(),
       };
 
-      setTracks((prev) => ({ ...prev, [track.id]: updatedTrack }));
+      const { isMultitrack, steps, activeStep } = updatedTrack;
+      if (!applyStepChange?.(track.id, () => ({ isMultitrack, steps, activeStep }))) return;
       toastActions.success(t('files:convertedToMultitrack'));
     },
-    [setTracks, t],
+    [applyStepChange, t],
   );
 
   const switchToStep = useCallback(
@@ -932,53 +937,35 @@ export function useFileManagerOperations({
 
       console.log('FileManager - switchToStep called for track:', track.name, 'step:', stepIndex);
 
+      // Clicking a step of another track leaves that track's editor text behind: save it first.
+      if (selectedTrack && selectedTrack !== trackId) {
+        await saveCurrentTrack(false);
+      }
+
+      // Text being left goes into its step and reaches the server with the switch, so nothing typed
+      // depends on an autosave that the switch would cancel. A step click with nothing typed writes
+      // nothing: it isn't a change, so the library's order, `modified` and other tabs stay as they are.
+      // A reload finds the step from the URL, and the next real save records it as active.
+      const leaving = track.steps[track.activeStep ?? 0];
+      const editorText = context.editorRef?.current?.code ?? '';
+      const nothingTyped = selectedTrack !== trackId || !editorText.trim() || editorText === leaving?.code;
+      const updatedTrack = applyStepChange?.(
+        trackId,
+        (current) => ({ activeStep: stepIndex, code: current.steps?.[stepIndex]?.code ?? '' }),
+        { quiet: nothingTyped },
+      );
+      if (!updatedTrack) return;
+
       // Set step selection state when switching to a step
       setSelectedStepTrack(trackId);
 
-      // Save current code to active step if this track is currently selected
-      if (selectedTrack === trackId && track.activeStep !== undefined) {
-        const currentCode = context.editorRef?.current?.code || context.activeCode || '';
-        const updatedSteps = [...track.steps];
-        updatedSteps[track.activeStep] = {
-          ...updatedSteps[track.activeStep],
-          code: currentCode,
-          modified: new Date().toISOString(),
-        };
-
-        setTracks((prev) => ({
-          ...prev,
-          [trackId]: {
-            ...prev[trackId],
-            steps: updatedSteps,
-            activeStep: stepIndex,
-            code: updatedSteps[stepIndex].code,
-            modified: new Date().toISOString(),
-          },
-        }));
-      } else {
-        setTracks((prev) => ({
-          ...prev,
-          [trackId]: {
-            ...prev[trackId],
-            activeStep: stepIndex,
-            code: track.steps![stepIndex].code,
-            modified: new Date().toISOString(),
-          },
-        }));
-      }
-
       // Load the new step immediately
-      const updatedTrack = {
-        ...track,
-        activeStep: stepIndex,
-        code: track.steps[stepIndex].code,
-      };
-
-      console.log('FileManager - loading step code:', track.steps[stepIndex].code.substring(0, 50) + '...');
+      console.log('FileManager - loading step code:', updatedTrack.code.substring(0, 50) + '...');
       loadTrack(updatedTrack);
 
-      // Update URL with step information using step name
-      if (selectedTrack === trackId) {
+      // Update URL with step information using step name. Autosave finds the open track from the URL,
+      // so it has to follow when this step belongs to another track too.
+      {
         try {
           console.log('FileManager - updating URL for step:', stepIndex);
 
@@ -1022,7 +1009,17 @@ export function useFileManagerOperations({
         }
       }
     },
-    [tracks, selectedTrack, context, setTracks, loadTrack, setSelectedStepTrack, folders, readOnly],
+    [
+      tracks,
+      selectedTrack,
+      saveCurrentTrack,
+      applyStepChange,
+      context,
+      loadTrack,
+      setSelectedStepTrack,
+      folders,
+      readOnly,
+    ],
   );
 
   const startRenameStep = useCallback(
@@ -1044,28 +1041,36 @@ export function useFileManagerOperations({
       const newName = renameValue.trim();
 
       if (step && step.name !== newName) {
-        const updatedSteps = [...track.steps!];
-        updatedSteps[stepIndex] = {
-          ...updatedSteps[stepIndex],
-          name: newName,
-          modified: new Date().toISOString(),
-        };
-
-        setTracks((prev) => ({
-          ...prev,
-          [trackId]: {
-            ...prev[trackId],
-            steps: updatedSteps,
-            modified: new Date().toISOString(),
-          },
+        const renamed = applyStepChange?.(trackId, (current) => ({
+          steps: current.steps!.map((other, i) =>
+            i === stepIndex ? { ...other, name: newName, modified: new Date().toISOString() } : other,
+          ),
         }));
-
-        toastActions.success(t('files:stepRenamed'));
+        if (renamed) {
+          // The URL names the open step, and a reload has to find it again.
+          if (renamed.activeStep === stepIndex && selectedTrack === trackId && typeof window !== 'undefined') {
+            const url = `${generateTrackUrlPath(renamed.name, renamed.folder, folders)}?step=${trackNameToSlug(newName)}`;
+            window.history.replaceState(window.history.state, '', url);
+            if (!readOnly) setActivePattern(url.replace('/repl/', ''));
+          }
+          toastActions.success(t('files:stepRenamed'));
+        }
       }
     }
     setRenamingStep(null);
     setRenameValue('');
-  }, [renamingStep, renameValue, tracks, setTracks, setRenamingStep, setRenameValue, t]);
+  }, [
+    renamingStep,
+    renameValue,
+    tracks,
+    applyStepChange,
+    selectedTrack,
+    folders,
+    readOnly,
+    setRenamingStep,
+    setRenameValue,
+    t,
+  ]);
 
   const deleteStep = useCallback(
     (trackId: string, stepIndex: number) => {
@@ -1075,24 +1080,30 @@ export function useFileManagerOperations({
         return;
       }
 
-      const updatedSteps = track.steps.filter((_, index) => index !== stepIndex);
-      const newActiveStep =
-        track.activeStep === stepIndex ? 0 : track.activeStep! > stepIndex ? track.activeStep! - 1 : track.activeStep;
+      const deletingOpenStep = selectedTrack === trackId && track.activeStep === stepIndex;
+      const next = applyStepChange?.(trackId, (current) => {
+        const steps = current.steps!.filter((_, index) => index !== stepIndex);
+        const active = current.activeStep ?? 0;
+        const activeStep = active === stepIndex ? 0 : active > stepIndex ? active - 1 : active;
+        return { steps, activeStep, code: steps[activeStep].code };
+      });
+      if (!next) return;
 
-      setTracks((prev) => ({
-        ...prev,
-        [trackId]: {
-          ...prev[trackId],
-          steps: updatedSteps,
-          activeStep: newActiveStep,
-          code: updatedSteps[newActiveStep!].code,
-          modified: new Date().toISOString(),
-        },
-      }));
+      // The editor held the step that's gone, and would save its text over the one now active.
+      if (deletingOpenStep) {
+        setSelectedStepTrack(trackId);
+        loadTrack(next);
+        if (typeof window !== 'undefined') {
+          const stepName = next.steps![next.activeStep ?? 0].name;
+          const url = `${generateTrackUrlPath(next.name, next.folder, folders)}?step=${trackNameToSlug(stepName)}`;
+          window.history.replaceState(window.history.state, '', url);
+          if (!readOnly) setActivePattern(url.replace('/repl/', ''));
+        }
+      }
 
       toastActions.success(t('files:stepDeleted'));
     },
-    [tracks, setTracks, t],
+    [tracks, selectedTrack, applyStepChange, loadTrack, setSelectedStepTrack, folders, readOnly, t],
   );
 
   const downloadTrack = useCallback(

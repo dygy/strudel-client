@@ -17,7 +17,14 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import i18n from '@src/i18n/i18n';
 import { createOAuthServerApi } from '@src/lib/oauthServerApi';
-import { ConnectedAssistants, SETUP_PAGE_URL } from '../ConnectedAssistants';
+import {
+  CLAUDE_CODE_COMMAND,
+  ConnectedAssistants,
+  HELPER_COMMAND,
+  HELPER_PUBLISHED,
+  LIST_REFRESH_MS,
+  MCP_ADDRESS,
+} from '../ConnectedAssistants';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -88,12 +95,12 @@ describe('Connected assistants', () => {
     await render(() => text().includes('Claude Code'));
     fetchMock.mockImplementation(async () => new Response(null, { status: 204 }));
     await act(async () => buttons()[0].click());
-    await settle(() => !text().includes('Claude Code'));
+    const listed = () => [...container!.querySelectorAll('li')].map((li) => li.textContent ?? '');
+    await settle(() => listed().length === 1);
     const [url, init] = fetchMock.mock.calls[fetchMock.mock.calls.length - 1];
     expect(url).toBe('https://sb.test/auth/v1/user/oauth/grants?client_id=c1');
     expect(init?.method).toBe('DELETE');
-    expect(text()).not.toContain('Claude Code');
-    expect(text()).toContain('An unnamed assistant');
+    expect(listed()[0]).toContain('An unnamed assistant');
   });
 
   it('keeps it on the list and says so if Disconnect fails', async () => {
@@ -122,12 +129,214 @@ describe('Connected assistants', () => {
     expect(text()).toContain('Disconnect ends access through Strudel at once.');
   });
 
-  it('with no assistant says so and links to the setup page', async () => {
+  it('with no assistant says so, and shows the connect steps open', async () => {
     fetchMock.mockImplementation(async () => json([]));
     await render(() => text().includes('No assistant'));
     expect(text()).toContain('No assistant is connected.');
-    expect(container!.querySelector('a')!.getAttribute('href')).toBe(SETUP_PAGE_URL);
-    expect(buttons()).toEqual([]);
+    const steps = container!.querySelector('[data-testid="connect-steps"]')!;
+    expect(steps.closest('details')).toBeNull();
+    expect(steps.textContent).toContain(MCP_ADDRESS);
+    expect(steps.textContent).toContain(CLAUDE_CODE_COMMAND);
+  });
+
+  it('with assistants connected keeps the steps collapsed under Connect another assistant', async () => {
+    await render(() => text().includes('Claude Code'));
+    const details = container!.querySelector<HTMLDetailsElement>('[data-testid="connect-another"]')!;
+    expect(details.open).toBe(false);
+    expect(details.querySelector('summary')!.textContent).toBe('Connect another assistant');
+    expect(details.querySelector('[data-testid="connect-steps"]')).not.toBeNull();
+  });
+
+  it('leaves the helper command out until the package is on npm', async () => {
+    fetchMock.mockImplementation(async () => json([]));
+    await render(() => text().includes('No assistant'));
+    expect(HELPER_PUBLISHED).toBe(false);
+    expect(text()).not.toContain('strudel-mcp');
+    expect(text()).not.toContain('Local helper');
+  });
+
+  it.each([
+    ['none connected', []],
+    ['some connected', GRANTS],
+  ])('says this is early access, with %s', async (_name, grants) => {
+    fetchMock.mockImplementation(async () => json(grants));
+    await render(() => text().includes('No assistant') || text().includes('Connected on'));
+    expect(text()).toContain("Early access: for now, an assistant can only confirm that it's connected.");
+  });
+
+  it('a list that fails to load still shows how to connect', async () => {
+    fetchMock.mockImplementation(async () => json({ msg: 'boom' }, 500));
+    await render(() => text().includes('Could not load'));
+    expect(container!.querySelector('[data-testid="connect-steps"]')).not.toBeNull();
+  });
+
+  it('a refresh read before a Disconnect finished does not bring the assistant back', async () => {
+    vi.useFakeTimers();
+    try {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      root = createRoot(container);
+      await act(async () => {
+        root!.render(<ConnectedAssistants api={api} />);
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      for (let i = 0; i < 5 && !container.querySelector('li'); i++) {
+        await act(async () => vi.advanceTimersByTimeAsync(20));
+      }
+      let answerList: (response: Response) => void = () => {};
+      fetchMock.mockImplementationOnce(() => new Promise((resolve) => (answerList = resolve)));
+      await act(async () => vi.advanceTimersByTimeAsync(LIST_REFRESH_MS));
+      fetchMock.mockImplementationOnce(async () => new Response(null, { status: 204 }));
+      await act(async () => {
+        container!.querySelector<HTMLButtonElement>('li button')!.click();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      await act(async () => {
+        answerList(json(GRANTS));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      const names = [...container.querySelectorAll('li')].map((li) => li.textContent ?? '');
+      expect(names).toHaveLength(1);
+      expect(names[0]).toContain('An unnamed assistant');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not poll in a hidden tab, and catches up on its return', async () => {
+    vi.useFakeTimers();
+    const visibility = vi.spyOn(document, 'visibilityState', 'get');
+    try {
+      visibility.mockReturnValue('visible');
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      root = createRoot(container);
+      await act(async () => {
+        root!.render(<ConnectedAssistants api={api} />);
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      fetchMock.mockClear();
+      visibility.mockReturnValue('hidden');
+      await act(async () => vi.advanceTimersByTimeAsync(LIST_REFRESH_MS * 3));
+      expect(fetchMock).not.toHaveBeenCalled();
+      visibility.mockReturnValue('visible');
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(fetchMock).toHaveBeenCalledOnce();
+    } finally {
+      visibility.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('the address and the command are the real ones', () => {
+    expect(HELPER_COMMAND).toContain('@dygy/strudel-mcp');
+    expect(MCP_ADDRESS).toBe('https://strudel.dygy.app/mcp');
+    expect(CLAUDE_CODE_COMMAND).toContain(MCP_ADDRESS);
+  });
+
+  describe('Copy', () => {
+    const firstCopy = () =>
+      [...container!.querySelectorAll('[data-testid="connect-steps"] button')][0] as HTMLButtonElement;
+    const stubClipboard = (writeText: () => Promise<void>) =>
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+
+    afterEach(() => {
+      Reflect.deleteProperty(navigator, 'clipboard');
+    });
+
+    it('puts the address on the clipboard and confirms for 2 seconds', async () => {
+      fetchMock.mockImplementation(async () => json([]));
+      const writeText = vi.fn(async () => {});
+      stubClipboard(writeText);
+      await render(() => text().includes('No assistant'));
+      await act(async () => firstCopy().click());
+      expect(writeText).toHaveBeenCalledWith(MCP_ADDRESS);
+      expect(firstCopy().textContent).toBe('Copied');
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2100));
+      });
+      expect(firstCopy().textContent).toBe('Copy');
+    }, 5000);
+
+    it('if the browser refuses, selects the text and says so', async () => {
+      fetchMock.mockImplementation(async () => json([]));
+      stubClipboard(async () => {
+        throw new DOMException('denied', 'NotAllowedError');
+      });
+      await render(() => text().includes('No assistant'));
+      await act(async () => firstCopy().click());
+      expect(container!.querySelector('[role="alert"]')!.textContent).toContain('selected');
+      expect(window.getSelection()!.toString()).toBe(MCP_ADDRESS);
+    });
+  });
+
+  it('refreshes the list while open, so a new assistant appears within 30 seconds', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementation(async () => json([]));
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      root = createRoot(container);
+      await act(async () => {
+        root!.render(<ConnectedAssistants api={api} />);
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      for (let i = 0; i < 5 && !text().includes('No assistant'); i++) {
+        await act(async () => vi.advanceTimersByTimeAsync(20));
+      }
+      expect(text()).toContain('No assistant');
+      expect(LIST_REFRESH_MS).toBeLessThanOrEqual(30_000);
+      fetchMock.mockImplementation(async () => json(GRANTS));
+      await act(async () => vi.advanceTimersByTimeAsync(LIST_REFRESH_MS));
+      expect(container!.querySelector('li')?.textContent).toContain('Claude Code');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a refresh that fails leaves the list as it was', async () => {
+    vi.useFakeTimers();
+    try {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      root = createRoot(container);
+      await act(async () => {
+        root!.render(<ConnectedAssistants api={api} />);
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      for (let i = 0; i < 5 && !text().includes('Claude Code'); i++) {
+        await act(async () => vi.advanceTimersByTimeAsync(20));
+      }
+      fetchMock.mockImplementation(async () => json({ msg: 'boom' }, 500));
+      await act(async () => vi.advanceTimersByTimeAsync(LIST_REFRESH_MS));
+      expect(container!.querySelector('li')?.textContent).toContain('Claude Code');
+      expect(text()).not.toContain('Could not load');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops refreshing when closed', async () => {
+    vi.useFakeTimers();
+    try {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      root = createRoot(container);
+      await act(async () => {
+        root!.render(<ConnectedAssistants api={api} />);
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      act(() => root!.unmount());
+      root = null;
+      fetchMock.mockClear();
+      await vi.advanceTimersByTimeAsync(LIST_REFRESH_MS * 2);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('says so if the list cannot be loaded, and can try again', async () => {
