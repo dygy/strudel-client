@@ -227,7 +227,7 @@ describe('Connected assistants', () => {
   });
 
   it('the address and the command are the real ones', () => {
-    expect(HELPER_COMMAND).toContain('strudel_mcp');
+    expect(HELPER_COMMAND).toContain('strudel_mcp_js');
     expect(MCP_ADDRESS).toBe('https://strudel.dygy.app/mcp');
     expect(CLAUDE_CODE_COMMAND).toContain(MCP_ADDRESS);
   });

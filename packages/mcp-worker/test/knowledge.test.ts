@@ -225,6 +225,6 @@ describe('check_code', () => {
     expect((await tools.call('check_code', { code: atLimit })).isError).toBeUndefined();
     const { error } = await tools.call('check_code', { code: `${atLimit}x` });
     expect(error.code).toBe('use_local_helper');
-    expect(error.next).toContain('strudel_mcp');
+    expect(error.next).toContain('strudel_mcp_js');
   });
 });

@@ -47,7 +47,7 @@ Prod steps below need an explicit yes each: turning on dynamic client registrati
 - [ ] **Slice 7: Pattern runs in the local helper**
   - [ ] `packages/mcp-local`: stdio server, QuickJS sandbox with `core`, `mini`, `tonal`; `$:`/`.p()` stacking; stubs for loaders, reported as skipped. **[Agent: strudel-engine-engineer]**
   - [ ] `run_pattern` and `summarize_pattern`: default 4 cycles, max 64, 2,000 event cap, 10 s stop, memory limit; `check_code` of any size, using the shared check. **[Agent: strudel-engine-engineer]**
-  - [ ] Package for npm as `strudel_mcp`, AGPL-3.0-or-later, runnable by `npx`. Publishing is a separate approved step. **[Agent: strudel-engine-engineer]**
+  - [ ] Package for npm as `strudel_mcp_js`, AGPL-3.0-or-later, runnable by `npx`. Publishing is a separate approved step. **[Agent: strudel-engine-engineer]**
   - [ ] Verify: run from a packed tarball in Claude Code: `s("bd sd")` gives 4 events in 2 cycles; infinite loop stops and the next run works; file and network attempts fail; events match the browser engine for several sample tunes. Delete artifacts. **[Agent: strudel-engine-engineer]**
 
 - [ ] **Slice 8: An assistant controls an open tab**

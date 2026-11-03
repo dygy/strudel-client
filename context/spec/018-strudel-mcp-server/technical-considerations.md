@@ -18,7 +18,7 @@ Three new parts, and one protective change to the existing app:
       │                     │  └──reads: Supabase REST with the user's token────────────────┘
       │                     └──> TabRelay Durable Object (one per user) <──WebSocket── open REPL tab
       │
-      └──stdio──> strudel_mcp (local helper): pattern runs in a QuickJS sandbox
+      └──stdio──> strudel_mcp_js (local helper): pattern runs in a QuickJS sandbox
 ```
 
 - **Remote server:** a separate Worker, `strudel-mcp`, on routes in front of the existing custom domain. Separate, so the Astro bundle, its entry point and its 3 MiB budget stay untouched, and a crash here can't take down the REPL.
@@ -36,7 +36,7 @@ Three new parts, and one protective change to the existing app:
 |---|---|---|
 | `packages/mcp-worker` (private) | New Worker `strudel-mcp` | Routes `strudel.dygy.app/mcp*` and `strudel.dygy.app/.well-known/oauth-protected-resource*`. Cloudflare's docs show a path route running in front of a custom domain on the same hostname |
 | `TabRelay` | Durable Object in that Worker | SQLite class, WebSocket hibernation |
-| `packages/mcp-local` | User's computer (Node ≥ 20) | Published as `strudel_mcp`: `strudel-mcp` is taken on npm (**measured**), and the `@strudel` scope is upstream's |
+| `packages/mcp-local` | User's computer (Node ≥ 20) | Published as `strudel_mcp_js`: `strudel-mcp` is taken on npm (**measured**), and the `@strudel` scope is upstream's |
 | Consent page, Connected assistants, switch, conflict UI | Browser | The consent page is prerendered, so nothing is added to the SSR bundle |
 | `/api/tracks/*`, `/api/folders/*` changes | Existing Worker | Additive; no new SSR pages |
 
