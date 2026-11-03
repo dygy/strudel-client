@@ -13,6 +13,7 @@ type Log = string[];
 function controlsWith(overrides: Partial<TabControls> = {}, log: Log = []) {
   const events = new EventTarget();
   const controls: TabControls = {
+    enabled: () => true,
     isPlaying: () => true,
     cps: () => 0.5,
     transitionPhase: () => 'idle' as TransitionPhase,
@@ -26,7 +27,7 @@ function controlsWith(overrides: Partial<TabControls> = {}, log: Log = []) {
     update: async () => void log.push('update'),
     stop: () => void log.push('stop'),
     evalError: () => null,
-    openTrack: async (id) => (log.push(`open:${id}`), true),
+    openTrack: async (id) => (log.push(`open:${id}`), 'opened' as const),
     notify: (message) => void log.push(`notify:${message}`),
     events,
     ...overrides,
@@ -58,13 +59,13 @@ describe('status', () => {
 describe('update_code', () => {
   it('on the track playing: replaces the text, then Update, and says so', async () => {
     const { handle } = controlsWith({}, log);
-    expect(await handle('update_code', { code: 'new' })).toMatchObject({ ok: true });
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toMatchObject({ ok: true });
     expect(log).toEqual(['replace:new', 'update', 'notify:updated']);
   });
 
   it('while stopped: changes the text and makes no sound', async () => {
     const { handle } = controlsWith({ isPlaying: () => false }, log);
-    await handle('update_code', { code: 'new' });
+    await handle('update_code', { code: 'new', trackId: 't1' });
     expect(log).toEqual(['replace:new', 'notify:updated']);
   });
 
@@ -80,13 +81,13 @@ describe('update_code', () => {
       },
       log,
     );
-    await handle('update_code', { code: 'new' });
+    await handle('update_code', { code: 'new', trackId: 't1' });
     expect(log).toEqual(['save', 'replace:new', 'update', 'notify:updated']);
   });
 
   it('refuses, and leaves the editor and the music alone, when that save fails', async () => {
     const { handle } = controlsWith({ hasUnsavedEdits: () => true }, log);
-    expect(await handle('update_code', { code: 'new' })).toEqual({ ok: false, code: 'save_failed' });
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toEqual({ ok: false, code: 'save_failed' });
     expect(log.filter((entry) => entry === 'save')).toHaveLength(3);
     expect(log.at(-1)).toBe('notify:refusedSave');
     expect(log.join()).not.toMatch(/replace|update/);
@@ -98,7 +99,7 @@ describe('update_code', () => {
       { hasUnsavedEdits: () => true, saveEdits: () => Promise.reject(new Error('x')) },
       log,
     );
-    expect(await handle('update_code', { code: 'new' })).toEqual({ ok: false, code: 'save_failed' });
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toEqual({ ok: false, code: 'save_failed' });
     error.mockRestore();
     expect(log.join()).not.toMatch(/replace/);
   });
@@ -114,7 +115,7 @@ describe('update_code', () => {
       },
       log,
     );
-    expect(await handle('update_code', { code: 'new' })).toMatchObject({ ok: true });
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toMatchObject({ ok: true });
   });
 
   it('says conflict_open when the save is what found the track changed elsewhere', async () => {
@@ -129,35 +130,41 @@ describe('update_code', () => {
       },
       log,
     );
-    expect(await handle('update_code', { code: 'new' })).toEqual({ ok: false, code: 'conflict_open' });
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toEqual({ ok: false, code: 'conflict_open' });
   });
 
   it('is refused during a transition, without touching anything', async () => {
-    const { handle } = controlsWith({ transitionPhase: () => 'running', hasUnsavedEdits: () => true }, log);
-    expect(await handle('update_code', { code: 'new' })).toEqual({ ok: false, code: 'transition_in_progress' });
+    const { handle } = controlsWith({ transitionPhase: () => 'running' as const, hasUnsavedEdits: () => true }, log);
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toEqual({
+      ok: false,
+      code: 'transition_in_progress',
+    });
     expect(log).toEqual(['notify:refusedTransition']);
   });
 
   it('is refused while a snapped switch is waiting too', async () => {
     const { handle } = controlsWith({ transitionPhase: () => 'waiting' }, log);
-    expect(await handle('update_code', { code: 'new' })).toEqual({ ok: false, code: 'transition_in_progress' });
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toEqual({
+      ok: false,
+      code: 'transition_in_progress',
+    });
   });
 
   it('is refused while the "changed elsewhere" message is open', async () => {
     const { handle } = controlsWith({ conflictOpen: () => true }, log);
-    expect(await handle('update_code', { code: 'new' })).toEqual({ ok: false, code: 'conflict_open' });
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toEqual({ ok: false, code: 'conflict_open' });
     expect(log).toEqual(['notify:refusedConflict']);
   });
 
   it('is refused with no track open, as the code would have nowhere to be saved', async () => {
     const { handle } = controlsWith({ currentTrack: () => null }, log);
-    expect(await handle('update_code', { code: 'new' })).toEqual({ ok: false, code: 'no_track_open' });
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toEqual({ ok: false, code: 'no_track_open' });
   });
 
   it('gives back a mistake with its line, keeps going, and says so in the tab', async () => {
     const mistake = Object.assign(new SyntaxError('Unexpected token (3:4)'), { loc: { line: 3, column: 4 } });
     const { handle } = controlsWith({ evalError: () => mistake }, log);
-    expect(await handle('update_code', { code: 'bad' })).toEqual({
+    expect(await handle('update_code', { code: 'bad', trackId: 't1' })).toEqual({
       ok: false,
       code: 'code_error',
       error: { message: 'Unexpected token (3:4)', line: 3 },
@@ -167,7 +174,7 @@ describe('update_code', () => {
 
   it('answers once a switch is under way, rather than waiting out a long transition', async () => {
     const { handle, events } = controlsWith({ update: () => new Promise(() => {}) }, log);
-    const reply = handle('update_code', { code: 'new' });
+    const reply = handle('update_code', { code: 'new', trackId: 't1' });
     await Promise.resolve();
     await Promise.resolve();
     await new Promise((resolve) => setTimeout(resolve));
@@ -188,7 +195,7 @@ describe('update_code', () => {
       },
       log,
     );
-    expect(await handle('update_code', { code: 'new' })).toEqual({
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toEqual({
       ok: false,
       code: 'code_error',
       error: { message: 'bad at line 2', line: 2 },
@@ -297,7 +304,7 @@ describe('open_track', () => {
   });
 
   it('says not_found for a track that is not there', async () => {
-    const { handle } = controlsWith({ openTrack: async () => false });
+    const { handle } = controlsWith({ openTrack: async () => 'not_found' as const });
     expect(await handle('open_track', { trackId: 'absent' })).toEqual({ ok: false, code: 'not_found' });
   });
 
@@ -325,8 +332,8 @@ describe('order', () => {
       },
       log,
     );
-    const first = handle('update_code', { code: 'one' });
-    const second = handle('update_code', { code: 'two' });
+    const first = handle('update_code', { code: 'one', trackId: 't1' });
+    const second = handle('update_code', { code: 'two', trackId: 't1' });
     await new Promise((resolve) => setTimeout(resolve));
     expect(log).toEqual(['replace:one']);
     release();
@@ -338,7 +345,7 @@ describe('order', () => {
 
   it('answers status at once, even with a command under way', async () => {
     const { handle } = controlsWith({ update: () => new Promise(() => {}) });
-    void handle('update_code', { code: 'one' });
+    void handle('update_code', { code: 'one', trackId: 't1' });
     expect(await handle('status', {})).toMatchObject({ ok: true });
   });
 
@@ -348,7 +355,7 @@ describe('order', () => {
         throw new Error('no editor');
       },
     });
-    await expect(handle('update_code', { code: 'x' })).rejects.toThrow('no editor');
+    await expect(handle('update_code', { code: 'x', trackId: 't1' })).rejects.toThrow('no editor');
     expect(await handle('status', {})).toMatchObject({ ok: true });
     expect(await handle('stop', {})).toMatchObject({ ok: true });
   });
@@ -356,6 +363,188 @@ describe('order', () => {
   it('refuses a command it does not know', async () => {
     const { handle } = controlsWith();
     expect(await handle('format_disk', {})).toEqual({ ok: false, code: 'unknown_command' });
+  });
+});
+
+describe('naming the track', () => {
+  it('refuses when another track is open, and says which', async () => {
+    const { handle } = controlsWith({ currentTrack: () => ({ id: 't2', name: 'Other' }) }, log);
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toEqual({
+      ok: false,
+      code: 'track_changed',
+      openTrackId: 't2',
+    });
+    expect(log).toEqual(['notify:refusedTrackChanged']);
+  });
+
+  it('saves the track it names', async () => {
+    const saved: string[] = [];
+    let unsaved = true;
+    const { handle } = controlsWith({
+      hasUnsavedEdits: () => unsaved,
+      saveEdits: async (id) => {
+        saved.push(id);
+        unsaved = false;
+      },
+    });
+    await handle('update_code', { code: 'new', trackId: 't1' });
+    expect(saved).toEqual(['t1']);
+  });
+});
+
+describe('after every wait, all of it is asked again', () => {
+  /** A save during which something happens. */
+  const during = (happen: () => void, overrides: Partial<TabControls> = {}) => {
+    let unsaved = true;
+    return controlsWith(
+      {
+        hasUnsavedEdits: () => unsaved,
+        saveEdits: async () => {
+          unsaved = false;
+          happen();
+        },
+        ...overrides,
+      },
+      log,
+    );
+  };
+
+  it('the track changed during the save: nothing replaced', async () => {
+    let open = 't1';
+    const { handle } = during(() => (open = 't2'), { currentTrack: () => ({ id: open, name: open }) });
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toMatchObject({ code: 'track_changed' });
+    expect(log.join()).not.toMatch(/replace|update/);
+  });
+
+  it('the switch went off during the save: nothing replaced', async () => {
+    let on = true;
+    const { handle } = during(() => (on = false), { enabled: () => on });
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toEqual({ ok: false, code: 'control_off' });
+    expect(log.join()).not.toMatch(/replace|update/);
+  });
+
+  it('a transition began during the save: nothing replaced', async () => {
+    let phase: TransitionPhase | 'switching' = 'idle';
+    const { handle } = during(() => (phase = 'switching'), { transitionPhase: () => phase });
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toMatchObject({
+      code: 'transition_in_progress',
+    });
+    expect(log.join()).not.toMatch(/replace|update/);
+  });
+
+  it('a conflict opened during the save: nothing replaced', async () => {
+    let conflict = false;
+    const { handle } = during(() => (conflict = true), { conflictOpen: () => conflict });
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toMatchObject({ code: 'conflict_open' });
+    expect(log.join()).not.toMatch(/replace|update/);
+  });
+
+  it('the same for open_track', async () => {
+    let on = true;
+    const { handle } = during(() => (on = false), { enabled: () => on });
+    expect(await handle('open_track', { trackId: 't2' })).toEqual({ ok: false, code: 'control_off' });
+    expect(log.join()).not.toMatch(/open:/);
+  });
+
+  it('a switch that says nothing about a transition phase still counts', async () => {
+    const { handle } = controlsWith({ transitionPhase: () => 'switching', playingAnotherTrack: () => true }, log);
+    expect(await handle('play', {})).toEqual({ ok: false, code: 'transition_in_progress' });
+    expect(log).toEqual(['notify:refusedTransition']);
+  });
+});
+
+describe('only play changes what is heard', () => {
+  it('update_code on a track that is not the one playing: text only, and it says so', async () => {
+    const { handle } = controlsWith({ playingAnotherTrack: () => true }, log);
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toMatchObject({
+      ok: true,
+      result: { heard: false, ran: false },
+    });
+    expect(log).toEqual(['replace:new', 'notify:updatedNotHeard']);
+  });
+
+  it('update_code on the track playing says it was heard', async () => {
+    const { handle } = controlsWith({}, log);
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toMatchObject({
+      result: { heard: true, ran: true },
+    });
+  });
+
+  it('while stopped, says it was not', async () => {
+    const { handle } = controlsWith({ isPlaying: () => false }, log);
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toMatchObject({ result: { heard: false } });
+  });
+});
+
+describe('ok means the code ran', () => {
+  it('says so when Update ignored it', async () => {
+    const { handle } = controlsWith({ update: async () => 'ignored' }, log);
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toEqual({ ok: false, code: 'ignored' });
+    expect(log).not.toContain('notify:updated');
+  });
+
+  it('says it may not have, when it was still loading as the wait ran out', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const { handle } = controlsWith({ update: () => new Promise(() => {}) });
+    const reply = handle('update_code', { code: 'new', trackId: 't1' });
+    await vi.advanceTimersByTimeAsync(4_000);
+    vi.useRealTimers();
+    expect(await reply).toMatchObject({ ok: true, result: { ran: false, heard: false } });
+  });
+});
+
+describe('turning off', () => {
+  it('cancels what was waiting its turn', async () => {
+    let on = true;
+    let finishFirst = () => {};
+    const { handle } = controlsWith(
+      {
+        enabled: () => on,
+        update: () => new Promise<void>((resolve) => (finishFirst = resolve)),
+        isPlaying: () => true,
+        playingAnotherTrack: () => true,
+      },
+      log,
+    );
+    const first = handle('play', {});
+    const second = handle('update_code', { code: 'queued', trackId: 't1' });
+    const third = handle('open_track', { trackId: 't2' });
+    await new Promise((resolve) => setTimeout(resolve));
+    on = false;
+    finishFirst();
+    await first;
+    expect(await second).toEqual({ ok: false, code: 'control_off' });
+    expect(await third).toEqual({ ok: false, code: 'control_off' });
+    expect(log.join()).not.toMatch(/replace|open:/);
+  });
+
+  it('refuses stop too, and does not press anything', async () => {
+    const { handle } = controlsWith({ enabled: () => false }, log);
+    expect(await handle('stop', {})).toEqual({ ok: false, code: 'control_off' });
+    expect(log).toEqual([]);
+  });
+});
+
+describe('opening honestly', () => {
+  it.each(['library_unavailable', 'open_failed'] as const)('says %s, as a refusal', async (result) => {
+    const { handle } = controlsWith({ openTrack: async () => result }, log);
+    expect(await handle('open_track', { trackId: 't2' })).toEqual({ ok: false, code: result });
+    expect(log).toEqual(['notify:refusedOpen']);
+  });
+
+  it('answers with the track it opened', async () => {
+    let open = 't1';
+    const { handle } = controlsWith({
+      currentTrack: () => ({ id: open, name: open }),
+      openTrack: async (id) => {
+        open = id;
+        return 'opened';
+      },
+    });
+    expect(await handle('open_track', { trackId: 't2' })).toMatchObject({
+      ok: true,
+      result: { track: { id: 't2', name: 't2' } },
+    });
   });
 });
 

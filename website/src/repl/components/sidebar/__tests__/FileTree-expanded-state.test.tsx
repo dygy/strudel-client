@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import i18n from '@src/i18n/i18n';
 import { FileTree } from '../FileTree';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -42,6 +43,11 @@ const props = (tracks: Record<string, any>) =>
     onRenameStepFinish: noop,
     onRenameStepCancel: noop,
   }) as any;
+
+// FileTree suspends until these have loaded, and whether they have depends on which file ran before.
+beforeAll(async () => {
+  await i18n.loadNamespaces(['files', 'common']);
+});
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;

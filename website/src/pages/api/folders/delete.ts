@@ -13,7 +13,14 @@ const NOT_FOUND = { error: 'Folder not found' };
 /** Enough to say what's inside without answering with a whole library. */
 const LISTED_NAMES = 20;
 
-type FolderRow = { id: string; name: string; path: string; parent: string | null; updated_at: string };
+type FolderRow = {
+  id: string;
+  name: string;
+  path: string;
+  parent: string | null;
+  created?: string;
+  updated_at: string;
+};
 
 /**
  * DELETE /api/folders/delete: `{ folderId, expectedVersion }`. One empty folder, as the signed-in user
@@ -41,7 +48,7 @@ export const DELETE: APIRoute = async ({ request }) => {
     const supabase = userClient(accessToken);
     const { data: folderRows, error: folderError } = await supabase
       .from('folders')
-      .select('id, name, path, parent, updated_at')
+      .select('id, name, path, parent, created, updated_at')
       .eq('user_id', user.id);
     if (folderError) {
       console.error('API /folders/delete - failed to list folders:', folderError);
@@ -114,6 +121,42 @@ export const DELETE: APIRoute = async ({ request }) => {
     }
     if (!deleted || (Array.isArray(deleted) && deleted.length === 0)) {
       return conflict();
+    }
+
+    // Tracks don't reference folders in the database, so no one statement can refuse a track added since
+    // the check above. Look again, and if one got in, put the folder back rather than strand it.
+    const { data: lateRows, error: lateError } = await supabase
+      .from('tracks')
+      .select('name')
+      .eq('user_id', user.id)
+      .in('folder', [folder.id, folder.path]);
+    const late = (lateRows ?? []) as Array<{ name: string }>;
+    if (lateError || late.length) {
+      const { error: restoreError } = await supabase.from('folders').insert({
+        id: folder.id,
+        user_id: user.id,
+        name: folder.name,
+        path: folder.path,
+        parent: folder.parent,
+        created: folder.created,
+      } as never);
+      if (restoreError) {
+        console.error('API /folders/delete - could not put a folder back:', restoreError);
+        return json({ error: 'Failed to delete folder' }, 500);
+      }
+      return json(
+        {
+          error: 'This folder is not empty',
+          code: 'folder_not_empty',
+          contents: {
+            folderCount: 0,
+            trackCount: late.length,
+            folders: [],
+            tracks: late.slice(0, LISTED_NAMES).map((t) => t.name),
+          },
+        },
+        409,
+      );
     }
 
     return json({ success: true }, 200);

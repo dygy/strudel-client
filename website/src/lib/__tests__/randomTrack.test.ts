@@ -7,13 +7,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { randomTrackUrl } from '../randomTrack';
 import { findTrackByFolderAndSlug, parseTrackUrlPath } from '../slugUtils';
 
-// A folder whose name has no letters or digits at all gets no URL segment, so its tracks' URLs
-// point at the root, where they are not (a known gap of folder URLs).
-const UNREACHABLE_FOLDER = { id: 'Vh3kQ9xZp2LmT8rB1cYwA', name: '♪♪♪', path: '♪♪♪' };
+// A folder value with nothing in it gets no URL segment, so the track's URL points at the root, where it
+// is not.
+const UNREACHABLE_FOLDER = '/';
 const DRUMS = { id: 'Dr0mS5kQ9xZp2LmT8rB1c', name: 'Drums', path: 'Drums' };
-const folders = [UNREACHABLE_FOLDER, DRUMS];
+const folders = [DRUMS];
 
-const lost = { id: 'lost', name: 'Beat', folder: UNREACHABLE_FOLDER.id };
+const lost = { id: 'lost', name: 'Beat', folder: UNREACHABLE_FOLDER };
 const kick = { id: 'kick', name: 'Kick loop', folder: DRUMS.id };
 const intro = { id: 'intro', name: 'Intro', folder: null };
 

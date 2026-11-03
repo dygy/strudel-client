@@ -212,7 +212,10 @@
       "refusedTransition": "助手：已拒绝，正在进行过渡",
       "refusedConflict": "助手：已拒绝，请先选择要保留的版本",
       "refusedSave": "助手：已拒绝，无法保存您的文本",
-      "refusedNoTrack": "助手：已拒绝，没有打开的音轨"
+      "refusedNoTrack": "助手：已拒绝，没有打开的音轨",
+      "refusedTrackChanged": "助手：已拒绝，该音轨已不是打开的音轨",
+      "refusedOpen": "助手：已拒绝，此处无法使用音轨库",
+      "updatedNotHeard": "助手：编辑器中的代码已更改。正在播放的音乐没有变化。"
     }
   }
 }

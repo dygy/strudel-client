@@ -610,6 +610,9 @@ export function useSupabaseFileManager(
       }
 
       setSelectedTrack(track.id);
+      // At once rather than on the next render: the editor changes below, and until then a save or a
+      // check for unsaved text would take the new track's text for an edit of the old one.
+      selectedTrackRef.current = track.id;
 
       // Initialize track-specific autosave context
       const autosaveContext = getTrackAutosaveContext(track.id);

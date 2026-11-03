@@ -212,7 +212,10 @@
       "refusedTransition": "Assistant : refusé, une transition est en cours",
       "refusedConflict": "Assistant : refusé tant que vous n'avez pas choisi la version à garder",
       "refusedSave": "Assistant : refusé, votre texte n'a pas pu être enregistré",
-      "refusedNoTrack": "Assistant : refusé, aucune piste n'est ouverte"
+      "refusedNoTrack": "Assistant : refusé, aucune piste n'est ouverte",
+      "refusedTrackChanged": "Assistant : refusé, cette piste n'est plus celle qui est ouverte",
+      "refusedOpen": "Assistant : refusé, la bibliothèque n'est pas disponible ici",
+      "updatedNotHeard": "Assistant : code modifié dans l'éditeur. La musique en cours n'a pas changé."
     }
   }
 }

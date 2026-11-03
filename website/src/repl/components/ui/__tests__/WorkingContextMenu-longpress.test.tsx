@@ -6,9 +6,10 @@
  * the row, and a mouse right-click works as before. The read-only (admin) view offers no edit
  * items, and the "⋮" button has a 44px hit area on touch screens.
  */
-import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from 'vitest';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import i18n from '@src/i18n/i18n';
 import { WorkingContextMenu, LONG_PRESS_MS } from '../WorkingContextMenu';
 import { BurgerMenuButton } from '../BurgerMenuButton';
 import { FileTree } from '../../sidebar/FileTree';
@@ -17,6 +18,11 @@ import { FileTree } from '../../sidebar/FileTree';
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
+
+// FileTree suspends until these have loaded, and whether they have depends on which file ran before.
+beforeAll(async () => {
+  await i18n.loadNamespaces(['files', 'common']);
+});
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {

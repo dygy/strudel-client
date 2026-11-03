@@ -2,9 +2,13 @@
  * Tests for the Strict Autosave System
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 
-// Mock crypto.subtle for testing
+// Mock crypto.subtle for testing. Put back afterwards: vitest's isolate is off, so this is every file's.
+const realCrypto = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+afterAll(() => {
+  if (realCrypto) Object.defineProperty(globalThis, 'crypto', realCrypto);
+});
 Object.defineProperty(global, 'crypto', {
   value: {
     subtle: {

@@ -28,7 +28,7 @@ The sound list comes from `website/public/*.json`, the inline lists in `website/
 
 ## The online check limit
 
-`check_code` takes 768 bytes (`CHECK_MAX_BYTES`). Larger code gets `use_local_helper`. The cost is the first check in a new isolate, when acorn and the mini parser haven't been compiled yet:
+`check_code` takes 512 bytes for now (`CHECK_MAX_BYTES`), under what the first table allows, until `cpuTime` has been measured on prod. Larger code gets `use_local_helper`. The cost is the first check in a new isolate, when acorn and the mini parser haven't been compiled yet:
 
 | Worst input, fresh Node process, CPU of the call | 512 B | 768 B | 1 KB | 2 KB | 8 KB |
 | --- | --- | --- | --- | --- | --- |

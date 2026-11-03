@@ -212,7 +212,10 @@
       "refusedTransition": "Asistente: rechazado, hay una transición en curso",
       "refusedConflict": "Asistente: rechazado hasta que elijas qué versión conservar",
       "refusedSave": "Asistente: rechazado, no se pudo guardar tu texto",
-      "refusedNoTrack": "Asistente: rechazado, no hay ninguna pista abierta"
+      "refusedNoTrack": "Asistente: rechazado, no hay ninguna pista abierta",
+      "refusedTrackChanged": "Asistente: rechazado, esa pista ya no es la abierta",
+      "refusedOpen": "Asistente: rechazado, la biblioteca no está disponible aquí",
+      "updatedNotHeard": "Asistente: código cambiado en el editor. La música que suena no ha cambiado."
     }
   }
 }

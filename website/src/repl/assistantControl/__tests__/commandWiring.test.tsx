@@ -84,7 +84,9 @@ const context = {
       evaluate: called('editor.evaluate'),
     },
   },
-  handleEvaluate: called('Update'),
+  // The button also stops a headphone preview, so commands use what's behind it.
+  handleEvaluate: called('the Update button itself'),
+  runUpdate: called('Update'),
   handleTogglePlay: called('Stop'),
   trackIds: () => ({ editor: 't1', playing: state.playingTrack }),
 };
@@ -92,8 +94,8 @@ const fileManager = {
   selectedTrack: 't1',
   tracks: { t1: { id: 't1', name: 'Song' } },
   hasUnsavedEdits: () => state.unsaved,
-  saveCurrentTrack: vi.fn(async (showToast: boolean) => {
-    calls.push(`save:${showToast}`);
+  saveSpecificTrack: vi.fn(async (trackId: string, showToast: boolean) => {
+    calls.push(`save:${trackId}:${showToast}`);
     if (state.saveWorks) state.unsaved = false;
     return state.saveWorks;
   }),
@@ -153,26 +155,26 @@ afterAll(() => {
 
 describe('updating the code', () => {
   it('on the track playing: the undoable replacement, then the Update button', async () => {
-    expect(await send('update_code', { code: 'new' })).toMatchObject({ ok: true });
+    expect(await send('update_code', { code: 'new', trackId: 't1' })).toMatchObject({ ok: true });
     expect(calls).toEqual(['replaceCode:new', 'Update']);
   });
 
   it('while stopped: the text changes, and no button makes a sound', async () => {
     state.playing = false;
-    expect(await send('update_code', { code: 'new' })).toMatchObject({ ok: true });
+    expect(await send('update_code', { code: 'new', trackId: 't1' })).toMatchObject({ ok: true });
     expect(calls).toEqual(['replaceCode:new']);
   });
 
   it("with typing unsaved: the file manager's save, with no toast, before the text is replaced", async () => {
     state.unsaved = true;
-    expect(await send('update_code', { code: 'new' })).toMatchObject({ ok: true });
-    expect(calls).toEqual(['save:false', 'replaceCode:new', 'Update']);
+    expect(await send('update_code', { code: 'new', trackId: 't1' })).toMatchObject({ ok: true });
+    expect(calls).toEqual(['save:t1:false', 'replaceCode:new', 'Update']);
   });
 
   it('when that save fails: refused, and neither the editor nor the music is touched', async () => {
     state.unsaved = true;
     state.saveWorks = false;
-    expect(await send('update_code', { code: 'new' })).toEqual({ ok: false, code: 'save_failed' });
+    expect(await send('update_code', { code: 'new', trackId: 't1' })).toEqual({ ok: false, code: 'save_failed' });
     expect(calls.filter((call) => !call.startsWith('save:'))).toEqual([]);
   });
 });
@@ -213,19 +215,22 @@ describe('stopping', () => {
 describe('what the tab knows', () => {
   it('a transition the REPL announced refuses a command until it ends', async () => {
     window.dispatchEvent(new Event('track-transition-start'));
-    expect(await send('update_code', { code: 'new' })).toEqual({ ok: false, code: 'transition_in_progress' });
+    expect(await send('update_code', { code: 'new', trackId: 't1' })).toEqual({
+      ok: false,
+      code: 'transition_in_progress',
+    });
     expect(await send('play')).toEqual({ ok: false, code: 'transition_in_progress' });
     expect(calls).toEqual([]);
     window.dispatchEvent(new Event('track-transition-end'));
-    expect(await send('update_code', { code: 'new' })).toMatchObject({ ok: true });
+    expect(await send('update_code', { code: 'new', trackId: 't1' })).toMatchObject({ ok: true });
   });
 
   it('the "changed elsewhere" message refuses a command until the user chooses', async () => {
     conflictOpen = true;
-    expect(await send('update_code', { code: 'new' })).toEqual({ ok: false, code: 'conflict_open' });
+    expect(await send('update_code', { code: 'new', trackId: 't1' })).toEqual({ ok: false, code: 'conflict_open' });
     expect(calls).toEqual([]);
     conflictOpen = false;
-    expect(await send('update_code', { code: 'new' })).toMatchObject({ ok: true });
+    expect(await send('update_code', { code: 'new', trackId: 't1' })).toMatchObject({ ok: true });
   });
 
   it('says what the track and tempo are', async () => {

@@ -104,6 +104,8 @@ describe('an assistant creates a track in a folder', () => {
     ['a nested folder', 'Live Sets/Night'],
     ['letters that are not Latin', 'Сеты'],
     ['a folder called Untitled', 'Untitled'],
+    ['a folder with no letters or digits', '♪♪♪'],
+    ['such a folder inside another', 'Live/♪♪♪'],
   ])('after a reload it is in that folder, and its address opens it: %s', async (_label, path) => {
     fakeState.tables.folders = [folder(ID_A, path)];
     const { webAddress } = await create({ name: 'My Song', code: 's("bd")', folder: ID_A });

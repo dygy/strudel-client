@@ -72,7 +72,7 @@ const CASES: Record<string, { good: () => Record<string, unknown>; bad: Record<s
   list_tabs: { good: () => ({}), bad: { extra: 1 }, code: 'invalid_arguments' },
   play: { good: () => ({}), bad: { tabId: 1 }, code: 'invalid_arguments' },
   stop: { good: () => ({}), bad: { tabId: 1 }, code: 'invalid_arguments' },
-  update_code: { good: () => ({ code: 'ok' }), bad: { code: 'bad' }, code: 'code_error' },
+  update_code: { good: () => ({ code: 'ok', trackId: 't' }), bad: { code: 'bad', trackId: 't' }, code: 'code_error' },
   open_track: { good: () => ({ trackId: 't' }), bad: { trackId: 'absent' }, code: 'not_found' },
   check_code: { good: () => ({ code: 's("bd [sd")' }), bad: { code: 'x'.repeat(9000) }, code: 'use_local_helper' },
 };
@@ -139,14 +139,14 @@ describe('tools/list through the SDK', () => {
     }
   });
 
-  it('marks the three deletes destructive, and only those', async () => {
+  it('marks what can delete destructive, and only those', async () => {
     const { tools } = await client.listTools();
     expect(
       tools
         .filter((tool) => tool.annotations?.destructiveHint)
         .map((tool) => tool.name)
         .sort(),
-    ).toEqual(['delete_empty_folder', 'delete_step', 'delete_track']);
+    ).toEqual(['delete_empty_folder', 'delete_step', 'delete_track', 'set_track_steps']);
   });
 
   it('marks as read-only exactly what changes nothing', async () => {

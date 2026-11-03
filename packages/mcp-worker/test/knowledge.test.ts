@@ -215,6 +215,10 @@ describe('distance', () => {
 });
 
 describe('check_code', () => {
+  it('takes 512 bytes for now, until CPU time has been measured on prod', () => {
+    expect(CHECK_MAX_BYTES).toBe(512);
+  });
+
   it('answers with the check', async () => {
     const { structured } = await tools.call('check_code', { code: 's("bd [sd")' });
     expect(structured.ok).toBe(false);
@@ -225,6 +229,8 @@ describe('check_code', () => {
     expect((await tools.call('check_code', { code: atLimit })).isError).toBeUndefined();
     const { error } = await tools.call('check_code', { code: `${atLimit}x` });
     expect(error.code).toBe('use_local_helper');
-    expect(error.next).toContain('strudel_mcp_js');
+    // Not offered while nobody owns the package.
+    expect(error.next).not.toContain('npx');
+    expect(error.next).toContain('not available yet');
   });
 });

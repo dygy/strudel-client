@@ -15,32 +15,40 @@ export type ControlMessage =
   | 'refusedTransition'
   | 'refusedConflict'
   | 'refusedSave'
-  | 'refusedNoTrack';
+  | 'refusedNoTrack'
+  | 'refusedTrackChanged'
+  | 'refusedOpen'
+  | 'updatedNotHeard';
+
+export type OpenTrackResult = 'opened' | 'not_found' | 'library_unavailable' | 'open_failed';
 
 export interface TabControls {
+  /** The switch is on, and this is still the same turn of it. */
+  enabled(): boolean;
   isPlaying(): boolean;
   cps(): number | null;
-  transitionPhase(): TransitionPhase;
+  /** `switching`: something is changing what's heard, before or without a transition's own phases. */
+  transitionPhase(): TransitionPhase | 'switching';
   conflictOpen(): boolean;
   /** The track open in the editor. */
   currentTrack(): { id: string; name: string } | null;
   /** Something's playing, and it isn't what's in the editor. */
   playingAnotherTrack(): boolean;
   hasUnsavedEdits(): boolean;
-  /** The file manager's save, the one Cmd+S uses. */
-  saveEdits(): Promise<unknown>;
+  /** The file manager's save, of this track only: it does nothing if that's not what the editor holds. */
+  saveEdits(trackId: string): Promise<unknown>;
   /** Replaces the editor's text as one Undo step. */
   replaceCode(code: string): void;
   /** What Play does when stopped. Resolves when the evaluate has finished. */
   start(): Promise<unknown>;
-  /** What Update does: a hot-swap, or a switch if the editor holds another track. */
+  /** What Update does: a hot-swap, or a switch if the editor holds another track. Says which, or `ignored`. */
   update(): Promise<unknown>;
   /** What Stop does. */
   stop(): void;
   /** The mistake the last evaluate left, if it left one. */
   evalError(): unknown;
-  /** Opens a track as the library does. False if there's no such track. */
-  openTrack(trackId: string): Promise<boolean>;
+  /** Opens a track as the library does, and says only once the tab really holds it. */
+  openTrack(trackId: string): Promise<OpenTrackResult>;
   notify(message: ControlMessage, values?: Record<string, string | number>): void;
   /** For tests. */
   events?: EventTarget;
@@ -69,25 +77,6 @@ const errorMessage = (error: unknown) =>
     : String(error)
   ).slice(0, 500);
 
-/**
- * Saves what's been typed. True when none of it is left only in the editor. A save already on its way
- * makes this one return without saving, so it asks again before giving up.
- */
-async function typingIsSafe(controls: TabControls): Promise<boolean> {
-  for (let attempt = 0; attempt < SAVE_TRIES; attempt++) {
-    if (!controls.hasUnsavedEdits()) return true;
-    if (attempt > 0) await wait(SAVE_RETRY_MS);
-    try {
-      await controls.saveEdits();
-    } catch (error: unknown) {
-      console.error('[assistant control] the save before a change failed:', error);
-    }
-    // Checked last, with nothing to wait for between this and the caller replacing the text.
-    if (!controls.hasUnsavedEdits()) return true;
-  }
-  return false;
-}
-
 export function createCommandHandler(controls: TabControls): CommandHandler {
   const status = () => {
     const track = controls.currentTrack();
@@ -100,8 +89,13 @@ export function createCommandHandler(controls: TabControls): CommandHandler {
     };
   };
 
-  /** What's refused for a track being switched, or one the user has to decide about. */
-  const blocked = (): RelayAnswer | null => {
+  /**
+   * Everything that can make a command wrong, asked again after every wait. Anything may have happened
+   * during one: the user pressed something, the switch went off, the track changed.
+   * @param trackId the track this command was meant for, if it was for one
+   */
+  const refused = (trackId?: string): RelayAnswer | null => {
+    if (!controls.enabled()) return refusal('control_off');
     if (controls.transitionPhase() !== 'idle') {
       controls.notify('refusedTransition');
       return refusal('transition_in_progress');
@@ -110,25 +104,53 @@ export function createCommandHandler(controls: TabControls): CommandHandler {
       controls.notify('refusedConflict');
       return refusal('conflict_open');
     }
+    if (trackId !== undefined) {
+      const open = controls.currentTrack();
+      if (!open) {
+        controls.notify('refusedNoTrack');
+        return refusal('no_track_open');
+      }
+      if (open.id !== trackId) {
+        controls.notify('refusedTrackChanged');
+        return refusal('track_changed', { openTrackId: open.id });
+      }
+    }
     return null;
   };
 
-  const protectTyping = async (): Promise<RelayAnswer | null> => {
-    if (await typingIsSafe(controls)) return null;
-    // The save itself may be what found out that the track changed elsewhere.
-    if (controls.conflictOpen()) {
-      controls.notify('refusedConflict');
-      return refusal('conflict_open');
+  /**
+   * Saves what was typed in this track. A save already on its way makes this one return without saving,
+   * so it asks again before giving up. Null when none of it is left only in the editor.
+   */
+  const protectTyping = async (trackId: string | undefined): Promise<RelayAnswer | null> => {
+    for (let attempt = 0; attempt < SAVE_TRIES; attempt++) {
+      if (!controls.hasUnsavedEdits()) return null;
+      if (trackId === undefined) break;
+      if (attempt > 0) await wait(SAVE_RETRY_MS);
+      const early = refused(trackId);
+      if (early) return early;
+      try {
+        await controls.saveEdits(trackId);
+      } catch (error: unknown) {
+        console.error('[assistant control] the save before a change failed:', error);
+      }
+      const after = refused(trackId);
+      if (after) return after;
     }
+    if (!controls.hasUnsavedEdits()) return null;
     controls.notify('refusedSave');
     return refusal('save_failed');
   };
 
   /**
    * Runs an evaluate and waits for what it says, or until a switch is under way (by then the new code
-   * has evaluated, and the transition can take far longer than the assistant should wait).
+   * has evaluated, and the transition can take far longer than the assistant should wait). `ran` is
+   * false if it was still loading when the wait ran out, so that nobody is told it ran when it may not.
    */
-  const evaluate = async (run: () => Promise<unknown>, waitMs: number): Promise<RelayAnswer | null> => {
+  const evaluate = async (
+    run: () => Promise<unknown>,
+    waitMs: number,
+  ): Promise<{ failed: RelayAnswer | null; ran: boolean }> => {
     const target = controls.events ?? window;
     let switchError: unknown = null;
     const onError = (event: Event) => {
@@ -138,7 +160,11 @@ export function createCommandHandler(controls: TabControls): CommandHandler {
     target.addEventListener(TRANSITION_EVENTS.error, onError);
     let stopListening = () => {};
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const finished = run().then(() => 'finished' as const);
+    let answer: unknown;
+    const finished = run().then((value) => {
+      answer = value;
+      return 'finished' as const;
+    });
     try {
       const outcome = await Promise.race([
         finished,
@@ -153,9 +179,16 @@ export function createCommandHandler(controls: TabControls): CommandHandler {
       ]);
       // The evaluate's own error says where the mistake is. The transition's only says that there is one.
       const error = switchError || outcome === 'finished' ? (controls.evalError() ?? switchError) : null;
-      if (!error) return null;
-      controls.notify('codeError');
-      return refusal('code_error', { error: { message: errorMessage(error), line: errorLine(error) } });
+      if (error) {
+        controls.notify('codeError');
+        return {
+          failed: refusal('code_error', { error: { message: errorMessage(error), line: errorLine(error) } }),
+          ran: false,
+        };
+      }
+      // Update found the same switch already under way, and did nothing.
+      if (answer === 'ignored') return { failed: refusal('ignored'), ran: false };
+      return { failed: null, ran: outcome !== 'waited' };
     } finally {
       stopListening();
       clearTimeout(timer);
@@ -167,54 +200,70 @@ export function createCommandHandler(controls: TabControls): CommandHandler {
     status: () => ({ ok: true, result: status() }),
 
     stop: () => {
+      if (!controls.enabled()) return refusal('control_off');
       if (controls.isPlaying()) controls.stop();
       controls.notify('stopped');
       return { ok: true, result: status() };
     },
 
     play: async () => {
-      const stopped = blocked();
+      const stopped = refused();
       if (stopped) return stopped;
       if (controls.isPlaying() && !controls.playingAnotherTrack()) {
         controls.notify('alreadyPlaying');
-        return { ok: true, result: status() };
+        return { ok: true, result: { ...status(), ran: false } };
       }
       // Stopped: Play. Another track playing: Update, which is what uses the selected transition.
       const run = controls.isPlaying() ? controls.update : controls.start;
-      const failed = await evaluate(() => run(), WAIT_FOR_EVALUATE_MS.play);
+      const { failed, ran } = await evaluate(() => run(), WAIT_FOR_EVALUATE_MS.play);
       if (failed) return failed;
       controls.notify('played');
-      return { ok: true, result: status() };
+      return { ok: true, result: { ...status(), ran } };
     },
 
-    update_code: async ({ code }) => {
-      const stopped = blocked();
+    update_code: async ({ code, trackId }) => {
+      const track = String(trackId);
+      const stopped = refused(track);
       if (stopped) return stopped;
-      if (!controls.currentTrack()) {
-        controls.notify('refusedNoTrack');
-        return refusal('no_track_open');
-      }
-      const unsafe = await protectTyping();
+      const unsafe = await protectTyping(track);
       if (unsafe) return unsafe;
+      const late = refused(track);
+      if (late) return late;
       // Nothing to wait for from here to the replacement, so nothing typed can slip in between.
-      controls.replaceCode(String(code));
-      // Stopped stays stopped: an update is never why sound starts.
-      if (controls.isPlaying()) {
-        const failed = await evaluate(() => controls.update(), WAIT_FOR_EVALUATE_MS.update_code);
-        if (failed) return failed;
+      if (controls.hasUnsavedEdits()) {
+        controls.notify('refusedSave');
+        return refusal('save_failed');
       }
+      controls.replaceCode(String(code));
+      // Only `play` starts sound or changes which track is heard. This changes text, and if this is the
+      // track being heard, what's heard.
+      if (!controls.isPlaying() || controls.playingAnotherTrack()) {
+        const elsewhere = controls.isPlaying();
+        controls.notify(elsewhere ? 'updatedNotHeard' : 'updated');
+        return { ok: true, result: { ...status(), ran: false, heard: false } };
+      }
+      const { failed, ran } = await evaluate(() => controls.update(), WAIT_FOR_EVALUATE_MS.update_code);
+      if (failed) return failed;
       controls.notify('updated');
-      return { ok: true, result: status() };
+      return { ok: true, result: { ...status(), ran, heard: ran } };
     },
 
     open_track: async ({ trackId }) => {
-      const stopped = blocked();
+      const wanted = String(trackId);
+      const stopped = refused();
       if (stopped) return stopped;
-      const unsafe = await protectTyping();
+      const unsafe = await protectTyping(controls.currentTrack()?.id);
       if (unsafe) return unsafe;
-      if (!(await controls.openTrack(String(trackId)))) return refusal('not_found');
-      const track = controls.currentTrack();
-      controls.notify('opened', { name: track?.name ?? '' });
+      const late = refused();
+      if (late) return late;
+      const opened = await controls.openTrack(wanted);
+      if (!controls.enabled()) return refusal('control_off');
+      if (opened === 'not_found') return refusal('not_found');
+      if (opened !== 'opened') {
+        controls.notify('refusedOpen');
+        return refusal(opened);
+      }
+      controls.notify('opened', { name: controls.currentTrack()?.name ?? '' });
       return { ok: true, result: status() };
     },
   };
@@ -225,7 +274,8 @@ export function createCommandHandler(controls: TabControls): CommandHandler {
     const handler = commands[command];
     if (!handler) return Promise.resolve(refusal('unknown_command'));
     if (command === 'status') return Promise.resolve(handler(args));
-    const run = queue.then(() => handler(args));
+    // The switch may have gone off while this waited its turn.
+    const run = queue.then(() => (controls.enabled() ? handler(args) : refusal('control_off')));
     queue = run.catch(() => {});
     return run;
   };

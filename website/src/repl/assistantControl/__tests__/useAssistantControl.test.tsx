@@ -3,7 +3,7 @@
  * @spec: 018-strudel-mcp-server (functional 2.8, 2.12)
  * Where control is possible at all. The admin view is read-only and must never be reachable.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => {
   const jsdomStorage = (globalThis as { jsdom?: { window: Window } }).jsdom?.window.localStorage;
@@ -18,6 +18,8 @@ import { createRoot, type Root } from 'react-dom/client';
 const sockets: string[] = [];
 const unsubscribe = vi.fn();
 
+// Fresh modules: another file in this worker may already hold the hook with the real client.
+vi.resetModules();
 vi.doMock('@src/lib/supabase', () => ({
   supabase: {
     auth: {
@@ -72,12 +74,16 @@ beforeEach(() => {
 afterEach(() => {
   unmount();
   vi.unstubAllGlobals();
-  vi.doUnmock('@src/lib/supabase');
   assistantControlOn.set(false);
   assistantControlAvailable.set(false);
 });
 
 const settle = () => act(async () => void (await new Promise((resolve) => setTimeout(resolve, 0))));
+
+afterAll(() => {
+  vi.doUnmock('@src/lib/supabase');
+  vi.resetModules();
+});
 
 describe('useAssistantControl', () => {
   it('makes control possible, off, with no socket until the switch is on', async () => {

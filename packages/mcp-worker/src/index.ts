@@ -9,6 +9,9 @@ export default {
       fetch: (input, init) => fetch(input, init),
       site: (siteRequest) => env.SITE.fetch(siteRequest),
       isRateLimited: env.MCP_RATE ? async (userId) => !(await env.MCP_RATE!.limit({ key: userId })).success : undefined,
+      isIpRateLimited: env.MCP_IP_RATE
+        ? async (address) => !(await env.MCP_IP_RATE!.limit({ key: address })).success
+        : undefined,
       // Workers Logs parses an object into searchable fields. scripts/cpu-time.mjs reads `handler`.
       log: (entry) => console.log(entry),
     });

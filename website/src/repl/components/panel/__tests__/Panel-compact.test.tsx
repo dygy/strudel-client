@@ -28,6 +28,7 @@ vi.mock('../ShortcutsTab', () => ({ ShortcutsTab: () => <div>shortcuts tab</div>
 vi.mock('../../useLogger', () => ({ useLogger: () => {} }));
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import i18n from '@src/i18n/i18n';
 import { parseBoolean, setActiveFooter, setIsFileManagerOpen, setIsPanelOpened, settingsMap } from '@src/settings';
 import { VerticalPanel } from '../Panel';
 import { openFileManager, resetPanelSession } from '../panelLayout';
@@ -73,7 +74,9 @@ const desktopClose = () =>
 
 const originalSize = { width: window.innerWidth, height: window.innerHeight };
 
-beforeEach(() => {
+beforeEach(async () => {
+  // Dragging reads the language to know which way is wider, and another file may have left it on Hebrew.
+  await i18n.changeLanguage('en');
   resetPanelSession();
   setActiveFooter('shortcuts');
   setIsPanelOpened(true);

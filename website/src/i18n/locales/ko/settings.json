@@ -212,7 +212,10 @@
       "refusedTransition": "어시스턴트: 거부됨, 전환이 진행 중입니다",
       "refusedConflict": "어시스턴트: 유지할 버전을 선택할 때까지 거부됩니다",
       "refusedSave": "어시스턴트: 거부됨, 내 텍스트를 저장하지 못했습니다",
-      "refusedNoTrack": "어시스턴트: 거부됨, 열린 트랙이 없습니다"
+      "refusedNoTrack": "어시스턴트: 거부됨, 열린 트랙이 없습니다",
+      "refusedTrackChanged": "어시스턴트: 거부됨, 그 트랙은 더 이상 열려 있지 않습니다",
+      "refusedOpen": "어시스턴트: 거부됨, 여기서는 라이브러리를 사용할 수 없습니다",
+      "updatedNotHeard": "어시스턴트: 편집기의 코드가 변경되었습니다. 재생 중인 음악은 바뀌지 않았습니다."
     }
   }
 }

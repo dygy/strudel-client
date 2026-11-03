@@ -40,6 +40,31 @@ const REFUSALS: Record<string, { code: ErrorCode; message: string; next: string 
     message: 'The tab did not answer in time, so this may or may not have happened.',
     next: 'Check with list_tabs before trying again.',
   },
+  track_changed: {
+    code: 'track_changed',
+    message: 'That track is not the one open in this tab now, and nothing was changed.',
+    next: 'Check with list_tabs, then open_track if you still mean that one.',
+  },
+  control_off: {
+    code: 'control_off',
+    message: 'The user turned off Allow assistant control in this tab, and this was not done.',
+    next: ALLOW,
+  },
+  ignored: {
+    code: 'ignored',
+    message: 'A switch to this track is already under way, so this did nothing.',
+    next: 'Check with list_tabs when it has finished.',
+  },
+  open_failed: {
+    code: 'open_failed',
+    message: 'The tab did not come to hold that track.',
+    next: 'Check with list_tabs before trying again.',
+  },
+  library_unavailable: {
+    code: 'library_unavailable',
+    message: 'This tab is in a view without the track library, so it can not open a track.',
+    next: 'Ask the user to leave zen mode.',
+  },
   not_found: { code: 'not_found', message: 'Track not found', next: 'Find its id with search_tracks.' },
   code_error: {
     code: 'code_error',
@@ -91,6 +116,7 @@ const refused = (answer: Answer): ToolResult => {
   const extra: Record<string, unknown> = {};
   if (answer.tabs) extra.tabs = answer.tabs;
   if (answer.error) extra.error = answer.error;
+  if (answer.openTrackId) extra.openTrackId = answer.openTrackId;
   return fail(code, message, next, extra);
 };
 
@@ -116,7 +142,10 @@ export const stop = (ctx: ToolContext, args: { tabId?: string }) => run(ctx, 'st
 export const openTrack = (ctx: ToolContext, args: { trackId: string; tabId?: string }) =>
   run(ctx, 'open_track', args, COMMAND_TIMEOUT_MS);
 
-export function updateCode(ctx: ToolContext, args: { code: string; tabId?: string }): Promise<ToolResult> | ToolResult {
+export function updateCode(
+  ctx: ToolContext,
+  args: { code: string; trackId: string; tabId?: string },
+): Promise<ToolResult> | ToolResult {
   if (new TextEncoder().encode(args.code).length > MAX_CODE_BYTES) {
     return fail('too_large', 'Code is limited to 512 KB, and nothing was changed.');
   }

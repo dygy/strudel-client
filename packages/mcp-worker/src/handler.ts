@@ -41,6 +41,16 @@ function rateLimited(message: unknown) {
   };
 }
 
+/**
+ * Before any token is looked at, so a forged one can't cost a call to Supabase each time. Cloudflare sets
+ * the header, and a client can't. Open if there's none or the limiter fails, like the per-user limit.
+ */
+async function overAddressLimit(request: Request, deps: Deps): Promise<boolean> {
+  const address = request.headers.get('cf-connecting-ip');
+  if (!address || !deps.isIpRateLimited) return false;
+  return deps.isIpRateLimited(address).catch(() => false);
+}
+
 const refusal = (status: number, message: string, headers: Record<string, string> = {}) =>
   json(rpcError(null, INVALID_REQUEST, message), status, headers);
 
@@ -88,6 +98,14 @@ async function mcpPost(request: Request, env: Env, deps: Deps, origin: string, s
   const pageOrigin = request.headers.get('origin');
   if (pageOrigin !== null && pageOrigin !== origin) {
     return finish(refusal(403, 'Origin not allowed'), 'auth', 'bad_origin');
+  }
+
+  if (await overAddressLimit(request, deps)) {
+    return finish(
+      refusal(429, 'Too many requests. Wait a minute.', { 'retry-after': '60' }),
+      'transport',
+      'rate_limited',
+    );
   }
 
   const token = bearerToken(request);
@@ -171,6 +189,10 @@ async function tabSocket(request: Request, env: Env, deps: Deps, origin: string,
     return refusal(426, 'Expected a WebSocket', { upgrade: 'websocket' });
   }
   if (request.headers.get('origin') !== origin) return finish(refusal(403, 'Origin not allowed'), 'bad_origin');
+
+  if (await overAddressLimit(request, deps)) {
+    return finish(refusal(429, 'Too many requests. Wait a minute.', { 'retry-after': '60' }), 'rate_limited');
+  }
 
   const token = sessionCookie(request);
   if (!token) return finish(refusal(401, 'Sign in'), 'no_cookie');

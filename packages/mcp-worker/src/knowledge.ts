@@ -1,4 +1,5 @@
 /** Looking things up and checking code (spec 018, functional 2.7). No network: all from generated data. */
+import { HELPER_PACKAGE, HELPER_PUBLISHED } from '../../../website/src/lib/mcpHelper';
 import { checkCode, closestNames } from './check';
 import { fail, ok, type ToolResult } from './context';
 import functions from './generated/functions.json';
@@ -9,7 +10,7 @@ import sounds from './generated/sounds.json';
  * What fits in 10 ms on the first check in a new isolate, measured on the bundle: see README.md. Larger
  * code gets `use_local_helper`. Don't raise it without measuring CPU time on the deployed Worker.
  */
-export const CHECK_MAX_BYTES = 768;
+export const CHECK_MAX_BYTES = 512;
 const SEARCH_PAGE = 50;
 const SOUND_PAGE = 200;
 
@@ -103,7 +104,9 @@ export function checkCodeTool(args: { code: string }): ToolResult {
     return fail(
       'use_local_helper',
       `The online check takes code up to ${CHECK_MAX_BYTES} bytes.`,
-      'For larger code, use the local helper: add it to your assistant with the command npx -y strudel_mcp_js.',
+      HELPER_PUBLISHED
+        ? `For larger code, use the local helper: add it to your assistant with the command npx -y ${HELPER_PACKAGE}.`
+        : 'Check it a part at a time. A local helper for larger code is on its way, but is not available yet.',
     );
   }
   return ok({ ...checkCode(args.code, names()) });

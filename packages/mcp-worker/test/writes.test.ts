@@ -297,14 +297,103 @@ describe('set_track_steps', () => {
     expect((siteUpdates().steps as Array<{ id: string }>).map((step) => step.id)).toEqual(['s2', 's0', 's1']);
   });
 
-  it('turns a plain track into a multitrack', async () => {
+  it('turns a plain track into a multitrack, with its code in a step', async () => {
     const row = library.addTrack({ id: 't', name: 'Song', code: 'old' });
     await tools.call('set_track_steps', {
       trackId: 't',
       expectedVersion: row.updated_at,
+      steps: [
+        { name: 'One', code: 'old' },
+        { name: 'Two', code: 'new' },
+      ],
+    });
+    expect(row).toMatchObject({ is_multitrack: true, code: 'old', active_step: 0 });
+  });
+
+  it("refuses to lose a plain track's code", async () => {
+    const row = library.addTrack({ id: 't', name: 'Song', code: 'old' });
+    const { error } = await tools.call('set_track_steps', {
+      trackId: 't',
+      expectedVersion: row.updated_at,
       steps: [{ name: 'One', code: 'new' }],
     });
-    expect(row).toMatchObject({ is_multitrack: true, code: 'new', active_step: 0 });
+    expect(error.code).toBe('steps_would_be_removed');
+    expect(library.siteCalls).toEqual([]);
+  });
+
+  describe('dropping a step', () => {
+    const three = () => {
+      const row = multitrack(['a', 'b', 'c']);
+      const [first, second, third] = row.steps as Array<{ id: string; name: string; code: string }>;
+      return { row, first, second, third };
+    };
+
+    it('is refused unless named, saying which, with nothing written', async () => {
+      const { row, first, second } = three();
+      const { error } = await tools.call('set_track_steps', {
+        trackId: 'm',
+        expectedVersion: row.updated_at,
+        steps: [first, second],
+      });
+      expect(error).toMatchObject({ code: 'steps_would_be_removed', steps: [{ id: 's2', name: 'Step 2' }] });
+      expect(library.siteCalls).toEqual([]);
+    });
+
+    it('goes through when named by id', async () => {
+      const { row, first, second } = three();
+      const { isError } = await tools.call('set_track_steps', {
+        trackId: 'm',
+        expectedVersion: row.updated_at,
+        steps: [first, second],
+        removeSteps: ['s2'],
+      });
+      expect(isError).toBeUndefined();
+      expect((siteUpdates().steps as unknown[]).length).toBe(2);
+    });
+
+    it('needs every dropped step named, not just some', async () => {
+      const { row, first } = three();
+      const { error } = await tools.call('set_track_steps', {
+        trackId: 'm',
+        expectedVersion: row.updated_at,
+        steps: [first],
+        removeSteps: ['s1'],
+      });
+      expect(error).toMatchObject({ code: 'steps_would_be_removed', steps: [{ id: 's2' }] });
+    });
+
+    it('takes a new step with no id for a dropped one, and an unknown id the same way', async () => {
+      const { row } = three();
+      const { error } = await tools.call('set_track_steps', {
+        trackId: 'm',
+        expectedVersion: row.updated_at,
+        steps: [{ id: 'nope', name: 'X', code: 'x' }],
+      });
+      expect(error.code).toBe('steps_would_be_removed');
+    });
+
+    it('never drops all of them: that is what deleting the track is for', async () => {
+      const { row } = three();
+      const { error } = await tools.call('set_track_steps', {
+        trackId: 'm',
+        expectedVersion: row.updated_at,
+        steps: [{ name: 'New', code: 'x' }],
+        removeSteps: ['s0', 's1', 's2'],
+      });
+      expect(error).toMatchObject({ code: 'last_step' });
+      expect(library.siteCalls).toEqual([]);
+    });
+
+    it('refuses to name a step it is keeping, or one that is not there', async () => {
+      const { row, first, second, third } = three();
+      const { error } = await tools.call('set_track_steps', {
+        trackId: 'm',
+        expectedVersion: row.updated_at,
+        steps: [first, second, third],
+        removeSteps: ['s1'],
+      });
+      expect(error.code).toBe('invalid_arguments');
+    });
   });
 
   it('gives a repeated id a new one, so the app can tell the steps apart', async () => {
@@ -478,6 +567,26 @@ describe('when the site is out of reach', () => {
       message: expect.stringContaining('nothing was changed'),
     });
     expect(row.code).toBe('old');
+  });
+
+  it("doesn't say nothing changed when a folder change failed partway", async () => {
+    const row = library.addFolder({ id: 'f', name: 'Live' });
+    tools = toolCaller(
+      library,
+      {},
+      {
+        site: async () =>
+          Response.json({ error: 'x', code: 'rollback_incomplete', failedUndos: ['a'] }, { status: 500 }),
+      },
+    );
+    const { error } = await tools.call('rename_folder', {
+      folderId: 'f',
+      expectedVersion: row.updated_at,
+      name: 'New',
+    });
+    expect(error.code).toBe('rollback_incomplete');
+    expect(error.message).toContain('half moved');
+    expect(error.message).not.toContain('nothing was');
   });
 
   it.each([

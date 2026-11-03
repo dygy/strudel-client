@@ -3,6 +3,7 @@
  * The relay with fake sockets: who counts as a tab, and how a command gets its answer. The real thing
  * through workerd is covered by the local browser run; plain vitest has no workerd.
  */
+import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLOSE_NOT_SIGNED_IN, TabRelay, TOKEN_GRACE_MS } from '../src/tabRelay';
 import type { Env } from '../src/env';
@@ -98,6 +99,8 @@ const fakeClock = (now: number) => vi.useFakeTimers({ now, toFake: ['setTimeout'
 const lastMessage = (socket: FakeSocket) => JSON.parse(socket.sent.at(-1)!);
 
 beforeEach(() => {
+  // Other files stub `crypto` and share this global (vitest's isolate is off).
+  vi.stubGlobal('crypto', webcrypto);
   vi.stubGlobal(
     'WebSocketPair',
     class {
@@ -398,6 +401,24 @@ describe('GET /mcp/tab', () => {
     expect(JSON.stringify(w.logs)).not.toContain('.signature');
   });
 
+  it('refuses an address over its limit, before looking at the token or waking anything', async () => {
+    const addresses: string[] = [];
+    const { get, w } = relayed();
+    const limited = worker(
+      undefined,
+      { TAB_RELAY: { idFromName: vi.fn(), get } as never },
+      {
+        isIpRateLimited: async (address) => (addresses.push(address), true),
+      },
+    );
+    const response = await limited.fetch(url, { headers: socketHeaders({ 'cf-connecting-ip': '192.0.2.1' }) });
+    expect(response.status).toBe(429);
+    expect(addresses).toEqual(['192.0.2.1']);
+    expect(limited.upstreamCalls).toEqual([]);
+    expect(get).not.toHaveBeenCalled();
+    void w;
+  });
+
   it('answers 426 without an upgrade and 405 to a POST', async () => {
     const { get, w } = relayed();
     expect((await w.fetch(url, { headers: { origin: ORIGIN } })).status).toBe(426);
@@ -440,7 +461,7 @@ describe('the tab tools', () => {
   it.each([
     ['play', {}, 'play'],
     ['stop', {}, 'stop'],
-    ['update_code', { code: 'x' }, 'update_code'],
+    ['update_code', { code: 'x', trackId: 't' }, 'update_code'],
     ['open_track', { trackId: 't' }, 'open_track'],
   ])('%s reaches the tab', async (tool, args, command) => {
     const seen: string[] = [];
@@ -449,15 +470,39 @@ describe('the tab tools', () => {
     expect(seen).toEqual([command]);
   });
 
-  it.each(['transition_in_progress', 'conflict_open', 'save_failed', 'no_track_open', 'not_found'])(
-    'passes on %s with a next step',
-    async (code) => {
-      const { tools } = await withRelay(() => ({ ok: false, code }));
-      const { error } = await tools.call('update_code', { code: 'x' });
-      expect(error.code).toBe(code);
-      expect(error.next).toBeTruthy();
-    },
-  );
+  it.each([
+    'transition_in_progress',
+    'conflict_open',
+    'save_failed',
+    'no_track_open',
+    'not_found',
+    'track_changed',
+    'control_off',
+    'ignored',
+    'open_failed',
+    'library_unavailable',
+  ])('passes on %s with a next step', async (code) => {
+    const { tools } = await withRelay(() => ({ ok: false, code }));
+    const { error } = await tools.call('update_code', { code: 'x', trackId: 't' });
+    expect(error.code).toBe(code);
+    expect(error.next).toBeTruthy();
+  });
+
+  it('requires the track, so nothing lands on whatever happens to be open', async () => {
+    const seen: string[] = [];
+    const { tools } = await withRelay((name) => (seen.push(name), { ok: true, result: {} }));
+    const { error } = await tools.call('update_code', { code: 'x' });
+    expect(error).toMatchObject({ code: 'invalid_arguments', message: 'arguments.trackId is required' });
+    expect(seen).toEqual([]);
+  });
+
+  it('says which track is open when the one named is not', async () => {
+    const { tools } = await withRelay(() => ({ ok: false, code: 'track_changed', openTrackId: 't2' }));
+    expect((await tools.call('update_code', { code: 'x', trackId: 't1' })).error).toMatchObject({
+      code: 'track_changed',
+      openTrackId: 't2',
+    });
+  });
 
   it('says "A transition is in progress" in those words', async () => {
     const { tools } = await withRelay(() => ({ ok: false, code: 'transition_in_progress' }));
@@ -467,7 +512,10 @@ describe('the tab tools', () => {
   it('gives the line of a code mistake', async () => {
     const error = { message: 'Unexpected token', line: 3 };
     const { tools } = await withRelay(() => ({ ok: false, code: 'code_error', error }));
-    expect((await tools.call('update_code', { code: 'x' })).error).toMatchObject({ code: 'code_error', error });
+    expect((await tools.call('update_code', { code: 'x', trackId: 't' })).error).toMatchObject({
+      code: 'code_error',
+      error,
+    });
   });
 
   it('lists both tabs when it can not tell which, so the assistant can choose', async () => {
@@ -480,14 +528,14 @@ describe('the tab tools', () => {
   it('refuses code over 512 KB before reaching the tab', async () => {
     const seen: string[] = [];
     const { tools } = await withRelay((name) => (seen.push(name), { ok: true, result: {} }));
-    const { error } = await tools.call('update_code', { code: 'x'.repeat(512 * 1024 + 1) });
+    const { error } = await tools.call('update_code', { code: 'x'.repeat(512 * 1024 + 1), trackId: 't' });
     expect(error.code).toBe('too_large');
     expect(seen).toEqual([]);
   });
 
   it('never logs the code', async () => {
     const { tools } = await withRelay(() => ({ ok: true, result: {} }));
-    await tools.call('update_code', { code: 'PRIVATE_CODE' });
+    await tools.call('update_code', { code: 'PRIVATE_CODE', trackId: 't' });
     expect(JSON.stringify(tools.logs)).not.toContain('PRIVATE_CODE');
   });
 

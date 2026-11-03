@@ -9,6 +9,7 @@ import {
   clearTestEnv,
   defaultFrom,
   fakeState,
+  insertedInto,
   mutationsOn,
   resetSupabaseFake,
   signIn,
@@ -157,6 +158,33 @@ describe('DELETE /api/folders/delete', () => {
     expect(tracks?.builder.in).toHaveBeenCalledWith('folder', ['f1', 'Empty']);
     from.mockReset();
     from.mockImplementation(defaultFrom);
+  });
+
+  it('puts the folder back and says so when a track got in as it was deleted', async () => {
+    fakeState.tables.folders[0].created = 'when-it-was-made';
+    const from = vi.spyOn(supabaseFake, 'from');
+    from.mockImplementation((table: string) => {
+      const builder = defaultFrom(table);
+      const startDelete = builder.delete;
+      builder.delete = vi.fn(() => {
+        fakeState.tables.tracks.push(trackRow('late', 'Late', 'f1'));
+        return startDelete();
+      });
+      return builder;
+    });
+    const res = await del({ folderId: 'f1', expectedVersion: V1 });
+    from.mockImplementation(defaultFrom);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'folder_not_empty', contents: { trackCount: 1, tracks: ['Late'] } });
+    expect(insertedInto('folders')).toEqual([
+      expect.objectContaining({
+        id: 'f1',
+        name: 'Empty',
+        path: 'Empty',
+        user_id: USER.id,
+        created: 'when-it-was-made',
+      }),
+    ]);
   });
 
   it('answers version_conflict when another write gets in just before the delete', async () => {

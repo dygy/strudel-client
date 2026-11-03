@@ -45,6 +45,7 @@ describe('the Worker bundle', () => {
     const allowed = [
       'acorn',
       '../../mini/krill-parser.js',
+      '../../../website/src/lib/mcpHelper',
       '../../../website/src/lib/multitrack',
       '../../../website/src/lib/slugUtils',
       '../../../website/src/lib/trackRename',

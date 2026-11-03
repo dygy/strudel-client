@@ -55,7 +55,7 @@ import {
 import { useAudioRecorder } from './recording/useAudioRecorder';
 import { useScreenRecorder } from './recording/useScreenRecorder';
 import { listenForSmoothTransitionErrors } from './smoothTransitionNotifier';
-import { createTrackSwitchController } from './trackSwitch';
+import { createTrackSwitchController, type UpdateOutcome } from './trackSwitch';
 import { settingsForSwitch, switchPath } from './transitionSettings';
 
 // Type definitions
@@ -101,6 +101,10 @@ interface ReplContext {
   transitionController?: TrackTransitionController | null;
   /** Which track is in the editor and which is playing, as Update sees them. */
   trackIds?: () => { editor: string | null; playing: string | null };
+  /** A switch or an evaluate is under way, however it started and whatever its transition type. */
+  isSwitching?: () => boolean;
+  /** Update, without what the button also does to a headphone preview. */
+  runUpdate?: (options?: { reset?: boolean }) => Promise<UpdateOutcome>;
   /** The editor now holds track `id` without going through handleUpdate (e.g. same code already loaded). */
   setEditorTrackId?: (id: string | null | undefined) => void;
   replaceTrackId?: (oldId: string, newId: string) => void;
@@ -722,7 +726,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   // - a DIFFERENT track while one is playing: a switch (evaluateNewTrack), fading the old track
   //   out and starting the new one at cycle 0.
   // - the same switch again while it is still in flight (double press): ignored.
-  const runUpdate = async ({ reset = false }: { reset?: boolean } = {}): Promise<void> => {
+  const runUpdate = async ({ reset = false }: { reset?: boolean } = {}): Promise<UpdateOutcome> => {
     const outcome = await trackSwitch.update({
       reset,
       isPlaying: Boolean(editorRef.current?.repl?.scheduler?.started),
@@ -738,6 +742,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     if (outcome === 'ignored') {
       console.log('[repl] Update ignored: already switching to this track');
     }
+    return outcome;
   };
 
   const handleEvaluate = async (): Promise<void> => {
@@ -840,7 +845,9 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     }
     await cleanupCanvasElements();
     editorRef.current?.flash?.();
-    repl.evaluate(code);
+    // Awaited, so that a switch lasts as long as it does: the Off type has no other signal that it's
+    // still loading, and a second Update or an assistant has to be able to see that.
+    await repl.evaluate(code);
   };
 
   const handleShuffle = async (): Promise<void> => {
@@ -969,6 +976,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     transitionController: transitionControllerRef.current,
     setEditorTrackId: trackSwitch.setEditorTrack,
     trackIds: () => ({ editor: trackSwitch.editorTrackId, playing: trackSwitch.playingTrackId }),
+    isSwitching: () => trackSwitch.busy || Boolean(transitionControllerRef.current?.busy),
+    runUpdate,
     replaceTrackId: trackSwitch.replaceTrackId,
     isRecording: audioRecorder.isRecording,
     recordingElapsedSeconds: audioRecorder.elapsedSeconds,

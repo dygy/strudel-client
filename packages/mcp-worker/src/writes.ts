@@ -93,7 +93,8 @@ export async function createTrack(
   });
   const folder = folderId;
   // The same sibling rule as a rename: a name or a URL already used in that folder.
-  if (trackNameClashes(args.name, folder, '', tracks, folders)) {
+  // Only that folder to resolve against: these are all its tracks, and a large library would cost CPU.
+  if (trackNameClashes(args.name, folder, '', tracks, target ? [target] : [])) {
     return fail('name_taken', `A track named "${args.name.trim()}" already exists here.`, 'Use another name.');
   }
 
@@ -174,6 +175,7 @@ export async function setTrackSteps(
     expectedVersion: string;
     steps: Array<{ id?: string; name: string; code: string }>;
     activeStep?: number;
+    removeSteps?: string[];
   },
 ): Promise<ToolResult> {
   args.steps.forEach((step) => {
@@ -186,6 +188,40 @@ export async function setTrackSteps(
   const row = await readForChange(ctx, args.trackId, args.expectedVersion);
   const track = reconciled(row);
   const existing = new Map((track.steps ?? []).map((step) => [step.id, step]));
+
+  // Dropping a step deletes it. That has to be meant, by name.
+  const kept = new Set<string | undefined>(args.steps.map((step) => step.id).filter((stepId) => existing.has(stepId)));
+  const dropped = [...existing.values()].filter((step) => !kept.has(step.id));
+  const named = new Set(args.removeSteps ?? []);
+  const unnamed = dropped.filter((step) => !named.has(step.id!));
+  if (unnamed.length) {
+    return fail(
+      'steps_would_be_removed',
+      'This would delete steps, and nothing was changed.',
+      'Keep their ids in steps, or ask the user and list them in removeSteps.',
+      { steps: unnamed.map(({ id, name }) => ({ id, name })) },
+    );
+  }
+  const notDropped = [...named].filter((stepId) => !dropped.some((step) => step.id === stepId));
+  if (notDropped.length) {
+    return fail('invalid_arguments', 'removeSteps names a step that this keeps, or that does not exist.');
+  }
+  if (existing.size > 0 && kept.size === 0) {
+    return fail(
+      'last_step',
+      'At least one existing step has to stay, and nothing was changed.',
+      'Delete the track instead.',
+    );
+  }
+  if (existing.size === 0 && row.code?.trim() && !args.steps.some((step) => step.code === row.code)) {
+    return fail(
+      'steps_would_be_removed',
+      "This track's code is not in any of these steps, so it would be lost, and nothing was changed.",
+      'Include it as a step.',
+      { steps: [] },
+    );
+  }
+
   const now = new Date().toISOString();
   const taken = new Set<string>();
   const steps = args.steps.map((step) => {

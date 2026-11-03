@@ -3,6 +3,7 @@
  * answers each. Failures are results with a stable code and a next step, not protocol errors.
  */
 import type { AssistantIdentity } from './auth';
+import { HELPER_PUBLISHED } from '../../../website/src/lib/mcpHelper';
 import { fail, ok, ToolFailure, unavailable, type ToolContext, type ToolResult } from './context';
 import { CHECK_MAX_BYTES, checkCodeTool, listSounds, lookupFunction, searchFunctions } from './knowledge';
 import { getTrack, listFolders, searchTracks } from './library';
@@ -78,8 +79,10 @@ const tabState = output(
     track: { type: ['object', 'null'], properties: { id: str, name: str } },
     playing: { type: 'boolean' },
     cps: { type: ['number', 'null'] },
-    transition: { type: 'string', enum: ['idle', 'waiting', 'running'] },
+    transition: { type: 'string', enum: ['idle', 'switching', 'waiting', 'running'] },
     changedElsewhere: { type: 'boolean' },
+    ran: { type: 'boolean', description: 'False if the code had not finished running when this answered.' },
+    heard: { type: 'boolean', description: 'Whether this changed what is playing.' },
   },
   ['track', 'playing', 'cps', 'transition', 'changedElsewhere'],
 );
@@ -208,7 +211,7 @@ const ALL: Tool[] = [
     name: 'set_track_steps',
     title: "Set a multitrack's steps",
     description:
-      'Replaces the steps of a track, in the order given: add, change and reorder. Keep the id of a step you are keeping. A plain track becomes a multitrack.',
+      'Replaces the steps of a track, in the order given: add, change and reorder. Keep the id of each step you are keeping. Dropping a step deletes it permanently, so it is refused unless removeSteps lists it by id: ask the user first. At least one existing step has to stay. A plain track becomes a multitrack, and its code has to be in one of the steps.',
     inputSchema: input(
       {
         trackId: id,
@@ -220,11 +223,17 @@ const ALL: Tool[] = [
           items: input({ id: { type: 'string', maxLength: 200 }, name, code }, ['name', 'code']),
         },
         activeStep: { type: 'integer', minimum: 0 },
+        removeSteps: {
+          type: 'array',
+          maxItems: MAX_STEPS,
+          items: { type: 'string', maxLength: 200 },
+          description: 'The ids of the steps this deletes.',
+        },
       },
       ['trackId', 'expectedVersion', 'steps'],
     ),
     outputSchema: changedTrack,
-    annotations: WRITE,
+    annotations: DESTROY,
     run: setTrackSteps,
   },
   {
@@ -339,7 +348,7 @@ const ALL: Tool[] = [
   {
     name: 'check_code',
     title: 'Check code',
-    description: `Finds syntax mistakes, mini-notation mistakes and function names that do not exist, with line and column, without running the code. Up to ${CHECK_MAX_BYTES} bytes here; larger code needs the local helper.`,
+    description: `Finds syntax mistakes, mini-notation mistakes and function names that do not exist, with line and column, without running the code. Up to ${CHECK_MAX_BYTES} bytes here${HELPER_PUBLISHED ? '; larger code needs the local helper' : ''}.`,
     inputSchema: input({ code: { type: 'string' } }, ['code']),
     outputSchema: output({
       ok: { type: 'boolean' },
@@ -382,8 +391,8 @@ const ALL: Tool[] = [
     name: 'update_code',
     title: 'Update the code in a tab',
     description:
-      "Replaces the code in the tab's editor. Anything the user typed is saved first, Undo brings it back, and if that save fails this is refused. If the track is playing, the new code is heard with no gap or fade. A mistake in the code leaves the music playing and comes back as code_error, with the line where known. It reaches the library by autosave, as typing does.",
-    inputSchema: input({ code: { type: 'string' }, tabId }, ['code']),
+      "Replaces the code of the track open in a tab's editor. Name that track with trackId, from list_tabs: if something else is open now, this is refused with track_changed. Anything the user typed is saved first, Undo brings it back, and if that save fails this is refused. If this is the track being heard, the new code is heard with no gap or fade (heard: true). A stopped tab stays stopped, and if another track is playing it keeps playing (heard: false): only play changes what's heard. A mistake in the code leaves the music playing and comes back as code_error, with the line where known. It reaches the library by autosave, as typing does.",
+    inputSchema: input({ code: { type: 'string' }, trackId: id, tabId }, ['code', 'trackId']),
     outputSchema: tabState,
     annotations: WRITE,
     run: updateCode,

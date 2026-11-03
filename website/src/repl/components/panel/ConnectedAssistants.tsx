@@ -5,6 +5,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import cx from '@src/cx';
 import { useTranslation } from '@src/i18n';
+import { HELPER_COMMAND, HELPER_PUBLISHED } from '@src/lib/mcpHelper';
+
+export { HELPER_COMMAND, HELPER_PUBLISHED };
+
 import { createOAuthServerApi, type OAuthGrant, type OAuthServerApi } from '@src/lib/oauthServerApi';
 import { supabase } from '@src/lib/supabase';
 import { usePanelViewport } from './panelViewport';
@@ -13,9 +17,6 @@ const { BASE_URL } = import.meta.env;
 export const SETUP_PAGE = `${BASE_URL.endsWith('/') ? BASE_URL : `${BASE_URL}/`}learn/ai-assistants`;
 export const MCP_ADDRESS = 'https://strudel.dygy.app/mcp';
 export const CLAUDE_CODE_COMMAND = `claude mcp add --transport http strudel ${MCP_ADDRESS}`;
-export const HELPER_COMMAND = 'claude mcp add strudel-local -- npx -y strudel_mcp_js';
-/** The command fails until the package is on npm (slice 7). Set this to true when it is. */
-export const HELPER_PUBLISHED = false;
 /** A new assistant shows up within this long while the section is open (functional 2.2). */
 export const LIST_REFRESH_MS = 30_000;
 const COPIED_MS = 2_000;

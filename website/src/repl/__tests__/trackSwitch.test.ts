@@ -230,3 +230,48 @@ describe('replaceTrackId (spec 018: a deleted track saved again under a new id)'
     expect(controller.playingTrackId).toBe('other');
   });
 });
+
+describe('busy: is what is heard changing', () => {
+  it('from the moment Update starts a switch until it has finished, for every transition type', async () => {
+    const controller = createTrackSwitchController();
+    controller.setEditorTrack('b');
+    expect(controller.busy).toBe(false);
+    let finish = () => {};
+    const update = controller.update({
+      isPlaying: true,
+      code: 'new',
+      hotSwap: async () => {},
+      switchTrack: () => new Promise<void>((resolve) => (finish = resolve)),
+    });
+    expect(controller.busy).toBe(true);
+    finish();
+    await update;
+    expect(controller.busy).toBe(false);
+  });
+
+  it('while an evaluate is loading its samples, and after one that fails', async () => {
+    const controller = createTrackSwitchController();
+    let finish: (value?: unknown) => void = () => {};
+    let refuse: (error: unknown) => void = () => {};
+    const editor = {
+      code: 'x',
+      evaluate: () =>
+        new Promise((resolve, reject) => {
+          finish = resolve;
+          refuse = reject;
+        }),
+    };
+    controller.attachEditor(editor);
+    const first = editor.evaluate();
+    expect(controller.busy).toBe(true);
+    finish();
+    await first;
+    await Promise.resolve();
+    expect(controller.busy).toBe(false);
+    const second = editor.evaluate();
+    refuse(new Error('no'));
+    await expect(second).rejects.toThrow('no');
+    await Promise.resolve();
+    expect(controller.busy).toBe(false);
+  });
+});

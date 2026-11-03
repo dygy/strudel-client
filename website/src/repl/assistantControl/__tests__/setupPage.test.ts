@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CHECK_MAX_BYTES } from '../../../../../packages/mcp-worker/src/knowledge';
+import { HELPER_COMMAND, HELPER_PACKAGE } from '../../../lib/mcpHelper';
 import { TOOLS } from '../../../../../packages/mcp-worker/src/tools';
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
@@ -23,12 +24,19 @@ describe('learn/ai-assistants', () => {
     expect(missing).toEqual([]);
   });
 
-  it('gives the address and the commands the app gives', () => {
+  it('gives the address and the command the app gives', () => {
     const address = /MCP_ADDRESS = '([^']+)'/.exec(panel)![1];
-    const helper = /HELPER_COMMAND = '([^']+)'/.exec(panel)![1];
     expect(page).toContain(address);
     expect(page).toContain(`claude mcp add --transport http strudel ${address}`);
-    expect(page).toContain(helper);
+  });
+
+  it('only offers the helper through the one constant, so nothing names the package until it is there', () => {
+    expect(page).toContain('{HELPER_PUBLISHED && (');
+    expect(page).toContain('{HELPER_COMMAND}');
+    expect(page).not.toContain(HELPER_PACKAGE);
+    expect(read('packages/mcp-worker/src/knowledge.ts')).not.toContain(HELPER_PACKAGE);
+    expect(panel).not.toContain(HELPER_PACKAGE);
+    expect(HELPER_COMMAND).toContain(`npx -y ${HELPER_PACKAGE}`);
   });
 
   it("gives the online check's limit as it is", () => {

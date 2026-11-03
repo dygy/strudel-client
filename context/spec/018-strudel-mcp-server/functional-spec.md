@@ -114,14 +114,14 @@ An assistant can look up Strudel's functions, with their descriptions, parameter
 
 A **pattern check** reports mistakes in code and in mini-notation with the line and column, and warns about function names that don't exist, with the closest real name. Code is never run by a check.
 
-The online service checks code up to 768 bytes. Larger code needs the local helper (§2.9), because the online service runs on a plan with a strict limit on work per request.
+The online service checks code up to 512 bytes. Larger code needs the local helper (§2.9), because the online service runs on a plan with a strict limit on work per request.
 
 - [ ] When an assistant looks up a function that exists, then it gets the description, parameters and at least the examples shown in the site's reference.
 - [ ] When an assistant asks about a function that doesn't exist, then it is told so and offered the closest real names.
 - [ ] When code contains a syntax mistake, then the check reports the line and column of it.
 - [ ] When a mini-notation string has unbalanced brackets, then the check reports that string's line and column.
 - [ ] When code calls a misspelled function such as `.lowpas(`, then the check warns about it and suggests `.lpf`.
-- [ ] When an assistant asks the online service to check code larger than 768 bytes, then it is told to use the local helper, and how to install it.
+- [ ] When an assistant asks the online service to check code larger than 512 bytes, then it is told to use the local helper, and how to install it.
 
 ### 2.8 Controlling an open tab
 
@@ -198,7 +198,7 @@ A documentation page explains how to connect the common assistants, how to insta
 - Connecting with Google sign-in and consent; a connect section in the app with copyable address and commands; listing and ending connections.
 - Reading, searching, creating, changing, moving and deleting library items.
 - Protection between assistants and open tabs, both ways.
-- Function and sample lookup, pattern checks online up to 768 bytes, and larger checks in the local helper.
+- Function and sample lookup, pattern checks online up to 512 bytes, and larger checks in the local helper.
 - Control of an open tab that has allowed it: status, play, stop, update, open track.
 - The local helper with pattern runs and summaries.
 - Rate limits, setup documentation, 9 languages for what users see.

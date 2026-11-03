@@ -75,6 +75,7 @@ export function createTrackSwitchController() {
   // code -> id of the track it belonged to when its evaluate started
   const startedEvaluations = new Map<string, string | null>();
   let switchesInFlight = 0;
+  let evaluationsInFlight = 0;
   let switchTarget: string | null = null;
 
   const evaluationStarted = (code: string | undefined, trackId: string | null = editorTrackId) => {
@@ -89,6 +90,10 @@ export function createTrackSwitchController() {
     },
     get playingTrackId() {
       return playingTrackId;
+    },
+    /** Something is changing what's heard: a switch of any type, from Update on, or an evaluate under way. */
+    get busy() {
+      return switchesInFlight > 0 || evaluationsInFlight > 0;
     },
     get switchTarget() {
       return switchesInFlight > 0 ? switchTarget : null;
@@ -122,7 +127,18 @@ export function createTrackSwitchController() {
       const evaluate = editor.evaluate.bind(editor);
       editor.evaluate = (...args: any[]) => {
         evaluationStarted(editor.code);
-        return evaluate(...args);
+        evaluationsInFlight++;
+        const finished = () => {
+          evaluationsInFlight = Math.max(0, evaluationsInFlight - 1);
+        };
+        try {
+          const result = evaluate(...args);
+          Promise.resolve(result).then(finished, finished);
+          return result;
+        } catch (error: unknown) {
+          finished();
+          throw error;
+        }
       };
     },
 

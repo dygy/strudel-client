@@ -3,6 +3,8 @@ title: AI Assistants
 layout: ../../layouts/MainLayout.astro
 ---
 
+import { HELPER_COMMAND, HELPER_PUBLISHED } from '../../lib/mcpHelper';
+
 # Using Strudel with an AI assistant
 
 An assistant that speaks the Model Context Protocol (MCP) can read and change your track library, look up Strudel's functions and sounds, check code for mistakes, and, if you allow it, control the music in an open tab.
@@ -41,9 +43,9 @@ Any assistant that supports remote MCP servers with OAuth can connect. Give it t
 
 **Change your library.** `create_track`, `update_track`, `move_track`, `set_track_steps`, `create_folder`, `rename_folder` and `move_folder`. The same naming rules apply as in the app. Each change says which version it read. If the track has changed since, the change is refused and the assistant has to read it again, so it can't overwrite your work without seeing it.
 
-**Delete.** `delete_track`, `delete_step` and `delete_empty_folder`, one item at a time. There is no trash, so assistants are told to ask you first. A folder with anything in it can't be deleted this way.
+**Delete.** `delete_track`, `delete_step` and `delete_empty_folder`, one item at a time. `set_track_steps` can drop steps too, but only ones it lists by id. There is no trash, so assistants are told to ask you first. A folder with anything in it can't be deleted this way.
 
-**Look things up and check code.** `lookup_function`, `search_functions`, `list_sounds` and `check_code`. The check finds syntax mistakes, mini-notation mistakes and names that don't exist, without running anything. Online it takes code up to 768 bytes. The local helper takes any size.
+**Look things up and check code.** `lookup_function`, `search_functions`, `list_sounds` and `check_code`. The check finds syntax mistakes, mini-notation mistakes and names that don't exist, without running anything. Online it takes code up to 512 bytes.
 
 **Control an open tab.** `list_tabs`, `play`, `stop`, `update_code` and `open_track`. See below.
 
@@ -51,27 +53,32 @@ If a track in your library holds text aimed at an assistant, assistants are told
 
 ## Letting an assistant control a tab
 
-Control is off in every tab until you turn on **Allow assistant control**, in Settings or, on a phone, in the menu. While it's on, the tab shows an indicator with a button to turn it off. It also turns off when you reload or close the tab, or sign out.
+Control is off in every tab until you turn on **Allow assistant control**, in Settings or, on a phone, in the menu. While it's on, the tab shows an indicator with a button to turn it off. It also turns off when you reload or close the tab, or sign out. Whatever an assistant had waiting when you turn it off isn't done.
 
-- **Updating the track that's playing** changes the code with no gap or fade, the same as pressing Update.
-- **Opening another track and playing it** uses the transition selected in that tab.
+- **Updating the track that's playing** changes the code with no gap or fade, the same as pressing Update. An assistant has to name the track it means, and is refused if something else is open by then.
+- **Only playing changes what you hear.** If the editor holds a different track from the one playing, or nothing is playing, an update only changes the text.
+- **Opening another track and playing it** uses the transition selected in that tab. While a track is switching, other actions are refused.
 - **Code with a mistake** leaves the music playing. The assistant gets the error, and the tab shows it. The code stays in the editor, as if you'd typed it, and autosave treats it the same way, so press Undo if you'd rather not keep it.
-- **Anything you typed** is saved before an assistant's code replaces it. If that save fails, the assistant is refused and your editor isn't touched. Undo brings your text back.
+- **Anything you typed** in that track is saved before an assistant's code replaces it. If that save fails, the assistant is refused and your editor isn't touched. Undo brings your text back.
+- **A headphone preview** keeps playing.
 - **If the "changed elsewhere" message is showing**, assistants are refused in that tab until you choose.
 
-With two tabs allowed, an assistant has to say which one it means.
+With two tabs allowed, an assistant has to say which one it means. In zen mode a tab has no library, so an assistant can't open a track there.
 
-## The local helper
+{HELPER_PUBLISHED && (
 
-The helper runs patterns on your own computer, so an assistant can see what its code produces without any sound, and can check code of any size. Patterns run in a sandbox with no file or network access.
-
-```sh
-claude mcp add strudel-local -- npx -y strudel_mcp_js
-```
-
-The package isn't on npm yet, so this command won't work until it is.
-
-It needs Node.js. It doesn't reach your library or your tabs, and doesn't need a sign-in.
+  <>
+    <h2 id="the-local-helper">The local helper</h2>
+    <p>
+      The helper runs patterns on your own computer, so an assistant can see what its code produces without any sound,
+      and can check code of any size. Patterns run in a sandbox with no file or network access. It needs Node.js. It
+      doesn't reach your library or your tabs, and doesn't need a sign-in.
+    </p>
+    <pre>
+      <code>{HELPER_COMMAND}</code>
+    </pre>
+  </>
+)}
 
 ## Disconnecting
 

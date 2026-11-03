@@ -4,7 +4,7 @@
  * The switch: off by default, one press off, nowhere to be seen where control isn't possible. Text comes
  * from the real locale files.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => {
   const jsdomStorage = (globalThis as { jsdom?: { window: Window } }).jsdom?.window.localStorage;
@@ -15,12 +15,14 @@ vi.hoisted(() => {
 
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import i18n from '@src/i18n/i18n';
 import en from '@src/i18n/locales/en/settings.json';
 
 const resume = vi.fn(async () => {});
+// Fresh modules: another file in this worker may already hold the switch with the real audio.
+vi.resetModules();
 vi.doMock('@strudel/webaudio', () => ({ getAudioContext: () => ({ resume }) }));
 
+const { default: i18n } = await import('@src/i18n/i18n');
 const { AllowAssistantSwitch, AssistantControlIndicator } = await import('../AllowAssistantSwitch');
 const { assistantControlAvailable, assistantControlOn, setAssistantControl } = await import('../store');
 
@@ -48,9 +50,13 @@ afterEach(() => {
   act(() => root?.unmount());
   root = null;
   container?.remove();
-  vi.doUnmock('@strudel/webaudio');
   assistantControlAvailable.set(false);
   assistantControlOn.set(false);
+});
+
+afterAll(() => {
+  vi.doUnmock('@strudel/webaudio');
+  vi.resetModules();
 });
 
 describe('the switch', () => {

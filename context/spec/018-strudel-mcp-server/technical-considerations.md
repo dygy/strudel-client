@@ -44,7 +44,7 @@ Three new parts, and one protective change to the existing app:
 - **No Prettier, and no formatting tool at all** (owner's decision, also not in the helper). `formatEngine.ts` is untouched.
 - **No MCP SDK or zod in the Worker.** A small hand-written JSON-RPC handler with static tool definitions (plain JSON Schema, a small validator), so no per-request server setup.
 - **No `supabase-js` in the Worker.** Plain `fetch`.
-- **`check_code` online is capped at 768 bytes**, measured: the first check in a new isolate takes 9.6 ms at worst there and 10.8 ms at 1 KB, on a laptop. Remeasure on workerd before raising it. Larger code gets a `use_local_helper` answer.
+- **`check_code` online is capped at 512 bytes**, measured: the first check in a new isolate takes 9.6 ms at worst there and 10.8 ms at 1 KB, on a laptop. Remeasure on workerd before raising it. Larger code gets a `use_local_helper` answer.
 - **Lists are paged at 50 and leave out `code`**, so a page stays cheap to parse.
 - **A CPU budget test:** each tool's handler is timed in a test against a fixture on the slowest case, and the spike measures real `cpuTime` in Workers observability. If a tool can't stay within budget, it moves to the helper and the spec is amended.
 
@@ -67,7 +67,7 @@ Free-plan quota: 100,000 Worker requests per day across the account, with an MCP
 | Library, read | `list_folders`, `search_tracks`, `get_track` |
 | Library, write | `create_track`, `update_track`, `move_track`, `create_folder`, `rename_folder`, `move_folder`, `set_track_steps` |
 | Library, destructive | `delete_track`, `delete_step`, `delete_empty_folder` |
-| Knowledge | `lookup_function`, `search_functions`, `list_sounds`, `check_code` (up to 768 bytes) |
+| Knowledge | `lookup_function`, `search_functions`, `list_sounds`, `check_code` (up to 512 bytes) |
 | Live | `list_tabs`, `play`, `stop`, `update_code`, `open_track` |
 | Local helper | `run_pattern`, `summarize_pattern`, `check_code` (any size) |
 
@@ -128,6 +128,7 @@ This is the highest-risk part. It touches strict autosave, `globalSaveManager` a
 - **Socket:** `GET /mcp/tab`, authenticated at the upgrade, before any Durable Object wakes. The Origin must be the site, because browsers don't apply CORS to WebSockets. The token comes from the `sb-access-token` cookie the browser already sends same-origin, checked as in §2.3 but as a web session: a token with a `client_id` is refused, so an assistant can't pose as a tab. Refused with 401 otherwise. The Worker passes the verified user id to the object in a header it sets itself, and the URL carries neither the user nor the token. The relay trusts a socket until its token expires, plus a minute: on a refresh the tab re-sends the new token over the socket, and a refused one closes it. An expired cookie on reconnect can't loop: the client backs off, and brings the session up to date through the browser client, the only refresh owner, before each try.
 - **Commands:** a tool call → relay → tab → ack with a result, 5 s timeout (10 s for play). Ids are random per socket. Refusal codes: `no_tab`, `ambiguous_tab`, `transition_in_progress`, `conflict_open`, `save_failed`.
 - **Browser:** `website/src/repl/assistantControl/{client,handlers}.ts`, with `AllowAssistantSwitch.tsx` and an indicator in `Header.tsx` and `compact/CompactTitleBar`. The switch state is in-memory only, so a reload resets it. The socket exists only while it's on, so tabs that never use this pay nothing.
+- **Every command names what it means:** `update_code` requires a `trackId` and is refused with `track_changed` if that isn't what's open. One check (switch on, no switch or transition under way, no conflict, the right track) runs again after every wait. A save on an assistant's behalf names the track. `update_code` only evaluates on the track being heard; only `play` changes what's heard. Headphone preview is left alone. `trackSwitch.busy` plus the transition controller's `busy` is the one answer to "is the music changing", from Update on, for every transition type.
 - **Handlers call the same functions as the user's buttons** (`useReplContext`, `trackSwitch.ts`, `transitionPhase.ts`). Editor changes go through a CodeMirror transaction so Undo works, after `globalSaveManager` has saved.
 
 ### 2.8 Audio graph

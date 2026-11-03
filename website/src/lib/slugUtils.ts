@@ -38,10 +38,12 @@ function decodeSegment(segment: string): string {
 export function folderPathToSlug(folderPath: string | null | undefined): string {
   if (!folderPath) return '';
 
+  // Blank parts of a path mean nothing. A folder whose name has no letters or digits is still a folder:
+  // dropped from the address, its tracks would look like the top level's, and wouldn't open.
   return folderPath
     .split('/')
+    .filter((segment) => segment.trim())
     .map((segment) => trackNameToSlug(segment))
-    .filter((segment) => segment && segment !== 'untitled')
     .join('/');
 }
 

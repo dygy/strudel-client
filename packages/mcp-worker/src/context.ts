@@ -38,7 +38,14 @@ export type ErrorCode =
   | 'save_failed'
   | 'no_track_open'
   | 'tab_timeout'
-  | 'code_error';
+  | 'code_error'
+  | 'track_changed'
+  | 'control_off'
+  | 'ignored'
+  | 'open_failed'
+  | 'library_unavailable'
+  | 'rollback_incomplete'
+  | 'steps_would_be_removed';
 
 export const ok = (structuredContent: Record<string, unknown>): ToolResult => ({
   content: [{ type: 'text', text: JSON.stringify(structuredContent) }],
@@ -120,6 +127,13 @@ export async function siteCall(
 export function refusal(what: 'Track' | 'Folder', { status, data }: { status: number; data: Record<string, unknown> }) {
   const said = typeof data.error === 'string' ? data.error : undefined;
   if (status === 401) return reconnect();
+  if (data.code === 'rollback_incomplete') {
+    return fail(
+      'rollback_incomplete',
+      'This failed partway and could not be fully undone, so some folder paths may be half moved.',
+      'Read the folders and tracks to see where things are, and tell the user. Do not retry blindly.',
+    );
+  }
   if (status === 404) return fail('not_found', `${what} not found`);
   if (status === 409 && data.code === 'version_conflict') {
     return fail(

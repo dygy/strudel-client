@@ -2,7 +2,7 @@
  * @spec: 018-strudel-mcp-server (tech 2.2)
  * The HTTP side of stateless Streamable HTTP: POST /mcp only, JSON replies, 202 for notifications.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { assistantToken, MCP_URL, ORIGIN, post, rpcBody, withToken, worker } from './helpers';
 
 const auth = () => withToken(assistantToken());
@@ -123,5 +123,28 @@ describe('headers', () => {
     const own = { ...auth(), origin: ORIGIN };
     expect((await worker().fetch(MCP_URL, post(rpcBody('ping'), own))).status).toBe(200);
     expect((await worker().fetch(MCP_URL, post(rpcBody('ping'), auth()))).status).toBe(200);
+  });
+});
+
+describe('the limit by address, before any token is looked at', () => {
+  const forged = post(rpcBody('ping'), withToken(assistantToken(), { 'cf-connecting-ip': '192.0.2.1' }));
+
+  it('refuses over the limit without reaching Supabase, so a forged token costs nothing', async () => {
+    const asked: string[] = [];
+    const w = worker(undefined, {}, { isIpRateLimited: async (address) => (asked.push(address), true) });
+    const response = await w.fetch(MCP_URL, forged);
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('60');
+    expect(asked).toEqual(['192.0.2.1']);
+    expect(w.upstreamCalls).toEqual([]);
+  });
+
+  it('stays open when the limiter fails, or there is no address', async () => {
+    const failing = worker(undefined, {}, { isIpRateLimited: () => Promise.reject(new Error('down')) });
+    expect((await failing.fetch(MCP_URL, forged)).status).toBe(200);
+    const asked = vi.fn(async () => true);
+    const none = worker(undefined, {}, { isIpRateLimited: asked });
+    expect((await none.fetch(MCP_URL, post(rpcBody('ping'), withToken(assistantToken())))).status).toBe(200);
+    expect(asked).not.toHaveBeenCalled();
   });
 });

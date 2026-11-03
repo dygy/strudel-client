@@ -159,7 +159,7 @@ const FIXTURES: Array<{
   { name: 'list_tabs', args: {}, relay: { ok: true, tabs: Array.from({ length: 8 }, () => TAB) } },
   { name: 'play', args: {}, relay: { ok: true, result: TAB } },
   { name: 'stop', args: {}, relay: { ok: true, result: TAB } },
-  { name: 'update_code', args: { code: LARGE_CODE }, relay: { ok: true, result: TAB } },
+  { name: 'update_code', args: { code: LARGE_CODE, trackId: 't' }, relay: { ok: true, result: TAB } },
   { name: 'open_track', args: { trackId: 't' }, relay: { ok: true, result: TAB } },
 ];
 
@@ -231,6 +231,7 @@ async function fastestRelayRun() {
 
 describe('the CPU budget', () => {
   it('the relay passing the largest code to a tab stays inside 10 ms', async () => {
+    vi.stubGlobal('crypto', webcrypto);
     const ms = await fastestRelayRun();
     if (process.env.MCP_BUDGET_PRINT) process.stdout.write(`BUDGET relay ${ms.toFixed(2)} ms\n`);
     expect(ms).toBeLessThan(CPU_LIMIT_MS);

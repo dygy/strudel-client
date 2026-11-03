@@ -114,7 +114,7 @@ The rule on kept text older than 30 days: `conflict` > "after 30 days an only co
 | A syntax mistake: line and column | test | `know` > "finds a syntax mistake, with line and column" | |
 | Unbalanced brackets in mini-notation: that string's line and column | test | `know` > "places a mini-notation mistake on the line of the string" | |
 | `.lowpas(`: warned, and `.lpf` suggested | test | `know` > "sends .%s( to the real name, %s" | |
-| Over 768 bytes online: told to use the helper, and how to install it | test + prod | `know` > "takes code of exactly the limit, and answers one byte more with use_local_helper" | Prod only: the command works once the package is published, its own approved step |
+| Over 512 bytes online: told to use the helper, and how to install it | test + prod | `know` > "takes code of exactly the limit, and answers one byte more with use_local_helper" | Prod only: the command works once the package is published, its own approved step |
 
 ## 2.8 Controlling an open tab
 
