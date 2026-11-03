@@ -6,6 +6,7 @@ import type { AssistantIdentity } from './auth';
 import { fail, ok, ToolFailure, unavailable, type ToolContext, type ToolResult } from './context';
 import { CHECK_MAX_BYTES, checkCodeTool, listSounds, lookupFunction, searchFunctions } from './knowledge';
 import { getTrack, listFolders, searchTracks } from './library';
+import { listTabs, openTrack, play, stop, updateCode } from './tabTools';
 import { firstProblem, type Schema } from './validate';
 import {
   createFolder,
@@ -65,6 +66,23 @@ interface Tool {
   annotations: typeof READ;
   run: (ctx: ToolContext, args: never) => Promise<ToolResult> | ToolResult;
 }
+
+const tabId = {
+  type: 'string',
+  maxLength: 64,
+  description: 'Which tab, from list_tabs. Needed only when more than one tab allows control.',
+} as const;
+const tabState = output(
+  {
+    tabId: str,
+    track: { type: ['object', 'null'], properties: { id: str, name: str } },
+    playing: { type: 'boolean' },
+    cps: { type: ['number', 'null'] },
+    transition: { type: 'string', enum: ['idle', 'waiting', 'running'] },
+    changedElsewhere: { type: 'boolean' },
+  },
+  ['track', 'playing', 'cps', 'transition', 'changedElsewhere'],
+);
 
 const ALL: Tool[] = [
   {
@@ -330,6 +348,55 @@ const ALL: Tool[] = [
     }),
     annotations: READ,
     run: (_ctx, args) => checkCodeTool(args),
+  },
+  {
+    name: 'list_tabs',
+    title: 'List open tabs',
+    description:
+      'The tabs where the user has switched on Allow assistant control, and what each is doing: track, playing or stopped, tempo. No tab means the switch is off everywhere, and only the user can turn it on.',
+    inputSchema: input({}),
+    outputSchema: output({ tabs: { type: 'array', items: tabState } }),
+    annotations: READ,
+    run: listTabs,
+  },
+  {
+    name: 'play',
+    title: 'Play in a tab',
+    description:
+      "Starts the track open in the tab. If another track is playing, this switches to it using the transition selected in the tab. Makes sound on the user's speakers.",
+    inputSchema: input({ tabId }),
+    outputSchema: tabState,
+    annotations: WRITE,
+    run: play,
+  },
+  {
+    name: 'stop',
+    title: 'Stop a tab',
+    description: 'Stops the music in the tab, the same as the user pressing Stop.',
+    inputSchema: input({ tabId }),
+    outputSchema: tabState,
+    annotations: { ...WRITE, idempotentHint: true },
+    run: stop,
+  },
+  {
+    name: 'update_code',
+    title: 'Update the code in a tab',
+    description:
+      "Replaces the code in the tab's editor. Anything the user typed is saved first, Undo brings it back, and if that save fails this is refused. If the track is playing, the new code is heard with no gap or fade. A mistake in the code leaves the music playing and comes back as code_error, with the line where known. It reaches the library by autosave, as typing does.",
+    inputSchema: input({ code: { type: 'string' }, tabId }, ['code']),
+    outputSchema: tabState,
+    annotations: WRITE,
+    run: updateCode,
+  },
+  {
+    name: 'open_track',
+    title: 'Open a track in a tab',
+    description:
+      "Opens a track in the tab's editor. What's playing carries on until play is called, which then uses the transition selected in the tab. Anything the user typed is saved first.",
+    inputSchema: input({ trackId: id, tabId }, ['trackId']),
+    outputSchema: tabState,
+    annotations: WRITE,
+    run: openTrack,
   },
 ];
 

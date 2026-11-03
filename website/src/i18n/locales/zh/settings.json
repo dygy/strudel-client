@@ -170,7 +170,6 @@
   "equalizerPresetTrebleReducer": "高音减弱",
   "equalizerPresetVocal": "人声增强",
   "connectedAssistants": {
-    "earlyNote": "抢先体验：目前，助手只能确认已连接。",
     "copy": "复制",
     "copied": "已复制",
     "copyRefused": "浏览器拒绝访问剪贴板。文本已选中，可以手动复制。",
@@ -193,6 +192,27 @@
     "disconnectFailed": "无法断开连接。请重试。",
     "retry": "重试",
     "unnamed": "未命名的助手",
-    "help": "断开连接会立即终止通过 Strudel 的访问。助手保留的访问密钥副本在最多一小时内仍可直接访问你的数据。"
+    "help": "断开连接会立即终止通过 Strudel 的访问。助手保留的访问密钥副本在最多一小时内仍可直接访问你的数据。",
+    "setupGuide": "设置指南"
+  },
+  "assistantControl": {
+    "allow": "允许助手控制",
+    "help": "让已连接的助手在此标签页中播放、停止和更改音乐。重新加载或关闭标签页，或退出登录时会关闭。",
+    "indicator": "助手控制已开启",
+    "off": "关闭",
+    "turnOff": "关闭助手控制",
+    "onLabel": "已开启",
+    "messages": {
+      "played": "助手：正在播放",
+      "alreadyPlaying": "助手：已在播放",
+      "stopped": "助手：已停止",
+      "updated": "助手：代码已更新。撤销可恢复您的文本。",
+      "opened": "助手：已打开 {{name}}",
+      "codeError": "助手：该代码有错误。音乐继续播放。",
+      "refusedTransition": "助手：已拒绝，正在进行过渡",
+      "refusedConflict": "助手：已拒绝，请先选择要保留的版本",
+      "refusedSave": "助手：已拒绝，无法保存您的文本",
+      "refusedNoTrack": "助手：已拒绝，没有打开的音轨"
+    }
   }
 }

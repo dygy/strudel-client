@@ -64,3 +64,13 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: website
           command: deploy
+
+      # The data in the repo can lag the code; doc.json is left by the site build above.
+      - run: node packages/mcp-worker/scripts/build-knowledge.mjs
+
+      # After the site: this Worker's service binding needs strudel-client to exist.
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: packages/mcp-worker
+          command: deploy

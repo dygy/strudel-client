@@ -170,7 +170,6 @@
   "equalizerPresetTrebleReducer": "Reducción de agudos",
   "equalizerPresetVocal": "Refuerzo vocal",
   "connectedAssistants": {
-    "earlyNote": "Acceso anticipado: por ahora, un asistente solo puede confirmar que está conectado.",
     "copy": "Copiar",
     "copied": "Copiado",
     "copyRefused": "Tu navegador rechazó el acceso al portapapeles. El texto está seleccionado para que lo copies a mano.",
@@ -193,6 +192,27 @@
     "disconnectFailed": "No se pudo desconectar. Inténtalo de nuevo.",
     "retry": "Reintentar",
     "unnamed": "Un asistente sin nombre",
-    "help": "Desconectar termina al instante el acceso a través de Strudel. Una copia de su clave de acceso que el asistente haya guardado aún puede llegar a tus datos directamente durante un máximo de una hora."
+    "help": "Desconectar termina al instante el acceso a través de Strudel. Una copia de su clave de acceso que el asistente haya guardado aún puede llegar a tus datos directamente durante un máximo de una hora.",
+    "setupGuide": "Guía de configuración"
+  },
+  "assistantControl": {
+    "allow": "Permitir el control del asistente",
+    "help": "Permite que un asistente conectado reproduzca, detenga y cambie la música en esta pestaña. Se desactiva al recargar o cerrar la pestaña, o al cerrar sesión.",
+    "indicator": "Control del asistente activo",
+    "off": "Desactivar",
+    "turnOff": "Desactivar el control del asistente",
+    "onLabel": "Activo",
+    "messages": {
+      "played": "Asistente: reproduciendo",
+      "alreadyPlaying": "Asistente: ya se está reproduciendo",
+      "stopped": "Asistente: detenido",
+      "updated": "Asistente: código actualizado. Deshacer recupera tu texto.",
+      "opened": "Asistente: abrió {{name}}",
+      "codeError": "Asistente: ese código tiene un error. La música continúa.",
+      "refusedTransition": "Asistente: rechazado, hay una transición en curso",
+      "refusedConflict": "Asistente: rechazado hasta que elijas qué versión conservar",
+      "refusedSave": "Asistente: rechazado, no se pudo guardar tu texto",
+      "refusedNoTrack": "Asistente: rechazado, no hay ninguna pista abierta"
+    }
   }
 }

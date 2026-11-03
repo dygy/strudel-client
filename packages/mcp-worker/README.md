@@ -14,15 +14,6 @@ npx wrangler deploy --dry-run --outdir dist        # bundle size, deploys nothin
 
 Point it at a fake auth server with `--var PUBLIC_SUPABASE_URL:http://localhost:<port>`.
 
-The WebSocket spike at `/mcp/tab` requires an `Origin` equal to the server's own origin:
-
-```js
-// In the browser console on https://strudel.dygy.app
-const ws = new WebSocket('wss://strudel.dygy.app/mcp/tab');
-ws.onmessage = (e) => console.log('echo:', e.data);
-ws.onopen = () => ws.send('hello');
-```
-
 ## Tools and what they read
 
 Reads go to Supabase REST with the assistant's own token, so RLS applies. Writes go over the `SITE` service binding to the site's own routes, so its naming and path rules stay in one place. No service-role key anywhere.
@@ -45,6 +36,12 @@ The sound list comes from `website/public/*.json`, the inline lists in `website/
 | Worst of 9 runs, ms | 9.1 | 9.6 | 10.8 | 16.6 | 19.7 |
 
 Once an isolate has checked something, 8 KB takes 2 to 5 ms, with occasional spikes to about 12 ms. So raising the limit is a question of how the Workers platform treats a cold isolate, and of how its CPUs compare: these figures are from a Mac, not workerd. Measure with `scripts/cpu-time.mjs` on the deployed Worker before changing it.
+
+## Live control of a tab
+
+A tab with **Allow assistant control** on holds a WebSocket to `GET /mcp/tab?u=<user id>`, on the site's own origin. The `u` only picks the user's `TabRelay`. It proves nothing: the first message is the access token, and a socket that hasn't sent a valid web-session token of that same user is never told or asked anything. An assistant's token is refused. Tokens never go in the URL.
+
+Heartbeats are `ping` and `pong`, answered without waking the object. A command waits 5 s for its answer (10 s for `play`). The relay passes a command's arguments on as text, without parsing them.
 
 ## Reading CPU time per handler
 

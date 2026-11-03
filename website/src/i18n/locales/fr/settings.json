@@ -170,7 +170,6 @@
   "equalizerPresetTrebleReducer": "Réduction des aigus",
   "equalizerPresetVocal": "Amplification vocale",
   "connectedAssistants": {
-    "earlyNote": "Accès anticipé : pour l'instant, un assistant peut seulement confirmer qu'il est connecté.",
     "copy": "Copier",
     "copied": "Copié",
     "copyRefused": "Votre navigateur a refusé l'accès au presse-papiers. Le texte est sélectionné pour que vous le copiiez à la main.",
@@ -193,6 +192,27 @@
     "disconnectFailed": "Impossible de déconnecter. Veuillez réessayer.",
     "retry": "Réessayer",
     "unnamed": "Un assistant sans nom",
-    "help": "Déconnecter met fin immédiatement à l'accès via Strudel. Une copie de sa clé d'accès conservée par l'assistant peut encore atteindre directement vos données pendant une heure au maximum."
+    "help": "Déconnecter met fin immédiatement à l'accès via Strudel. Une copie de sa clé d'accès conservée par l'assistant peut encore atteindre directement vos données pendant une heure au maximum.",
+    "setupGuide": "Guide de configuration"
+  },
+  "assistantControl": {
+    "allow": "Autoriser le contrôle par l'assistant",
+    "help": "Permet à un assistant connecté de lancer, d'arrêter et de modifier la musique dans cet onglet. Se désactive quand vous rechargez ou fermez l'onglet, ou quand vous vous déconnectez.",
+    "indicator": "Contrôle par l'assistant activé",
+    "off": "Désactiver",
+    "turnOff": "Désactiver le contrôle par l'assistant",
+    "onLabel": "Activé",
+    "messages": {
+      "played": "Assistant : lecture en cours",
+      "alreadyPlaying": "Assistant : déjà en lecture",
+      "stopped": "Assistant : arrêté",
+      "updated": "Assistant : code mis à jour. Annuler rétablit votre texte.",
+      "opened": "Assistant : {{name}} ouvert",
+      "codeError": "Assistant : ce code contient une erreur. La musique continue.",
+      "refusedTransition": "Assistant : refusé, une transition est en cours",
+      "refusedConflict": "Assistant : refusé tant que vous n'avez pas choisi la version à garder",
+      "refusedSave": "Assistant : refusé, votre texte n'a pas pu être enregistré",
+      "refusedNoTrack": "Assistant : refusé, aucune piste n'est ouverte"
+    }
   }
 }

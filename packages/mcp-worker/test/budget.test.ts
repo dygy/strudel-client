@@ -8,6 +8,7 @@
 import { webcrypto } from 'node:crypto';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { CHECK_MAX_BYTES } from '../src/knowledge';
+import { TabRelay } from '../src/tabRelay';
 import { assistantToken, MCP_URL, post, rpcBody, USER, withToken, worker } from './helpers';
 
 const CODE = 's("bd [sd cp]*2").lpf(200).room(0.5) // '.padEnd(4096, 'x');
@@ -78,6 +79,15 @@ const answers = {
   large: JSON.stringify([largeRow]),
 };
 
+const TAB = {
+  tabId: 'tab',
+  track: { id: 't', name: 'Song' },
+  playing: true,
+  cps: 0.5,
+  transition: 'idle',
+  changedElsewhere: false,
+};
+
 /** What each tool's slowest case reads, and how the route answers it. */
 const FIXTURES: Array<{
   name: string;
@@ -85,6 +95,7 @@ const FIXTURES: Array<{
   tracks?: string;
   folders?: string;
   site?: Record<string, unknown>;
+  relay?: Record<string, unknown>;
 }> = [
   { name: 'whoami', args: {} },
   { name: 'list_folders', args: {}, folders: JSON.stringify(Array.from({ length: 51 }, (_, i) => folderRow(i))) },
@@ -145,19 +156,29 @@ const FIXTURES: Array<{
   { name: 'search_functions', args: { query: 'a' } },
   { name: 'list_sounds', args: {} },
   { name: 'check_code', args: { code: WORST_CHECK } },
+  { name: 'list_tabs', args: {}, relay: { ok: true, tabs: Array.from({ length: 8 }, () => TAB) } },
+  { name: 'play', args: {}, relay: { ok: true, result: TAB } },
+  { name: 'stop', args: {}, relay: { ok: true, result: TAB } },
+  { name: 'update_code', args: { code: LARGE_CODE }, relay: { ok: true, result: TAB } },
+  { name: 'open_track', args: { trackId: 't' }, relay: { ok: true, result: TAB } },
 ];
 
 const RUNS = 7;
 const CPU_LIMIT_MS = 10;
 const token = assistantToken();
 
-async function fastestRun({ name, args, tracks, folders, site }: (typeof FIXTURES)[number]) {
+async function fastestRun({ name, args, tracks, folders, site, relay }: (typeof FIXTURES)[number]) {
   const w = worker(
     (url) => {
       if (url.includes('/auth/v1/user')) return new Response(JSON.stringify(USER));
       return new Response(url.includes('/rest/v1/folders') ? (folders ?? '[]') : (tracks ?? '[]'));
     },
-    {},
+    {
+      TAB_RELAY: {
+        idFromName: (user: string) => user,
+        get: () => ({ fetch: async () => new Response(JSON.stringify(relay ?? {})) }),
+      } as never,
+    },
     { site: async () => new Response(JSON.stringify(site ?? {}), { status: 200 }) },
   );
   const init = post(rpcBody('tools/call', { name, arguments: args }), withToken(token));
@@ -175,7 +196,46 @@ beforeAll(() => {
   vi.stubGlobal('crypto', webcrypto);
 });
 
+/** The relay's own part of `update_code`, with a tab that answers at once, on the largest code. */
+async function fastestRelayRun() {
+  const socket = {
+    attachment: { userId: USER.id, tabId: 'tab', connectedAt: 0, expiresAt: Date.now() + 3_600_000 },
+    deserializeAttachment() {
+      return this.attachment;
+    },
+    send(raw: string) {
+      // The frame goes out as text, so the tab's answer is the only thing parsed here.
+      const id = raw.slice(raw.indexOf('"id":"') + 6, raw.indexOf('","command"'));
+      void relay.webSocketMessage(
+        socket as never,
+        JSON.stringify({ type: 'ack', id, answer: { ok: true, result: TAB } }),
+      );
+    },
+  };
+  const state = { getWebSockets: () => [socket] } as never;
+  const relay = new TabRelay(state, {} as never, (async () => new Response()) as never);
+  const body = JSON.stringify({ code: LARGE_CODE });
+  let best = Infinity;
+  for (let i = 0; i < RUNS; i++) {
+    const request = new Request('https://relay/command', {
+      method: 'POST',
+      headers: { 'x-command': 'update_code', 'x-timeout-ms': '5000' },
+      body,
+    });
+    const started = performance.now();
+    await (await relay.fetch(request)).text();
+    best = Math.min(best, performance.now() - started);
+  }
+  return best;
+}
+
 describe('the CPU budget', () => {
+  it('the relay passing the largest code to a tab stays inside 10 ms', async () => {
+    const ms = await fastestRelayRun();
+    if (process.env.MCP_BUDGET_PRINT) process.stdout.write(`BUDGET relay ${ms.toFixed(2)} ms\n`);
+    expect(ms).toBeLessThan(CPU_LIMIT_MS);
+  });
+
   it.each(FIXTURES.map((fixture) => [fixture.name, fixture] as const))(
     '%s stays inside 10 ms',
     async (name, fixture) => {

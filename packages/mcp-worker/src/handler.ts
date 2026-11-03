@@ -156,14 +156,26 @@ async function mcpPost(request: Request, env: Env, deps: Deps, origin: string, s
  * The WebSocket spike (spec task slice 1): the Origin check is the one part of the final relay
  * that's here already, because browsers don't apply CORS to WebSockets.
  */
+const USER_ID = /^[0-9a-f-]{36}$/i;
+
+/**
+ * A tab's socket. The relay is the user's, so the address says which user this claims to be. That
+ * isn't trusted: the socket counts for nothing until its first message proves it (tabRelay.ts). The
+ * token never goes in the URL. Browsers don't apply CORS to WebSockets, so the Origin is checked here.
+ */
 function tabSocket(request: Request, env: Env, origin: string): Promise<Response> | Response {
-  if (env.TAB_ECHO_ENABLED !== '1') return refusal(404, 'Not found');
   if (request.method !== 'GET') return refusal(405, 'Method not allowed', { allow: 'GET' });
   if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
     return refusal(426, 'Expected a WebSocket', { upgrade: 'websocket' });
   }
   if (request.headers.get('origin') !== origin) return refusal(403, 'Origin not allowed');
-  return env.TAB_RELAY.get(env.TAB_RELAY.idFromName('spike')).fetch(request);
+  const userId = new URL(request.url).searchParams.get('u') ?? '';
+  if (!USER_ID.test(userId)) return refusal(400, 'Bad request');
+  return env.TAB_RELAY.get(env.TAB_RELAY.idFromName(userId.toLowerCase())).fetch(
+    new Request('https://relay/connect', {
+      headers: { upgrade: 'websocket', 'x-tab-user': userId.toLowerCase() },
+    }),
+  );
 }
 
 export async function handleRequest(request: Request, env: Env, deps: Deps): Promise<Response> {

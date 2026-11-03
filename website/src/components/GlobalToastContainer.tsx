@@ -90,7 +90,7 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
   return (
     <div
       className={`
-        transform transition-all duration-300 ease-in-out mb-2
+        transition-all duration-300 ease-in-out mb-2
         ${isVisible && !isLeaving ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}
       `}
       onMouseEnter={() => setIsPaused(true)}

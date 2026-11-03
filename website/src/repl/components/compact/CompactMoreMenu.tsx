@@ -1,8 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { EyeIcon, MicrophoneIcon, ShareIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, MicrophoneIcon, ShareIcon, SparklesIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
+import { useStore } from '@nanostores/react';
 import cx from '@src/cx';
 import { useTranslation } from '@src/i18n';
 import { AuthButton } from '../../../components/auth/AuthButton';
+import { turnOn } from '../../assistantControl/AllowAssistantSwitch';
+import { assistantControlAvailable, assistantControlOn, setAssistantControl } from '../../assistantControl/store';
 import { formatElapsedTime } from '../../recording/formatUtils';
 import {
   isAudioRecordDisabled,
@@ -50,7 +53,7 @@ function MenuItem({
       {...data}
     >
       {icon}
-      <span className="flex-1 min-w-0 truncate">{label}</span>
+      <span className="flex-1 min-w-0 leading-tight">{label}</span>
       {trailing}
     </button>
   );
@@ -73,6 +76,9 @@ export function CompactMoreMenu({
   anchorRef: React.RefObject<HTMLElement | null>;
 }) {
   const { t } = useTranslation('common');
+  const { t: tSettings } = useTranslation('settings');
+  const assistantOn = useStore(assistantControlOn);
+  const assistantAvailable = useStore(assistantControlAvailable);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -144,6 +150,24 @@ export function CompactMoreMenu({
           }}
           icon={<EyeIcon className={cx('w-5 h-5', context.isPreviewing ? 'text-blue-400' : 'opacity-70')} />}
           label={context.isPreviewing ? t('stopPreview') : t('preview')}
+        />
+      )}
+      {assistantAvailable && (
+        <MenuItem
+          data-more-assistant-control=""
+          onClick={() => {
+            if (assistantOn) setAssistantControl(false);
+            else turnOn();
+            onClose();
+          }}
+          active={assistantOn}
+          icon={
+            <SparklesIcon className={cx('w-5 h-5', assistantOn ? 'text-green-400' : 'text-foreground opacity-70')} />
+          }
+          label={tSettings('assistantControl.allow')}
+          trailing={
+            assistantOn && <span className="text-xs text-green-400">{tSettings('assistantControl.onLabel')}</span>
+          }
         />
       )}
       <MenuItem

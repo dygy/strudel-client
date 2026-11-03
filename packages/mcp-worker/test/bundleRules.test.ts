@@ -68,6 +68,31 @@ describe('the Worker bundle', () => {
   });
 });
 
+describe('the deploy workflow', () => {
+  const workflow = readFileSync(resolve(ROOT, '../../.github/workflows/deploy.yml'), 'utf8');
+  const deployJob = workflow.slice(workflow.indexOf('  deploy:'));
+  const steps = deployJob.split(/\n {6}- /);
+  const indexOf = (text: string) => steps.findIndex((step) => step.includes(text));
+
+  it('deploys strudel-mcp after strudel-client, which its service binding needs', () => {
+    const site = indexOf('workingDirectory: website');
+    const mcp = indexOf('workingDirectory: packages/mcp-worker');
+    expect(site).toBeGreaterThan(0);
+    expect(mcp).toBeGreaterThan(site);
+    expect(steps[mcp]).toContain('command: deploy');
+  });
+
+  it('builds the knowledge data from this commit first, using the doc.json the site build made', () => {
+    expect(indexOf('pnpm run build:cloudflare')).toBeLessThan(indexOf('build-knowledge.mjs'));
+    expect(indexOf('build-knowledge.mjs')).toBeLessThan(indexOf('workingDirectory: packages/mcp-worker'));
+  });
+
+  it('deploys only after the checks, with the same token', () => {
+    expect(deployJob).toContain('needs: check');
+    expect(steps[indexOf('workingDirectory: packages/mcp-worker')]).toContain('secrets.CLOUDFLARE_API_TOKEN');
+  });
+});
+
 describe('wrangler.jsonc', () => {
   it('is the strudel-mcp Worker on the two path routes, with no custom domain', () => {
     expect(wrangler.name).toBe('strudel-mcp');

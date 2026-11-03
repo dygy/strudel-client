@@ -3,6 +3,7 @@ import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import cx from '@src/cx';
 import { useTranslation } from '@src/i18n';
 import { formatElapsedTime } from '../../recording/formatUtils';
+import { AssistantControlIndicator } from '../../assistantControl/AllowAssistantSwitch';
 import { activeRecordingSeconds, isAnyRecording } from '../recordActions';
 import { CompactMoreMenu, type MoreMenuContext } from './CompactMoreMenu';
 
@@ -53,6 +54,7 @@ export function CompactTitleBar({ context, trackName }: { context: TitleBarConte
             {formatElapsedTime(activeRecordingSeconds(context))}
           </span>
         )}
+        <AssistantControlIndicator compact />
         <div className="relative">
           <button
             ref={moreRef}

@@ -9,6 +9,8 @@ import { createOAuthServerApi, type OAuthGrant, type OAuthServerApi } from '@src
 import { supabase } from '@src/lib/supabase';
 import { usePanelViewport } from './panelViewport';
 
+const { BASE_URL } = import.meta.env;
+export const SETUP_PAGE = `${BASE_URL.endsWith('/') ? BASE_URL : `${BASE_URL}/`}learn/ai-assistants`;
 export const MCP_ADDRESS = 'https://strudel.dygy.app/mcp';
 export const CLAUDE_CODE_COMMAND = `claude mcp add --transport http strudel ${MCP_ADDRESS}`;
 export const HELPER_COMMAND = 'claude mcp add strudel-local -- npx -y strudel_mcp';
@@ -84,6 +86,15 @@ function ConnectSteps() {
         </p>
       </div>
       <CopyLine text={CLAUDE_CODE_COMMAND} label={t('connectedAssistants.claudeCodeTitle')} />
+      <a
+        href={SETUP_PAGE}
+        target="_blank"
+        rel="noreferrer"
+        data-testid="assistants-setup-link"
+        className="inline-block text-sm text-foreground underline min-h-11 sm:min-h-0 leading-[2.75rem] sm:leading-normal"
+      >
+        {t('connectedAssistants.setupGuide')}
+      </a>
       {HELPER_PUBLISHED && (
         <>
           <CopyLine text={HELPER_COMMAND} label={t('connectedAssistants.helperTitle')} />
@@ -184,7 +195,6 @@ export function ConnectedAssistants({ api: injected }: { api?: OAuthServerApi })
 
   return (
     <div data-testid="connected-assistants" className="space-y-3">
-      <p className="text-xs text-foreground opacity-80 leading-relaxed">{t('connectedAssistants.earlyNote')}</p>
       {list.status === 'loading' && (
         <p className="text-sm text-foreground opacity-70">{t('connectedAssistants.loading')}</p>
       )}

@@ -80,6 +80,7 @@ export const SIDEBAR: Sidebar = {
       { text: 'Mini-Notation', link: 'learn/mini-notation' },
       { text: 'Visual Feedback', link: 'learn/visual-feedback' },
       { text: 'Offline', link: 'learn/pwa' },
+      { text: 'AI Assistants', link: 'learn/ai-assistants' },
       { text: 'Patterns', link: 'technical-manual/patterns' },
       { text: 'Mondo Notation', link: 'learn/mondo-notation' },
       { text: 'Music metadata', link: 'learn/metadata' },

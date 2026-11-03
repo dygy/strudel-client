@@ -170,7 +170,6 @@
   "equalizerPresetTrebleReducer": "고음 감소",
   "equalizerPresetVocal": "보컬 부스트",
   "connectedAssistants": {
-    "earlyNote": "미리 보기: 현재 어시스턴트는 연결 여부만 확인할 수 있습니다.",
     "copy": "복사",
     "copied": "복사됨",
     "copyRefused": "브라우저가 클립보드 접근을 거부했습니다. 텍스트가 선택되어 있으니 직접 복사하세요.",
@@ -193,6 +192,27 @@
     "disconnectFailed": "연결을 해제할 수 없습니다. 다시 시도해 주세요.",
     "retry": "다시 시도",
     "unnamed": "이름 없는 어시스턴트",
-    "help": "연결을 해제하면 Strudel을 통한 접근이 즉시 끝납니다. 어시스턴트가 보관한 접근 키 사본은 최대 1시간 동안 데이터에 직접 접근할 수 있습니다."
+    "help": "연결을 해제하면 Strudel을 통한 접근이 즉시 끝납니다. 어시스턴트가 보관한 접근 키 사본은 최대 1시간 동안 데이터에 직접 접근할 수 있습니다.",
+    "setupGuide": "설정 안내"
+  },
+  "assistantControl": {
+    "allow": "어시스턴트 제어 허용",
+    "help": "연결된 어시스턴트가 이 탭에서 음악을 재생, 정지, 변경할 수 있습니다. 탭을 새로 고치거나 닫거나 로그아웃하면 꺼집니다.",
+    "indicator": "어시스턴트 제어 켜짐",
+    "off": "끄기",
+    "turnOff": "어시스턴트 제어 끄기",
+    "onLabel": "켜짐",
+    "messages": {
+      "played": "어시스턴트: 재생 중",
+      "alreadyPlaying": "어시스턴트: 이미 재생 중",
+      "stopped": "어시스턴트: 정지됨",
+      "updated": "어시스턴트: 코드가 업데이트되었습니다. 실행 취소하면 내 텍스트로 돌아갑니다.",
+      "opened": "어시스턴트: {{name}} 열림",
+      "codeError": "어시스턴트: 코드에 오류가 있습니다. 음악은 계속됩니다.",
+      "refusedTransition": "어시스턴트: 거부됨, 전환이 진행 중입니다",
+      "refusedConflict": "어시스턴트: 유지할 버전을 선택할 때까지 거부됩니다",
+      "refusedSave": "어시스턴트: 거부됨, 내 텍스트를 저장하지 못했습니다",
+      "refusedNoTrack": "어시스턴트: 거부됨, 열린 트랙이 없습니다"
+    }
   }
 }

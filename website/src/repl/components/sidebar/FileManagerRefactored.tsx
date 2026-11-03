@@ -1,3 +1,4 @@
+import { registerTrackSelect } from '../../assistantControl/openTrack';
 import React from 'react';
 import { FileTree } from './FileTree';
 import { InfoModal } from '../ui/InfoModal';
@@ -135,6 +136,15 @@ export function FileManagerRefactored({
           readOnly,
         },
   );
+
+  // Spec 018: an assistant opens a track the same way as a press in this list.
+  const selectTrackRef = React.useRef(operations.handleTrackSelect);
+  selectTrackRef.current = operations.handleTrackSelect;
+  React.useEffect(() => {
+    if (readOnly) return undefined;
+    registerTrackSelect((track) => selectTrackRef.current(track as never));
+    return () => registerTrackSelect(null);
+  }, [readOnly]);
 
   // If no fileManagerHook (unauthenticated), show sign-in prompt
   if (!fileManagerState) {

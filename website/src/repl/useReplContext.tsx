@@ -99,6 +99,8 @@ interface ReplContext {
   previewEngine?: PreviewEngine | null;
   /** Switches the speakers between tracks with the selected transition type (spec 017). */
   transitionController?: TrackTransitionController | null;
+  /** Which track is in the editor and which is playing, as Update sees them. */
+  trackIds?: () => { editor: string | null; playing: string | null };
   /** The editor now holds track `id` without going through handleUpdate (e.g. same code already loaded). */
   setEditorTrackId?: (id: string | null | undefined) => void;
   replaceTrackId?: (oldId: string, newId: string) => void;
@@ -966,6 +968,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     previewEngine: mixer,
     transitionController: transitionControllerRef.current,
     setEditorTrackId: trackSwitch.setEditorTrack,
+    trackIds: () => ({ editor: trackSwitch.editorTrackId, playing: trackSwitch.playingTrackId }),
     replaceTrackId: trackSwitch.replaceTrackId,
     isRecording: audioRecorder.isRecording,
     recordingElapsedSeconds: audioRecorder.elapsedSeconds,

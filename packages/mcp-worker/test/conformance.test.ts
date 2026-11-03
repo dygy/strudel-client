@@ -69,7 +69,29 @@ const CASES: Record<string, { good: () => Record<string, unknown>; bad: Record<s
   lookup_function: { good: () => ({ name: 'lpf' }), bad: { name: 'zzzzzz' }, code: 'not_found' },
   search_functions: { good: () => ({ query: 'filter' }), bad: { query: '' }, code: 'invalid_arguments' },
   list_sounds: { good: () => ({ kind: 'synths' }), bad: { kind: 'none' }, code: 'invalid_arguments' },
+  list_tabs: { good: () => ({}), bad: { extra: 1 }, code: 'invalid_arguments' },
+  play: { good: () => ({}), bad: { tabId: 1 }, code: 'invalid_arguments' },
+  stop: { good: () => ({}), bad: { tabId: 1 }, code: 'invalid_arguments' },
+  update_code: { good: () => ({ code: 'ok' }), bad: { code: 'bad' }, code: 'code_error' },
+  open_track: { good: () => ({ trackId: 't' }), bad: { trackId: 'absent' }, code: 'not_found' },
   check_code: { good: () => ({ code: 's("bd [sd")' }), bad: { code: 'x'.repeat(9000) }, code: 'use_local_helper' },
+};
+
+const TAB_RESULT = { track: null, playing: true, cps: 0.5, transition: 'idle', changedElsewhere: false };
+const relay = {
+  idFromName: (name: string) => name,
+  get: () => ({
+    fetch: async (_url: string, init: { headers: Record<string, string>; body: string }) => {
+      const args = JSON.parse(init.body) as Record<string, unknown>;
+      if (init.headers['x-command'] === 'status') return Response.json({ ok: true, tabs: [TAB_RESULT] });
+      if (args.trackId === 'absent') return Response.json({ ok: false, code: 'not_found' });
+      if (args.code === 'bad')
+        return Response.json({ ok: false, code: 'code_error', error: { message: 'x', line: 1 } });
+      return args.tabId === undefined && init.headers['x-tab-id'] === 'none'
+        ? Response.json({ ok: false, code: 'no_tab' })
+        : Response.json({ ok: true, result: TAB_RESULT });
+    },
+  }),
 };
 
 const version = (id: string) => library.tracks.find((t) => t.id === id)!.updated_at;
@@ -81,7 +103,7 @@ beforeEach(async () => {
   library.addFolder({ id: 'empty', name: 'Empty' });
   library.addTrack({ id: 'plain', name: 'Plain', code: 'x' });
   library.addTrack({ id: 'multi', name: 'Multi', code: 'a', is_multitrack: true, steps: STEPS, active_step: 0 });
-  const w = worker(library.upstream, {}, { site: library.site });
+  const w = worker(library.upstream, { TAB_RELAY: relay as never }, { site: library.site });
   client = new Client({ name: 'conformance-test', version: '1.0.0' });
   await client.connect(
     new StreamableHTTPClientTransport(new URL(MCP_URL), {
@@ -136,6 +158,7 @@ describe('tools/list through the SDK', () => {
         'get_track',
         'list_folders',
         'list_sounds',
+        'list_tabs',
         'lookup_function',
         'search_functions',
         'search_tracks',

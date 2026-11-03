@@ -28,6 +28,7 @@ import { widgetPlugin, updateWidgets } from './widget.mjs';
 import { isSignatureHelpEnabled } from './signature.mjs';
 import { isLinterEnabled } from './diagnostics.mjs';
 import { prettierExtension } from './prettierExtension.mjs';
+import { wholeDocumentReplacement } from './replaceCode.mjs';
 import { persistentAtom } from '@nanostores/persistent';
 import { basicSetup } from './basicSetup.mjs';
 
@@ -421,6 +422,11 @@ export class StrudelMirror {
   setCode(code) {
     const changes = { from: 0, to: this.editor.state.doc.length, insert: code };
     this.editor.dispatch({ changes });
+  }
+  // Replaces all the text as one Undo step of its own, for text that comes from elsewhere while the
+  // user may be typing. A plain `setCode` can join the previous step, so Undo would skip what was typed.
+  replaceCode(code) {
+    this.editor.dispatch(wholeDocumentReplacement(this.editor.state, code));
   }
   clear() {
     this.onStartRepl && document.removeEventListener('start-repl', this.onStartRepl);

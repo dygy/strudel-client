@@ -18,6 +18,7 @@ import { useTracks } from '@src/hooks/useTracks';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 import { GlobalToastContainer } from '@src/components/GlobalToastContainer';
 import { TrackConflictNotice } from './TrackConflictNotice';
+import { useAssistantControl } from '../assistantControl/useAssistantControl';
 import { openingTrack } from '@src/lib/multitrack';
 import { nanoid } from 'nanoid';
 import { useState, useEffect, memo, useRef } from 'react';
@@ -58,6 +59,7 @@ interface ReplEditorProps extends React.HTMLAttributes<HTMLDivElement> {
 
 function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer, ...editorProps }: ReplEditorProps) {
   const { containerRef, editorRef, error, init, pending } = context;
+  useAssistantControl(context, fileManagerHook, readOnly);
   const settings = useSettings();
   const { panelPosition, isZen } = settings;
   const { filesOpen: isFileManagerOpen, compact, panelOpen } = usePanelLayout();

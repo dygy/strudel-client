@@ -1,3 +1,4 @@
+import { AssistantControlIndicator } from '../assistantControl/AllowAssistantSwitch';
 import { useState, useRef, useEffect } from 'react';
 import PlayCircleIcon from '@heroicons/react/20/solid/PlayCircleIcon';
 import StopCircleIcon from '@heroicons/react/20/solid/StopCircleIcon';
@@ -281,6 +282,7 @@ export function Header({ context, embedded, trackName }: HeaderProps) {
 
       {/* ---- RIGHT SIDE (macOS menu bar style) ---- */}
       <div className="flex items-center gap-1">
+        {!embedded && <AssistantControlIndicator />}
         {/* Play / Stop */}
         <IconBtn
           onClick={() => context.handleTogglePlay()}

@@ -1,0 +1,78 @@
+---
+title: AI Assistants
+layout: ../../layouts/MainLayout.astro
+---
+
+# Using Strudel with an AI assistant
+
+An assistant that speaks the Model Context Protocol (MCP) can read and change your track library, look up Strudel's functions and sounds, check code for mistakes, and, if you allow it, control the music in an open tab.
+
+You sign in to Strudel yourself and approve the connection. The assistant only ever acts as you, on your own tracks, and you can end the connection at any time.
+
+## Connect an assistant
+
+The address of the server is:
+
+```
+https://strudel.dygy.app/mcp
+```
+
+### Claude on the web and Claude desktop
+
+1. Open **Settings**, then **Connectors**.
+2. Choose **Add custom connector** and paste the address above.
+3. Sign in to Strudel when asked, and press **Allow**.
+
+### Claude Code
+
+```sh
+claude mcp add --transport http strudel https://strudel.dygy.app/mcp
+```
+
+Then run `/mcp` in Claude Code, choose `strudel` and sign in when your browser opens.
+
+### Other assistants
+
+Any assistant that supports remote MCP servers with OAuth can connect. Give it the address above, and sign in when it asks.
+
+## What an assistant can do
+
+**Read your library.** `list_folders`, `search_tracks` and `get_track`. Search looks at track names and code. In a multitrack it only looks at the code of the active step.
+
+**Change your library.** `create_track`, `update_track`, `move_track`, `set_track_steps`, `create_folder`, `rename_folder` and `move_folder`. The same naming rules apply as in the app. Each change says which version it read. If the track has changed since, the change is refused and the assistant has to read it again, so it can't overwrite your work without seeing it.
+
+**Delete.** `delete_track`, `delete_step` and `delete_empty_folder`, one item at a time. There is no trash, so assistants are told to ask you first. A folder with anything in it can't be deleted this way.
+
+**Look things up and check code.** `lookup_function`, `search_functions`, `list_sounds` and `check_code`. The check finds syntax mistakes, mini-notation mistakes and names that don't exist, without running anything. Online it takes code up to 768 bytes. The local helper takes any size.
+
+**Control an open tab.** `list_tabs`, `play`, `stop`, `update_code` and `open_track`. See below.
+
+If a track in your library holds text aimed at an assistant, assistants are told to treat it as your data, not as instructions. That is a request to the assistant rather than a guarantee, so be careful about pasting in code you don't trust.
+
+## Letting an assistant control a tab
+
+Control is off in every tab until you turn on **Allow assistant control**, in Settings or, on a phone, in the menu. While it's on, the tab shows an indicator with a button to turn it off. It also turns off when you reload or close the tab, or sign out.
+
+- **Updating the track that's playing** changes the code with no gap or fade, the same as pressing Update.
+- **Opening another track and playing it** uses the transition selected in that tab.
+- **Code with a mistake** leaves the music playing. The assistant gets the error, and the tab shows it. The code stays in the editor, as if you'd typed it, and autosave treats it the same way, so press Undo if you'd rather not keep it.
+- **Anything you typed** is saved before an assistant's code replaces it. If that save fails, the assistant is refused and your editor isn't touched. Undo brings your text back.
+- **If the "changed elsewhere" message is showing**, assistants are refused in that tab until you choose.
+
+With two tabs allowed, an assistant has to say which one it means.
+
+## The local helper
+
+The helper runs patterns on your own computer, so an assistant can see what its code produces without any sound, and can check code of any size. Patterns run in a sandbox with no file or network access.
+
+```sh
+claude mcp add strudel-local -- npx -y strudel_mcp
+```
+
+The package isn't on npm yet, so this command won't work until it is.
+
+It needs Node.js. It doesn't reach your library or your tabs, and doesn't need a sign-in.
+
+## Disconnecting
+
+In Strudel, open **Settings** and find **Connected assistants**. Press **Disconnect** next to the assistant. This ends its access through Strudel at once. A copy of its access key that the assistant kept can still reach your data for up to an hour, until the key runs out.

@@ -30,7 +30,15 @@ export type ErrorCode =
   | 'use_local_helper'
   | 'rate_limited'
   | 'reconnect'
-  | 'service_unavailable';
+  | 'service_unavailable'
+  | 'no_tab'
+  | 'ambiguous_tab'
+  | 'transition_in_progress'
+  | 'conflict_open'
+  | 'save_failed'
+  | 'no_track_open'
+  | 'tab_timeout'
+  | 'code_error';
 
 export const ok = (structuredContent: Record<string, unknown>): ToolResult => ({
   content: [{ type: 'text', text: JSON.stringify(structuredContent) }],

@@ -24,6 +24,7 @@ const MAX_TOKEN_LENGTH = 8192;
 interface Claims {
   iss?: unknown;
   client_id?: unknown;
+  exp?: unknown;
 }
 
 function decodeClaims(token: string): Claims | null {
@@ -44,6 +45,42 @@ function decodeClaims(token: string): Claims | null {
 export function bearerToken(request: Request): string | null {
   const match = /^Bearer +(\S+)$/i.exec(request.headers.get('authorization') ?? '');
   return match ? match[1] : null;
+}
+
+export type TabTokenCheck = { ok: true; expiresAt: number } | { ok: false; reason: 'rejected' | 'service_unavailable' };
+
+/**
+ * A tab's token: a web session of exactly this user. An assistant's token is refused here, because a
+ * socket that counts as a tab is what assistants send commands to, not what they may become.
+ */
+export async function checkTabToken(
+  token: string,
+  userId: string,
+  env: Env,
+  fetchImpl: typeof fetch,
+): Promise<TabTokenCheck> {
+  const claims = decodeClaims(token);
+  if (!claims || claims.iss !== `${env.PUBLIC_SUPABASE_URL}/auth/v1`) return { ok: false, reason: 'rejected' };
+  if (claims.client_id !== undefined) return { ok: false, reason: 'rejected' };
+  if (typeof claims.exp !== 'number') return { ok: false, reason: 'rejected' };
+
+  let response: Response;
+  try {
+    response = await fetchImpl(`${env.PUBLIC_SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: env.PUBLIC_SUPABASE_ANON_KEY, authorization: `Bearer ${token}` },
+    });
+  } catch {
+    return { ok: false, reason: 'service_unavailable' };
+  }
+  if (response.status === 429 || response.status >= 500) return { ok: false, reason: 'service_unavailable' };
+  if (!response.ok) return { ok: false, reason: 'rejected' };
+  try {
+    const user = (await response.json()) as { id?: unknown };
+    if (user?.id !== userId) return { ok: false, reason: 'rejected' };
+  } catch {
+    return { ok: false, reason: 'service_unavailable' };
+  }
+  return { ok: true, expiresAt: claims.exp * 1000 };
 }
 
 export async function checkToken(token: string, env: Env, fetchImpl: typeof fetch): Promise<TokenCheck> {

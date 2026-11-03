@@ -170,7 +170,6 @@
   "equalizerPresetTrebleReducer": "Treble Reducer",
   "equalizerPresetVocal": "Vocal Boost",
   "connectedAssistants": {
-    "earlyNote": "Early access: for now, an assistant can only confirm that it's connected.",
     "copy": "Copy",
     "copied": "Copied",
     "copyRefused": "Your browser refused access to the clipboard. The text is selected, so you can copy it by hand.",
@@ -193,6 +192,27 @@
     "disconnectFailed": "Could not disconnect. Please try again.",
     "retry": "Try again",
     "unnamed": "An unnamed assistant",
-    "help": "Disconnect ends access through Strudel at once. A copy of its access key that the assistant kept can still reach your data directly for up to an hour."
+    "help": "Disconnect ends access through Strudel at once. A copy of its access key that the assistant kept can still reach your data directly for up to an hour.",
+    "setupGuide": "Setup guide"
+  },
+  "assistantControl": {
+    "allow": "Allow assistant control",
+    "help": "Lets a connected assistant play, stop and change the music in this tab. It turns off when you reload or close the tab, or sign out.",
+    "indicator": "Assistant control on",
+    "off": "Turn off",
+    "turnOff": "Turn off assistant control",
+    "onLabel": "On",
+    "messages": {
+      "played": "Assistant: playing",
+      "alreadyPlaying": "Assistant: already playing",
+      "stopped": "Assistant: stopped",
+      "updated": "Assistant: code updated. Undo brings your text back.",
+      "opened": "Assistant: opened {{name}}",
+      "codeError": "Assistant: that code has a mistake. The music carries on.",
+      "refusedTransition": "Assistant: refused, a transition is in progress",
+      "refusedConflict": "Assistant: refused until you choose which version to keep",
+      "refusedSave": "Assistant: refused, your text could not be saved",
+      "refusedNoTrack": "Assistant: refused, no track is open"
+    }
   }
 }

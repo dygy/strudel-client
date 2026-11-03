@@ -155,15 +155,6 @@ describe('Connected assistants', () => {
     expect(text()).not.toContain('Local helper');
   });
 
-  it.each([
-    ['none connected', []],
-    ['some connected', GRANTS],
-  ])('says this is early access, with %s', async (_name, grants) => {
-    fetchMock.mockImplementation(async () => json(grants));
-    await render(() => text().includes('No assistant') || text().includes('Connected on'));
-    expect(text()).toContain("Early access: for now, an assistant can only confirm that it's connected.");
-  });
-
   it('a list that fails to load still shows how to connect', async () => {
     fetchMock.mockImplementation(async () => json({ msg: 'boom' }, 500));
     await render(() => text().includes('Could not load'));

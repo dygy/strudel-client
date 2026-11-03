@@ -9,6 +9,7 @@ import { LanguageSelector } from './LanguageSelector';
 import { SampleCacheSettings } from './SampleCacheSettings';
 import { MixerSettings } from './MixerSettings';
 import { ConnectedAssistants } from './ConnectedAssistants';
+import { AllowAssistantSwitch } from '../../assistantControl/AllowAssistantSwitch';
 import { useAuth } from '@src/hooks/useAuth';
 import { DEFAULT_MAX_POLYPHONY, setMaxPolyphony, setMultiChannelOrbits } from '@strudel/webaudio';
 import { useTranslation } from '@src/i18n';
@@ -473,7 +474,10 @@ export function SettingsTab({ started, mixer, readOnly = false }: SettingsTabPro
 
         {isAuthenticated && !readOnly && (
           <FormItem label={t('connectedAssistants.title')}>
-            <ConnectedAssistants />
+            <div className="space-y-4">
+              <AllowAssistantSwitch />
+              <ConnectedAssistants />
+            </div>
           </FormItem>
         )}
 
