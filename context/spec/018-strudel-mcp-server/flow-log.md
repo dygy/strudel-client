@@ -34,3 +34,13 @@
 - **Decision:** shared audio code reverted to main after three review rounds found regressions in it. Pre-existing behaviour left alone, to file: a stale evaluate can win over an edited Update; on Crossfade an edited Update during a slow switch is ignored; a hanging evaluate on Crossfade blocks Update until reload.
 - **Open:** real client through Google sign-in; prod CPU for `check_code`; `MCP_RATE` and `MCP_IP_RATE` on Free; publishing the helper.
 - **Flow defects:** the push gate runs on the local Node, not CI's.
+
+## 2026-11-03: live on prod
+
+- **Shipped:** `30aeae9`, run 41684878155, both Workers deployed by CI. `3e9fba4` failed CI first: wall-clock budget tests and a memory test that were too load-sensitive; test-only fix.
+- **Verified on prod with temporary users, deleted afterwards:** 40 checks, 39 passed. The one failure is the `SyntaxError` the check's own deliberately bad code logs. Covers all 23 tools listed, version refusals, another user's track and tab, tab socket with the real cookie, play, update, stop, switch off, Disconnect refused in 49 ms.
+- **Real client:** the owner connected Claude through Google sign-in; `whoami` showed the account, before the tools shipped. Not repeated with the tools.
+- **CPU on prod:** 55 sampled requests, 0 errors, p50 2.4 ms, p99 5.0 ms, including `check_code` near its limit. Few cold isolates in that sample.
+- **Open:** publish `strudel_mcp_js` and set `HELPER_PUBLISHED`; real speakers; `MCP_IP_RATE` under real traffic.
+- **Known limits:** after Disconnect a kept token still works directly against Supabase until it expires, up to 60 min. Same-named tracks in symbol-only folders share an address. Folder delete has a narrow race.
+- **To file:** a stale evaluate can win over an edited Update; on Crossfade an edited Update during a slow switch is ignored; a hanging evaluate on Crossfade blocks Update until reload. All pre-existing.

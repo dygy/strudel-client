@@ -1,7 +1,7 @@
 # Technical Specification: Strudel for AI Assistants (MCP Server)
 
 - **Functional Specification:** [functional-spec.md](./functional-spec.md)
-- **Status:** Draft
+- **Status:** Completed
 - **Author(s):** Claude (for the owner, Dygy)
 
 Facts marked **measured** were checked on 2026-11-02 against prod or the repo. **Assumption** marks what has not been confirmed. **Spike** marks what only a real run can settle (task slice 1).

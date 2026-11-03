@@ -38,6 +38,13 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
 
 ---
 
+### AI assistants (shipped)
+
+- [x] **Connect an assistant over MCP** ([018](../spec/018-strudel-mcp-server/), 2026-11-03): sign in with Google, then an assistant reads and edits the library, looks up functions, checks code and controls a tab that allowed it. Saves now carry versions, so an assistant and a tab can't overwrite each other; emergency save and multitrack steps actually persist.
+- [ ] **Publish the local helper** `strudel_mcp_js` for pattern runs and large code checks.
+
+---
+
 ### Phase 4 — Make it safe to change (next)
 
 - [x] **A test suite that can gate deploys**

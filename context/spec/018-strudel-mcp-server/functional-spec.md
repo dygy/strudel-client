@@ -1,7 +1,7 @@
 # Functional Specification: Strudel for AI Assistants (MCP Server)
 
 - **Roadmap Item:** Not on the roadmap. Requested by the owner in chat on 2026-11-02. No GitHub issue.
-- **Status:** Draft
+- **Status:** Completed
 - **Author:** Claude (for the owner, Dygy)
 
 ---
