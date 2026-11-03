@@ -16,3 +16,24 @@ export interface RoleCarrier {
 export function isAdminUser(user: RoleCarrier | null | undefined): boolean {
   return user?.app_metadata?.role === 'admin';
 }
+
+/**
+ * Was this token issued to an assistant? Only tokens from the OAuth server carry a `client_id`. Supabase
+ * accepts them like any session, and an admin who connects an assistant hands it a token with their role,
+ * so paths past RLS have to ask. Only says what the token claims: Supabase still has to accept it.
+ */
+export function isAssistantToken(token: string | null | undefined): boolean {
+  const payload = token?.split('.')[1];
+  if (!payload) return false;
+  try {
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return (JSON.parse(json) as { client_id?: unknown }).client_id !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+/** An admin, signed in as themselves: what every service-role path and bulk delete requires. */
+export function isAdminSession(user: RoleCarrier | null | undefined, token: string | null | undefined): boolean {
+  return isAdminUser(user) && !isAssistantToken(token);
+}

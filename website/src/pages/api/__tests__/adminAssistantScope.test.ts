@@ -15,6 +15,12 @@ import {
   signIn,
   useTestEnv,
 } from './apiTestHelpers';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { isAdminSession, isAssistantToken } from '../../../lib/adminAuth';
+import { GET as adminUsers } from '../admin/users';
+import { DELETE as foldersDeleteAll } from '../folders/delete-all';
+import { DELETE as tracksDeleteAll } from '../tracks/delete-all';
 import { POST as trackCreate } from '../tracks/create';
 import { PUT as trackUpdate } from '../tracks/update';
 import { DELETE as trackDelete } from '../tracks/delete';
@@ -109,5 +115,66 @@ describe('an admin on the routes an assistant writes through', () => {
     );
     expect(response.status).toBe(404);
     expect(mutationsOn('folders')).toEqual([]);
+  });
+});
+
+describe('an assistant holding an admin token, where RLS does not protect anyone', () => {
+  const base64url = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const tokenWith = (claims: Record<string, unknown>) => `${base64url({ alg: 'ES256' })}.${base64url(claims)}.sig`;
+  const ASSISTANT = tokenWith({ sub: ADMIN.id, client_id: 'c1' });
+  const WEB = tokenWith({ sub: ADMIN.id });
+
+  beforeEach(() => {
+    signIn(ASSISTANT, ADMIN);
+    signIn(WEB, ADMIN);
+  });
+
+  it('tells the two tokens apart', () => {
+    expect(isAssistantToken(ASSISTANT)).toBe(true);
+    expect(isAssistantToken(WEB)).toBe(false);
+    expect(isAssistantToken('not a token')).toBe(false);
+    expect(isAssistantToken(null)).toBe(false);
+  });
+
+  it('counts as an admin only when signed in as themselves', () => {
+    expect(isAdminSession(ADMIN, WEB)).toBe(true);
+    expect(isAdminSession(ADMIN, ASSISTANT)).toBe(false);
+    expect(isAdminSession({ app_metadata: {} }, WEB)).toBe(false);
+  });
+
+  const adminList = (token: string) =>
+    adminUsers(apiContext({ url: 'http://test/api/admin/users', method: 'GET', token }));
+
+  it('GET /api/admin/users refuses an assistant', async () => {
+    expect((await adminList(ASSISTANT)).status).toBe(403);
+  });
+
+  it('GET /api/admin/users still serves the admin', async () => {
+    fakeState.authUsers = [];
+    expect((await adminList(WEB)).status).toBe(200);
+  });
+
+  it.each([
+    ['tracks', tracksDeleteAll, '/api/tracks/delete-all'],
+    ['folders', foldersDeleteAll, '/api/folders/delete-all'],
+  ])('deleting all %s refuses an assistant, and deletes nothing', async (table, route, url) => {
+    const response = await route(apiContext({ url: `http://test${url}`, method: 'DELETE', token: ASSISTANT }));
+    expect(response.status).toBe(403);
+    expect(mutationsOn(table)).toEqual([]);
+  });
+
+  it('deleting all still works for the user themselves', async () => {
+    const response = await tracksDeleteAll(
+      apiContext({ url: 'http://test/api/tracks/delete-all', method: 'DELETE', token: WEB }),
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it('every page and route that reads the service-role key for people checks this', () => {
+    for (const file of ['pages/api/admin/users.ts', 'pages/admin.astro', 'pages/[userId]/repl/[...trackPath].astro']) {
+      const source = readFileSync(resolve(process.cwd(), 'website/src', file), 'utf8');
+      expect(`${file}: ${source.includes('isAdminSession(')}`).toBe(`${file}: true`);
+      expect(`${file}: ${/\bisAdminUser\(/.test(source)}`).toBe(`${file}: false`);
+    }
   });
 });

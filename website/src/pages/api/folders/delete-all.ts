@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { isAssistantToken } from '../../../lib/adminAuth';
 import { getAuthenticatedUser, AuthError } from '../_auth';
 import { userClient } from '../_userClient';
 
@@ -8,6 +9,13 @@ export const DELETE: APIRoute = async ({ request }) => {
   try {
     // Bearer header, then cookie (api/_auth.ts); as the user, so RLS applies.
     const { user, accessToken } = await getAuthenticatedUser(request);
+    // Assistants delete one thing at a time, by name of it (spec 018, functional 2.6).
+    if (isAssistantToken(accessToken)) {
+      return new Response(JSON.stringify({ error: 'Not available to assistants' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
     const supabase = userClient(accessToken);
 
     console.log('API /folders/delete-all - User verified:', user.id);

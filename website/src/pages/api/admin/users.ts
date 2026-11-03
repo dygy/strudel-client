@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
-import { isAdminUser } from '../../../lib/adminAuth';
+import { isAdminSession } from '../../../lib/adminAuth';
 import { serverEnv } from '../../../lib/server-env';
 
 export const prerender = false;
@@ -49,7 +49,7 @@ export const GET: APIRoute = async ({ cookies, request }) => {
       });
     }
 
-    if (!isAdminUser(user)) {
+    if (!isAdminSession(user, accessToken)) {
       return new Response(JSON.stringify({ error: 'Unauthorized - admin access required' }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' },
