@@ -25,22 +25,31 @@ afterEach(() => {
   setViewport(originalSize.width, originalSize.height);
 });
 
-function renderSelect() {
+// useTranslation suspends while a namespace loads, and under isolate:false that depends on which files
+// ran before this one on the worker. So wait for the select rather than expect it on the first render.
+async function renderSelect() {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root!.render(<LanguageSelector currentLanguage="en" />));
+  await act(async () => root!.render(<LanguageSelector currentLanguage="en" />));
+  for (let i = 0; i < 100 && !container.querySelector('select'); i++) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+  }
   return container.querySelector('select')!;
 }
 
 describe('LanguageSelector touch size', () => {
-  it('is at least 44px tall on a phone', () => {
+  it('is at least 44px tall on a phone', async () => {
     setViewport(390, 844);
-    expect(renderSelect().className).toMatch(/\bmin-h-11\b/);
+    expect((await renderSelect()).className).toMatch(/\bmin-h-11\b/);
   });
 
-  it('keeps the desktop classes on a wide screen', () => {
+  it('keeps the desktop classes on a wide screen', async () => {
     setViewport(1440, 900);
-    expect(renderSelect().className).toBe('p-2 bg-background rounded-xl text-foreground border-foreground/50 pe-8');
+    expect((await renderSelect()).className).toBe(
+      'p-2 bg-background rounded-xl text-foreground border-foreground/50 pe-8',
+    );
   });
 });
