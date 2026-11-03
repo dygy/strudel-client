@@ -1,7 +1,8 @@
 /**
  * The relay between an assistant's tool calls and the user's open tabs (spec 018, tech 2.7). One per
- * user: the Worker asks for it by user id, and a socket only counts as a tab once its first message has
- * proved it's that user. A socket that hasn't is never told or asked anything.
+ * user. Every socket here was checked by the Worker at the upgrade (handler.ts), which is also what
+ * chose this object, so all of them are this user's tabs. A session only lasts as long as its token: a
+ * tab re-sends the token when it's refreshed, and past expiry a socket isn't trusted any more.
  *
  * What's kept across hibernation is on each socket's attachment; the waiting commands are in memory
  * only because a request in flight keeps the object awake. A plain class on purpose:
@@ -10,24 +11,20 @@
 import { checkTabToken } from './auth';
 import type { Env } from './env';
 
-/** How long a socket may stay silent before saying who it is. */
-export const AUTH_DEADLINE_MS = 10_000;
 /** A tab refreshes its token before this: past expiry plus this, it's treated as gone. */
 export const TOKEN_GRACE_MS = 60_000;
 export const STATUS_TIMEOUT_MS = 2_000;
-const MAX_SOCKETS = 8;
-/** A tab sends tokens and short answers. A hostile socket gets no further than this. */
+const MAX_TABS = 8;
+/** A tab sends tokens and short answers. */
 const MAX_INCOMING_LENGTH = 64 * 1024;
 
 export const CLOSE_NOT_SIGNED_IN = 4401;
-export const CLOSE_TRY_AGAIN = 4503;
 const CLOSE_TOO_BIG = 1009;
 
-/** Who a socket says it is. `tabId` is null until the token has been checked. */
+/** What the Worker verified, and until when. */
 interface Attachment {
   userId: string;
-  tabId: string | null;
-  connectedAt: number;
+  tabId: string;
   expiresAt: number;
 }
 
@@ -67,38 +64,22 @@ export class TabRelay {
     return socket.deserializeAttachment() as Attachment | null;
   }
 
-  private async connect(request: Request): Promise<Response> {
+  private connect(request: Request): Response {
     if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
       return new Response('Expected a WebSocket', { status: 426, headers: { upgrade: 'websocket' } });
     }
     const userId = request.headers.get('x-tab-user');
-    if (!userId) return new Response('No user', { status: 400 });
-
-    const sockets = this.ctx.getWebSockets();
-    if (sockets.length >= MAX_SOCKETS) {
-      // Silent sockets make way, so a stranger can't keep the owner's tabs out. Otherwise, it's full.
-      const silent = sockets.find((socket) => this.attachment(socket)?.tabId === null);
-      if (!silent) return new Response('Too many tabs', { status: 429 });
-      silent.close(CLOSE_NOT_SIGNED_IN, 'Not signed in');
-    }
+    const expiresAt = Number(request.headers.get('x-tab-expires'));
+    if (!userId || !expiresAt) return new Response('Not verified', { status: 400 });
+    // Asks each socket whether it still stands, so ones past their token don't hold a place.
+    if (this.tabs().length >= MAX_TABS) return new Response('Too many tabs', { status: 429 });
 
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server);
-    const now = Date.now();
-    server.serializeAttachment({ userId, tabId: null, connectedAt: now, expiresAt: 0 } satisfies Attachment);
-    await this.ctx.storage.setAlarm(now + AUTH_DEADLINE_MS);
+    const tabId = crypto.randomUUID();
+    server.serializeAttachment({ userId, tabId, expiresAt } satisfies Attachment);
+    server.send(JSON.stringify({ type: 'ready', tabId }));
     return new Response(null, { status: 101, webSocket: client });
-  }
-
-  /** Closes sockets that never said who they are. */
-  alarm(): void {
-    const now = Date.now();
-    for (const socket of this.ctx.getWebSockets()) {
-      const attachment = this.attachment(socket);
-      if (attachment?.tabId === null && now - attachment.connectedAt >= AUTH_DEADLINE_MS) {
-        socket.close(CLOSE_NOT_SIGNED_IN, 'Not signed in');
-      }
-    }
   }
 
   async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
@@ -107,44 +88,32 @@ export class TabRelay {
       socket.close(CLOSE_TOO_BIG, 'Message too big');
       return;
     }
-    const attachment = this.attachment(socket);
     let parsed: { type?: unknown; id?: unknown; token?: unknown; answer?: unknown } | null = null;
     try {
       parsed = typeof message === 'string' ? JSON.parse(message) : null;
     } catch {
-      // Falls through: what isn't understood from a socket that hasn't signed in ends it.
-    }
-
-    if (parsed?.type === 'auth' && typeof parsed.token === 'string' && attachment) {
-      await this.authenticate(socket, attachment, parsed.token);
       return;
     }
-    if (!attachment || attachment.tabId === null) {
-      socket.close(CLOSE_NOT_SIGNED_IN, 'Not signed in');
-      return;
-    }
-    if (parsed?.type === 'ack' && typeof parsed.id === 'string') {
+    if (parsed?.type === 'token' && typeof parsed.token === 'string') {
+      await this.refresh(socket, parsed.token);
+    } else if (parsed?.type === 'ack' && typeof parsed.id === 'string') {
       const waiting = this.waiting.get(parsed.id);
       // Only the tab that was asked can answer.
       if (waiting && waiting.socket === socket) this.settle(parsed.id, parsed.answer as RelayAnswer);
     }
   }
 
-  /** The first message, and each refreshed token after it. */
-  private async authenticate(socket: WebSocket, attachment: Attachment, token: string): Promise<void> {
-    const check = await checkTabToken(token, attachment.userId, this.env, this.fetchImpl);
-    if (!check.ok) {
-      if (check.reason === 'service_unavailable') {
-        // Says nothing about the token. A tab already signed in carries on until its token runs out.
-        if (attachment.tabId === null) socket.close(CLOSE_TRY_AGAIN, 'Try again');
-        return;
-      }
+  /** The session's token was refreshed. It has to be the same user's, and it extends this socket's trust. */
+  private async refresh(socket: WebSocket, token: string): Promise<void> {
+    const attachment = this.attachment(socket);
+    if (!attachment) return;
+    const check = await checkTabToken(token, this.env, this.fetchImpl);
+    if (check.ok && check.userId === attachment.userId) {
+      socket.serializeAttachment({ ...attachment, expiresAt: check.expiresAt } satisfies Attachment);
+    } else if (check.ok || check.reason === 'rejected') {
       socket.close(CLOSE_NOT_SIGNED_IN, 'Not signed in');
-      return;
     }
-    const tabId = attachment.tabId ?? crypto.randomUUID();
-    socket.serializeAttachment({ ...attachment, tabId, expiresAt: check.expiresAt } satisfies Attachment);
-    socket.send(JSON.stringify({ type: 'ready', tabId }));
+    // An outage says nothing about the token: the socket carries on until the old one runs out.
   }
 
   webSocketClose(socket: WebSocket): void {
@@ -170,13 +139,13 @@ export class TabRelay {
     waiting.resolve(answer);
   }
 
-  /** Tabs that proved who they are and whose token still stands. */
+  /** Tabs whose token still stands. One that has run out is closed. */
   private tabs(): Array<{ socket: WebSocket; tabId: string }> {
     const now = Date.now();
     const tabs: Array<{ socket: WebSocket; tabId: string }> = [];
     for (const socket of this.ctx.getWebSockets()) {
       const attachment = this.attachment(socket);
-      if (!attachment?.tabId) continue;
+      if (!attachment) continue;
       if (attachment.expiresAt + TOKEN_GRACE_MS < now) {
         socket.close(CLOSE_NOT_SIGNED_IN, 'Not signed in');
         continue;

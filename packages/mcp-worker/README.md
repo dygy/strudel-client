@@ -39,7 +39,9 @@ Once an isolate has checked something, 8 KB takes 2 to 5 ms, with occasional spi
 
 ## Live control of a tab
 
-A tab with **Allow assistant control** on holds a WebSocket to `GET /mcp/tab?u=<user id>`, on the site's own origin. The `u` only picks the user's `TabRelay`. It proves nothing: the first message is the access token, and a socket that hasn't sent a valid web-session token of that same user is never told or asked anything. An assistant's token is refused. Tokens never go in the URL.
+A tab with **Allow assistant control** on holds a WebSocket to `GET /mcp/tab`, on the site's own origin. The Worker authenticates the upgrade with the `sb-access-token` cookie the browser sends: the Origin must be the site, Supabase must accept the token, and a token with a `client_id` (an assistant's) is refused. Anything refused never reaches a Durable Object. This is the one place this Worker reads a cookie; `/mcp` never does.
+
+The verified user id picks the user's `TabRelay`. The relay only trusts a socket until its token expires, plus a minute. When the session refreshes, the tab sends the new token over the socket (`{ "type": "token" }`), which extends that. A refused token closes the socket with `4401`.
 
 Heartbeats are `ping` and `pong`, answered without waking the object. A command waits 5 s for its answer (10 s for `play`). The relay passes a command's arguments on as text, without parsing them.
 

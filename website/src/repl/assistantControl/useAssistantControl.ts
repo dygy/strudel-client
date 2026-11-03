@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '@nanostores/react';
 import { useTranslation } from '@src/i18n';
+import { writeSessionCookies } from '@src/lib/authCookies';
 import { supabase } from '@src/lib/supabase';
 import { toastActions } from '@src/stores/toastStore';
 import { hasOpenTrackConflict } from '../trackConflict';
@@ -16,11 +17,17 @@ const WAIT_FOR_NEW_TRACK_MS = 2_000;
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- the REPL context and file manager are untyped here */
 type Loose = any;
 
+/**
+ * The browser client is the only refresh owner: `getSession` renews an expired session, and the cookie
+ * the Worker reads is mirrored from it. Mirrored here too, because a try can come before the app's own
+ * listener has run.
+ */
 async function currentSession() {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  return session ? { userId: session.user.id, accessToken: session.access_token } : null;
+  if (session) writeSessionCookies(session);
+  return session;
 }
 
 export function useAssistantControl(context: Loose, fileManager: Loose, readOnly: boolean) {
@@ -96,10 +103,10 @@ export function useAssistantControl(context: Loose, fileManager: Loose, readOnly
     let userId: string | null = null;
     const client = createAssistantControlClient({
       origin: window.location.origin,
-      getSession: async () => {
+      prepareSession: async () => {
         const session = await currentSession();
-        userId = session?.userId ?? null;
-        return session;
+        userId = session?.user.id ?? null;
+        return session !== null;
       },
       handle: createCommandHandler(controls),
     });

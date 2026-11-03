@@ -51,7 +51,7 @@ Prod steps below need an explicit yes each: turning on dynamic client registrati
   - [ ] Verify: run from a packed tarball in Claude Code: `s("bd sd")` gives 4 events in 2 cycles; infinite loop stops and the next run works; file and network attempts fail; events match the browser engine for several sample tunes. Delete artifacts. **[Agent: strudel-engine-engineer]**
 
 - [ ] **Slice 8: An assistant controls an open tab**
-  - [ ] Full `TabRelay`: keyed by user id, Origin check, token as first message and on refresh, hibernation, command/ack with timeouts, refusal codes. **[Agent: strudel-web-engineer]**
+  - [ ] Full `TabRelay`: keyed by verified user id, Origin and cookie checked at the upgrade, token message on refresh, hibernation, command/ack with timeouts, refusal codes. **[Agent: strudel-web-engineer]**
   - [ ] `website/src/repl/assistantControl/{client,handlers}.ts`, using the same functions as the user's buttons; save first, refuse on failure; CodeMirror transaction so Undo works; refuse during a transition or an open conflict. **[Agent: strudel-web-engineer]**
   - [ ] **Allow assistant control** switch, indicator (header and compact), short messages, 9 locales; memory-only state. **[Agent: strudel-web-engineer]**
   - [ ] `list_tabs`, `play`, `stop`, `update_code`, `open_track`. **[Agent: strudel-web-engineer]**

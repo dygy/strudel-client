@@ -4,7 +4,7 @@
  * through workerd is covered by the local browser run; plain vitest has no workerd.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AUTH_DEADLINE_MS, CLOSE_NOT_SIGNED_IN, CLOSE_TRY_AGAIN, TabRelay, TOKEN_GRACE_MS } from '../src/tabRelay';
+import { CLOSE_NOT_SIGNED_IN, TabRelay, TOKEN_GRACE_MS } from '../src/tabRelay';
 import type { Env } from '../src/env';
 import { fakeLibrary, toolCaller } from './fakeLibrary';
 import { assistantToken, env, ISSUER, makeJwt, ORIGIN, USER, worker } from './helpers';
@@ -47,20 +47,20 @@ const RealResponse = globalThis.Response;
 
 function makeRelay(auth: (token: string) => Response | Promise<Response> = () => Response.json({ id: USER.id })) {
   const accepted: FakeSocket[] = [];
-  const alarms: number[] = [];
   const state = {
     getWebSockets: () => accepted.filter((socket) => socket.closed.length === 0),
     acceptWebSocket: (socket: FakeSocket) => accepted.push(socket),
-    storage: { setAlarm: async (at: number) => void alarms.push(at) },
   } as unknown as DurableObjectState;
   const fetchImpl = vi.fn(async (_url: unknown, init?: RequestInit) =>
     auth(new Headers(init?.headers).get('authorization')!.replace('Bearer ', '')),
   );
   const relay = new TabRelay(state, env as Env, fetchImpl as unknown as typeof fetch);
-  const connect = async (): Promise<FakeSocket> => {
+  const connect = async (expiresAt = Date.now() + 3_600_000): Promise<FakeSocket> => {
     vi.stubGlobal('Response', FakeResponse);
     await relay.fetch(
-      new Request('https://relay/connect', { headers: { upgrade: 'websocket', 'x-tab-user': USER.id } }),
+      new Request('https://relay/connect', {
+        headers: { upgrade: 'websocket', 'x-tab-user': USER.id, 'x-tab-expires': String(expiresAt) },
+      }),
     );
     vi.stubGlobal('Response', RealResponse);
     return accepted.at(-1)!;
@@ -72,7 +72,6 @@ function makeRelay(auth: (token: string) => Response | Promise<Response> = () =>
     );
   const tab = async (answer: (command: string, args: unknown) => unknown = () => ({ ok: true, result: {} })) => {
     const socket = await connect();
-    await tell(socket, { type: 'auth', token: webToken() });
     socket.onSend = (raw) => {
       const message = JSON.parse(raw);
       if (message.type !== 'command') return;
@@ -90,7 +89,7 @@ function makeRelay(auth: (token: string) => Response | Promise<Response> = () =>
     );
     return response.json() as Promise<Record<string, unknown>>;
   };
-  return { relay, accepted, alarms, fetchImpl, connect, tell, tab, command };
+  return { relay, accepted, fetchImpl, connect, tell, tab, command };
 }
 
 /** Only the clock: reading a request's body needs the real event loop. */
@@ -112,18 +111,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('who counts as a tab', () => {
-  it('nobody, until the first message has proved it', async () => {
-    const { connect, command } = makeRelay();
-    const socket = await connect();
-    expect(await command('play')).toEqual({ ok: false, code: 'no_tab' });
-    expect(socket.sent).toEqual([]);
-  });
-
-  it('a web session of this user, which gets a tab id and commands', async () => {
+describe('a tab', () => {
+  it('is told its id as soon as it connects, and gets commands', async () => {
     const { connect, tell, command } = makeRelay();
     const socket = await connect();
-    await tell(socket, { type: 'auth', token: webToken() });
     expect(lastMessage(socket)).toMatchObject({ type: 'ready', tabId: expect.any(String) });
     socket.onSend = (raw) => {
       const { id } = JSON.parse(raw);
@@ -132,82 +123,83 @@ describe('who counts as a tab', () => {
     expect(await command('play')).toEqual({ ok: true, result: { done: 1 } });
   });
 
-  it("not another user's session, even a valid one", async () => {
-    const { connect, tell, command } = makeRelay(() => Response.json({ id: 'someone-else' }));
+  it('is refused a place without what the Worker verified', async () => {
+    const { relay, accepted } = makeRelay();
+    const response = await relay.fetch(new Request('https://relay/connect', { headers: { upgrade: 'websocket' } }));
+    expect(response.status).toBe(400);
+    expect(accepted).toEqual([]);
+  });
+
+  it('has its trust extended by a refreshed token, and keeps its id', async () => {
+    fakeClock(1_000_000_000);
+    const { connect, tell, command } = makeRelay();
+    const socket = await connect(1_000_100_000);
+    const { tabId } = lastMessage(socket);
+    await tell(socket, { type: 'token', token: makeJwt({ iss: ISSUER, sub: USER.id, exp: 2_000_000 }) });
+    vi.setSystemTime(1_000_100_000 + TOKEN_GRACE_MS + 1);
+    const reply = command('status');
+    await vi.advanceTimersByTimeAsync(2_000);
+    await reply;
+    expect(socket.closed).toEqual([]);
+    expect((socket.attachment as { tabId: string }).tabId).toBe(tabId);
+  });
+
+  it('is closed when its session has ended, so a refreshed token is refused', async () => {
+    const { connect, tell, command } = makeRelay(() => new Response('no', { status: 401 }));
     const socket = await connect();
-    await tell(socket, { type: 'auth', token: webToken({ sub: 'someone-else' }) });
-    expect(socket.closed).toEqual([[CLOSE_NOT_SIGNED_IN, 'Not signed in']]);
+    await tell(socket, { type: 'token', token: webToken() });
+    expect(socket.closed[0][0]).toBe(CLOSE_NOT_SIGNED_IN);
     expect(await command('play')).toEqual({ ok: false, code: 'no_tab' });
   });
 
-  it("not an assistant's token, which must not be able to pose as a tab", async () => {
+  it("is closed by another user's token, even a valid one", async () => {
+    const { connect, tell } = makeRelay(() => Response.json({ id: 'someone-else' }));
+    const socket = await connect();
+    await tell(socket, { type: 'token', token: webToken({ sub: 'someone-else' }) });
+    expect(socket.closed[0][0]).toBe(CLOSE_NOT_SIGNED_IN);
+  });
+
+  it("is closed by an assistant's token", async () => {
     const { connect, tell, fetchImpl } = makeRelay();
     const socket = await connect();
-    await tell(socket, { type: 'auth', token: assistantToken({ exp: inHour() }) });
+    await tell(socket, { type: 'token', token: assistantToken({ exp: inHour() }) });
     expect(socket.closed[0][0]).toBe(CLOSE_NOT_SIGNED_IN);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('not a token Supabase refuses, or anything sent before signing in', async () => {
-    const { connect, tell } = makeRelay(() => new Response('no', { status: 401 }));
-    const refused = await connect();
-    await tell(refused, { type: 'auth', token: webToken() });
-    expect(refused.closed[0][0]).toBe(CLOSE_NOT_SIGNED_IN);
-    const early = await connect();
-    await tell(early, { type: 'ack', id: 'x', answer: { ok: true } });
-    expect(early.closed[0][0]).toBe(CLOSE_NOT_SIGNED_IN);
-  });
-
-  it('asks a socket to try again when the sign-in service is down, as that says nothing about the token', async () => {
+  it('carries on when the sign-in service is down, as that says nothing about the token', async () => {
     const { connect, tell } = makeRelay(() => new Response('down', { status: 503 }));
     const socket = await connect();
-    await tell(socket, { type: 'auth', token: webToken() });
-    expect(socket.closed[0][0]).toBe(CLOSE_TRY_AGAIN);
+    await tell(socket, { type: 'token', token: webToken() });
+    expect(socket.closed).toEqual([]);
   });
 
-  it('closes a socket that stays silent past the deadline, and leaves a tab alone', async () => {
-    fakeClock(1_000_000);
-    const { connect, tell, relay, alarms } = makeRelay();
-    const silent = await connect();
-    const tab = await connect();
-    await tell(tab, { type: 'auth', token: makeJwt({ iss: ISSUER, sub: USER.id, exp: 2_000_000 }) });
-    expect(alarms.at(-1)).toBe(1_000_000 + AUTH_DEADLINE_MS);
-    vi.setSystemTime(1_000_000 + AUTH_DEADLINE_MS);
-    relay.alarm();
-    expect(silent.closed[0][0]).toBe(CLOSE_NOT_SIGNED_IN);
-    expect(tab.closed).toEqual([]);
-  });
-
-  it('takes a refreshed token and keeps the same tab id', async () => {
-    const { tab, tell } = makeRelay();
-    const socket = await tab();
-    const { tabId } = lastMessage(socket);
-    socket.onSend = undefined;
-    await tell(socket, { type: 'auth', token: webToken() });
-    expect(lastMessage(socket).tabId).toBe(tabId);
-  });
-
-  it('drops a tab whose token ran out and was never refreshed', async () => {
+  it('stops being trusted when its token has run out and was never refreshed', async () => {
     fakeClock(1_000_000_000);
-    const { connect, tell, command } = makeRelay();
-    const socket = await connect();
-    await tell(socket, { type: 'auth', token: makeJwt({ iss: ISSUER, sub: USER.id, exp: 1_000_100 }) });
+    const { connect, command } = makeRelay();
+    const socket = await connect(1_000_100_000);
     vi.setSystemTime(1_000_100_000 + TOKEN_GRACE_MS + 1);
     expect(await command('play')).toEqual({ ok: false, code: 'no_tab' });
     expect(socket.closed[0][0]).toBe(CLOSE_NOT_SIGNED_IN);
   });
 
-  it('makes a silent socket give way rather than letting strangers keep the tabs out', async () => {
-    const { connect } = makeRelay();
-    const first = await connect();
-    for (let i = 0; i < 7; i++) await connect();
-    await connect();
-    expect(first.closed[0][0]).toBe(CLOSE_NOT_SIGNED_IN);
+  it('is refused past the most tabs a user can have, without closing the others', async () => {
+    const { connect, relay, accepted } = makeRelay();
+    for (let i = 0; i < 8; i++) await connect();
+    const response = await relay.fetch(
+      new Request('https://relay/connect', {
+        headers: { upgrade: 'websocket', 'x-tab-user': USER.id, 'x-tab-expires': String(Date.now() + 1000) },
+      }),
+    );
+    expect(response.status).toBe(429);
+    expect(accepted.every((socket) => socket.closed.length === 0)).toBe(true);
   });
 
-  it('closes on a message over the limit', async () => {
+  it('closes on a message over the limit, and ignores what it can not read', async () => {
     const { connect, tell } = makeRelay();
     const socket = await connect();
+    await tell(socket, 'not json');
+    expect(socket.closed).toEqual([]);
     await tell(socket, 'x'.repeat(64 * 1024 + 1));
     expect(socket.closed[0][0]).toBe(1009);
   });
@@ -260,7 +252,6 @@ describe('commands', () => {
     fakeClock(Date.now());
     const { connect, tell, command } = makeRelay();
     const socket = await connect();
-    await tell(socket, { type: 'auth', token: webToken() });
     const reply = command('play');
     await vi.advanceTimersByTimeAsync(4_999);
     let settled = false;
@@ -274,7 +265,6 @@ describe('commands', () => {
   it('answers at once when the tab closes while asked', async () => {
     const { connect, tell, command, relay } = makeRelay();
     const socket = await connect();
-    await tell(socket, { type: 'auth', token: webToken() });
     socket.onSend = () => relay.webSocketClose(socket as unknown as WebSocket);
     expect(await command('play')).toEqual({ ok: false, code: 'no_tab' });
   });
@@ -283,9 +273,7 @@ describe('commands', () => {
     fakeClock(Date.now());
     const { connect, tell, command } = makeRelay();
     const asked = await connect();
-    await tell(asked, { type: 'auth', token: webToken() });
     const other = await connect();
-    await tell(other, { type: 'auth', token: webToken() });
     const tabId = JSON.parse(asked.sent[0]).tabId;
     const reply = command('play', {}, { 'x-tab-id': tabId });
     await vi.advanceTimersByTimeAsync(0);
@@ -300,7 +288,6 @@ describe('commands', () => {
     const { connect, tell, tab, command } = makeRelay();
     await tab(() => ({ ok: true, result: { playing: true } }));
     const silent = await connect();
-    await tell(silent, { type: 'auth', token: webToken() });
     const reply = command('status');
     await vi.advanceTimersByTimeAsync(2_000);
     expect(((await reply).tabs as unknown[]).length).toBe(1);
@@ -308,48 +295,114 @@ describe('commands', () => {
 });
 
 describe('GET /mcp/tab', () => {
-  const relayed = () => {
+  const url = `${ORIGIN}/mcp/tab`;
+  const relayed = (upstream?: (url: string, init?: RequestInit) => Response) => {
     const fetch = vi.fn(async (_request: Request) => new Response('from the relay'));
     const idFromName = vi.fn((name: string) => name);
-    const namespace = { idFromName, get: () => ({ fetch }) } as unknown as Env['TAB_RELAY'];
-    return { fetch, idFromName, w: worker(undefined, { TAB_RELAY: namespace }) };
+    const get = vi.fn(() => ({ fetch }));
+    const namespace = { idFromName, get } as unknown as Env['TAB_RELAY'];
+    return { fetch, idFromName, get, w: worker(upstream, { TAB_RELAY: namespace }) };
   };
-  const url = `${ORIGIN}/mcp/tab?u=11111111-1111-4111-8111-111111111111`;
+  const socketHeaders = (extra: Record<string, string> = {}) => ({
+    upgrade: 'WebSocket',
+    origin: ORIGIN,
+    cookie: `other=1; sb-access-token=${encodeURIComponent(webToken())}; more=2`,
+    ...extra,
+  });
 
-  it("reaches that user's relay, from the site itself", async () => {
+  it("reaches the verified user's relay, saying who and until when", async () => {
     const { fetch, idFromName, w } = relayed();
-    const response = await w.fetch(url, { headers: { upgrade: 'WebSocket', origin: ORIGIN } });
+    const response = await w.fetch(url, { headers: socketHeaders() });
     expect(await response.text()).toBe('from the relay');
-    expect(idFromName).toHaveBeenCalledWith('11111111-1111-4111-8111-111111111111');
-    expect(fetch.mock.calls[0][0].headers.get('x-tab-user')).toBe('11111111-1111-4111-8111-111111111111');
+    expect(idFromName).toHaveBeenCalledWith(USER.id);
+    const sent = fetch.mock.calls[0][0].headers;
+    expect(sent.get('x-tab-user')).toBe(USER.id);
+    expect(Number(sent.get('x-tab-expires'))).toBeGreaterThan(Date.now());
   });
 
-  it("doesn't let a request say for itself who it was checked to be", async () => {
-    const { fetch, w } = relayed();
-    await w.fetch(url, { headers: { upgrade: 'websocket', origin: ORIGIN, 'x-tab-user': 'someone-else' } });
-    expect(fetch.mock.calls[0][0].headers.get('x-tab-user')).toBe('11111111-1111-4111-8111-111111111111');
+  it('takes who it is from the token check, not from anything the request says', async () => {
+    const { fetch, idFromName, w } = relayed();
+    await w.fetch(`${url}?u=someone-else`, {
+      headers: socketHeaders({ 'x-tab-user': 'someone-else', 'x-tab-expires': '99999999999999' }),
+    });
+    expect(idFromName).toHaveBeenCalledWith(USER.id);
+    const sent = fetch.mock.calls[0][0].headers;
+    expect(sent.get('x-tab-user')).toBe(USER.id);
+    expect(sent.get('x-tab-expires')).not.toBe('99999999999999');
   });
 
-  it.each([{ origin: 'https://evil.test' }, {}])('refuses other origins and none: %j', async (extra) => {
+  it('never passes the cookie on to the relay', async () => {
     const { fetch, w } = relayed();
-    const response = await w.fetch(url, { headers: { upgrade: 'websocket', ...extra } });
-    expect(response.status).toBe(403);
-    expect(fetch).not.toHaveBeenCalled();
+    await w.fetch(url, { headers: socketHeaders() });
+    expect(fetch.mock.calls[0][0].headers.get('cookie')).toBeNull();
   });
 
-  it('refuses a missing or malformed user', async () => {
-    const { fetch, w } = relayed();
-    const headers = { upgrade: 'websocket', origin: ORIGIN };
-    expect((await w.fetch(`${ORIGIN}/mcp/tab`, { headers })).status).toBe(400);
-    expect((await w.fetch(`${ORIGIN}/mcp/tab?u=../x`, { headers })).status).toBe(400);
-    expect(fetch).not.toHaveBeenCalled();
+  const refusedWithoutWaking = async (
+    headers: Record<string, string>,
+    status: number,
+    upstream?: (url: string, init?: RequestInit) => Response,
+  ) => {
+    const { get, idFromName, w } = relayed(upstream);
+    const response = await w.fetch(url, { headers });
+    expect(response.status).toBe(status);
+    expect(idFromName).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
+    return w;
+  };
+
+  it.each([{ origin: 'https://evil.test' }, { origin: '' }])('refuses another origin: %j', async (extra) => {
+    const w = await refusedWithoutWaking(socketHeaders(extra), 403);
+    expect(w.upstreamCalls).toEqual([]);
+  });
+
+  it('refuses no origin at all', async () => {
+    const { origin: _origin, ...headers } = socketHeaders();
+    await refusedWithoutWaking(headers, 403);
+  });
+
+  it('refuses no cookie, with 401 and without asking Supabase', async () => {
+    const { cookie: _cookie, ...headers } = socketHeaders();
+    const w = await refusedWithoutWaking(headers, 401);
+    expect(w.upstreamCalls).toEqual([]);
+  });
+
+  it('reads nothing but its own cookie', async () => {
+    await refusedWithoutWaking(socketHeaders({ cookie: `sb-other=${webToken()}` }), 401);
+  });
+
+  it("refuses an assistant's token in the cookie, so it can't pose as a tab", async () => {
+    const w = await refusedWithoutWaking(
+      socketHeaders({ cookie: `sb-access-token=${assistantToken({ exp: inHour() })}` }),
+      401,
+    );
+    expect(w.upstreamCalls).toEqual([]);
+  });
+
+  it('refuses a token Supabase turns down, such as an expired one', async () => {
+    await refusedWithoutWaking(socketHeaders(), 401, () => new Response('no', { status: 401 }));
+  });
+
+  it('refuses a token from another issuer', async () => {
+    const other = makeJwt({ iss: 'https://evil.test/auth/v1', sub: USER.id, exp: inHour() });
+    await refusedWithoutWaking(socketHeaders({ cookie: `sb-access-token=${other}` }), 401);
+  });
+
+  it('says try again when the sign-in service is down', async () => {
+    await refusedWithoutWaking(socketHeaders(), 503, () => new Response('down', { status: 503 }));
+  });
+
+  it('logs the outcome and never the token', async () => {
+    const { w } = relayed();
+    await w.fetch(url, { headers: socketHeaders() });
+    expect(w.logs).toEqual([expect.objectContaining({ handler: 'tab/connect', outcome: 'ok' })]);
+    expect(JSON.stringify(w.logs)).not.toContain('.signature');
   });
 
   it('answers 426 without an upgrade and 405 to a POST', async () => {
-    const { fetch, w } = relayed();
+    const { get, w } = relayed();
     expect((await w.fetch(url, { headers: { origin: ORIGIN } })).status).toBe(426);
     expect((await w.fetch(url, { method: 'POST' })).status).toBe(405);
-    expect(fetch).not.toHaveBeenCalled();
+    expect(get).not.toHaveBeenCalled();
   });
 });
 

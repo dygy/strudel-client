@@ -93,7 +93,8 @@ describe('useAssistantControl', () => {
     act(() => setAssistantControl(true));
     await settle();
     expect(sockets).toHaveLength(1);
-    expect(sockets[0]).toContain('/mcp/tab?u=');
+    expect(sockets[0]).toMatch(/\/mcp\/tab$/);
+    expect(document.cookie).toContain('sb-access-token');
   });
 
   it('leaves control impossible in the read-only admin view, whatever is asked', async () => {

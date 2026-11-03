@@ -1,7 +1,9 @@
 /**
- * The tab's end of the relay: one socket, which exists only while the switch is on. It says who it is
- * in its first message, and again whenever the session's token is refreshed. The token never goes in
- * the URL. Framework-free, with no knowledge of what the commands do.
+ * The tab's end of the relay: one socket, which exists only while the switch is on. The Worker checks
+ * the session cookie the browser sends with the upgrade, and a refused upgrade looks the same here as a
+ * network failure. So before every try the session is brought up to date, which is what renews an
+ * expired cookie, and only a socket the relay has accepted resets the wait between tries. A refreshed
+ * token is sent over the socket. Framework-free, with no knowledge of what the commands do.
  */
 export const HEARTBEAT_MS = 30_000;
 const PONG_WAIT_MS = 10_000;
@@ -14,15 +16,11 @@ export type RelayAnswer = { ok: true; result?: unknown } | { ok: false; code: st
 export type CommandHandler = (command: string, args: Record<string, unknown>) => Promise<RelayAnswer>;
 export type ConnectionState = 'connecting' | 'connected' | 'offline';
 
-export interface Session {
-  userId: string;
-  accessToken: string;
-}
-
 export interface AssistantControlClientOptions {
   /** The site's own origin, because the socket's Origin has to be it. */
   origin: string;
-  getSession: () => Promise<Session | null>;
+  /** Brings the session and its cookie up to date. False if there's no session. */
+  prepareSession: () => Promise<boolean>;
   handle: CommandHandler;
   onState?: (state: ConnectionState) => void;
   createSocket?: (url: string) => WebSocket;
@@ -30,7 +28,7 @@ export interface AssistantControlClientOptions {
 
 export function createAssistantControlClient({
   origin,
-  getSession,
+  prepareSession,
   handle,
   onState,
   createSocket = (url) => new WebSocket(url),
@@ -77,24 +75,22 @@ export function createAssistantControlClient({
   async function connect() {
     if (stopped) return;
     onState?.('connecting');
-    let session: Session | null = null;
+    let signedIn = false;
     try {
-      session = await getSession();
+      signedIn = await prepareSession();
     } catch (error: unknown) {
       console.warn('[assistant control] no session:', error);
     }
     if (stopped) return;
-    if (!session) {
+    if (!signedIn) {
       retryLater();
       return;
     }
-    const { userId, accessToken } = session;
-    const opened = createSocket(`${origin.replace(/^http/, 'ws')}/mcp/tab?u=${encodeURIComponent(userId)}`);
+    const opened = createSocket(`${origin.replace(/^http/, 'ws')}/mcp/tab`);
     socket = opened;
 
     opened.onopen = () => {
       if (socket !== opened) return;
-      opened.send(JSON.stringify({ type: 'auth', token: accessToken }));
       heartbeat = setInterval(() => {
         // Exactly this text: the relay answers it without waking up.
         if (opened.readyState === WebSocket.OPEN) opened.send('ping');
@@ -125,7 +121,7 @@ export function createAssistantControlClient({
       if (socket !== opened) return;
       socket = null;
       clearTimers();
-      // A token that was turned down gets a new one on the next try, so that's worth one, slowly.
+      // Its session has ended, or nearly: not worth a quick try.
       if (event.code === CLOSE_NOT_SIGNED_IN) retryMs = Math.max(retryMs, MAX_RETRY_MS / 2);
       retryLater();
     };
@@ -150,7 +146,7 @@ export function createAssistantControlClient({
     },
     /** The session's token was refreshed. */
     sendToken(accessToken: string) {
-      send({ type: 'auth', token: accessToken });
+      send({ type: 'token', token: accessToken });
     },
   };
 }

@@ -1,5 +1,5 @@
 /** HTTP surface of the Worker: everything the two routes in wrangler.jsonc can receive. */
-import { bearerToken, checkToken } from './auth';
+import { bearerToken, checkTabToken, checkToken, sessionCookie } from './auth';
 import { fail, type ToolContext } from './context';
 import { isTool } from './tools';
 import type { Deps, Env } from './env';
@@ -156,26 +156,37 @@ async function mcpPost(request: Request, env: Env, deps: Deps, origin: string, s
  * The WebSocket spike (spec task slice 1): the Origin check is the one part of the final relay
  * that's here already, because browsers don't apply CORS to WebSockets.
  */
-const USER_ID = /^[0-9a-f-]{36}$/i;
-
 /**
- * A tab's socket. The relay is the user's, so the address says which user this claims to be. That
- * isn't trusted: the socket counts for nothing until its first message proves it (tabRelay.ts). The
- * token never goes in the URL. Browsers don't apply CORS to WebSockets, so the Origin is checked here.
+ * A tab's socket, authenticated here at the upgrade with the session cookie the browser sends to its own
+ * origin: the one place this Worker reads a cookie. Anything refused never reaches a Durable Object, so
+ * a stranger can't wake one. Browsers don't apply CORS to WebSockets, so the Origin is checked first.
  */
-function tabSocket(request: Request, env: Env, origin: string): Promise<Response> | Response {
+async function tabSocket(request: Request, env: Env, deps: Deps, origin: string, started: number): Promise<Response> {
+  const finish = (response: Response, outcome: string) => {
+    deps.log({ handler: 'tab/connect', outcome, ms: Date.now() - started });
+    return response;
+  };
   if (request.method !== 'GET') return refusal(405, 'Method not allowed', { allow: 'GET' });
   if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
     return refusal(426, 'Expected a WebSocket', { upgrade: 'websocket' });
   }
-  if (request.headers.get('origin') !== origin) return refusal(403, 'Origin not allowed');
-  const userId = new URL(request.url).searchParams.get('u') ?? '';
-  if (!USER_ID.test(userId)) return refusal(400, 'Bad request');
-  return env.TAB_RELAY.get(env.TAB_RELAY.idFromName(userId.toLowerCase())).fetch(
+  if (request.headers.get('origin') !== origin) return finish(refusal(403, 'Origin not allowed'), 'bad_origin');
+
+  const token = sessionCookie(request);
+  if (!token) return finish(refusal(401, 'Sign in'), 'no_cookie');
+  const check = await checkTabToken(token, env, deps.fetch);
+  if (!check.ok) {
+    return check.reason === 'service_unavailable'
+      ? finish(refusal(503, 'Try again', { 'retry-after': '5' }), check.reason)
+      : finish(refusal(401, 'Sign in'), check.reason);
+  }
+  // A new request, so these say what was verified here. Nothing the client sent gets through.
+  const response = await env.TAB_RELAY.get(env.TAB_RELAY.idFromName(check.userId)).fetch(
     new Request('https://relay/connect', {
-      headers: { upgrade: 'websocket', 'x-tab-user': userId.toLowerCase() },
+      headers: { upgrade: 'websocket', 'x-tab-user': check.userId, 'x-tab-expires': String(check.expiresAt) },
     }),
   );
+  return finish(response, 'ok');
 }
 
 export async function handleRequest(request: Request, env: Env, deps: Deps): Promise<Response> {
@@ -183,7 +194,7 @@ export async function handleRequest(request: Request, env: Env, deps: Deps): Pro
   const { origin, pathname } = new URL(request.url);
 
   if (pathname === METADATA_PATH) return protectedResourceMetadata(request, env, origin);
-  if (pathname === TAB_PATH) return tabSocket(request, env, origin);
+  if (pathname === TAB_PATH) return tabSocket(request, env, deps, origin, started);
   if (pathname !== MCP_PATH) return refusal(404, 'Not found');
   if (request.method !== 'POST') return refusal(405, 'Method not allowed', { allow: 'POST' });
   return mcpPost(request, env, deps, origin, started);

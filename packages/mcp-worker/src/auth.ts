@@ -41,24 +41,21 @@ function decodeClaims(token: string): Claims | null {
   }
 }
 
-/** The bearer token, or null. Cookies are never read: a web session can't reach this server. */
+/** The bearer token, or null. `/mcp` never reads a cookie: a web session can't call its tools. */
 export function bearerToken(request: Request): string | null {
   const match = /^Bearer +(\S+)$/i.exec(request.headers.get('authorization') ?? '');
   return match ? match[1] : null;
 }
 
-export type TabTokenCheck = { ok: true; expiresAt: number } | { ok: false; reason: 'rejected' | 'service_unavailable' };
+export type TabTokenCheck =
+  | { ok: true; userId: string; expiresAt: number }
+  | { ok: false; reason: 'rejected' | 'service_unavailable' };
 
 /**
- * A tab's token: a web session of exactly this user. An assistant's token is refused here, because a
- * socket that counts as a tab is what assistants send commands to, not what they may become.
+ * A tab's token: a web session. An assistant's token is refused here, because a socket that counts as a
+ * tab is what assistants send commands to, not what they may become.
  */
-export async function checkTabToken(
-  token: string,
-  userId: string,
-  env: Env,
-  fetchImpl: typeof fetch,
-): Promise<TabTokenCheck> {
+export async function checkTabToken(token: string, env: Env, fetchImpl: typeof fetch): Promise<TabTokenCheck> {
   const claims = decodeClaims(token);
   if (!claims || claims.iss !== `${env.PUBLIC_SUPABASE_URL}/auth/v1`) return { ok: false, reason: 'rejected' };
   if (claims.client_id !== undefined) return { ok: false, reason: 'rejected' };
@@ -74,13 +71,29 @@ export async function checkTabToken(
   }
   if (response.status === 429 || response.status >= 500) return { ok: false, reason: 'service_unavailable' };
   if (!response.ok) return { ok: false, reason: 'rejected' };
+  let user: { id?: unknown };
   try {
-    const user = (await response.json()) as { id?: unknown };
-    if (user?.id !== userId) return { ok: false, reason: 'rejected' };
+    user = (await response.json()) as { id?: unknown };
   } catch {
     return { ok: false, reason: 'service_unavailable' };
   }
-  return { ok: true, expiresAt: claims.exp * 1000 };
+  if (typeof user?.id !== 'string' || user.id === '') return { ok: false, reason: 'service_unavailable' };
+  return { ok: true, userId: user.id, expiresAt: claims.exp * 1000 };
+}
+
+/** The session cookie the site keeps in step with the browser's session. Only `/mcp/tab` reads it. */
+export function sessionCookie(request: Request): string | null {
+  for (const part of (request.headers.get('cookie') ?? '').split(';')) {
+    const [name, value] = part.trim().split('=');
+    if (name === 'sb-access-token' && value) {
+      try {
+        return decodeURIComponent(value);
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
 }
 
 export async function checkToken(token: string, env: Env, fetchImpl: typeof fetch): Promise<TokenCheck> {

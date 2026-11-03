@@ -24,13 +24,13 @@ class FakeSocket {
 
 const USER = '11111111-1111-4111-8111-111111111111';
 
-function setup(handle: CommandHandler = async () => ({ ok: true, result: {} }), session: unknown = undefined) {
+function setup(handle: CommandHandler = async () => ({ ok: true, result: {} }), prepareSession = async () => true) {
   const sockets: FakeSocket[] = [];
   const onState = vi.fn();
+  const prepare = vi.fn(prepareSession);
   const client = createAssistantControlClient({
     origin: 'https://strudel.test',
-    getSession: async () =>
-      (session === undefined ? { userId: USER, accessToken: 'SECRET.TOKEN.VALUE' } : session) as never,
+    prepareSession: prepare,
     handle,
     onState,
     createSocket: (url) => {
@@ -39,7 +39,7 @@ function setup(handle: CommandHandler = async () => ({ ok: true, result: {} }), 
       return socket as unknown as WebSocket;
     },
   });
-  return { client, sockets, onState };
+  return { client, sockets, onState, prepare };
 }
 const flush = async () => {
   for (let i = 0; i < 5; i++) await Promise.resolve();
@@ -61,14 +61,25 @@ describe('connecting', () => {
     expect(sockets).toEqual([]);
   });
 
-  it('sends the token as the first message and never in the address', async () => {
+  it('has nothing about the user or the token in the address, and sends neither on opening', async () => {
     const { client, sockets } = setup();
     client.start();
     await flush();
-    expect(sockets[0].url).toBe(`wss://strudel.test/mcp/tab?u=${USER}`);
-    expect(sockets[0].url).not.toContain('TOKEN');
+    expect(sockets[0].url).toBe('wss://strudel.test/mcp/tab');
     sockets[0].onopen!();
-    expect(JSON.parse(sockets[0].sent[0])).toEqual({ type: 'auth', token: 'SECRET.TOKEN.VALUE' });
+    expect(sockets[0].sent).toEqual([]);
+  });
+
+  it('brings the session up to date before it opens, which renews an expired cookie', async () => {
+    const order: string[] = [];
+    const { client, sockets } = setup(undefined, async () => {
+      order.push(`session, with ${sockets.length} sockets`);
+      return true;
+    });
+    client.start();
+    await flush();
+    expect(order).toEqual(['session, with 0 sockets']);
+    expect(sockets).toHaveLength(1);
   });
 
   it('reports connected once the relay accepts it', async () => {
@@ -84,11 +95,11 @@ describe('connecting', () => {
     client.start();
     await flush();
     client.sendToken('NEW.TOKEN');
-    expect(JSON.parse(sockets[0].sent.at(-1)!)).toEqual({ type: 'auth', token: 'NEW.TOKEN' });
+    expect(JSON.parse(sockets[0].sent.at(-1)!)).toEqual({ type: 'token', token: 'NEW.TOKEN' });
   });
 
   it('opens nothing with no session', async () => {
-    const { client, sockets } = setup(undefined, null);
+    const { client, sockets } = setup(undefined, async () => false);
     client.start();
     await flush();
     expect(sockets).toEqual([]);
@@ -171,6 +182,54 @@ describe('staying connected', () => {
     expect(sockets).toHaveLength(2);
     await vi.advanceTimersByTimeAsync(1_000);
     expect(sockets).toHaveLength(3);
+  });
+
+  it('does not loop on a refused upgrade: each try waits longer, and renews the session first', async () => {
+    const { client, sockets, prepare } = setup();
+    client.start();
+    await flush();
+    // A refused upgrade: closed, and never `ready`.
+    const waits = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000];
+    for (const [i, ms] of waits.entries()) {
+      sockets[i].onclose!({ code: 1006 });
+      await vi.advanceTimersByTimeAsync(ms - 1);
+      expect(sockets).toHaveLength(i + 1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(sockets).toHaveLength(i + 2);
+    }
+    expect(prepare).toHaveBeenCalledTimes(waits.length + 1);
+  });
+
+  it('keeps waiting, and opens nothing, while there is no session', async () => {
+    const { client, sockets, prepare } = setup(undefined, async () => false);
+    client.start();
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(sockets).toEqual([]);
+    expect(prepare).toHaveBeenCalledTimes(3);
+  });
+
+  it('goes back to a quick retry only once the relay has accepted a socket', async () => {
+    const { client, sockets } = setup();
+    client.start();
+    await flush();
+    sockets[0].onclose!({ code: 1006 });
+    await vi.advanceTimersByTimeAsync(1_000);
+    sockets[1].onmessage!({ data: JSON.stringify({ type: 'ready', tabId: 'x' }) });
+    sockets[1].onclose!({ code: 1006 });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(sockets).toHaveLength(3);
+  });
+
+  it('waits longer after the relay said the session ended', async () => {
+    const { client, sockets } = setup();
+    client.start();
+    await flush();
+    sockets[0].onmessage!({ data: JSON.stringify({ type: 'ready', tabId: 'x' }) });
+    sockets[0].onclose!({ code: 4401 });
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(sockets).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(sockets).toHaveLength(2);
   });
 
   it('pings, and closes a socket that stops answering so that it reconnects', async () => {
