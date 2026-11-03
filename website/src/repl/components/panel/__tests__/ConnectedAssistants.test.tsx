@@ -171,7 +171,8 @@ describe('Connected assistants', () => {
   });
 
   it('a refresh read before a Disconnect finished does not bring the assistant back', async () => {
-    vi.useFakeTimers();
+    // Only the refresh interval: faking the rest makes React and i18next spin forever on Node 24.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     try {
       container = document.createElement('div');
       document.body.appendChild(container);
@@ -180,8 +181,10 @@ describe('Connected assistants', () => {
         root!.render(<ConnectedAssistants api={api} />);
         await vi.advanceTimersByTimeAsync(0);
       });
-      for (let i = 0; i < 5 && !container.querySelector('li'); i++) {
-        await act(async () => vi.advanceTimersByTimeAsync(20));
+      for (let i = 0; i < 100 && !container.querySelector('li'); i++) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        });
       }
       let answerList: (response: Response) => void = () => {};
       fetchMock.mockImplementationOnce(() => new Promise((resolve) => (answerList = resolve)));
@@ -204,7 +207,8 @@ describe('Connected assistants', () => {
   });
 
   it('does not poll in a hidden tab, and catches up on its return', async () => {
-    vi.useFakeTimers();
+    // Only the refresh interval: faking the rest makes React and i18next spin forever on Node 24.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     const visibility = vi.spyOn(document, 'visibilityState', 'get');
     try {
       visibility.mockReturnValue('visible');
@@ -274,7 +278,8 @@ describe('Connected assistants', () => {
   });
 
   it('refreshes the list while open, so a new assistant appears within 30 seconds', async () => {
-    vi.useFakeTimers();
+    // Only the refresh interval: faking the rest makes React and i18next spin forever on Node 24.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     try {
       fetchMock.mockImplementation(async () => json([]));
       container = document.createElement('div');
@@ -284,8 +289,10 @@ describe('Connected assistants', () => {
         root!.render(<ConnectedAssistants api={api} />);
         await vi.advanceTimersByTimeAsync(0);
       });
-      for (let i = 0; i < 5 && !text().includes('No assistant'); i++) {
-        await act(async () => vi.advanceTimersByTimeAsync(20));
+      for (let i = 0; i < 100 && !text().includes('No assistant'); i++) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        });
       }
       expect(text()).toContain('No assistant');
       expect(LIST_REFRESH_MS).toBeLessThanOrEqual(30_000);
@@ -298,7 +305,8 @@ describe('Connected assistants', () => {
   });
 
   it('a refresh that fails leaves the list as it was', async () => {
-    vi.useFakeTimers();
+    // Only the refresh interval: faking the rest makes React and i18next spin forever on Node 24.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     try {
       container = document.createElement('div');
       document.body.appendChild(container);
@@ -307,8 +315,10 @@ describe('Connected assistants', () => {
         root!.render(<ConnectedAssistants api={api} />);
         await vi.advanceTimersByTimeAsync(0);
       });
-      for (let i = 0; i < 5 && !text().includes('Claude Code'); i++) {
-        await act(async () => vi.advanceTimersByTimeAsync(20));
+      for (let i = 0; i < 100 && !text().includes('Claude Code'); i++) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        });
       }
       fetchMock.mockImplementation(async () => json({ msg: 'boom' }, 500));
       await act(async () => vi.advanceTimersByTimeAsync(LIST_REFRESH_MS));
@@ -320,7 +330,8 @@ describe('Connected assistants', () => {
   });
 
   it('stops refreshing when closed', async () => {
-    vi.useFakeTimers();
+    // Only the refresh interval: faking the rest makes React and i18next spin forever on Node 24.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     try {
       container = document.createElement('div');
       document.body.appendChild(container);
