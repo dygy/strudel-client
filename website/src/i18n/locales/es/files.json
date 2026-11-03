@@ -133,6 +133,34 @@
   "loadingTracks": "Cargando tus pistas...",
   "loadingTracksDescription": "Por favor espera mientras obtenemos tus datos de la nube",
 
+  "trackConflict": {
+
+  
+  "message": "Esta pista se ha cambiado en otro lugar",
+
+  
+  "detail": "El autoguardado está en pausa para esta pista hasta que elijas.",
+
+  
+  "restoredDetail": "Tienes texto anterior sin guardar. El autoguardado está en pausa para esta pista hasta que elijas.",
+
+  
+  "deletedDetail": "\"{{name}}\" ya no existe en tu biblioteca. Conservar el mío guarda tu texto como una pista de nuevo.",
+
+  
+  "loadNew": "Cargar la versión nueva",
+
+  
+  "keepMine": "Conservar el mío",
+
+  
+  "discard": "Descartar mi texto",
+
+  
+  "failed": "No ha funcionado, pero tu texto está a salvo. Inténtalo de nuevo."
+
+  },
+
   "errors": {
     "loadFailed": "Error al cargar archivos",
     "createTrackFailed": "Error al crear pista",

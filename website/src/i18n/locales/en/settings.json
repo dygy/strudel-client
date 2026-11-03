@@ -168,5 +168,19 @@
   "equalizerPresetSpokenWord": "Spoken Word",
   "equalizerPresetTrebleBoost": "Treble Boost",
   "equalizerPresetTrebleReducer": "Treble Reducer",
-  "equalizerPresetVocal": "Vocal Boost"
+  "equalizerPresetVocal": "Vocal Boost",
+  "connectedAssistants": {
+    "title": "Connected assistants",
+    "empty": "No assistant is connected.",
+    "setupLink": "How to connect one",
+    "connectedOn": "Connected on {{date}}",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting...",
+    "loading": "Loading...",
+    "failed": "Could not load the list. Please try again.",
+    "disconnectFailed": "Could not disconnect. Please try again.",
+    "retry": "Try again",
+    "unnamed": "An unnamed assistant",
+    "help": "Disconnect ends access through Strudel at once. A copy of its access key that the assistant kept can still reach your data directly for up to an hour."
+  }
 }

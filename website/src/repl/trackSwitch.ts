@@ -99,6 +99,18 @@ export function createTrackSwitchController() {
       editorTrackId = id || null;
     },
 
+    /**
+     * A deleted track was saved again under a new id (spec 018): the same music, so what plays and
+     * what's in the editor stay the same track, and the next Update stays a hot-swap.
+     */
+    replaceTrackId(oldId: string, newId: string) {
+      if (playingTrackId === oldId) playingTrackId = newId;
+      if (editorTrackId === oldId) editorTrackId = newId;
+      for (const [code, id] of startedEvaluations) {
+        if (id === oldId) startedEvaluations.set(code, newId);
+      }
+    },
+
     /** An evaluate of `code` starts now, for `trackId` (default: the editor's track). */
     evaluationStarted,
 

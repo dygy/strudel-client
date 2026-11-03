@@ -7,6 +7,7 @@
  */
 
 import { URLParser } from '../routing/URLParser';
+import { flushTrackConflictDraft, hasOpenTrackConflict } from './trackConflict';
 
 interface SaveManager {
   fileManagerHook: any;
@@ -46,6 +47,8 @@ class GlobalSaveManager {
    */
   hasUnsavedChanges(): boolean {
     if (!this.saveManager) return false;
+    // A conflict's text is in its draft, and must not be saved over the other version.
+    if (hasOpenTrackConflict()) return false;
 
     try {
       const { fileManagerHook, context } = this.saveManager;
@@ -92,6 +95,12 @@ class GlobalSaveManager {
   async performEmergencySave(): Promise<boolean> {
     if (!this.saveManager || this.isSaving) {
       return false;
+    }
+
+    // During a conflict an emergency save writes nothing: the text goes to the draft instead.
+    if (hasOpenTrackConflict()) {
+      flushTrackConflictDraft();
+      return true;
     }
 
     this.isSaving = true;
@@ -188,6 +197,7 @@ export const globalSaveManager = new GlobalSaveManager();
 // Setup global beforeunload handler
 if (typeof window !== 'undefined') {
   const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+    flushTrackConflictDraft();
     if (globalSaveManager.hasUnsavedChanges()) {
       console.log('🚨 Global beforeunload: Unsaved changes detected (URL-based)');
 
@@ -211,6 +221,7 @@ if (typeof window !== 'undefined') {
   };
 
   const handleVisibilityChange = () => {
+    flushTrackConflictDraft();
     if (document.visibilityState === 'hidden' && globalSaveManager.hasUnsavedChanges()) {
       console.log('🚨 Global visibilitychange: Performing emergency save (URL-based)');
       globalSaveManager.performEmergencySave();
@@ -218,6 +229,7 @@ if (typeof window !== 'undefined') {
   };
 
   const handlePageHide = () => {
+    flushTrackConflictDraft();
     if (globalSaveManager.hasUnsavedChanges()) {
       console.log('🚨 Global pagehide: Performing emergency save (URL-based)');
       globalSaveManager.performEmergencySave();

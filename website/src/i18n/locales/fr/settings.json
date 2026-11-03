@@ -168,5 +168,19 @@
   "equalizerPresetSpokenWord": "Parole",
   "equalizerPresetTrebleBoost": "Amplification des aigus",
   "equalizerPresetTrebleReducer": "Réduction des aigus",
-  "equalizerPresetVocal": "Amplification vocale"
+  "equalizerPresetVocal": "Amplification vocale",
+  "connectedAssistants": {
+    "title": "Assistants connectés",
+    "empty": "Aucun assistant n'est connecté.",
+    "setupLink": "Comment en connecter un",
+    "connectedOn": "Connecté le {{date}}",
+    "disconnect": "Déconnecter",
+    "disconnecting": "Déconnexion...",
+    "loading": "Chargement...",
+    "failed": "Impossible de charger la liste. Veuillez réessayer.",
+    "disconnectFailed": "Impossible de déconnecter. Veuillez réessayer.",
+    "retry": "Réessayer",
+    "unnamed": "Un assistant sans nom",
+    "help": "Déconnecter met fin immédiatement à l'accès via Strudel. Une copie de sa clé d'accès conservée par l'assistant peut encore atteindre directement vos données pendant une heure au maximum."
+  }
 }

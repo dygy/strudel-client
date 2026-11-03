@@ -4,6 +4,7 @@
  */
 
 import { ensureValidSession } from './authUtils';
+import { sameContent, serverTrackFromRow, trackVersions, VersionConflictError } from '../repl/trackVersion';
 
 export interface Track {
   id: string;
@@ -16,6 +17,8 @@ export interface Track {
   steps: any[];
   activeStep: number;
   user_id: string;
+  /** The row's updated_at: what a save names as the version it read (spec 018). */
+  version?: string;
 }
 
 export interface Folder {
@@ -43,6 +46,18 @@ export interface User {
     picture?: string;
     [key: string]: any;
   };
+}
+
+/** A refused request. The message is what callers always got; status and body are for those who ask. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly data: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
 }
 
 class SecureApiClient {
@@ -103,7 +118,7 @@ class SecureApiClient {
         }
       }
 
-      throw new Error(errorData.error || `HTTP ${response.status}`);
+      throw new ApiError(errorData.error || `HTTP ${response.status}`, response.status, errorData);
     }
 
     return response.json();
@@ -168,24 +183,83 @@ class SecureApiClient {
     });
   }
 
-  async updateTrack(trackId: string, updates: Partial<Track>): Promise<{ track: Track }> {
+  private sendTrackUpdate(trackId: string, updates: Partial<Track>, expectedVersion?: string) {
     return this.request('/tracks/update', {
       method: 'PUT',
-      body: JSON.stringify({ trackId, updates }),
+      body: JSON.stringify({ trackId, updates, ...(expectedVersion ? { expectedVersion } : {}) }),
+    });
+  }
+
+  /**
+   * Every save goes through here (spec 018, tech 2.6). It names the version this tab last synced
+   * with, so it can't overwrite a change made elsewhere, and moves that baseline to the version the
+   * server returns. Raises VersionConflictError when the server holds different content, and an
+   * ApiError with status 404 when the track is gone.
+   *
+   * `force` is for a user's explicit overwrite (import): no version check, and the baseline stays,
+   * so an open tab still finds out that its copy is out of date.
+   */
+  async updateTrack(
+    trackId: string,
+    updates: Partial<Track>,
+    { force = false }: { force?: boolean } = {},
+  ): Promise<{ track: Track }> {
+    if (force) {
+      return trackVersions.serialize(trackId, () => this.sendTrackUpdate(trackId, updates));
+    }
+    return trackVersions.serialize(trackId, async () => {
+      if (trackVersions.isPaused(trackId)) throw new VersionConflictError(trackId, null);
+
+      // At most one retry: after a conflict that turned out to change no content.
+      for (let attempt = 0; ; attempt++) {
+        const baseline = trackVersions.get(trackId);
+        try {
+          const result = await this.sendTrackUpdate(trackId, updates, baseline?.version);
+          const saved = serverTrackFromRow(result.track);
+          if (saved) trackVersions.set(trackId, saved);
+          else trackVersions.forget(trackId);
+          return result;
+        } catch (error: unknown) {
+          if (!(error instanceof ApiError) || error.status !== 409 || error.data.code !== 'version_conflict') {
+            throw error;
+          }
+          const current = serverTrackFromRow(error.data.current);
+          if (!current) throw new VersionConflictError(trackId, null);
+          // The server already holds exactly what this save is writing (an earlier attempt landed
+          // and its answer was lost): nothing can be overwritten and nothing is left to do.
+          const merged = { code: updates.code ?? current.code, steps: updates.steps ?? current.steps };
+          if (sameContent(merged, current)) {
+            trackVersions.set(trackId, current);
+            return { track: error.data.current as Track };
+          }
+          // Only the version moved (a folder move or a rename): save again on top of it.
+          if (attempt === 0 && baseline && sameContent(baseline, current)) {
+            trackVersions.set(trackId, current);
+            continue;
+          }
+          throw new VersionConflictError(trackId, current);
+        }
+      }
     });
   }
 
   async deleteTrack(trackId: string): Promise<{ success: boolean }> {
-    return this.request('/tracks/delete', {
-      method: 'DELETE',
-      body: JSON.stringify({ trackId }),
+    return trackVersions.serialize(trackId, async () => {
+      const result = await this.request('/tracks/delete', {
+        method: 'DELETE',
+        body: JSON.stringify({ trackId }),
+      });
+      trackVersions.forget(trackId);
+      return result;
     });
   }
 
   async deleteAllTracks(): Promise<{ success: boolean }> {
-    return this.request('/tracks/delete-all', {
-      method: 'DELETE',
-    });
+    return trackVersions.bulk(() =>
+      this.request('/tracks/delete-all', {
+        method: 'DELETE',
+      }),
+    );
   }
 
   // Folders
@@ -235,9 +309,9 @@ export const db = {
         return { data: null, error };
       }
     },
-    update: async (id: string, updates: Partial<Track>) => {
+    update: async (id: string, updates: Partial<Track>, options?: { force?: boolean }) => {
       try {
-        const result = await secureApi.updateTrack(id, updates);
+        const result = await secureApi.updateTrack(id, updates, options);
         return { data: result.track, error: null };
       } catch (error) {
         return { data: null, error };

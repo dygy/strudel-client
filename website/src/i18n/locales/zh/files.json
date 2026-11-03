@@ -133,6 +133,34 @@
   "loadingTracks": "正在加载您的音轨...",
   "loadingTracksDescription": "请稍候，我们正在从云端获取您的数据",
 
+  "trackConflict": {
+
+  
+  "message": "此音轨已在其他地方被更改",
+
+  
+  "detail": "在你做出选择之前，此音轨的自动保存已暂停。",
+
+  
+  "restoredDetail": "你有之前未保存的文本。在你做出选择之前，此音轨的自动保存已暂停。",
+
+  
+  "deletedDetail": "“{{name}}”已不在你的音乐库中。“保留我的”会将你的文本重新保存为音轨。",
+
+  
+  "loadNew": "加载新版本",
+
+  
+  "keepMine": "保留我的",
+
+  
+  "discard": "丢弃我的文本",
+
+  
+  "failed": "操作未成功，你的文本是安全的。请重试。"
+
+  },
+
   "errors": {
     "loadFailed": "加载文件失败",
     "createTrackFailed": "创建音轨失败",

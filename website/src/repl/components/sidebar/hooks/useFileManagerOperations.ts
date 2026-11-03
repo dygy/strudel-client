@@ -21,6 +21,7 @@ import {
 import { validateTrackName, generateUniqueTrackName } from '@src/lib/trackValidation';
 import { followedTrackUrl, resolveTrackFolder, trackNameClashes } from '@src/lib/trackRename';
 import { stepFileNames } from '@src/lib/multitrackZip';
+import { trackVersions } from '../../../trackVersion';
 import type { Track, TrackStep, Folder } from '../types/fileManager';
 
 interface UseFileManagerOperationsProps {
@@ -635,6 +636,10 @@ export function useFileManagerOperations({
           const data = await response.json().catch(() => ({}));
           console.error('FileManager - track update refused:', response.status, data);
           failure = response.status === 409 ? 'duplicate' : 'failed';
+        } else {
+          // The rename moved the version; if the content is what this tab knows, nothing else did.
+          const data = await response.json().catch(() => ({}));
+          trackVersions.adoptIfSameContent(trackId, data.track);
         }
       } catch (error: unknown) {
         console.error('FileManager - track update failed:', error);

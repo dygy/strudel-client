@@ -17,6 +17,7 @@ import { userPattern } from '@src/user_pattern_utils';
 import { useTracks } from '@src/hooks/useTracks';
 import { DEFAULT_TRACK_CODE } from '@src/constants/defaultCode';
 import { GlobalToastContainer } from '@src/components/GlobalToastContainer';
+import { TrackConflictNotice } from './TrackConflictNotice';
 import { nanoid } from 'nanoid';
 import { useState, useEffect, memo, useRef } from 'react';
 import { getPendingCode, clearPendingCode, getEditorInstance, setPendingCode } from '../../stores/editorStore';
@@ -412,6 +413,7 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
     >
       <Loader active={pending} />
       <Header context={context} trackName={currentTrackName(fileManagerHook)} />
+      {!readOnly && <TrackConflictNotice controller={fileManagerHook?.trackConflict ?? null} />}
 
       <div className="grow flex relative overflow-hidden">
         {/* Spec 016: compact drawer slot, desktop sidebar slot, then the editor. Each slot keeps its

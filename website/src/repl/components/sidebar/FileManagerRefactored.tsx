@@ -534,12 +534,17 @@ export function FileManagerRefactored({
 
       if (existing) {
         // Update existing track
-        const { data, error } = await db.tracks.update(existing.id, {
-          code: importData.code,
-          isMultitrack: importData.isMultitrack,
-          steps: importData.steps,
-          activeStep: importData.activeStep,
-        });
+        const { data, error } = await db.tracks.update(
+          existing.id,
+          {
+            code: importData.code,
+            isMultitrack: importData.isMultitrack,
+            steps: importData.steps,
+            activeStep: importData.activeStep,
+            // The user chose to overwrite this track, so there's no version to check.
+          },
+          { force: true },
+        );
 
         if (!error && data) {
           toastActions.success(t('files:trackImported', { name: importData.name }));

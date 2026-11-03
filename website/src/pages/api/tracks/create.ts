@@ -120,6 +120,7 @@ export const POST: APIRoute = async ({ request }) => {
       steps: newTrack.steps || [],
       activeStep: newTrack.active_step || 0,
       user_id: newTrack.user_id,
+      version: newTrack.updated_at,
     };
 
     return new Response(

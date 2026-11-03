@@ -168,5 +168,19 @@
   "equalizerPresetSpokenWord": "语音",
   "equalizerPresetTrebleBoost": "高音增强",
   "equalizerPresetTrebleReducer": "高音减弱",
-  "equalizerPresetVocal": "人声增强"
+  "equalizerPresetVocal": "人声增强",
+  "connectedAssistants": {
+    "title": "已连接的助手",
+    "empty": "没有已连接的助手。",
+    "setupLink": "如何连接助手",
+    "connectedOn": "连接于 {{date}}",
+    "disconnect": "断开连接",
+    "disconnecting": "正在断开...",
+    "loading": "加载中...",
+    "failed": "无法加载列表。请重试。",
+    "disconnectFailed": "无法断开连接。请重试。",
+    "retry": "重试",
+    "unnamed": "未命名的助手",
+    "help": "断开连接会立即终止通过 Strudel 的访问。助手保留的访问密钥副本在最多一小时内仍可直接访问你的数据。"
+  }
 }

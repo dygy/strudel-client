@@ -20,6 +20,8 @@ export interface Track {
   steps: any[];
   activeStep: number;
   user_id: string;
+  /** The row's updated_at: what a save names as the version it read (spec 018). */
+  version?: string;
 }
 
 export interface Folder {

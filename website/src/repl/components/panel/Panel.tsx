@@ -359,7 +359,7 @@ function PanelContent({ context, tab }: PanelContentProps) {
         return <FilesTab />;
       case 'settings':
       default:
-        return <SettingsTab started={context.started} mixer={context.mixer} />;
+        return <SettingsTab started={context.started} mixer={context.mixer} readOnly={context.readOnly} />;
     }
   };
 

@@ -168,5 +168,19 @@
   "equalizerPresetSpokenWord": "Речь",
   "equalizerPresetTrebleBoost": "Усиление высоких",
   "equalizerPresetTrebleReducer": "Ослабление высоких",
-  "equalizerPresetVocal": "Усиление вокала"
+  "equalizerPresetVocal": "Усиление вокала",
+  "connectedAssistants": {
+    "title": "Подключённые ассистенты",
+    "empty": "Нет подключённых ассистентов.",
+    "setupLink": "Как подключить",
+    "connectedOn": "Подключён {{date}}",
+    "disconnect": "Отключить",
+    "disconnecting": "Отключаем...",
+    "loading": "Загрузка...",
+    "failed": "Не удалось загрузить список. Попробуйте ещё раз.",
+    "disconnectFailed": "Не удалось отключить. Попробуйте ещё раз.",
+    "retry": "Повторить",
+    "unnamed": "Ассистент без названия",
+    "help": "Отключение сразу прекращает доступ через Strudel. Копия ключа доступа, сохранённая ассистентом, ещё может напрямую обращаться к вашим данным в течение часа."
+  }
 }

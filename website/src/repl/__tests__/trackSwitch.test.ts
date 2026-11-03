@@ -199,3 +199,34 @@ describe('createTrackSwitchController', () => {
     expect(switchTrack).toHaveBeenCalledWith('s("bd")', { reset: true });
   });
 });
+
+describe('replaceTrackId (spec 018: a deleted track saved again under a new id)', () => {
+  it('keeps the next Update a hot-swap, with the same music playing', () => {
+    const controller = createTrackSwitchController();
+    controller.setEditorTrack('old');
+    controller.evaluationStarted('code');
+    controller.evaluated('code');
+    controller.replaceTrackId('old', 'new');
+    expect(controller.playingTrackId).toBe('new');
+    expect(controller.editorTrackId).toBe('new');
+    expect(controller.decide(true)).toBe('hot-swap');
+  });
+
+  it('an evaluate already under way lands on the new id', () => {
+    const controller = createTrackSwitchController();
+    controller.setEditorTrack('old');
+    controller.evaluationStarted('code');
+    controller.replaceTrackId('old', 'new');
+    controller.evaluated('code');
+    expect(controller.playingTrackId).toBe('new');
+  });
+
+  it('leaves other tracks alone', () => {
+    const controller = createTrackSwitchController();
+    controller.setEditorTrack('other');
+    controller.evaluationStarted('code');
+    controller.evaluated('code');
+    controller.replaceTrackId('old', 'new');
+    expect(controller.playingTrackId).toBe('other');
+  });
+});

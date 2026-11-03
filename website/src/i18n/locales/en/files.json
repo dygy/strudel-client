@@ -133,6 +133,34 @@
   "loadingTracks": "Loading your tracks...",
   "loadingTracksDescription": "Please wait while we fetch your data from the cloud",
   
+  "trackConflict": {
+  
+    
+  "message": "This track was changed elsewhere",
+  
+    
+  "detail": "Autosave is paused for this track until you choose.",
+  
+    
+  "restoredDetail": "You have text from earlier that was not saved. Autosave is paused for this track until you choose.",
+  
+    
+  "deletedDetail": "\"{{name}}\" no longer exists in your library. Keep mine saves your text as a track again.",
+  
+    
+  "loadNew": "Load the new version",
+  
+    
+  "keepMine": "Keep mine",
+  
+    
+  "discard": "Discard my text",
+  
+    
+  "failed": "That did not work, and your text is safe. Please try again."
+  
+  },
+  
   "errors": {
     "loadFailed": "Failed to load files",
     "createTrackFailed": "Failed to create track",

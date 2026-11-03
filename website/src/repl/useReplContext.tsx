@@ -101,6 +101,7 @@ interface ReplContext {
   transitionController?: TrackTransitionController | null;
   /** The editor now holds track `id` without going through handleUpdate (e.g. same code already loaded). */
   setEditorTrackId?: (id: string | null | undefined) => void;
+  replaceTrackId?: (oldId: string, newId: string) => void;
   isRecording?: boolean;
   recordingElapsedSeconds?: number;
   handleRecordToggle?: () => void;
@@ -965,6 +966,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     previewEngine: mixer,
     transitionController: transitionControllerRef.current,
     setEditorTrackId: trackSwitch.setEditorTrack,
+    replaceTrackId: trackSwitch.replaceTrackId,
     isRecording: audioRecorder.isRecording,
     recordingElapsedSeconds: audioRecorder.elapsedSeconds,
     handleRecordToggle: audioRecorder.handleRecordToggle,

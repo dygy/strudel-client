@@ -242,8 +242,54 @@ describe('what the page tells the user before they allow', () => {
     expect(text()).toContain('client.test');
   });
 
-  it('says the assistant can permanently delete tracks and folders', async () => {
+  it('lists everything it will be able to do, including permanent deletion', async () => {
     await open('/oauth/consent/?authorization_id=auth-1');
-    expect(text()).toContain('permanently delete');
+    const items = [...container!.querySelectorAll('li')].map((li) => li.textContent);
+    expect(items).toEqual([
+      'Read and search your tracks and folders',
+      'Create, change, rename and move your tracks and folders',
+      'Permanently delete tracks, steps and empty folders. Deleted tracks cannot be restored.',
+      'Control a Strudel tab, only in a tab where you turn that on',
+    ]);
+  });
+
+  it('warns when the assistant only returns to this computer', async () => {
+    fetchMock.mockImplementation(async () => json({ ...DETAILS, redirect_uri: 'http://localhost:33418/callback' }));
+    await open('/oauth/consent/?authorization_id=auth-1');
+    expect(text()).toContain('localhost:33418');
+    expect(container!.querySelector('[data-testid="consent-localhost-warning"]')).not.toBeNull();
+  });
+
+  it.each(['http://127.0.0.1:9/cb', 'http://[::1]:9/cb'])('treats %s as this computer too', async (redirect_uri) => {
+    fetchMock.mockImplementation(async () => json({ ...DETAILS, redirect_uri }));
+    await open('/oauth/consent/?authorization_id=auth-1');
+    expect(container!.querySelector('[data-testid="consent-localhost-warning"]')).not.toBeNull();
+  });
+
+  it.each(['https://client.test/callback', 'https://localhost.evil.test/cb', 'cursor://x/cb'])(
+    'does not warn for %s',
+    async (redirect_uri) => {
+      fetchMock.mockImplementation(async () => json({ ...DETAILS, redirect_uri }));
+      await open('/oauth/consent/?authorization_id=auth-1');
+      expect(container!.querySelector('[data-testid="consent-localhost-warning"]')).toBeNull();
+    },
+  );
+
+  it('says access was refused after Deny, and still returns to the assistant', async () => {
+    await open('/oauth/consent/?authorization_id=auth-1');
+    fetchMock.mockImplementation(async () => json({ redirect_url: `${REDIRECT}&error=access_denied` }));
+    await click(deny());
+    await settle(() => navigate.mock.calls.length > 0);
+    expect(text()).toContain('Access was refused');
+    expect(navigate.mock.calls).toEqual([[`${REDIRECT}&error=access_denied`]]);
+  });
+
+  it('says it is returning after Allow, not that access was refused', async () => {
+    await open('/oauth/consent/?authorization_id=auth-1');
+    fetchMock.mockImplementation(async () => json({ redirect_url: REDIRECT }));
+    await click(allow());
+    await settle(() => navigate.mock.calls.length > 0);
+    expect(text()).not.toContain('Access was refused');
+    expect(text()).toContain('Returning to the assistant');
   });
 });

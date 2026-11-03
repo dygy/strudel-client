@@ -1,6 +1,6 @@
 /**
  * /oauth/consent: where Supabase's OAuth server sends the user to approve an assistant (spec 018).
- * Minimum form for now: the client's name, what it may do, where it returns, Allow and Deny.
+ * Shows the client's name, everything it will be able to do, where it returns, Allow and Deny.
  *
  * The only navigations here are to /login, keeping `authorization_id`, and to a `redirect_url`
  * exactly as the API returned it. Nothing from this page's own URL can choose where the browser goes.
@@ -48,9 +48,20 @@ function returnHost(redirectUri: string): string {
   }
 }
 
+/** Every address it returns to is this computer's, so anyone can claim to be anything there. */
+function isLocalOnly(redirectUri: string): boolean {
+  try {
+    const { hostname } = new URL(redirectUri);
+    return hostname === 'localhost' || hostname === '[::1]' || /^127\./.test(hostname);
+  } catch {
+    return false;
+  }
+}
+
 type State =
   | { status: 'loading' }
   | { status: 'redirecting' }
+  | { status: 'denied' }
   | { status: 'missing' }
   | { status: 'failed' }
   | { status: 'ready'; details: OAuthAuthorizationDetails; busy: boolean; actionFailed: boolean };
@@ -105,7 +116,7 @@ export default function ConsentPage({ deps: injected }: { deps?: ConsentPageDeps
     setState({ status: 'ready', details, busy: true, actionFailed: false });
     try {
       const { redirect_url } = await deps.api[action](details.authorization_id);
-      setState({ status: 'redirecting' });
+      setState({ status: action === 'deny' ? 'denied' : 'redirecting' });
       deps.navigate(redirect_url);
     } catch (error: unknown) {
       if (isSessionRejected(error)) {
@@ -125,6 +136,7 @@ export default function ConsentPage({ deps: injected }: { deps?: ConsentPageDeps
 
         {state.status === 'loading' && <p className="text-gray-600">{t('consent.loading')}</p>}
         {state.status === 'redirecting' && <p className="text-gray-600">{t('consent.redirecting')}</p>}
+        {state.status === 'denied' && <p className="text-gray-700">{t('consent.denied')}</p>}
         {state.status === 'missing' && <p className="text-red-600">{t('consent.missingRequest')}</p>}
         {state.status === 'failed' && <p className="text-red-600">{t('consent.failed')}</p>}
 
@@ -133,10 +145,24 @@ export default function ConsentPage({ deps: injected }: { deps?: ConsentPageDeps
             <p className="mb-3 text-gray-700">
               {t('consent.request', { client: state.details.client?.name || t('consent.unnamedClient') })}
             </p>
-            <p className="mb-3 text-gray-700">{t('consent.access')}</p>
-            <p className="mb-6 text-sm text-gray-600">
+            <p className="mb-2 text-start font-medium text-gray-800">{t('consent.canHeading')}</p>
+            <ul className="mb-4 list-disc ps-5 text-start text-sm text-gray-700 space-y-1">
+              <li>{t('consent.canRead')}</li>
+              <li>{t('consent.canChange')}</li>
+              <li className="font-medium text-gray-900">{t('consent.canDelete')}</li>
+              <li>{t('consent.canLive')}</li>
+            </ul>
+            <p className="mb-4 text-sm text-gray-600">
               {t('consent.returnsTo', { host: returnHost(state.details.redirect_uri) })}
             </p>
+            {isLocalOnly(state.details.redirect_uri) && (
+              <p
+                data-testid="consent-localhost-warning"
+                className="mb-4 rounded-md bg-amber-50 p-2 text-start text-sm text-amber-900"
+              >
+                {t('consent.localhostWarning')}
+              </p>
+            )}
             {state.actionFailed && (
               <p role="alert" className="mb-4 text-red-600 text-sm">
                 {t('consent.actionFailed')}

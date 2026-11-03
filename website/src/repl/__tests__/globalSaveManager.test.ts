@@ -167,6 +167,87 @@ describe('GlobalSaveManager', () => {
     expect(globalSaveManager.hasUnsavedChanges()).toBe(false);
   });
 
+  describe('during a track conflict (spec 018)', () => {
+    /** A conflict open on the track in the editor, through the same module the manager reads. */
+    async function openConflict() {
+      const { createTrackConflictController, setActiveTrackConflictController, trackConflictStore } =
+        await import('../trackConflict');
+      const { createTrackVersions } = await import('../trackVersion');
+      const versions = createTrackVersions();
+      versions.setOpenTrack('track-1');
+      const storage = new Map<string, string>();
+      const controller = createTrackConflictController({
+        userId: 'u1',
+        versions,
+        storage: {
+          getItem: (k: string) => storage.get(k) ?? null,
+          setItem: (k: string, v: string) => void storage.set(k, v),
+          removeItem: (k: string) => void storage.delete(k),
+          key: () => null,
+          length: 0,
+        },
+        readVersion: async () => ({ status: 'unknown' }),
+        readTrack: async () => ({ status: 'unknown' }),
+        getEditorCode: () => '// typed during the conflict',
+        getLastSavedCode: () => '// original code',
+        getLocalTrack: () => ({ name: 'Test Track', folder: null, isMultitrack: false, steps: [], activeStep: 0 }),
+        setEditorCode: () => {},
+        saveCode: async () => {},
+        applySynced: () => {},
+        recreate: async () => false,
+        removeLocal: () => {},
+      });
+      setActiveTrackConflictController(controller);
+      trackConflictStore.set({
+        trackId: 'track-1',
+        trackName: 'Test Track',
+        kind: 'changed',
+        restored: false,
+        busy: false,
+        failed: false,
+      });
+      return {
+        storage,
+        cleanup: () => {
+          setActiveTrackConflictController(null);
+          trackConflictStore.set(null);
+        },
+      };
+    }
+
+    it('an emergency save writes nothing to the server, and keeps the text as a draft', async () => {
+      window.location.pathname = '/repl/track-1';
+      globalSaveManager.register(mockFileManagerHook, mockContext);
+      const { storage, cleanup } = await openConflict();
+
+      await expect(globalSaveManager.performEmergencySave()).resolves.toBe(true);
+
+      expect(mockFileManagerHook.saveSpecificTrack).not.toHaveBeenCalled();
+      expect(mockFileManagerHook.saveCurrentTrack).not.toHaveBeenCalled();
+      expect(JSON.parse(storage.get('strudel-conflict-draft:track-1')!).code).toBe('// typed during the conflict');
+      cleanup();
+    });
+
+    it('reports no unsaved changes: the draft holds them, so leaving asks nothing', async () => {
+      window.location.pathname = '/repl/track-1';
+      globalSaveManager.register(mockFileManagerHook, mockContext);
+      const { cleanup } = await openConflict();
+      expect(globalSaveManager.hasUnsavedChanges()).toBe(false);
+      cleanup();
+      expect(globalSaveManager.hasUnsavedChanges()).toBe(true);
+    });
+
+    it('leaving the page stores the draft, even though no save would run', async () => {
+      window.location.pathname = '/repl/track-1';
+      globalSaveManager.register(mockFileManagerHook, mockContext);
+      const { storage, cleanup } = await openConflict();
+      window.dispatchEvent(new Event('pagehide'));
+      expect(storage.get('strudel-conflict-draft:track-1')).toBeDefined();
+      expect(mockFileManagerHook.saveSpecificTrack).not.toHaveBeenCalled();
+      cleanup();
+    });
+  });
+
   it('should prevent concurrent saves', async () => {
     // Set URL to track-1
     window.location.pathname = '/repl/track-1';

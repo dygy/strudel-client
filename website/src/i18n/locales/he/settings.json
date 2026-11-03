@@ -168,5 +168,19 @@
   "equalizerPresetSpokenWord": "דיבור",
   "equalizerPresetTrebleBoost": "הגברת טרבל",
   "equalizerPresetTrebleReducer": "הפחתת טרבל",
-  "equalizerPresetVocal": "הגברת ווקאל"
+  "equalizerPresetVocal": "הגברת ווקאל",
+  "connectedAssistants": {
+    "title": "עוזרים מחוברים",
+    "empty": "אין עוזר מחובר.",
+    "setupLink": "איך לחבר עוזר",
+    "connectedOn": "חובר בתאריך {{date}}",
+    "disconnect": "ניתוק",
+    "disconnecting": "מתנתק...",
+    "loading": "בטעינה...",
+    "failed": "לא ניתן לטעון את הרשימה. נא לנסות שוב.",
+    "disconnectFailed": "לא ניתן לנתק. נא לנסות שוב.",
+    "retry": "לנסות שוב",
+    "unnamed": "עוזר ללא שם",
+    "help": "ניתוק מסיים מיד את הגישה דרך Strudel. עותק של מפתח הגישה שהעוזר שמר עדיין יכול להגיע לנתונים שלך ישירות עד שעה."
+  }
 }

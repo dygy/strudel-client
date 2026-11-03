@@ -64,6 +64,7 @@ export const GET: APIRoute = async ({ request }) => {
       steps: track.steps || [],
       activeStep: track.active_step || 0,
       user_id: track.user_id,
+      version: track.updated_at,
     }));
 
     const folders = (foldersData || []).map((folder) => ({

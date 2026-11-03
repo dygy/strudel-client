@@ -3,6 +3,7 @@ import { getAuthenticatedUser, AuthError } from '../_auth';
 import { userClient } from '../_userClient';
 import { readJsonObject, invalidDataResponse } from '../../../lib/apiBody';
 import { trackNameClashes, type NamedTrack, type PathedFolder } from '../../../lib/trackRename';
+import { invalidVersionResponse, isVersionToken, missOnVersion } from './_version';
 
 export const prerender = false;
 
@@ -12,7 +13,10 @@ const json = (body: unknown, status: number) =>
 /**
  * PUT /api/tracks/update — save (code, steps), rename and/or move one of the session user's tracks.
  * Every code save (autosave, Cmd+S, save-before-switch, emergency save) comes through here.
- * Body: `{ trackId, updates: { code?, steps?, isMultitrack?, activeStep?, name?, folder? } }`.
+ * Body: `{ trackId, updates: { code?, steps?, isMultitrack?, activeStep?, name?, folder? }, expectedVersion? }`.
+ * With `expectedVersion` (the `updated_at` the caller read) nothing is written unless the row is still
+ * at that version: 409 `version_conflict` otherwise. Without it, the write is unconditional, so a tab
+ * opened before this deploy keeps saving.
  * Only these fields are written: the query runs with the service-role key, so anything else sent
  * (user_id, id, created, …) is ignored.
  */
@@ -26,13 +30,16 @@ export const PUT: APIRoute = async ({ request }) => {
     if (!body) {
       return invalidDataResponse();
     }
-    const { trackId, updates } = body;
+    const { trackId, updates, expectedVersion } = body;
 
     if (!trackId || typeof trackId !== 'string') {
       return json({ error: 'Track ID is required' }, 400);
     }
     if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
       return json({ error: 'Updates object is required' }, 400);
+    }
+    if (expectedVersion !== undefined && !isVersionToken(expectedVersion)) {
+      return invalidVersionResponse();
     }
 
     const changes: {
@@ -120,12 +127,15 @@ export const PUT: APIRoute = async ({ request }) => {
       }
     }
 
-    const { data: updatedRows, error } = await supabase
+    // One UPDATE: the version check and the write can't be separated by another writer.
+    const update = supabase
       .from('tracks')
       .update({ ...changes, modified: new Date().toISOString() } as never)
       .eq('id', trackId)
-      .eq('user_id', user.id)
-      .select();
+      .eq('user_id', user.id);
+    const { data: updatedRows, error } = await (
+      expectedVersion === undefined ? update : update.eq('updated_at', expectedVersion)
+    ).select();
 
     if (error) {
       // unique (user_id, name, folder): a concurrent write took the name.
@@ -138,6 +148,7 @@ export const PUT: APIRoute = async ({ request }) => {
 
     const updatedTrack = Array.isArray(updatedRows) ? updatedRows[0] : updatedRows;
     if (!updatedTrack) {
+      if (expectedVersion !== undefined) return missOnVersion(supabase, trackId, user.id);
       return json({ error: 'Track not found' }, 404);
     }
 

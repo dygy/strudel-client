@@ -4,7 +4,10 @@ import { getActivePattern, setActivePattern, useActivePattern } from '@src/user_
 import { toastActions } from '@src/stores/toastStore';
 import { useTranslation } from '@src/i18n';
 import { useAuth } from '@src/hooks/useAuth';
-import { db, type Folder, type Track, secureApi } from '@src/lib/secureApi.ts';
+import { ApiError, db, type Folder, type Track, secureApi } from '@src/lib/secureApi.ts';
+import { trackVersions, VersionConflictError } from '../../../trackVersion';
+import { useTrackConflict } from '../../../hooks/useTrackConflict';
+import type { TrackConflictController, TrackDraft } from '../../../trackConflict';
 import { getEditorInstance, setPendingCode } from '@src/stores/editorStore.ts';
 import { tracksStore, tracksActions } from '@src/stores/tracksStore.ts';
 import { nanoid } from 'nanoid';
@@ -170,6 +173,7 @@ interface ReplContext {
   editorRef?: React.RefObject<{ code: string; setCode?: (code: string) => void }>;
   handleUpdate: (update: { id?: string; code: string; [key: string]: any }, replace?: boolean) => void;
   setEditorTrackId?: (id: string | null | undefined) => void;
+  replaceTrackId?: (oldId: string, newId: string) => void;
   trackRouter?: any;
 }
 
@@ -244,6 +248,9 @@ export function useSupabaseFileManager(
     >
   >(new Map());
 
+  // Spec 018: set below, once the functions it needs exist. saveSpecificTrack reads it at call time.
+  const conflictRef = useRef<TrackConflictController | null>(null);
+
   // Hooks
   const { isAutosaveEnabled, autosaveInterval } = useSettings();
   const activePattern = useActivePattern();
@@ -310,6 +317,7 @@ export function useSupabaseFileManager(
       const tracksObj = arrayToRecord(ssrData.tracks || []);
       const foldersObj = arrayToRecord(ssrData.folders || []);
 
+      trackVersions.seed(ssrData.tracks || []);
       setTracks(tracksObj);
       setFolders(foldersObj);
       setIsInitialized(true);
@@ -357,7 +365,9 @@ export function useSupabaseFileManager(
               steps: track.steps || [],
               activeStep: track.activeStep || 0,
               user_id: track.user_id,
+              version: track.version,
             }));
+            trackVersions.seed(tracks);
 
             const folders = foldersData.map((folder) => ({
               id: folder.id,
@@ -462,7 +472,9 @@ export function useSupabaseFileManager(
               steps: track.steps || [],
               activeStep: track.activeStep || 0,
               user_id: track.user_id,
+              version: track.version,
             }));
+            trackVersions.seed(tracks);
 
             const folders = foldersData.map((folder) => ({
               id: folder.id,
@@ -752,6 +764,14 @@ export function useSupabaseFileManager(
       }
 
       let currentCode = context.editorRef?.current?.code || context.activeCode || '';
+
+      // A conflict is open for this track: nothing is written until the user chooses. This is where
+      // autosave, Cmd+S, save-before-switch and emergency save all meet, and the text is kept.
+      if (trackVersions.isPaused(trackId)) {
+        conflictRef.current?.savePaused(trackId, currentCode);
+        return false;
+      }
+
       if (!currentCode.trim()) {
         if (showToast) toastActions.warning(t('files:noCodeToSave'));
         return false;
@@ -855,6 +875,15 @@ export function useSupabaseFileManager(
         console.log('SupabaseFileManager - saveSpecificTrack: SUCCESS for track:', trackId);
         return true;
       } catch (error) {
+        // Not a failed save: the notice takes over, with the text that was being written.
+        if (error instanceof VersionConflictError) {
+          conflictRef.current?.saveConflicted(trackId, codeToSave);
+          return false;
+        }
+        if (error instanceof ApiError && error.status === 404) {
+          conflictRef.current?.saveFoundGone(trackId, codeToSave);
+          return false;
+        }
         console.error('Error saving track to Supabase:', error);
         if (showToast) {
           toastActions.error(t('files:errors.saveFailed'));
@@ -1029,6 +1058,7 @@ export function useSupabaseFileManager(
 
         if (result.success && result.track) {
           console.log('✅ Track created successfully:', result.track.id, result.track.name);
+          trackVersions.seed([result.track]);
           setTracks((prev) => ({ ...prev, [result.track.id]: result.track }));
           toastActions.success(t('files:trackCreated'));
           return result.track;
@@ -1346,6 +1376,8 @@ export function useSupabaseFileManager(
           throw error;
         }
 
+        conflictRef.current?.trackDeletedHere(trackId);
+
         // Update local state
         setTracks((prev) => {
           const newTracks = { ...prev };
@@ -1401,6 +1433,7 @@ export function useSupabaseFileManager(
           console.error('Error deleting tracks:', tracksError);
           throw tracksError;
         }
+        trackIds.forEach((id) => conflictRef.current?.trackDeletedHere(id));
       }
 
       // Delete all folders directly from Supabase
@@ -1487,6 +1520,101 @@ export function useSupabaseFileManager(
     const interval = setInterval(checkCodeChanges, 2000); // Check every 2 seconds
     return () => clearInterval(interval);
   }, [isAutosaveEnabled, context, folders, getTrackAutosaveContext, scheduleTrackAutosave]);
+
+  // Spec 018: another tab or an assistant changed the open track. Read-only views never save, and
+  // their reads would find nothing, so they don't watch.
+  const knownTrackIds = React.useMemo(
+    () => (isInitialized && hasLoadedData ? new Set(Object.keys(tracks)) : null),
+    [isInitialized, hasLoadedData, tracks],
+  );
+  const trackConflict = useTrackConflict({
+    userId: user?.id ?? null,
+    enabled: !readOnly,
+    openTrackId: selectedTrack,
+    knownTrackIds,
+    appDeps: {
+      getEditorCode: () => context.editorRef?.current?.code || context.activeCode || '',
+      getLastSavedCode: (id) => getTrackAutosaveContext(id).lastSavedCode,
+      getLocalTrack: (id) => tracks[id],
+      setEditorCode: (id, code) => {
+        // The same call as opening a track from the library, with no reset: nothing is evaluated.
+        void context.handleUpdate({ id, code }, false);
+      },
+      saveCode: async (id, code) => {
+        const { error } = await db.tracks.update(id, { code, modified: new Date().toISOString() });
+        if (error) throw error;
+      },
+      applySynced: (id, code, server) => {
+        setTracks((prev) =>
+          prev[id]
+            ? {
+                ...prev,
+                [id]: {
+                  ...prev[id],
+                  code,
+                  ...(server ? { steps: server.steps as Track['steps'], version: server.version } : {}),
+                  modified: new Date().toISOString(),
+                },
+              }
+            : prev,
+        );
+        const autosaveContext = getTrackAutosaveContext(id);
+        clearTrackAutosaveTimer(id);
+        autosaveContext.lastSavedCode = code;
+        autosaveContext.lastSavedTimestamp = Date.now();
+        if (selectedTrack === id) lastSavedCodeRef.current = code;
+      },
+      recreate: async (oldId: string, draft: TrackDraft, open: boolean) => {
+        // The folder may have gone with it: the root is better than a folder nobody can see.
+        const folderExists = Object.values(folders).some((f) => f.id === draft.folder || f.path === draft.folder);
+        const created = await createTrack(
+          draft.name,
+          draft.code,
+          folderExists && draft.folder ? draft.folder : undefined,
+          draft.isMultitrack,
+          draft.steps as Track['steps'],
+          draft.activeStep,
+        );
+        if (!created) return false;
+        cleanupTrackAutosaveContext(oldId);
+        setTracks((prev) => {
+          const { [oldId]: _gone, ...rest } = prev;
+          return { ...rest, [created.id]: { ...created, version: created.version } };
+        });
+        tracksActions.removeTrack(oldId);
+        tracksActions.addTrack(created);
+        if (open) {
+          const autosaveContext = getTrackAutosaveContext(created.id);
+          autosaveContext.lastSavedCode = draft.code;
+          autosaveContext.lastSavedTimestamp = Date.now();
+          lastSavedCodeRef.current = draft.code;
+          // It's the same music under a new id: the next Update is still a hot-swap.
+          context.replaceTrackId?.(oldId, created.id);
+          setSelectedTrack(created.id);
+          // Autosave finds the open track from the URL, which has to follow if the folder is gone.
+          const url = generateTrackUrlPath(created.name, created.folder, folders);
+          if (typeof window !== 'undefined' && window.location.pathname !== url.split('?')[0]) {
+            window.history.replaceState(window.history.state, '', url);
+            setActivePattern(url.replace(/^\/repl\//, ''));
+          }
+          if ((context.editorRef?.current?.code ?? '') !== draft.code) {
+            void context.handleUpdate({ id: created.id, code: draft.code }, false);
+          }
+        }
+        return true;
+      },
+      removeLocal: (id) => {
+        cleanupTrackAutosaveContext(id);
+        setTracks((prev) => {
+          const { [id]: _gone, ...rest } = prev;
+          return rest;
+        });
+        if (tracksStore.get().tracks[id]) tracksActions.removeTrack(id);
+        if (selectedTrack === id) setSelectedTrack(null);
+      },
+    },
+  });
+  conflictRef.current = trackConflict;
 
   // If not authenticated, return minimal state with no-op functions
   if (!user) {
@@ -1588,6 +1716,9 @@ export function useSupabaseFileManager(
     // Settings (disable autosave in read-only mode)
     isAutosaveEnabled: readOnly ? false : isAutosaveEnabled,
     autosaveInterval,
+
+    // Spec 018: the "changed elsewhere" notice
+    trackConflict,
 
     // Translation
     t,

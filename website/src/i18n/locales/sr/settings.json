@@ -168,5 +168,19 @@
   "equalizerPresetSpokenWord": "Говор",
   "equalizerPresetTrebleBoost": "Појачање високих",
   "equalizerPresetTrebleReducer": "Смањење високих",
-  "equalizerPresetVocal": "Појачање вокала"
+  "equalizerPresetVocal": "Појачање вокала",
+  "connectedAssistants": {
+    "title": "Повезани асистенти",
+    "empty": "Нема повезаних асистената.",
+    "setupLink": "Како да повежете асистента",
+    "connectedOn": "Повезан {{date}}",
+    "disconnect": "Прекини везу",
+    "disconnecting": "Прекидање везе...",
+    "loading": "Учитавање...",
+    "failed": "Листа није могла да се учита. Покушајте поново.",
+    "disconnectFailed": "Веза није могла да се прекине. Покушајте поново.",
+    "retry": "Покушај поново",
+    "unnamed": "Асистент без имена",
+    "help": "Прекид везе одмах завршава приступ преко Strudel-а. Копија приступног кључа коју је асистент задржао и даље може директно да приступи вашим подацима најдуже један сат."
+  }
 }

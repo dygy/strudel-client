@@ -14,6 +14,8 @@ export interface FlatTrack {
   steps: any[];
   activeStep: number;
   user_id: string;
+  /** The row's updated_at: what a save names as the version it read (spec 018). */
+  version?: string;
 }
 
 export interface FlatFolder {
@@ -44,6 +46,7 @@ export interface TreeItem {
 
   // Common properties
   user_id: string;
+  version?: string;
 }
 
 export interface TreeStructure {
@@ -230,6 +233,7 @@ export class TreeDataTransformer {
       steps: track.steps,
       activeStep: track.activeStep,
       user_id: track.user_id,
+      version: track.version,
     }));
 
     // Place tracks in their folders - try UUID first, then path as fallback
@@ -506,6 +510,7 @@ export class TreeDataTransformer {
         steps: item.steps || [],
         activeStep: item.activeStep || 0,
         user_id: item.user_id,
+        version: item.version,
       });
     }
   }

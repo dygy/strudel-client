@@ -8,6 +8,8 @@ import { AudioEngineTargetSelector } from './AudioEngineTargetSelector';
 import { LanguageSelector } from './LanguageSelector';
 import { SampleCacheSettings } from './SampleCacheSettings';
 import { MixerSettings } from './MixerSettings';
+import { ConnectedAssistants } from './ConnectedAssistants';
+import { useAuth } from '@src/hooks/useAuth';
 import { DEFAULT_MAX_POLYPHONY, setMaxPolyphony, setMultiChannelOrbits } from '@strudel/webaudio';
 import { useTranslation } from '@src/i18n';
 
@@ -154,10 +156,13 @@ const fontFamilyOptions = {
 interface SettingsTabProps {
   started: boolean;
   mixer?: any; // AudioMixer instance
+  /** The admin's view of another user: nothing here acts on any account. */
+  readOnly?: boolean;
 }
 
-export function SettingsTab({ started, mixer }: SettingsTabProps) {
+export function SettingsTab({ started, mixer, readOnly = false }: SettingsTabProps) {
   const { t } = useTranslation('settings');
+  const { isAuthenticated } = useAuth();
   const { t: tMessages } = useTranslation('messages');
   const {
     theme,
@@ -465,6 +470,12 @@ export function SettingsTab({ started, mixer }: SettingsTabProps) {
             )}
           </div>
         </FormItem>
+
+        {isAuthenticated && !readOnly && (
+          <FormItem label={t('connectedAssistants.title')}>
+            <ConnectedAssistants />
+          </FormItem>
+        )}
 
         <FormItem label={t('theme')}>
           <SelectInput options={themeOptions} value={theme} onChange={(theme) => settingsMap.setKey('theme', theme)} />

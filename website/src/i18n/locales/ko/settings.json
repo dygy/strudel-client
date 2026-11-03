@@ -168,5 +168,19 @@
   "equalizerPresetSpokenWord": "음성",
   "equalizerPresetTrebleBoost": "고음 부스트",
   "equalizerPresetTrebleReducer": "고음 감소",
-  "equalizerPresetVocal": "보컬 부스트"
+  "equalizerPresetVocal": "보컬 부스트",
+  "connectedAssistants": {
+    "title": "연결된 어시스턴트",
+    "empty": "연결된 어시스턴트가 없습니다.",
+    "setupLink": "연결 방법",
+    "connectedOn": "{{date}}에 연결됨",
+    "disconnect": "연결 해제",
+    "disconnecting": "연결 해제 중...",
+    "loading": "불러오는 중...",
+    "failed": "목록을 불러올 수 없습니다. 다시 시도해 주세요.",
+    "disconnectFailed": "연결을 해제할 수 없습니다. 다시 시도해 주세요.",
+    "retry": "다시 시도",
+    "unnamed": "이름 없는 어시스턴트",
+    "help": "연결을 해제하면 Strudel을 통한 접근이 즉시 끝납니다. 어시스턴트가 보관한 접근 키 사본은 최대 1시간 동안 데이터에 직접 접근할 수 있습니다."
+  }
 }

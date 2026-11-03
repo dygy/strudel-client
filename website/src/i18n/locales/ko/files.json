@@ -133,6 +133,34 @@
   "loadingTracks": "트랙을 불러오는 중...",
   "loadingTracksDescription": "클라우드에서 데이터를 가져오는 동안 잠시 기다려 주세요",
 
+  "trackConflict": {
+
+  
+  "message": "이 트랙이 다른 곳에서 변경되었습니다",
+
+  
+  "detail": "선택할 때까지 이 트랙의 자동 저장이 일시 중지됩니다.",
+
+  
+  "restoredDetail": "이전에 저장되지 않은 텍스트가 있습니다. 선택할 때까지 이 트랙의 자동 저장이 일시 중지됩니다.",
+
+  
+  "deletedDetail": "\"{{name}}\" 트랙이 라이브러리에 더 이상 없습니다. 내 것 유지를 누르면 텍스트를 트랙으로 다시 저장합니다.",
+
+  
+  "loadNew": "새 버전 불러오기",
+
+  
+  "keepMine": "내 것 유지",
+
+  
+  "discard": "내 텍스트 버리기",
+
+  
+  "failed": "실패했지만 텍스트는 안전합니다. 다시 시도해 주세요."
+
+  },
+
   "errors": {
     "loadFailed": "파일 불러오기 실패",
     "createTrackFailed": "트랙 생성 실패",

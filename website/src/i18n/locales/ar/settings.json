@@ -168,5 +168,19 @@
   "equalizerPresetSpokenWord": "كلمة منطوقة",
   "equalizerPresetTrebleBoost": "تعزيز الحاد",
   "equalizerPresetTrebleReducer": "تقليل الحاد",
-  "equalizerPresetVocal": "تعزيز صوتي"
+  "equalizerPresetVocal": "تعزيز صوتي",
+  "connectedAssistants": {
+    "title": "المساعدون المتصلون",
+    "empty": "لا يوجد مساعد متصل.",
+    "setupLink": "كيفية ربط مساعد",
+    "connectedOn": "متصل منذ {{date}}",
+    "disconnect": "قطع الاتصال",
+    "disconnecting": "جارٍ قطع الاتصال...",
+    "loading": "جارٍ التحميل...",
+    "failed": "تعذر تحميل القائمة. يرجى المحاولة مرة أخرى.",
+    "disconnectFailed": "تعذر قطع الاتصال. يرجى المحاولة مرة أخرى.",
+    "retry": "إعادة المحاولة",
+    "unnamed": "مساعد بلا اسم",
+    "help": "يُنهي قطع الاتصال الوصول عبر Strudel فورًا. يمكن لنسخة من مفتاح الوصول احتفظ بها المساعد أن تصل إلى بياناتك مباشرة لمدة تصل إلى ساعة."
+  }
 }
