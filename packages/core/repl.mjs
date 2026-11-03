@@ -199,10 +199,14 @@ export function repl({
     });
   };
 
+  let latestEvaluation = 0;
   const evaluate = async (code, autostart = true, shouldHush = true) => {
     if (!code) {
       throw new Error('no code to evaluate');
     }
+    // fork addition (strudel-client spec 018): when evaluates overlap, the latest wins. A slow one
+    // that lands after a newer one would put old code back over what the user last asked for.
+    const evaluation = ++latestEvaluation;
     try {
       updateState({ code, pending: true });
       await injectPatternMethods();
@@ -215,6 +219,9 @@ export function repl({
         code = `mondolang\`${code}\``;
       }
       let { pattern, meta } = await _evaluate(code, transpiler, transpilerOptions);
+      if (evaluation !== latestEvaluation) {
+        return;
+      }
       // fork addition (strudel-client spec 017, used by @strudel/mixer transitions):
       // the per-layer `$:` / `.p(id)` patterns, in stack order, readable from editPattern.
       const layers = [];
@@ -258,6 +265,9 @@ export function repl({
       afterEval?.({ code, pattern, meta });
       return pattern;
     } catch (err) {
+      if (evaluation !== latestEvaluation) {
+        return;
+      }
       logger(`[eval] error: ${err.message}`, 'error');
       console.error(err);
       updateState({ evalError: err, pending: false });

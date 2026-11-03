@@ -41,14 +41,30 @@ function rateLimited(message: unknown) {
   };
 }
 
+/** An IPv6 address's first 64 bits: one customer has a whole /64, so a key per address would limit nothing. */
+export function addressKey(address: string): string {
+  if (!address.includes(':')) return address;
+  const [head, tail = ''] = address.toLowerCase().split('::');
+  const groups = head ? head.split(':') : [];
+  const rest = tail ? tail.split(':') : [];
+  const full = address.includes('::')
+    ? [...groups, ...Array(8 - groups.length - rest.length).fill('0'), ...rest]
+    : groups;
+  return `${full
+    .slice(0, 4)
+    .map((group) => group.replace(/^0+(?=.)/, ''))
+    .join(':')}::/64`;
+}
+
 /**
- * Before any token is looked at, so a forged one can't cost a call to Supabase each time. Cloudflare sets
- * the header, and a client can't. Open if there's none or the limiter fails, like the per-user limit.
+ * Before any token is looked at, so a forged one can't cost a call to Supabase each time. High, as hosted
+ * assistants can share an address, and the limit per user still applies. Cloudflare sets the header, and
+ * a client can't. Open if there's none or the limiter fails, like the per-user limit.
  */
 async function overAddressLimit(request: Request, deps: Deps): Promise<boolean> {
   const address = request.headers.get('cf-connecting-ip');
   if (!address || !deps.isIpRateLimited) return false;
-  return deps.isIpRateLimited(address).catch(() => false);
+  return deps.isIpRateLimited(addressKey(address)).catch(() => false);
 }
 
 const refusal = (status: number, message: string, headers: Record<string, string> = {}) =>

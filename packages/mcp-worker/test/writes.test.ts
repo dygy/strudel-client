@@ -321,6 +321,130 @@ describe('set_track_steps', () => {
     expect(library.siteCalls).toEqual([]);
   });
 
+  describe('steps with no unique id, as older rows can have', () => {
+    const stored = (steps: unknown[], fields: Record<string, unknown> = {}) =>
+      library.addTrack({
+        id: 'm',
+        name: 'Multi',
+        code: (steps[0] as { code: string }).code,
+        is_multitrack: true,
+        steps,
+        active_step: 0,
+        ...fields,
+      });
+    const refs = async () =>
+      ((await tools.call('get_track', { trackId: 'm' })).structured.steps as Array<{ ref: string }>).map(
+        (step) => step.ref,
+      );
+
+    it('get_track gives each one a reference, by id where that is unique and by position where not', async () => {
+      stored([
+        { id: 'good', name: 'A', code: 'a' },
+        { name: 'B', code: 'b' },
+        { id: 'twin', name: 'C', code: 'c' },
+        { id: 'twin', name: 'D', code: 'd' },
+      ]);
+      expect(await refs()).toEqual(['good', '#1', '#2', '#3']);
+    });
+
+    it('case 1, no ids: dropping one is refused, and says which by reference', async () => {
+      const row = stored([
+        { name: 'A', code: 'a' },
+        { name: 'B', code: 'b' },
+      ]);
+      const { error } = await tools.call('set_track_steps', {
+        trackId: 'm',
+        expectedVersion: row.updated_at,
+        steps: [{ id: '#0', name: 'A', code: 'a' }],
+      });
+      expect(error).toMatchObject({ code: 'steps_would_be_removed', steps: [{ ref: '#1', id: null, name: 'B' }] });
+      expect(library.siteCalls).toEqual([]);
+    });
+
+    it('case 2, the same id twice: they do not collapse, and only the named one goes', async () => {
+      const row = stored([
+        { id: 'twin', name: 'A', code: 'a' },
+        { id: 'twin', name: 'B', code: 'b' },
+      ]);
+      const missing = await tools.call('set_track_steps', {
+        trackId: 'm',
+        expectedVersion: row.updated_at,
+        steps: [{ id: '#1', name: 'B', code: 'b' }],
+      });
+      expect(missing.error).toMatchObject({ code: 'steps_would_be_removed', steps: [{ ref: '#0', name: 'A' }] });
+      const { isError } = await tools.call('set_track_steps', {
+        trackId: 'm',
+        expectedVersion: row.updated_at,
+        steps: [{ id: '#1', name: 'B', code: 'b' }],
+        removeSteps: ['#0'],
+      });
+      expect(isError).toBeUndefined();
+      expect((siteUpdates().steps as Array<{ code: string }>).map((step) => step.code)).toEqual(['b']);
+    });
+
+    it('case 3, kept by reference: each gets a real id of its own, and the active step follows', async () => {
+      const row = stored(
+        [
+          { name: 'A', code: 'a' },
+          { id: 'twin', name: 'B', code: 'b' },
+          { id: 'twin', name: 'C', code: 'c' },
+        ],
+        { active_step: 2, code: 'c' },
+      );
+      await tools.call('set_track_steps', {
+        trackId: 'm',
+        expectedVersion: row.updated_at,
+        steps: [
+          { id: '#2', name: 'C', code: 'c' },
+          { id: '#0', name: 'A', code: 'a' },
+          { id: '#1', name: 'B', code: 'b' },
+        ],
+      });
+      const steps = siteUpdates().steps as Array<{ id: string; code: string }>;
+      expect(steps.map((step) => step.code)).toEqual(['c', 'a', 'b']);
+      expect(new Set(steps.map((step) => step.id)).size).toBe(3);
+      expect(steps.every((step) => step.id && step.id !== 'twin')).toBe(true);
+      expect(siteUpdates()).toMatchObject({ activeStep: 0, code: 'c' });
+    });
+
+    it('case 4, not marked multitrack with steps left over: a plain track, whose code is what counts', async () => {
+      const row = stored([{ id: 'stale', name: 'Old', code: 'old step' }], { is_multitrack: false, code: 'the music' });
+      const read = await tools.call('get_track', { trackId: 'm' });
+      expect(read.structured).toMatchObject({ isMultitrack: false, code: 'the music', steps: [] });
+      const lost = await tools.call('set_track_steps', {
+        trackId: 'm',
+        expectedVersion: row.updated_at,
+        steps: [{ id: 'stale', name: 'Old', code: 'old step' }],
+      });
+      expect(lost.error).toMatchObject({ code: 'steps_would_be_removed', steps: [] });
+      const kept = await tools.call('set_track_steps', {
+        trackId: 'm',
+        expectedVersion: row.updated_at,
+        steps: [{ name: 'One', code: 'the music' }],
+      });
+      expect(kept.isError).toBeUndefined();
+    });
+
+    it('delete_step refuses on such a row', async () => {
+      const row = stored(
+        [
+          { id: 'a', name: 'A', code: 'a' },
+          { id: 'b', name: 'B', code: 'b' },
+        ],
+        {
+          is_multitrack: false,
+          code: 'x',
+        },
+      );
+      const { error } = await tools.call('delete_step', {
+        trackId: 'm',
+        expectedVersion: row.updated_at,
+        stepIndex: 0,
+      });
+      expect(error.code).toBe('invalid_arguments');
+    });
+  });
+
   describe('dropping a step', () => {
     const three = () => {
       const row = multitrack(['a', 'b', 'c']);
@@ -335,7 +459,7 @@ describe('set_track_steps', () => {
         expectedVersion: row.updated_at,
         steps: [first, second],
       });
-      expect(error).toMatchObject({ code: 'steps_would_be_removed', steps: [{ id: 's2', name: 'Step 2' }] });
+      expect(error).toMatchObject({ code: 'steps_would_be_removed', steps: [{ ref: 's2', id: 's2', name: 'Step 2' }] });
       expect(library.siteCalls).toEqual([]);
     });
 

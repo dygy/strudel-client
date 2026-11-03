@@ -9,7 +9,17 @@
 import { type StepLike } from '../../../website/src/lib/multitrack';
 import { trackNameClashes } from '../../../website/src/lib/trackRename';
 import { fail, newId, ok, refusal, rest, siteCall, ToolFailure, type ToolContext, type ToolResult } from './context';
-import { allFolders, inFolder, reconciled, readTrackRow, webAddress, type FolderRow, type TrackRow } from './library';
+import {
+  allFolders,
+  inFolder,
+  stepRef,
+  trackSteps,
+  reconciled,
+  readTrackRow,
+  webAddress,
+  type FolderRow,
+  type TrackRow,
+} from './library';
 
 export const MAX_CODE_BYTES = 512 * 1024;
 export const MAX_STEPS = 200;
@@ -187,33 +197,41 @@ export async function setTrackSteps(
   }
   const row = await readForChange(ctx, args.trackId, args.expectedVersion);
   const track = reconciled(row);
-  const existing = new Map((track.steps ?? []).map((step) => [step.id, step]));
+  // By position, with `ref` as the name: stored steps can have no id, or share one.
+  const stored = trackSteps(track);
+  const refs = stored.map((_, index) => stepRef(stored, index));
+  const kept = new Set<number>();
+  const sources = args.steps.map((step) => {
+    const position = step.id === undefined ? -1 : refs.indexOf(step.id);
+    // A ref used twice, or one that doesn't exist, makes a new step.
+    if (position < 0 || kept.has(position)) return undefined;
+    kept.add(position);
+    return position;
+  });
 
   // Dropping a step deletes it. That has to be meant, by name.
-  const kept = new Set<string | undefined>(args.steps.map((step) => step.id).filter((stepId) => existing.has(stepId)));
-  const dropped = [...existing.values()].filter((step) => !kept.has(step.id));
+  const dropped = stored.flatMap((_, index) => (kept.has(index) ? [] : [index]));
   const named = new Set(args.removeSteps ?? []);
-  const unnamed = dropped.filter((step) => !named.has(step.id!));
+  const unnamed = dropped.filter((index) => !named.has(refs[index]));
   if (unnamed.length) {
     return fail(
       'steps_would_be_removed',
       'This would delete steps, and nothing was changed.',
-      'Keep their ids in steps, or ask the user and list them in removeSteps.',
-      { steps: unnamed.map(({ id, name }) => ({ id, name })) },
+      "Keep each one by giving its ref as the step's id, or ask the user and list the refs in removeSteps.",
+      { steps: unnamed.map((index) => ({ ref: refs[index], id: stored[index].id ?? null, name: stored[index].name })) },
     );
   }
-  const notDropped = [...named].filter((stepId) => !dropped.some((step) => step.id === stepId));
-  if (notDropped.length) {
+  if ([...named].some((ref) => !dropped.some((index) => refs[index] === ref))) {
     return fail('invalid_arguments', 'removeSteps names a step that this keeps, or that does not exist.');
   }
-  if (existing.size > 0 && kept.size === 0) {
+  if (stored.length > 0 && kept.size === 0) {
     return fail(
       'last_step',
       'At least one existing step has to stay, and nothing was changed.',
       'Delete the track instead.',
     );
   }
-  if (existing.size === 0 && row.code?.trim() && !args.steps.some((step) => step.code === row.code)) {
+  if (stored.length === 0 && row.code?.trim() && !args.steps.some((step) => step.code === row.code)) {
     return fail(
       'steps_would_be_removed',
       "This track's code is not in any of these steps, so it would be lost, and nothing was changed.",
@@ -223,15 +241,13 @@ export async function setTrackSteps(
   }
 
   const now = new Date().toISOString();
-  const taken = new Set<string>();
-  const steps = args.steps.map((step) => {
-    const before = step.id ? existing.get(step.id) : undefined;
-    // An id used twice, or one that doesn't exist, makes a new step.
-    const keepId = before && !taken.has(before.id!) ? before.id! : newId();
-    taken.add(keepId);
+  const steps = args.steps.map((step, index) => {
+    const position = sources[index];
+    const before = position === undefined ? undefined : stored[position];
     const changed = !before || before.code !== step.code || before.name !== step.name;
     return {
-      id: keepId,
+      // A step with no id of its own gets one now.
+      id: position !== undefined && refs[position] === before?.id ? before.id : newId(),
       name: step.name.trim(),
       code: step.code,
       created: before?.created ?? now,
@@ -239,8 +255,7 @@ export async function setTrackSteps(
     };
   });
   // The active step follows its text through a reorder, unless told otherwise.
-  const activeId = (track.steps ?? [])[track.activeStep ?? 0]?.id;
-  const followed = steps.findIndex((step) => step.id === activeId);
+  const followed = sources.indexOf(track.activeStep ?? 0);
   const activeStep = args.activeStep ?? (followed >= 0 ? followed : 0);
   return putTrack(ctx, args.trackId, args.expectedVersion, {
     isMultitrack: true,
@@ -256,8 +271,8 @@ export async function deleteStep(
 ): Promise<ToolResult> {
   const row = await readForChange(ctx, args.trackId, args.expectedVersion);
   const track = reconciled(row);
-  const steps = track.steps ?? [];
-  if (!track.isMultitrack || steps.length === 0) return fail('invalid_arguments', 'This track has no steps.');
+  const steps = trackSteps(track);
+  if (steps.length === 0) return fail('invalid_arguments', 'This track has no steps.');
   if (args.stepIndex >= steps.length) return fail('invalid_arguments', `This track has ${steps.length} steps.`);
   if (steps.length === 1) {
     return fail('last_step', 'This is the last step, and nothing was deleted.', 'Delete the track instead.');

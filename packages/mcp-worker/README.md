@@ -37,6 +37,10 @@ The sound list comes from `website/public/*.json`, the inline lists in `website/
 
 Once an isolate has checked something, 8 KB takes 2 to 5 ms, with occasional spikes to about 12 ms. So raising the limit is a question of how the Workers platform treats a cold isolate, and of how its CPUs compare: these figures are from a Mac, not workerd. Measure with `scripts/cpu-time.mjs` on the deployed Worker before changing it.
 
+## Rate limits
+
+`MCP_RATE` allows 120 requests a minute per user, after the token is checked. `MCP_IP_RATE` allows 1000 a minute per address, or per /64 for IPv6, before any token is looked at. That second one exists to shield Supabase from forged tokens, and it's high because hosted assistants can share addresses.
+
 ## Live control of a tab
 
 A tab with **Allow assistant control** on holds a WebSocket to `GET /mcp/tab`, on the site's own origin. The Worker authenticates the upgrade with the `sb-access-token` cookie the browser sends: the Origin must be the site, Supabase must accept the token, and a token with a `client_id` (an assistant's) is refused. Anything refused never reaches a Durable Object. This is the one place this Worker reads a cookie; `/mcp` never does.

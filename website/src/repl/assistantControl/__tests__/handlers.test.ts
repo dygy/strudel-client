@@ -19,6 +19,7 @@ function controlsWith(overrides: Partial<TabControls> = {}, log: Log = []) {
     transitionPhase: () => 'idle' as TransitionPhase,
     conflictOpen: () => false,
     currentTrack: () => ({ id: 't1', name: 'Song' }),
+    editorTrack: () => 't1',
     playingAnotherTrack: () => false,
     hasUnsavedEdits: () => false,
     saveEdits: async () => void log.push('save'),
@@ -368,13 +369,31 @@ describe('order', () => {
 
 describe('naming the track', () => {
   it('refuses when another track is open, and says which', async () => {
-    const { handle } = controlsWith({ currentTrack: () => ({ id: 't2', name: 'Other' }) }, log);
+    const { handle } = controlsWith(
+      { currentTrack: () => ({ id: 't2', name: 'Other' }), editorTrack: () => 't2' },
+      log,
+    );
     expect(await handle('update_code', { code: 'new', trackId: 't1' })).toEqual({
       ok: false,
       code: 'track_changed',
       openTrackId: 't2',
     });
     expect(log).toEqual(['notify:refusedTrackChanged']);
+  });
+
+  it('goes by the editor as well as React: it changes a moment sooner, and its text is what gets replaced', async () => {
+    const { handle } = controlsWith({ editorTrack: () => 't2' }, log);
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toEqual({
+      ok: false,
+      code: 'track_changed',
+      openTrackId: 't2',
+    });
+    expect(log.join()).not.toMatch(/replace/);
+  });
+
+  it('carries on when the editor does not say, as on a page load', async () => {
+    const { handle } = controlsWith({ editorTrack: () => null }, log);
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toMatchObject({ ok: true });
   });
 
   it('saves the track it names', async () => {
@@ -411,7 +430,10 @@ describe('after every wait, all of it is asked again', () => {
 
   it('the track changed during the save: nothing replaced', async () => {
     let open = 't1';
-    const { handle } = during(() => (open = 't2'), { currentTrack: () => ({ id: open, name: open }) });
+    const { handle } = during(() => (open = 't2'), {
+      currentTrack: () => ({ id: open, name: open }),
+      editorTrack: () => open,
+    });
     expect(await handle('update_code', { code: 'new', trackId: 't1' })).toMatchObject({ code: 'track_changed' });
     expect(log.join()).not.toMatch(/replace|update/);
   });
@@ -526,10 +548,13 @@ describe('turning off', () => {
 });
 
 describe('opening honestly', () => {
-  it.each(['library_unavailable', 'open_failed'] as const)('says %s, as a refusal', async (result) => {
+  it.each([
+    ['library_unavailable', 'notify:refusedOpen'],
+    ['open_failed', 'notify:refusedOpenFailed'],
+  ] as const)('says %s, as a refusal, with its own message', async (result, message) => {
     const { handle } = controlsWith({ openTrack: async () => result }, log);
     expect(await handle('open_track', { trackId: 't2' })).toEqual({ ok: false, code: result });
-    expect(log).toEqual(['notify:refusedOpen']);
+    expect(log).toEqual([message]);
   });
 
   it('answers with the track it opened', async () => {

@@ -18,6 +18,7 @@ export type ControlMessage =
   | 'refusedNoTrack'
   | 'refusedTrackChanged'
   | 'refusedOpen'
+  | 'refusedOpenFailed'
   | 'updatedNotHeard';
 
 export type OpenTrackResult = 'opened' | 'not_found' | 'library_unavailable' | 'open_failed';
@@ -32,6 +33,8 @@ export interface TabControls {
   conflictOpen(): boolean;
   /** The track open in the editor. */
   currentTrack(): { id: string; name: string } | null;
+  /** The track the editor holds this moment, if known. */
+  editorTrack(): string | null;
   /** Something's playing, and it isn't what's in the editor. */
   playingAnotherTrack(): boolean;
   hasUnsavedEdits(): boolean;
@@ -110,9 +113,11 @@ export function createCommandHandler(controls: TabControls): CommandHandler {
         controls.notify('refusedNoTrack');
         return refusal('no_track_open');
       }
-      if (open.id !== trackId) {
+      // The editor changes a moment before React says so, and it's the editor's text this would replace.
+      const held = controls.editorTrack();
+      if (open.id !== trackId || (held !== null && held !== trackId)) {
         controls.notify('refusedTrackChanged');
-        return refusal('track_changed', { openTrackId: open.id });
+        return refusal('track_changed', { openTrackId: held ?? open.id });
       }
     }
     return null;
@@ -260,7 +265,7 @@ export function createCommandHandler(controls: TabControls): CommandHandler {
       if (!controls.enabled()) return refusal('control_off');
       if (opened === 'not_found') return refusal('not_found');
       if (opened !== 'opened') {
-        controls.notify('refusedOpen');
+        controls.notify(opened === 'open_failed' ? 'refusedOpenFailed' : 'refusedOpen');
         return refusal(opened);
       }
       controls.notify('opened', { name: controls.currentTrack()?.name ?? '' });

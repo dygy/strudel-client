@@ -43,7 +43,7 @@ Any assistant that supports remote MCP servers with OAuth can connect. Give it t
 
 **Change your library.** `create_track`, `update_track`, `move_track`, `set_track_steps`, `create_folder`, `rename_folder` and `move_folder`. The same naming rules apply as in the app. Each change says which version it read. If the track has changed since, the change is refused and the assistant has to read it again, so it can't overwrite your work without seeing it.
 
-**Delete.** `delete_track`, `delete_step` and `delete_empty_folder`, one item at a time. `set_track_steps` can drop steps too, but only ones it lists by id. There is no trash, so assistants are told to ask you first. A folder with anything in it can't be deleted this way.
+**Delete.** `delete_track`, `delete_step` and `delete_empty_folder`, one item at a time. `set_track_steps` can drop steps too, but only ones it lists by name. There is no trash, so assistants are told to ask you first. A folder with anything in it can't be deleted this way.
 
 **Look things up and check code.** `lookup_function`, `search_functions`, `list_sounds` and `check_code`. The check finds syntax mistakes, mini-notation mistakes and names that don't exist, without running anything. Online it takes code up to 512 bytes.
 

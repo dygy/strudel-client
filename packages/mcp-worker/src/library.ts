@@ -1,5 +1,5 @@
 /** Reading the library (spec 018, functional 2.3): plain fetch to Supabase REST, as the user. */
-import { reconcileMultitrack, type StepLike } from '../../../website/src/lib/multitrack';
+import { hasSteps, reconcileMultitrack, type StepLike } from '../../../website/src/lib/multitrack';
 import { generateTrackUrlPath } from '../../../website/src/lib/slugUtils';
 import { fail, ok, rest, ToolFailure, type ToolContext, type ToolResult } from './context';
 
@@ -94,6 +94,18 @@ export function reconciled(row: TrackRow) {
   );
 }
 
+/** The steps that count: a row not marked multitrack is a plain track, whatever is left in `steps`. */
+export const trackSteps = (track: Parameters<typeof hasSteps>[0]): StepLike[] => (hasSteps(track) ? track.steps! : []);
+
+/**
+ * What to call a step by. Older rows can hold steps with no id, or the same id twice, so those go by
+ * position (`#2`), which can't be wrong while a change has to name the version it read.
+ */
+export function stepRef(steps: StepLike[], index: number): string {
+  const { id } = steps[index];
+  return id && steps.filter((step) => step.id === id).length === 1 ? id : `#${index}`;
+}
+
 export async function listFolders(ctx: ToolContext, args: { cursor?: string }): Promise<ToolResult> {
   const after = args.cursor ? decodeCursor(args.cursor, 1)[0] : null;
   const rows = await rest<FolderRow>(ctx, 'folders', {
@@ -172,7 +184,12 @@ export async function getTrack(ctx: ToolContext, args: { trackId: string }): Pro
     code: track.code,
     isMultitrack: Boolean(track.isMultitrack),
     activeStep: track.activeStep ?? 0,
-    steps: (track.steps ?? []).map((step) => ({ id: step.id ?? null, name: step.name ?? '', code: step.code ?? '' })),
+    steps: trackSteps(track).map((step, i, all) => ({
+      ref: stepRef(all, i),
+      id: step.id ?? null,
+      name: step.name ?? '',
+      code: step.code ?? '',
+    })),
     modified: row.modified,
     version: row.updated_at,
     webAddress: webAddress(ctx, row.name, row.folder, folders),

@@ -48,6 +48,18 @@ export interface UpdateRequest {
   switchTrack: (code: string, options: { reset: boolean }) => Promise<void> | void;
 }
 
+/**
+ * After this long a switch or an evaluate that hasn't finished stops counting as under way. The same
+ * bound as the transition controller's own wait for an evaluate.
+ */
+export const STUCK_AFTER_MS = 20_000;
+
+interface SwitchInFlight {
+  startedAt: number;
+  target: string | null;
+  code: string;
+}
+
 /** The subset of StrudelMirror this controller wraps. */
 export interface EvaluatingEditor {
   code: string;
@@ -74,9 +86,11 @@ export function createTrackSwitchController() {
   let playingTrackId: string | null = null;
   // code -> id of the track it belonged to when its evaluate started
   const startedEvaluations = new Map<string, string | null>();
-  let switchesInFlight = 0;
-  let evaluationsInFlight = 0;
-  let switchTarget: string | null = null;
+  const switches = new Set<SwitchInFlight>();
+  const evaluations = new Set<{ startedAt: number }>();
+  // A switch or an evaluate that never finishes must not count for ever: code can hang.
+  const live = <T extends { startedAt: number }>(all: Set<T>): T[] =>
+    [...all].filter(({ startedAt }) => Date.now() - startedAt < STUCK_AFTER_MS);
 
   const evaluationStarted = (code: string | undefined, trackId: string | null = editorTrackId) => {
     if (typeof code === 'string') {
@@ -93,10 +107,10 @@ export function createTrackSwitchController() {
     },
     /** Something is changing what's heard: a switch of any type, from Update on, or an evaluate under way. */
     get busy() {
-      return switchesInFlight > 0 || evaluationsInFlight > 0;
+      return live(switches).length > 0 || live(evaluations).length > 0;
     },
     get switchTarget() {
-      return switchesInFlight > 0 ? switchTarget : null;
+      return live(switches).at(-1)?.target ?? null;
     },
 
     /** The editor now holds track `id` (handleUpdate, the library, shuffle). */
@@ -127,10 +141,9 @@ export function createTrackSwitchController() {
       const evaluate = editor.evaluate.bind(editor);
       editor.evaluate = (...args: any[]) => {
         evaluationStarted(editor.code);
-        evaluationsInFlight++;
-        const finished = () => {
-          evaluationsInFlight = Math.max(0, evaluationsInFlight - 1);
-        };
+        const evaluation = { startedAt: Date.now() };
+        evaluations.add(evaluation);
+        const finished = () => evaluations.delete(evaluation);
         try {
           const result = evaluate(...args);
           Promise.resolve(result).then(finished, finished);
@@ -159,10 +172,12 @@ export function createTrackSwitchController() {
     },
 
     /** Decide what Update does right now, without doing it. */
-    decide(isPlaying: boolean, reset = false): UpdateOutcome {
-      if (switchesInFlight > 0) {
-        // The scheduler may be stopped mid-switch, so `isPlaying` is not meaningful here.
-        return editorTrackId !== null && editorTrackId === switchTarget ? 'ignored' : 'switch';
+    decide(isPlaying: boolean, reset = false, code?: string): UpdateOutcome {
+      const latest = live(switches).at(-1);
+      if (latest) {
+        // The scheduler may be stopped mid-switch, so `isPlaying` is not meaningful here. Only the very
+        // same thing again is a repeat: changed code always goes through.
+        return editorTrackId !== null && editorTrackId === latest.target && code === latest.code ? 'ignored' : 'switch';
       }
       const action = getUpdateAction({ isPlaying, playingTrackId, editorTrackId });
       if (action === 'hot-swap' && reset && !isPlaying) {
@@ -173,7 +188,7 @@ export function createTrackSwitchController() {
 
     /** Update / Ctrl+U / handleUpdate(…, true): hot-swap, switch, or ignore a repeat. */
     async update({ reset = false, isPlaying, code, hotSwap, switchTrack }: UpdateRequest): Promise<UpdateOutcome> {
-      const outcome = controller.decide(isPlaying, reset);
+      const outcome = controller.decide(isPlaying, reset, code);
       if (outcome === 'ignored') {
         return outcome;
       }
@@ -183,15 +198,12 @@ export function createTrackSwitchController() {
       }
       const target = editorTrackId;
       evaluationStarted(code, target);
-      switchesInFlight++;
-      switchTarget = target;
+      const inFlight: SwitchInFlight = { startedAt: Date.now(), target, code };
+      switches.add(inFlight);
       try {
         await switchTrack(code, { reset });
       } finally {
-        switchesInFlight = Math.max(0, switchesInFlight - 1);
-        if (switchesInFlight === 0) {
-          switchTarget = null;
-        }
+        switches.delete(inFlight);
       }
       return 'switch';
     },

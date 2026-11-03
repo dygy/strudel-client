@@ -2,7 +2,10 @@
  * @spec: 018-strudel-mcp-server (tech 2.2)
  * The HTTP side of stateless Streamable HTTP: POST /mcp only, JSON replies, 202 for notifications.
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { addressKey } from '../src/handler';
 import { assistantToken, MCP_URL, ORIGIN, post, rpcBody, withToken, worker } from './helpers';
 
 const auth = () => withToken(assistantToken());
@@ -126,7 +129,31 @@ describe('headers', () => {
   });
 });
 
+describe('addressKey', () => {
+  it.each([
+    ['192.0.2.1', '192.0.2.1'],
+    ['2001:db8:1:2:3:4:5:6', '2001:db8:1:2::/64'],
+    ['2001:db8:1:2:ffff:ffff:ffff:ffff', '2001:db8:1:2::/64'],
+    ['2001:DB8:0001:0002::1', '2001:db8:1:2::/64'],
+    ['2001:db8::1', '2001:db8:0:0::/64'],
+    ['::1', '0:0:0:0::/64'],
+  ])('%s is %s', (address, key) => {
+    expect(addressKey(address)).toBe(key);
+  });
+});
+
 describe('the limit by address, before any token is looked at', () => {
+  it('keys a whole /64 together, and the binding says 1000', async () => {
+    const asked: string[] = [];
+    const w = worker(undefined, {}, { isIpRateLimited: async (address) => (asked.push(address), false) });
+    for (const ip of ['2001:db8:1:2::1', '2001:db8:1:2::2']) {
+      await w.fetch(MCP_URL, post(rpcBody('ping'), withToken(assistantToken(), { 'cf-connecting-ip': ip })));
+    }
+    expect(asked).toEqual(['2001:db8:1:2::/64', '2001:db8:1:2::/64']);
+    const wrangler = readFileSync(resolve(process.cwd(), 'packages/mcp-worker/wrangler.jsonc'), 'utf8');
+    expect(wrangler).toMatch(/"MCP_IP_RATE"[^}]*\{ "limit": 1000, "period": 60 \}/);
+  });
+
   const forged = post(rpcBody('ping'), withToken(assistantToken(), { 'cf-connecting-ip': '192.0.2.1' }));
 
   it('refuses over the limit without reaching Supabase, so a forged token costs nothing', async () => {

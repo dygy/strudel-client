@@ -215,7 +215,8 @@
       "refusedNoTrack": "Assistant : refusé, aucune piste n'est ouverte",
       "refusedTrackChanged": "Assistant : refusé, cette piste n'est plus celle qui est ouverte",
       "refusedOpen": "Assistant : refusé, la bibliothèque n'est pas disponible ici",
-      "updatedNotHeard": "Assistant : code modifié dans l'éditeur. La musique en cours n'a pas changé."
+      "updatedNotHeard": "Assistant : code modifié dans l'éditeur. La musique en cours n'a pas changé.",
+      "refusedOpenFailed": "Assistant : la piste ne s'est pas ouverte"
     }
   }
 }

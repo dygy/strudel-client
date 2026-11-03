@@ -39,6 +39,10 @@ export const GLIDE_STEPS_PER_CYCLE = 16;
 export const RESTORE_RAMP = 0.08;
 /** The tempo a track runs at when its code sets none (matches the restart path's reset). */
 export const DEFAULT_CPS = 0.5;
+/** How long a switch waits for the new code to evaluate before giving up on it. */
+export const EVALUATE_TIMEOUT_MS = 20_000;
+/** How long, after a Stop, since nothing is playing that it would have to keep. */
+export const EVALUATE_WAIT_AFTER_STOP_MS = 1_000;
 /** Match loudness: the old track is measured over this many seconds before T... */
 export const OLD_LOUDNESS_SECONDS = 2;
 /** ...and the new one over this many cycles after the transition ends. */
@@ -132,6 +136,7 @@ export class TrackTransitionController {
    * @param {Function} [options.getSettings] returns the current transition settings; read when a switch begins
    * @param {Function} [options.cleanupCanvases] clears the old track's visuals; called before the new code evaluates
    * @param {EventTarget} [options.eventTarget=window] where `track-transition-*` events go
+   * @param {number} [options.evaluateTimeoutMs] how long a switch waits for new code to evaluate
    * @param {number} [options.targetVolume=1] master level after a Dip or a restore
    * @param {Function} [options.setTimeout] timer functions (default: the global ones, looked up per call)
    * @param {Function} [options.clearTimeout]
@@ -149,6 +154,7 @@ export class TrackTransitionController {
     setTimeout: setTimeoutFn,
     clearTimeout: clearTimeoutFn,
     voices = SUPERDOUGH_VOICES,
+    evaluateTimeoutMs = EVALUATE_TIMEOUT_MS,
   } = {}) {
     this.repl = repl;
     this.audioContext = audioContext;
@@ -167,6 +173,7 @@ export class TrackTransitionController {
     this.active = null; // the transition that is waiting or running
     this.inflight = null; // the switch being processed (armed or active)
     this.queued = null; // the latest switch requested while busy
+    this.evaluateTimeoutMs = evaluateTimeoutMs;
     this.measure = null; // a new track's loudness being measured after its transition
     this.metering = false; // take loudness readings on every tick
     this.meter = null;
@@ -384,7 +391,7 @@ export class TrackTransitionController {
             console.warn('[TrackTransitionController] prepare() failed:', error);
           }
         }
-        await this.repl.evaluate(code);
+        await this._evaluateBounded(code, sw);
       } finally {
         if (this.armed === sw) {
           this.armed = null;
@@ -396,7 +403,9 @@ export class TrackTransitionController {
       }
 
       if (!sw.consumed) {
-        const error = new Error('The new track failed to evaluate');
+        const error = new Error(
+          sw.gaveUp ? 'The new track took too long to evaluate' : 'The new track failed to evaluate',
+        );
         error.evaluateFailed = true;
         throw error;
       }
@@ -438,6 +447,37 @@ export class TrackTransitionController {
       }
       this._processQueue();
     }
+  }
+
+  /**
+   * Waits for the new code to evaluate, but not for ever: code can hang, and until this ends every later
+   * switch waits in the queue. The old track keeps playing, as for a track that fails. Nothing can cancel
+   * the evaluate itself: if it does land later, it lands as a plain hot-swap.
+   */
+  _evaluateBounded(code, sw) {
+    return new Promise((resolve, reject) => {
+      const giveUp = () => {
+        sw.gaveUp = true;
+        finish();
+      };
+      const timer = setTimeout(giveUp, this.evaluateTimeoutMs);
+      const finish = () => {
+        clearTimeout(timer);
+        clearTimeout(sw.stopTimer);
+        sw.giveUpSoon = null;
+        resolve();
+      };
+      // After a Stop nothing is playing to keep, so someone's next Update shouldn't wait as long.
+      sw.giveUpSoon = () => {
+        sw.stopTimer = setTimeout(giveUp, EVALUATE_WAIT_AFTER_STOP_MS);
+      };
+      Promise.resolve(this.repl.evaluate(code)).then(finish, (error) => {
+        clearTimeout(timer);
+        clearTimeout(sw.stopTimer);
+        sw.giveUpSoon = null;
+        reject(error);
+      });
+    });
   }
 
   /** While the new code evaluates, its setcps/setcpm (and prepare's tempo reset) are recorded, not applied. */
@@ -752,6 +792,7 @@ export class TrackTransitionController {
     this.trimState = null;
     if (this.armed) {
       this.armed.immediate = true;
+      this.armed.giveUpSoon?.();
     }
     const capture = this._capture;
     if (capture) {

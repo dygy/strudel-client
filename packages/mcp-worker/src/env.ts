@@ -6,7 +6,7 @@ export interface Env {
   SITE: Fetcher;
   /** 120 a minute, per user (wrangler.jsonc). */
   MCP_RATE?: { limit(options: { key: string }): Promise<{ success: boolean }> };
-  /** 300 a minute, per address, before any token is looked at. */
+  /** 1000 a minute, per address or IPv6 /64, before any token is looked at. */
   MCP_IP_RATE?: { limit(options: { key: string }): Promise<{ success: boolean }> };
 }
 

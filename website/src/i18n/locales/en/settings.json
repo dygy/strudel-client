@@ -215,7 +215,8 @@
       "refusedNoTrack": "Assistant: refused, no track is open",
       "refusedTrackChanged": "Assistant: refused, that track is no longer the one open",
       "refusedOpen": "Assistant: refused, the library isn't available here",
-      "updatedNotHeard": "Assistant: code changed in the editor. The music playing hasn't changed."
+      "updatedNotHeard": "Assistant: code changed in the editor. The music playing hasn't changed.",
+      "refusedOpenFailed": "Assistant: the track didn't open"
     }
   }
 }

@@ -48,6 +48,17 @@ export function folderPathToSlug(folderPath: string | null | undefined): string 
 }
 
 /**
+ * The address folders used to have, which left out any part whose name has no letters or digits. Links
+ * made then have to keep opening. Only for reading a URL: addresses are made with `folderPathToSlug`.
+ */
+function oldFolderSlug(folderPath: string): string {
+  return folderPathToSlug(folderPath)
+    .split('/')
+    .filter((segment) => segment !== 'untitled')
+    .join('/');
+}
+
+/**
  * Generate full URL path for a track including folder structure
  * Format: /repl/folder1/folder2/track-name or /repl/track-name for root tracks
  *
@@ -176,7 +187,8 @@ export function trackMatchesUrlPath(
   if (folderValue === urlFolderPath) return true;
 
   const resolvedPath = folders.find((f) => f.id === folderValue)?.path ?? folderValue;
-  return folderPathToSlug(resolvedPath) === folderPathToSlug(urlFolderPath);
+  const wanted = folderPathToSlug(urlFolderPath);
+  return folderPathToSlug(resolvedPath) === wanted || (wanted !== '' && oldFolderSlug(resolvedPath) === wanted);
 }
 
 /**
@@ -195,6 +207,14 @@ export function findTrackByFolderAndSlug<T extends { id: string; name: string; f
   if (candidates.length === 1) {
     return candidates[0];
   } else if (candidates.length > 1) {
+    // `/repl/sub/x` is both the address of Sub's x, and the old address of Sub/Untitled's. Today's wins.
+    const decoded = folderPath ? folderPath.split('/').map(decodeSegment).join('/') : '';
+    const exact = candidates.find((track) => {
+      const value = track.folder && track.folder !== 'root' ? track.folder : '';
+      const path = folders.find((f) => f.id === value)?.path ?? value;
+      return folderPathToSlug(path) === folderPathToSlug(decoded);
+    });
+    if (exact) return exact;
     console.warn(
       'findTrackByFolderAndSlug: Multiple matches found, returning first:',
       candidates.map((t) => t.name),

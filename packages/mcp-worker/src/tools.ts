@@ -53,7 +53,7 @@ const DESTROY = { readOnlyHint: false, destructiveHint: true, idempotentHint: fa
 
 const str = { type: 'string' } as const;
 const nullableStr = { type: ['string', 'null'] } as const;
-const stepOut: Schema = output({ id: nullableStr, name: str, code: str });
+const stepOut: Schema = output({ ref: str, id: nullableStr, name: str, code: str });
 const changedTrack = output({ id: str, name: str, folder: nullableStr, version: str, webAddress: str });
 const changedFolder = output({ id: str, name: str, path: str, parent: nullableStr, version: nullableStr });
 const deleted = output({ deleted: str });
@@ -211,7 +211,7 @@ const ALL: Tool[] = [
     name: 'set_track_steps',
     title: "Set a multitrack's steps",
     description:
-      'Replaces the steps of a track, in the order given: add, change and reorder. Keep the id of each step you are keeping. Dropping a step deletes it permanently, so it is refused unless removeSteps lists it by id: ask the user first. At least one existing step has to stay. A plain track becomes a multitrack, and its code has to be in one of the steps.',
+      'Replaces the steps of a track, in the order given: add, change and reorder. Keep each step you are keeping by giving its ref from get_track as its id. Dropping a step deletes it permanently, so it is refused unless removeSteps lists its ref: ask the user first. At least one existing step has to stay. A plain track becomes a multitrack, and its code has to be in one of the steps.',
     inputSchema: input(
       {
         trackId: id,
@@ -220,14 +220,17 @@ const ALL: Tool[] = [
           type: 'array',
           minItems: 1,
           maxItems: MAX_STEPS,
-          items: input({ id: { type: 'string', maxLength: 200 }, name, code }, ['name', 'code']),
+          items: input(
+            { id: { type: 'string', maxLength: 200, description: 'The ref of the step this keeps.' }, name, code },
+            ['name', 'code'],
+          ),
         },
         activeStep: { type: 'integer', minimum: 0 },
         removeSteps: {
           type: 'array',
           maxItems: MAX_STEPS,
           items: { type: 'string', maxLength: 200 },
-          description: 'The ids of the steps this deletes.',
+          description: 'The refs of the steps this deletes.',
         },
       },
       ['trackId', 'expectedVersion', 'steps'],

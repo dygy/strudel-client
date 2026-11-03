@@ -49,6 +49,7 @@ export function createTabControls({ live, enabled, phase }: TabControlSources): 
       const track = selectedTrack ? tracks?.[selectedTrack] : null;
       return track ? { id: track.id, name: track.name } : null;
     },
+    editorTrack,
     playingAnotherTrack: () => {
       const ids = live().context.trackIds?.();
       return Boolean(ids?.editor && ids.editor !== ids.playing);

@@ -14,7 +14,11 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import * as core from '@strudel/core';
 import { repl as createRepl, evalScope } from '@strudel/core';
-import { TrackTransitionController } from '../TrackTransitionController.mjs';
+import {
+  EVALUATE_TIMEOUT_MS,
+  EVALUATE_WAIT_AFTER_STOP_MS,
+  TrackTransitionController,
+} from '../TrackTransitionController.mjs';
 import { BASS_SWAP_HZ } from '../transitions/envelopes.mjs';
 import { MockAudioContext, stubWebAudio, unstubWebAudio } from './webAudioMock.mjs';
 
@@ -533,5 +537,79 @@ describe('spec 017 §2.6: headphone preview is not affected by a transition on t
     env.r.stop();
     expect(sd.getActiveSoundIds(main)).toEqual([mainId]);
     expect(sd.getActiveSoundIds(preview)).toEqual([previewId]);
+  });
+});
+
+describe('a track whose evaluate never finishes, on the real repl and controller', () => {
+  const HANGS = 'hangs';
+  /** What a samples() that never answers looks like from here. The repl's evaluate has no other way. */
+  const withHanging = (t, slowMs) => {
+    const real = t.r.evaluate;
+    t.r.evaluate = (code, ...rest) => {
+      if (code === HANGS) return new Promise(() => {});
+      if (slowMs && code.includes('slow')) {
+        return new Promise((resolve) => setTimeout(resolve, slowMs)).then(() => real(code, ...rest));
+      }
+      return real(code, ...rest);
+    };
+    return t;
+  };
+
+  describe.each(ALL_TYPES)('%s', (type) => {
+    it('the old track keeps playing, the switch gives up, and the next Update runs', async () => {
+      const t = withHanging(realSetup({ settings: { type } }));
+      await t.r.evaluate(quarters('old'));
+      await cycles(1);
+      const stuck = t.controller.switchTo(HANGS).catch((error) => error);
+      await cycles(1);
+      expect(t.controller.busy).toBe(true);
+      const fixed = t.controller.switchTo(quarters('new'));
+      t.played.length = 0;
+      await vi.advanceTimersByTimeAsync(EVALUATE_TIMEOUT_MS);
+      expect((await stuck).evaluateFailed).toBe(true);
+      expect((await stuck).message).toContain('too long');
+      expect(named(t.played, 'old').length).toBeGreaterThan(0);
+      await cycles(8);
+      await fixed;
+      expect(t.controller.busy).toBe(false);
+      t.played.length = 0;
+      await cycles(1);
+      expect(named(t.played, 'new').length).toBeGreaterThan(0);
+      expect(named(t.played, 'old')).toEqual([]);
+      t.r.stop();
+    });
+
+    it('after a Stop it gives up in about a second, and the fixed code plays', async () => {
+      const t = withHanging(realSetup({ settings: { type } }));
+      await t.r.evaluate(quarters('old'));
+      await cycles(1);
+      const stuck = t.controller.switchTo(HANGS).catch((error) => error);
+      await cycles(1);
+      t.r.stop();
+      t.controller.stopped();
+      await vi.advanceTimersByTimeAsync(EVALUATE_WAIT_AFTER_STOP_MS);
+      expect((await stuck).evaluateFailed).toBe(true);
+      expect(t.controller.busy).toBe(false);
+      t.played.length = 0;
+      await t.controller.switchTo(quarters('new'));
+      await cycles(1);
+      expect(named(t.played, 'new').length).toBeGreaterThan(0);
+      t.r.stop();
+    });
+  });
+
+  it('a slow track that does land in time still transitions, with no timeout in the way', async () => {
+    const t = withHanging(realSetup({ settings: { type: 'crossfade' } }), EVALUATE_TIMEOUT_MS - 1000);
+    await t.r.evaluate(quarters('old'));
+    await cycles(1);
+    const slow = t.controller.switchTo(quarters('slow'));
+    await vi.advanceTimersByTimeAsync(EVALUATE_TIMEOUT_MS - 1000);
+    await cycles(6);
+    await slow;
+    expect(t.events.map(([name]) => name)).not.toContain('error');
+    t.played.length = 0;
+    await cycles(1);
+    expect(named(t.played, 'slow').length).toBeGreaterThan(0);
+    t.r.stop();
   });
 });

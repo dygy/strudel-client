@@ -91,3 +91,46 @@ describe('repl state.layers (fork addition for @strudel/mixer transitions)', () 
     expect(seen).toEqual([['$0', 'drums'], []]);
   });
 });
+
+describe('overlapping evaluates', () => {
+  beforeAll(async () => {
+    await evalScope(core);
+  });
+
+  // What a slow samples() looks like from here: `s("slow")` takes until `gate` to get going.
+  const setup = (gate) => {
+    const seen = [];
+    const instance = makeRepl({
+      beforeEval: ({ code }) => (code === 's("slow")' ? gate : undefined),
+      afterEval: ({ code }) => seen.push(code),
+    });
+    return { instance, seen };
+  };
+
+  it('the latest wins, however late an earlier one lands', async () => {
+    let release = () => {};
+    const { instance, seen } = setup(new Promise((resolve) => (release = resolve)));
+    const slow = instance.evaluate('s("slow")', false);
+    await instance.evaluate('s("fast")', false);
+    release();
+    await slow;
+    expect(seen).toEqual(['s("fast")']);
+    expect(instance.state.activeCode).toBe('s("fast")');
+  });
+
+  it('an earlier one that fails late leaves no error behind', async () => {
+    let release = () => {};
+    const { instance } = setup(new Promise((_resolve, reject) => (release = () => reject(new Error('late')))));
+    const slow = instance.evaluate('s("slow")', false);
+    await instance.evaluate('s("fast")', false);
+    release();
+    await slow;
+    expect(instance.state.evalError).toBeUndefined();
+  });
+
+  it('one on its own evaluates as ever', async () => {
+    const { instance, seen } = setup();
+    await instance.evaluate('s("fast")', false);
+    expect(seen).toEqual(['s("fast")']);
+  });
+});
