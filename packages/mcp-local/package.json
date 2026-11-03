@@ -1,5 +1,5 @@
 {
-  "name": "@dygy/strudel-mcp",
+  "name": "strudel_mcp",
   "version": "0.1.0",
   "description": "MCP server that runs Strudel patterns in a WebAssembly sandbox and returns their events, without audio",
   "type": "module",

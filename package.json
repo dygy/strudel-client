@@ -23,6 +23,7 @@
     "build": "npm run prebuild && cd website && npm run build",
     "build:static": "npm run prebuild && cd website && npx astro build --config astro.config.static.mjs",
     "build:cloudflare": "NODE_OPTIONS='--max-old-space-size=4096' npm run prebuild && cd website && NODE_OPTIONS='--max-old-space-size=4096' npx astro build --config astro.config.cloudflare.mjs",
+    "build:mcp": "npm run jsdoc-json && node packages/mcp-worker/scripts/build-knowledge.mjs",
     "dev:cloudflare": "npm run prestart && cd website && npx astro dev --config astro.config.cloudflare.mjs",
     "preview:cloudflare": "cd website && npx wrangler dev",
     "deploy:cloudflare": "npm run build:cloudflare && cd website && npx wrangler deploy",

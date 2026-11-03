@@ -7,10 +7,12 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = resolve(process.cwd(), 'packages/mcp-worker');
-const sources = readdirSync(resolve(ROOT, 'src')).map((name) => ({
-  name,
-  text: readFileSync(resolve(ROOT, 'src', name), 'utf8'),
-}));
+const sources = readdirSync(resolve(ROOT, 'src'), { withFileTypes: true })
+  .filter((entry) => entry.isFile())
+  .map(({ name }) => ({
+    name,
+    text: readFileSync(resolve(ROOT, 'src', name), 'utf8'),
+  }));
 const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')) as {
   private: boolean;
   dependencies?: unknown;
@@ -30,17 +32,33 @@ const wranglerText = readFileSync(resolve(ROOT, 'wrangler.jsonc'), 'utf8');
 const wrangler = parseJsonc(wranglerText);
 
 describe('the Worker bundle', () => {
-  it('has no runtime dependency at all', () => {
+  it('depends on acorn and nothing else at runtime: no SDK, zod or supabase-js', () => {
     expect(pkg.private).toBe(true);
-    expect(pkg.dependencies).toBeUndefined();
+    expect(Object.keys(pkg.dependencies ?? {})).toEqual(['acorn']);
   });
 
-  it('imports only its own files', () => {
+  it('imports only its own files, acorn, the mini parser and the pure rules the site uses', () => {
     const imports = sources.flatMap(({ text }) =>
-      [...text.matchAll(/(?:from\s+|import\s*\()['"]([^'"]+)['"]/g)].map((match) => match[1]),
+      [...text.matchAll(/(?:from\s+|import\s*\(\s*|^import\s+)['"]([^'"]+)['"]/gm)].map((match) => match[1]),
     );
     expect(imports.length).toBeGreaterThan(0);
-    expect(imports.filter((path) => !path.startsWith('./'))).toEqual([]);
+    const allowed = [
+      'acorn',
+      '../../mini/krill-parser.js',
+      '../../../website/src/lib/multitrack',
+      '../../../website/src/lib/slugUtils',
+      '../../../website/src/lib/trackRename',
+    ];
+    expect(imports.filter((path) => !path.startsWith('./') && !allowed.includes(path))).toEqual([]);
+  });
+
+  it('pulls in nothing else through those site files', () => {
+    const relevant = ['multitrack', 'slugUtils', 'trackRename'];
+    for (const name of relevant) {
+      const text = readFileSync(resolve(ROOT, '../../website/src/lib', `${name}.ts`), 'utf8');
+      const imports = [...text.matchAll(/^import\s+(?!type)[^;]*from\s+['"]([^'"]+)['"]/gm)].map((match) => match[1]);
+      expect(`${name}: ${imports.filter((path) => !path.startsWith('./'))}`).toBe(`${name}: `);
+    }
   });
 
   it('never mentions the service-role key', () => {

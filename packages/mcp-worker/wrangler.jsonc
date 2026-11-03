@@ -20,6 +20,10 @@
     "PUBLIC_SUPABASE_URL": "https://iarlunyimplczudavrcl.supabase.co",
     "PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_TrzPO2LYvui4ipk9IKWiaQ_gsdZXQKX",
   },
+  // Writes go through the site's own routes. strudel-client has to be deployed first.
+  "services": [{ "binding": "SITE", "service": "strudel-client" }],
+  // 120 a minute per user (src/handler.ts). Per Cloudflare location, and eventually consistent.
+  "ratelimits": [{ "name": "MCP_RATE", "namespace_id": "1018", "simple": { "limit": 120, "period": 60 } }],
   "durable_objects": {
     "bindings": [{ "name": "TAB_RELAY", "class_name": "TabRelay" }],
   },

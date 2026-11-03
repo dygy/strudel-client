@@ -33,7 +33,11 @@ export const env = {
 } as unknown as Env;
 
 /** The Worker's handler with a fake Supabase, plus what it logged and asked upstream. */
-export function worker(upstream: Upstream = acceptingUpstream, overrides: Partial<Env> = {}) {
+export function worker(
+  upstream: Upstream = acceptingUpstream,
+  overrides: Partial<Env> = {},
+  extra: Partial<Deps> = {},
+) {
   const logs: LogEntry[] = [];
   const upstreamCalls: Array<{ url: string; headers: Headers }> = [];
   const deps: Deps = {
@@ -41,7 +45,9 @@ export function worker(upstream: Upstream = acceptingUpstream, overrides: Partia
       upstreamCalls.push({ url: String(input), headers: new Headers(init?.headers) });
       return upstream(String(input), init);
     }) as typeof fetch,
+    site: async () => new Response('no site in this test', { status: 500 }),
     log: (entry) => logs.push(entry),
+    ...extra,
   };
   const fetchWorker = (input: RequestInfo | URL, init?: RequestInit) =>
     handleRequest(new Request(input, init), { ...env, ...overrides }, deps);

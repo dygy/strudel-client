@@ -318,6 +318,10 @@ importers:
         version: 3.0.4(@types/debug@4.1.12)(@types/node@22.19.3)(@vitest/ui@3.0.4)(jiti@2.4.2)(jsdom@27.4.0)(lightningcss@1.29.1)(terser@5.44.1)(yaml@2.7.1)
 
   packages/mcp-worker:
+    dependencies:
+      acorn:
+        specifier: ^8.14.0
+        version: 8.15.0
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20260702.1

@@ -8,7 +8,11 @@
     "dev": "wrangler dev",
     "size": "wrangler deploy --dry-run --outdir dist",
     "typecheck": "tsc --noEmit",
-    "cpu-time": "node scripts/cpu-time.mjs"
+    "cpu-time": "node scripts/cpu-time.mjs",
+    "knowledge": "node scripts/build-knowledge.mjs"
+  },
+  "dependencies": {
+    "acorn": "^8.14.0"
   },
   "license": "AGPL-3.0-or-later",
   "devDependencies": {

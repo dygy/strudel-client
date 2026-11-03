@@ -11,7 +11,7 @@ import { usePanelViewport } from './panelViewport';
 
 export const MCP_ADDRESS = 'https://strudel.dygy.app/mcp';
 export const CLAUDE_CODE_COMMAND = `claude mcp add --transport http strudel ${MCP_ADDRESS}`;
-export const HELPER_COMMAND = 'claude mcp add strudel-local -- npx -y @dygy/strudel-mcp';
+export const HELPER_COMMAND = 'claude mcp add strudel-local -- npx -y strudel_mcp';
 /** The command fails until the package is on npm (slice 7). Set this to true when it is. */
 export const HELPER_PUBLISHED = false;
 /** A new assistant shows up within this long while the section is open (functional 2.2). */

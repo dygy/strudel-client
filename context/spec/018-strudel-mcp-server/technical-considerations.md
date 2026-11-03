@@ -18,7 +18,7 @@ Three new parts, and one protective change to the existing app:
       │                     │  └──reads: Supabase REST with the user's token────────────────┘
       │                     └──> TabRelay Durable Object (one per user) <──WebSocket── open REPL tab
       │
-      └──stdio──> @dygy/strudel-mcp (local helper): pattern runs in a QuickJS sandbox
+      └──stdio──> strudel_mcp (local helper): pattern runs in a QuickJS sandbox
 ```
 
 - **Remote server:** a separate Worker, `strudel-mcp`, on routes in front of the existing custom domain. Separate, so the Astro bundle, its entry point and its 3 MiB budget stay untouched, and a crash here can't take down the REPL.
@@ -36,7 +36,7 @@ Three new parts, and one protective change to the existing app:
 |---|---|---|
 | `packages/mcp-worker` (private) | New Worker `strudel-mcp` | Routes `strudel.dygy.app/mcp*` and `strudel.dygy.app/.well-known/oauth-protected-resource*`. Cloudflare's docs show a path route running in front of a custom domain on the same hostname |
 | `TabRelay` | Durable Object in that Worker | SQLite class, WebSocket hibernation |
-| `packages/mcp-local` | User's computer (Node ≥ 20) | Published as `@dygy/strudel-mcp`: `strudel-mcp` is taken on npm (**measured**), and the `@strudel` scope is upstream's |
+| `packages/mcp-local` | User's computer (Node ≥ 20) | Published as `strudel_mcp`: `strudel-mcp` is taken on npm (**measured**), and the `@strudel` scope is upstream's |
 | Consent page, Connected assistants, switch, conflict UI | Browser | The consent page is prerendered, so nothing is added to the SSR bundle |
 | `/api/tracks/*`, `/api/folders/*` changes | Existing Worker | Additive; no new SSR pages |
 
@@ -44,7 +44,7 @@ Three new parts, and one protective change to the existing app:
 - **No Prettier, and no formatting tool at all** (owner's decision, also not in the helper). `formatEngine.ts` is untouched.
 - **No MCP SDK or zod in the Worker.** A small hand-written JSON-RPC handler with static tool definitions (plain JSON Schema, a small validator), so no per-request server setup.
 - **No `supabase-js` in the Worker.** Plain `fetch`.
-- **`check_code` online is capped at 8 KB**, and the cap is set from the spike's measurement. Larger code gets a `use_local_helper` answer.
+- **`check_code` online is capped at 768 bytes**, measured: the first check in a new isolate takes 9.6 ms at worst there and 10.8 ms at 1 KB, on a laptop. Remeasure on workerd before raising it. Larger code gets a `use_local_helper` answer.
 - **Lists are paged at 50 and leave out `code`**, so a page stays cheap to parse.
 - **A CPU budget test:** each tool's handler is timed in a test against a fixture on the slowest case, and the spike measures real `cpuTime` in Workers observability. If a tool can't stay within budget, it moves to the helper and the spec is amended.
 
@@ -67,7 +67,7 @@ Free-plan quota: 100,000 Worker requests per day across the account, with an MCP
 | Library, read | `list_folders`, `search_tracks`, `get_track` |
 | Library, write | `create_track`, `update_track`, `move_track`, `create_folder`, `rename_folder`, `move_folder`, `set_track_steps` |
 | Library, destructive | `delete_track`, `delete_step`, `delete_empty_folder` |
-| Knowledge | `lookup_function`, `search_functions`, `list_sounds`, `check_code` (up to 8 KB) |
+| Knowledge | `lookup_function`, `search_functions`, `list_sounds`, `check_code` (up to 768 bytes) |
 | Live | `list_tabs`, `play`, `stop`, `update_code`, `open_track` |
 | Local helper | `run_pattern`, `summarize_pattern`, `check_code` (any size) |
 

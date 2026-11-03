@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   publish:
-    name: Test and publish @dygy/strudel-mcp
+    name: Test and publish strudel_mcp
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -45,7 +45,7 @@ describe('the official SDK client', () => {
   it('lists whoami with its annotations and schemas', async () => {
     const { client } = await connect();
     const { tools } = await client.listTools();
-    expect(tools.map((tool) => tool.name)).toEqual(['whoami']);
+    expect(tools[0].name).toBe('whoami');
     expect(tools[0].annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
     expect(tools[0].outputSchema).toBeDefined();
   });

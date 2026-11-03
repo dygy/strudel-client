@@ -93,7 +93,7 @@ afterAll(async () => {
 describe('the published package', TIMEOUT, () => {
   it('has the name, license, engines and bin the spec asks for', () => {
     expect(manifest).toMatchObject({
-      name: '@dygy/strudel-mcp',
+      name: 'strudel_mcp',
       license: 'AGPL-3.0-or-later',
       engines: { node: '>=20' },
       bin: { 'strudel-mcp': expect.any(String) },

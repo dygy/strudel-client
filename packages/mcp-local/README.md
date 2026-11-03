@@ -1,12 +1,12 @@
-# @dygy/strudel-mcp
+# strudel_mcp
 
 A local [MCP](https://modelcontextprotocol.io) server that lets an AI assistant run [Strudel](https://strudel.cc) patterns on your computer and see which events they produce. It makes no sound and needs no account.
 
 ```sh
-claude mcp add strudel -- npx -y @dygy/strudel-mcp
+claude mcp add strudel -- npx -y strudel_mcp
 ```
 
-Any other MCP client: run `npx -y @dygy/strudel-mcp` as a stdio server. Needs Node 20 or newer.
+Any other MCP client: run `npx -y strudel_mcp` as a stdio server. Needs Node 20 or newer.
 
 ## Tools
 

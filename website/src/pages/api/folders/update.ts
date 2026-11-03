@@ -9,6 +9,7 @@ import {
   type FolderRenamePlan,
   type RenamableFolder,
 } from '../../../lib/folderRename';
+import { invalidVersionResponse, isVersionToken } from '../tracks/_version';
 
 export const prerender = false;
 
@@ -34,7 +35,7 @@ export const PUT: APIRoute = async ({ request }) => {
     if (!body) {
       return invalidDataResponse();
     }
-    const { folderId, updates } = body;
+    const { folderId, updates, expectedVersion } = body;
 
     if (!folderId || typeof folderId !== 'string') {
       return json({ error: 'Folder ID is required' }, 400);
@@ -45,6 +46,10 @@ export const PUT: APIRoute = async ({ request }) => {
     if (updates.name !== undefined && typeof updates.name !== 'string') {
       return json({ error: 'Folder name must be a string' }, 400);
     }
+    // Optional: the sidebar sends none and writes as it always did. An assistant says what it read.
+    if (expectedVersion !== undefined && !isVersionToken(expectedVersion)) {
+      return invalidVersionResponse();
+    }
 
     // As the user, so RLS applies; every query below is also scoped by the session user's id.
     const supabase = userClient(accessToken);
@@ -53,7 +58,7 @@ export const PUT: APIRoute = async ({ request }) => {
     // check, the parent/cycle checks and the descendant cascade.
     const { data: folderRows, error: listError } = await supabase
       .from('folders')
-      .select('id, user_id, name, path, parent, created')
+      .select('id, user_id, name, path, parent, created, updated_at')
       .eq('user_id', user.id);
     if (listError) {
       console.error('API /folders/update - Failed to list folders:', listError);
@@ -64,6 +69,16 @@ export const PUT: APIRoute = async ({ request }) => {
     const existingFolder = folders.find((f) => f.id === folderId);
     if (!existingFolder) {
       return json(RENAME_ERRORS.notFound, 404);
+    }
+    if (expectedVersion !== undefined && existingFolder.updated_at !== expectedVersion) {
+      return json(
+        {
+          error: 'This folder changed since you read it',
+          code: 'version_conflict',
+          current: { version: existingFolder.updated_at, name: existingFolder.name, path: existingFolder.path },
+        },
+        409,
+      );
     }
 
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -183,9 +198,30 @@ export const PUT: APIRoute = async ({ request }) => {
       return json({ error: 'Failed to update folder' }, 500);
     };
 
-    const { error: updateError } = await updateRow('folders', ['id', folderId], updateData);
-    if (updateError) {
-      return fail('Folder update', updateError);
+    // With a version, one UPDATE: the check and the write can't be separated by another writer. What
+    // it returns is what the trigger wrote, so the caller's next version is the real one.
+    let writtenVersion: string | undefined;
+    if (expectedVersion === undefined) {
+      const { error: updateError } = await updateRow('folders', ['id', folderId], updateData);
+      if (updateError) {
+        return fail('Folder update', updateError);
+      }
+    } else {
+      const { data: won, error: updateError } = await supabase
+        .from('folders')
+        .update(updateData as never)
+        .eq('id', folderId)
+        .eq('user_id', user.id)
+        .eq('updated_at', expectedVersion)
+        .select('updated_at');
+      if (updateError) {
+        return fail('Folder update', updateError);
+      }
+      const row = (won as Array<{ updated_at: string }> | null)?.[0];
+      if (!row) {
+        return json({ error: 'This folder changed since you read it', code: 'version_conflict' }, 409);
+      }
+      writtenVersion = row.updated_at;
     }
     applied.push({
       what: `folder ${folderId}`,
@@ -237,7 +273,7 @@ export const PUT: APIRoute = async ({ request }) => {
           path: updatedFolder.path,
           parent: updatedFolder.parent ?? null,
           created: updatedFolder.created,
-          updated_at: updatedFolder.updated_at,
+          updated_at: writtenVersion ?? updatedFolder.updated_at,
         },
         pathChanges: plan?.pathChanges ?? [],
         trackFolderRemaps: plan?.trackFolderRemaps ?? [],

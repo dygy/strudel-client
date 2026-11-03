@@ -1,5 +1,7 @@
 /** HTTP surface of the Worker: everything the two routes in wrangler.jsonc can receive. */
 import { bearerToken, checkToken } from './auth';
+import { fail, type ToolContext } from './context';
+import { isTool } from './tools';
 import type { Deps, Env } from './env';
 import { dispatch, INVALID_REQUEST, PARSE_ERROR, rpcError, SUPPORTED_PROTOCOL_VERSIONS } from './jsonrpc';
 
@@ -9,11 +11,35 @@ const METADATA_PATH = '/.well-known/oauth-protected-resource/mcp';
 
 /** Room for a 512 KB track (spec 2.4) once it's escaped into JSON. */
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
+/** Must match `ratelimits` in wrangler.jsonc. */
+export const RATE_LIMIT_PER_MINUTE = 120;
 
 const JSON_HEADERS = { 'content-type': 'application/json', 'cache-control': 'no-store' };
 
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { ...JSON_HEADERS, ...headers } });
+
+/** A tool call gets a result it can act on; anything else, the HTTP answer. */
+function rateLimited(message: unknown) {
+  const { id, method, params } = (message ?? {}) as { id?: string | number; method?: unknown; params?: unknown };
+  const text = `Too many requests: at most ${RATE_LIMIT_PER_MINUTE} a minute.`;
+  if (method === 'tools/call' && id !== undefined) {
+    const name = (params as { name?: unknown } | undefined)?.name;
+    const reply = fail('rate_limited', text, 'Wait a minute, then try again. Nothing was changed.');
+    return {
+      body: { jsonrpc: '2.0', id, result: reply },
+      status: 200,
+      headers: {} as Record<string, string>,
+      handler: `tools/call:${isTool(name) ? name : 'unknown'}`,
+    };
+  }
+  return {
+    body: rpcError(null, INVALID_REQUEST, `${text} Wait a minute, then try again.`),
+    status: 429,
+    headers: { 'retry-after': '60' },
+    handler: 'transport',
+  };
+}
 
 const refusal = (status: number, message: string, headers: Record<string, string> = {}) =>
   json(rpcError(null, INVALID_REQUEST, message), status, headers);
@@ -105,7 +131,23 @@ async function mcpPost(request: Request, env: Env, deps: Deps, origin: string, s
     return finish(json(rpcError(null, PARSE_ERROR, 'Parse error'), 400), 'transport', 'parse_error');
   }
 
-  const reply = dispatch(message, check.identity);
+  // Per user, so one assistant can't use up the account's quota. Eventually consistent, as the binding
+  // is, and open if it's missing or fails: a limit must never be why the library can't be reached.
+  const limited = await deps.isRateLimited?.(check.identity.userId).catch(() => false);
+  if (limited) {
+    const over = rateLimited(message);
+    return finish(json(over.body, over.status, over.headers), over.handler, 'rate_limited');
+  }
+
+  const ctx: ToolContext = {
+    env,
+    identity: check.identity,
+    token,
+    fetch: deps.fetch,
+    site: deps.site,
+    origin,
+  };
+  const reply = await dispatch(message, ctx);
   if (!reply) return finish(new Response(null, { status: 202 }), 'notification', 'accepted');
   return finish(json(reply.body), reply.handler, reply.outcome);
 }
