@@ -175,9 +175,17 @@ export function createTrackConflictController(deps: TrackConflictDeps) {
     return Date.now() - draft.createdAt >= CLAIM_GRACE_MS && !(await isTabAlive(draft.tabId));
   }
 
-  function keep(trackId: string, code: string, stepIndex?: number): TrackDraft {
+  function keep(trackId: string, code: string, stepIndex?: number): TrackDraft | null {
     const local = deps.getLocalTrack(trackId);
     const previous = ownDraft(trackId);
+    // An empty editor is never text worth keeping, and must not replace text that is.
+    if (!code.trim()) return previous;
+    // From an earlier page, and never shown: it may be the only copy. It stays, under a tab id no page
+    // holds, so it's offered as a closed tab's draft once the grace has passed.
+    if (previous && !writtenHere.has(trackId) && previous.code !== code) {
+      const aside = { ...previous, tabId: `${previous.tabId}~${previous.createdAt}` };
+      store((storage) => storage.setItem(keyOf(aside), JSON.stringify(aside)));
+    }
     const steps = (local?.steps ?? previous?.steps ?? []) as StepLike[];
     const isMultitrack = hasSteps({ code, steps, isMultitrack: local?.isMultitrack ?? previous?.isMultitrack });
     const index = activeStepIndex({ code, steps, activeStep: stepIndex ?? local?.activeStep ?? previous?.stepIndex });
@@ -367,6 +375,8 @@ export function createTrackConflictController(deps: TrackConflictDeps) {
     textSaved(id: string, text: string, sentAt: number, { leaving = false } = {}) {
       const draft = ownDraft(id);
       if (!draft) return;
+      // Not written or shown by this page, so this save can't contain it. The next check offers it.
+      if (draft.code !== text && !writtenHere.has(id)) return;
       if (draft.code === text || draft.createdAt <= sentAt) {
         if (!leaving) {
           removeDraft(draft);
@@ -449,6 +459,7 @@ export function createTrackConflictController(deps: TrackConflictDeps) {
       const isOpen = versions.openTrackId === id;
       const text = isOpen ? deps.getEditorCode() : (ownDraft(id)?.code ?? drafts(id)[0]?.code ?? '');
       const fail = () => patch(id, { busy: false, failed: true });
+      if (!text.trim()) return fail();
       patch(id, { busy: true, failed: false });
 
       const read = await deps.readTrack(id);

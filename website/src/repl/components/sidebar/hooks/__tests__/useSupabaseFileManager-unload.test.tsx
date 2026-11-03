@@ -487,6 +487,30 @@ describe('a multitrack', () => {
     expect(stepCodes(lastSent())).toEqual(['alpha edited', 'beta edited']);
   });
 
+  it('text typed while a save is in flight survives that save answering after a step switch', async () => {
+    let answerFirst: (value: Response) => void = () => {};
+    fetchMock.mockImplementationOnce(() => new Promise((resolve) => (answerFirst = resolve)));
+    fetchMock.mockImplementationOnce(async () => ok(row({ code: 'beta', steps: STEPS }, V3)));
+
+    editor.code = 'T1';
+    let inFlight: Promise<boolean> = Promise.resolve(false);
+    await React.act(async () => {
+      inFlight = hook.saveSpecificTrack('m1', false);
+    });
+    await flush();
+    editor.code = 'T2';
+    await React.act(async () => ops.switchToStep('m1', 1));
+
+    await React.act(async () => {
+      answerFirst(ok(row({ code: 'T1', steps: STEPS }, V2)));
+      await inFlight;
+    });
+    await flush();
+
+    expect(hook.tracks.m1.steps[0].code).toBe('T2');
+    expect(stepCodes(lastSent())).toEqual(['T2', 'beta']);
+  });
+
   it('a step switch during auto-format drops that save, not the text: the switch carried it', async () => {
     settings = { isPrettierEnabled: true, prettierAutoFormatOnSave: true };
     let finishFormat: (value: { success: boolean; formattedCode: string }) => void = () => {};

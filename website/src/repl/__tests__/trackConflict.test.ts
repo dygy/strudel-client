@@ -1112,3 +1112,69 @@ describe('a multitrack', () => {
     expect(notice()).toMatchObject({ kind: 'changed' });
   });
 });
+
+describe('final review: drafts this page has not shown, and empty text', () => {
+  const earlier = (code: string): TrackDraft => ({
+    userId: USER,
+    tabId: TAB,
+    trackId: 't1',
+    stepIndex: 0,
+    code,
+    steps: [],
+    baseVersion: V1,
+    createdAt: Date.now() - 1000,
+    name: 'Track',
+    folder: 'f1',
+    isMultitrack: false,
+  });
+  const storedCodes = (w: World) => {
+    const codes: string[] = [];
+    for (let i = 0; i < w.storage.length; i++) codes.push(JSON.parse(w.storage.getItem(w.storage.key(i)!)!).code);
+    return codes;
+  };
+
+  it("a save doesn't delete a draft from an earlier page that was never shown", () => {
+    world.storage.setItem(keyOf(), JSON.stringify(earlier('only copy')));
+    controller.textSaved('t1', 'typed on the old text', Date.now());
+    expect(storedCodes(world)).toContain('only copy');
+  });
+
+  it("typing doesn't overwrite a draft from an earlier page that was never shown", () => {
+    world.storage.setItem(keyOf(), JSON.stringify(earlier('only copy')));
+    controller.keepDraft('t1', 'typed on the old text');
+    expect(storedCodes(world)).toEqual(expect.arrayContaining(['only copy', 'typed on the old text']));
+  });
+
+  it('a draft set aside this way is offered once its grace has passed', async () => {
+    world.storage.setItem(keyOf(), JSON.stringify(earlier('only copy')));
+    controller.keepDraft('t1', 'typed on the old text');
+    const later = Date.now() + 60_000;
+    controller.textSaved('t1', 'typed on the old text', later);
+    vi.spyOn(Date, 'now').mockReturnValue(later + 1);
+    world.remote = { status: 'found', value: server('typed on the old text', V2) };
+    world.versions.set('t1', server('typed on the old text', V2));
+    world.editor = 'typed on the old text';
+    world.lastSaved = 'typed on the old text';
+    await open();
+    expect(notice()).not.toBeNull();
+    expect(world.editor).toBe('only copy');
+  });
+
+  it("an empty editor doesn't replace a stored draft", () => {
+    controller.keepDraft('t1', 'typed');
+    controller.keepDraft('t1', '   ');
+    controller.savePaused('t1', '');
+    expect(draftOf(world).code).toBe('typed');
+  });
+
+  it('Keep mine sends nothing from an empty editor, and the notice stays', async () => {
+    world.editor = 'typed';
+    world.remote = { status: 'found', value: server('theirs', V2) };
+    await open();
+    expect(notice()).not.toBeNull();
+    world.editor = '';
+    await controller.keepMine();
+    expect(world.saveCode).not.toHaveBeenCalled();
+    expect(notice()).toMatchObject({ failed: true });
+  });
+});

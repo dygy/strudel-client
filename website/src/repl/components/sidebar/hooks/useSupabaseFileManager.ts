@@ -792,12 +792,14 @@ export function useSupabaseFileManager(
       const now = new Date().toISOString();
       const wasActive = (track: Track) => !hasSteps(track as never) || activeStepIndex(track as never) === stepIndex;
       const saved = tracksRef.current[trackId];
-      // The user may have moved to another step while this was in flight. Then this text belongs in
-      // its step only: the editor and the baseline already hold the other step's.
-      const stillOnIt = saved ? wasActive(saved) : false;
+      // A step change since this was sent carried newer text in the steps, and its own save follows.
+      // This answer is about an older state, so it must not put that text back.
+      const overtaken = (stepChangeCountRef.current.get(trackId) ?? 0) !== sent.stepChange;
+      const stillOnIt = saved ? wasActive(saved) && !overtaken : false;
       setTracks((prev) => {
         const track = prev[trackId];
         if (!track) return prev;
+        if (overtaken) return { ...prev, [trackId]: { ...track, modified: now } as Track };
         return {
           ...prev,
           [trackId]: {
