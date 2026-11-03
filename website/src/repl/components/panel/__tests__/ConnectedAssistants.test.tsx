@@ -232,6 +232,12 @@ describe('Connected assistants', () => {
     expect(CLAUDE_CODE_COMMAND).toContain(MCP_ADDRESS);
   });
 
+  // @spec: 018-strudel-mcp-server (2.2) @regression. With no transport, Claude Code runs the address as a program.
+  it('gives Claude Code a whole command for an HTTP server, needing nothing else', () => {
+    expect(CLAUDE_CODE_COMMAND).toBe('claude mcp add --transport http strudel https://strudel.dygy.app/mcp');
+    expect(CLAUDE_CODE_COMMAND).not.toMatch(/--transport (sse|stdio)|<|\[/);
+  });
+
   describe('Copy', () => {
     const firstCopy = () =>
       [...container!.querySelectorAll('[data-testid="connect-steps"] button')][0] as HTMLButtonElement;
