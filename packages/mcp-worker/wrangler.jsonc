@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "strudel-mcp",
+  "account_id": "503e92d7d95838d80c33802d3274f284",
+  "main": "./src/index.ts",
+  "compatibility_date": "2026-08-19",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  // Path routes in front of the strudel-client custom domain on the same hostname. Every other
+  // path on strudel.dygy.app stays with strudel-client.
+  "routes": [
+    { "pattern": "strudel.dygy.app/mcp*", "zone_name": "dygy.app" },
+    { "pattern": "strudel.dygy.app/.well-known/oauth-protected-resource*", "zone_name": "dygy.app" },
+  ],
+  // Public values only, the same ones as website/wrangler.jsonc. This Worker has no secrets, and
+  // the site's admin key must never reach it (test/bundleRules.test.ts).
+  "vars": {
+    "PUBLIC_SUPABASE_URL": "https://iarlunyimplczudavrcl.supabase.co",
+    "PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_TrzPO2LYvui4ipk9IKWiaQ_gsdZXQKX",
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "TAB_RELAY", "class_name": "TabRelay" }],
+  },
+  // Workers Free only allows SQLite-backed Durable Objects.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TabRelay"] }],
+}

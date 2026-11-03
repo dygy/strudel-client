@@ -17,3 +17,12 @@
   - `supabase-js` installed is 2.48.1, with no `auth.oauth` namespace.
 - **Flow defects:** `/ship` says to work on `main`. The session rule is to branch first on the default branch, so this work is on a feature branch. `tasks.md` keeps its `not-user-reviewed` marker because `/ship` tells `/awos:tasks` not to ask.
 - **Next:** Slice 1 spike. It needs approval for two prod steps: dynamic registration and deploying the Worker.
+
+## 2026-11-03: Slice 1 spike on prod (approved)
+
+- **Done:** consent page pushed to main (`d96349b`, run 41548388023 green, page serves 200 with frame and Referer headers). Worker `strudel-mcp` deployed on its routes, version `615044df`. Dynamic registration turned on in prod Supabase.
+- **Measured:** see tech spec section 2.3. Revocation 89 ms at `/mcp`; REST token valid until expiry; p50 CPU 0.36 ms, p99 1.33 ms; socket through the route works.
+- **Echo:** tested, then gated off with `TAB_ECHO_ENABLED` (prod answers 404).
+- **Temporary user and OAuth client:** created by script and deleted (200, 204).
+- **Open:** a real client (Claude Code, claude.ai) connecting through Google sign-in, which needs the owner. `scripts/cpu-time.mjs` got 403 with wrangler's login, which has no observability scope; quantiles came from the GraphQL analytics API instead, with few samples (6).
+- **Next:** Slice 2.
