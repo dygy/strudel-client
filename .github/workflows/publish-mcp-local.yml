@@ -1,0 +1,44 @@
+name: Publish local MCP helper
+
+# Same shape as dygy/tauri-example's publish.yml: a pushed tag publishes to npm with the npm_token
+# secret. To release: bump packages/mcp-local/package.json, then push the tag mcp-local-v<version>.
+on:
+  push:
+    tags:
+      - 'mcp-local-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Test and publish @dygy/strudel-mcp
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: pnpm
+          registry-url: https://registry.npmjs.org/
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: The tag must match the package version
+        run: |
+          version=$(node -p "require('./packages/mcp-local/package.json').version")
+          test "$GITHUB_REF_NAME" = "mcp-local-v$version"
+
+      - run: pnpm exec vitest run packages/mcp-local
+
+      # prepack builds dist. The checkout is a detached tag, hence no git checks.
+      - name: Publish
+        working-directory: packages/mcp-local
+        run: pnpm publish --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.npm_token }}
