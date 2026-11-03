@@ -63,7 +63,17 @@ export function createTabControls({ live, enabled, phase }: TabControlSources): 
     },
     replaceCode: (code) => editor().replaceCode(code),
     start: () => editor().evaluate(),
-    update: () => live().context.runUpdate(),
+    // The same Update as a person's. It doesn't wait for a switch's evaluate on the Off type, so this
+    // does, on its own, to answer honestly. The caller limits how long.
+    update: async () => {
+      const outcome = await live().context.runUpdate();
+      if (outcome !== 'ignored') await live().context.evaluationsSettled?.();
+      return outcome;
+    },
+    isActiveCode: (code) => {
+      const active = editor()?.repl?.state?.activeCode;
+      return active === undefined || active === code;
+    },
     stop: () => live().context.handleTogglePlay(),
     evalError: () => editor()?.repl?.state?.evalError ?? null,
     openTrack: async (trackId) => {

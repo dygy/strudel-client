@@ -26,3 +26,11 @@
 - **Temporary user and OAuth client:** created by script and deleted (200, 204).
 - **Open:** a real client (Claude Code, claude.ai) connecting through Google sign-in, which needs the owner. `scripts/cpu-time.mjs` got 403 with wrangler's login, which has no observability scope; quantiles came from the GraphQL analytics API instead, with few samples (6).
 - **Next:** Slice 2.
+
+## 2026-11-03: save protection shipped, tools ready
+
+- **Shipped:** `5289c6c`, run 41659340595. The first push, `68315e8`, failed CI: Node 24 ran out of memory on plain `useFakeTimers`, and this Mac runs Node 26. Verified on prod with a temporary user, 19 of 19, user deleted.
+- **On branch:** slices 4 to 10, helper renamed `strudel_mcp_js`.
+- **Decision:** shared audio code reverted to main after three review rounds found regressions in it. Pre-existing behaviour left alone, to file: a stale evaluate can win over an edited Update; on Crossfade an edited Update during a slow switch is ignored; a hanging evaluate on Crossfade blocks Update until reload.
+- **Open:** real client through Google sign-in; prod CPU for `check_code`; `MCP_RATE` and `MCP_IP_RATE` on Free; publishing the helper.
+- **Flow defects:** the push gate runs on the local Node, not CI's.

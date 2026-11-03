@@ -3,8 +3,8 @@
  * it into the old track's timeline (no fades, same cycle position). Update must tell a
  * track switch from an in-place update of the playing track.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createTrackSwitchController, getUpdateAction, STUCK_AFTER_MS } from '../trackSwitch';
+import { describe, it, expect, vi } from 'vitest';
+import { createTrackSwitchController, getUpdateAction } from '../trackSwitch';
 
 describe('getUpdateAction (Update / Ctrl+U)', () => {
   it('a different track in the editor while one is playing is a track switch', () => {
@@ -228,126 +228,5 @@ describe('replaceTrackId (spec 018: a deleted track saved again under a new id)'
     controller.evaluated('code');
     controller.replaceTrackId('old', 'new');
     expect(controller.playingTrackId).toBe('other');
-  });
-});
-
-describe('busy: is what is heard changing', () => {
-  it('from the moment Update starts a switch until it has finished, for every transition type', async () => {
-    const controller = createTrackSwitchController();
-    controller.setEditorTrack('b');
-    expect(controller.busy).toBe(false);
-    let finish = () => {};
-    const update = controller.update({
-      isPlaying: true,
-      code: 'new',
-      hotSwap: async () => {},
-      switchTrack: () => new Promise<void>((resolve) => (finish = resolve)),
-    });
-    expect(controller.busy).toBe(true);
-    finish();
-    await update;
-    expect(controller.busy).toBe(false);
-  });
-
-  it('while an evaluate is loading its samples, and after one that fails', async () => {
-    const controller = createTrackSwitchController();
-    let finish: (value?: unknown) => void = () => {};
-    let refuse: (error: unknown) => void = () => {};
-    const editor = {
-      code: 'x',
-      evaluate: () =>
-        new Promise((resolve, reject) => {
-          finish = resolve;
-          refuse = reject;
-        }),
-    };
-    controller.attachEditor(editor);
-    const first = editor.evaluate();
-    expect(controller.busy).toBe(true);
-    finish();
-    await first;
-    await Promise.resolve();
-    expect(controller.busy).toBe(false);
-    const second = editor.evaluate();
-    refuse(new Error('no'));
-    await expect(second).rejects.toThrow('no');
-    await Promise.resolve();
-    expect(controller.busy).toBe(false);
-  });
-});
-
-describe('Update can never go dead', () => {
-  const NEVER = () => new Promise<void>(() => {});
-  const setup = () => {
-    const controller = createTrackSwitchController();
-    const runs: string[] = [];
-    const update = (code: string, switchTrack: (code: string) => Promise<void> = async (c) => void runs.push(c)) =>
-      controller.update({ isPlaying: true, code, hotSwap: async () => void runs.push(`hot:${code}`), switchTrack });
-    return { controller, runs, update };
-  };
-
-  beforeEach(() => {
-    vi.useFakeTimers({ now: 1_000_000, toFake: ['Date'] });
-  });
-  afterEach(() => vi.useRealTimers());
-
-  it('a hanging track: Stop, fix it, Update runs; open another, edit, Update runs', async () => {
-    const { controller, runs, update } = setup();
-    controller.setEditorTrack('a');
-    void update('hangs', NEVER);
-    controller.stopped();
-    expect(await update('fixed')).toBe('switch');
-    expect(runs).toEqual(['fixed']);
-    controller.setEditorTrack('b');
-    expect(await update('another, edited')).toBe('switch');
-    expect(runs).toEqual(['fixed', 'another, edited']);
-  });
-
-  it('a slow load: an edited Update goes through at once', async () => {
-    const { runs, update, controller } = setup();
-    controller.setEditorTrack('a');
-    void update('slow', NEVER);
-    expect(await update('slow, edited')).toBe('switch');
-    expect(runs).toEqual(['slow, edited']);
-  });
-
-  it('only the very same code again is a repeat', async () => {
-    const { runs, update, controller } = setup();
-    controller.setEditorTrack('a');
-    void update('same', NEVER);
-    expect(await update('same')).toBe('ignored');
-    expect(runs).toEqual([]);
-  });
-
-  it('a switch stuck in flight stops counting after the bound, for a repeat and for busy', async () => {
-    const { runs, update, controller } = setup();
-    controller.setEditorTrack('a');
-    void update('same', NEVER);
-    vi.setSystemTime(1_000_000 + STUCK_AFTER_MS - 1);
-    expect(controller.busy).toBe(true);
-    expect(controller.switchTarget).toBe('a');
-    vi.setSystemTime(1_000_000 + STUCK_AFTER_MS);
-    expect(controller.busy).toBe(false);
-    expect(controller.switchTarget).toBeNull();
-    expect(controller.decide(true, false, 'same')).not.toBe('ignored');
-    expect(await update('same')).not.toBe('ignored');
-    expect(runs).toHaveLength(1);
-  });
-
-  it('an evaluate that never finishes stops counting too', () => {
-    const { controller } = setup();
-    const editor = { code: 'x', evaluate: NEVER };
-    controller.attachEditor(editor);
-    void editor.evaluate();
-    expect(controller.busy).toBe(true);
-    vi.setSystemTime(1_000_000 + STUCK_AFTER_MS);
-    expect(controller.busy).toBe(false);
-  });
-
-  it('forgets a switch once it finishes, even one that failed', async () => {
-    const { update, controller } = setup();
-    controller.setEditorTrack('a');
-    await expect(update('x', () => Promise.reject(new Error('no')))).rejects.toThrow('no');
-    expect(controller.busy).toBe(false);
   });
 });

@@ -71,6 +71,14 @@ Last surveyed: 2026-10-08.
 | Data model (`profiles`, `tracks`, `folders`, `file_system_nodes`, `tree_*`; RLS by `auth.uid()`) | F | `supabase_schema.sql`; `website/src/lib/database/tree-schema.sql`; types in `website/database.types.ts` | none | none | web |
 | Admin read-only dashboard | F | `pages/admin.astro`; `components/admin/AdminDashboard.tsx`; `/api/admin/users`; `lib/adminAuth.ts` (admin = `app_metadata.role === 'admin'`, set only via the Admin API) | none | `pages/api/__tests__/admin.test.ts`: exact role match (not the address, not `user_metadata`), 401/403/200, no service-role reads before the admin check | web |
 
+## AI assistants (MCP)
+
+| Feature | Origin | Code | Spec | Tests | Owner |
+|---|---|---|---|---|---|
+| MCP server for assistants: OAuth through Supabase, library, write and knowledge tools, control of an open tab that allowed it | F | Worker `packages/mcp-worker` (`strudel-mcp`, routes `/mcp*`, `/.well-known/oauth-protected-resource*`, Durable Object `TabRelay`); consent `pages/oauth/consent.astro`, `components/oauth/ConsentPage.tsx`, `lib/oauthServerApi.ts`; tab side `repl/assistantControl/*`, `repl/evaluationWatch.ts`; `panel/ConnectedAssistants.tsx`; `pages/learn/ai-assistants.mdx`; `lib/mcpHelper.ts` | [018](../spec/018-strudel-mcp-server/) | `packages/mcp-worker/test/*`; `repl/assistantControl/__tests__/*`; `components/oauth/__tests__/*`; `panel/__tests__/ConnectedAssistants*`; `pages/api/__tests__/{adminAssistantScope,assistantCreateThenOpen,folderDelete}`; map in `coverage.md` | web |
+| Local helper `strudel_mcp_js`: pattern runs in a QuickJS sandbox, `check_code` of any size | F | `packages/mcp-local`; published by `.github/workflows/publish-mcp-local.yml` | [018](../spec/018-strudel-mcp-server/) | `packages/mcp-local/test/*` | engine |
+| Save protection: version checks on `updated_at`, conflict notice, drafts per tab, emergency save, multitrack steps persist | F | `pages/api/tracks/{update,delete,_version}.ts`; `repl/{trackVersion,trackConflict,tabIdentity,globalSaveManager}.ts`; `repl/hooks/useTrackConflict.ts`; `components/TrackConflictNotice.tsx`; `lib/multitrack.ts` | [018](../spec/018-strudel-mcp-server/) | `repl/__tests__/{trackConflict,trackVersion,globalSaveManager}`; `sidebar/hooks/__tests__/useSupabaseFileManager-{conflict,unload}`; `lib/__tests__/multitrack`; `pages/api/__tests__/trackVersionWire` | web |
+
 ## Recording and embed
 
 | Feature | Origin | Code | Spec | Tests | Owner |

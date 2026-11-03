@@ -61,6 +61,34 @@ describe('openTrack', () => {
   });
 });
 
+describe('update', () => {
+  it('is the same runUpdate, and then waits on its own for the evaluate it started', async () => {
+    let settle = () => {};
+    const order: string[] = [];
+    const context = {
+      runUpdate: async () => (order.push('runUpdate'), 'switch'),
+      evaluationsSettled: () => new Promise<void>((resolve) => (settle = resolve)),
+    };
+    let answered: unknown;
+    void controls({}, context)
+      .update()
+      .then((value) => (answered = value));
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(order).toEqual(['runUpdate']);
+    expect(answered).toBeUndefined();
+    settle();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(answered).toBe('switch');
+  });
+
+  it('says ignored without waiting for anything', async () => {
+    const evaluationsSettled = vi.fn();
+    const context = { runUpdate: async () => 'ignored', evaluationsSettled };
+    expect(await controls({}, context).update()).toBe('ignored');
+    expect(evaluationsSettled).not.toHaveBeenCalled();
+  });
+});
+
 describe('saveEdits', () => {
   it('saves the track it was told, not whichever is selected', async () => {
     const saveSpecificTrack = vi.fn(async () => true);

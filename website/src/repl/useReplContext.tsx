@@ -55,6 +55,7 @@ import {
 import { useAudioRecorder } from './recording/useAudioRecorder';
 import { useScreenRecorder } from './recording/useScreenRecorder';
 import { listenForSmoothTransitionErrors } from './smoothTransitionNotifier';
+import { createEvaluationWatch, isMusicChanging } from './evaluationWatch';
 import { createTrackSwitchController, type UpdateOutcome } from './trackSwitch';
 import { settingsForSwitch, switchPath } from './transitionSettings';
 
@@ -101,8 +102,10 @@ interface ReplContext {
   transitionController?: TrackTransitionController | null;
   /** Which track is in the editor and which is playing, as Update sees them. */
   trackIds?: () => { editor: string | null; playing: string | null };
-  /** A switch or an evaluate is under way, however it started and whatever its transition type. */
+  /** For assistants: a switch or an evaluate is under way. Read-only: no human path looks at this. */
   isSwitching?: () => boolean;
+  /** For assistants: resolves when the evaluates going now have finished. Nothing else waits for it. */
+  evaluationsSettled?: () => Promise<void>;
   /** Update, without what the button also does to a headphone preview. */
   runUpdate?: (options?: { reset?: boolean }) => Promise<UpdateOutcome>;
   /** The editor now holds track `id` without going through handleUpdate (e.g. same code already loaded). */
@@ -335,6 +338,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     setEditorInstance(editor);
     // Capture the editor's track id whenever an evaluate starts (Play, Ctrl+Enter, Update).
     trackSwitch.attachEditor(editor);
+    // Only so that assistants can tell (spec 018): it watches, and changes nothing about an evaluate.
+    if (editor.repl) evaluationWatch.watch(editor.repl);
 
     // Store editor in editorRef for component access
     editorRef.current = editor;
@@ -411,6 +416,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   // One instance for the component's life, because handleUpdate is useCallback([]) and
   // init's callbacks outlive renders.
   const [trackSwitch] = useState(createTrackSwitchController);
+  const [evaluationWatch] = useState(() => createEvaluationWatch());
   const [mixer, setMixer] = useState<PreviewEngine | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
 
@@ -845,9 +851,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     }
     await cleanupCanvasElements();
     editorRef.current?.flash?.();
-    // Awaited, so that a switch lasts as long as it does: the Off type has no other signal that it's
-    // still loading, and a second Update or an assistant has to be able to see that.
-    await repl.evaluate(code);
+    repl.evaluate(code);
   };
 
   const handleShuffle = async (): Promise<void> => {
@@ -976,7 +980,12 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     transitionController: transitionControllerRef.current,
     setEditorTrackId: trackSwitch.setEditorTrack,
     trackIds: () => ({ editor: trackSwitch.editorTrackId, playing: trackSwitch.playingTrackId }),
-    isSwitching: () => trackSwitch.busy || Boolean(transitionControllerRef.current?.busy),
+    isSwitching: () =>
+      isMusicChanging(evaluationWatch, {
+        transitionActive: ['waiting', 'running'].includes(transitionControllerRef.current?.getState().phase ?? 'idle'),
+        switchUnderWay: trackSwitch.switchTarget !== null || Boolean(transitionControllerRef.current?.busy),
+      }),
+    evaluationsSettled: () => evaluationWatch.settled(),
     runUpdate,
     replaceTrackId: trackSwitch.replaceTrackId,
     isRecording: audioRecorder.isRecording,

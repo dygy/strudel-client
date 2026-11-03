@@ -46,6 +46,8 @@ export interface TabControls {
   start(): Promise<unknown>;
   /** What Update does: a hot-swap, or a switch if the editor holds another track. Says which, or `ignored`. */
   update(): Promise<unknown>;
+  /** This is the code the repl last started. False if someone else's has landed since. */
+  isActiveCode(code: string): boolean;
   /** What Stop does. */
   stop(): void;
   /** The mistake the last evaluate left, if it left one. */
@@ -249,8 +251,10 @@ export function createCommandHandler(controls: TabControls): CommandHandler {
       }
       const { failed, ran } = await evaluate(() => controls.update(), WAIT_FOR_EVALUATE_MS.update_code);
       if (failed) return failed;
-      controls.notify('updated');
-      return { ok: true, result: { ...status(), ran, heard: ran } };
+      // A person may have pressed something while this ran, and theirs is what's heard.
+      const heard = ran && controls.isActiveCode(String(code));
+      controls.notify(ran && !heard ? 'updatedNotHeard' : 'updated');
+      return { ok: true, result: { ...status(), ran, heard } };
     },
 
     open_track: async ({ trackId }) => {

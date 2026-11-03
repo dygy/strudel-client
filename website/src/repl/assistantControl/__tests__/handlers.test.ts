@@ -28,6 +28,7 @@ function controlsWith(overrides: Partial<TabControls> = {}, log: Log = []) {
     update: async () => void log.push('update'),
     stop: () => void log.push('stop'),
     evalError: () => null,
+    isActiveCode: () => true,
     openTrack: async (id) => (log.push(`open:${id}`), 'opened' as const),
     notify: (message) => void log.push(`notify:${message}`),
     events,
@@ -512,6 +513,17 @@ describe('ok means the code ran', () => {
     await vi.advanceTimersByTimeAsync(4_000);
     vi.useRealTimers();
     expect(await reply).toMatchObject({ ok: true, result: { ran: false, heard: false } });
+  });
+});
+
+describe('losing to a person', () => {
+  it('says the code was not what ended up heard, when their Update landed instead', async () => {
+    const { handle } = controlsWith({ isActiveCode: () => false }, log);
+    expect(await handle('update_code', { code: 'new', trackId: 't1' })).toMatchObject({
+      ok: true,
+      result: { ran: true, heard: false },
+    });
+    expect(log).toContain('notify:updatedNotHeard');
   });
 });
 
