@@ -4,7 +4,7 @@ These are the commands every implementer and reviewer runs, with their measured 
 
 | Suite | Command | Baseline (test row re-measured 2026-10-09) |
 |---|---|---|
-| Unit tests | `pnpm exec vitest run` (whole repo, ~3 s) | **721/721 pass** (2026-10-09, `c4c2414`). [`known-red-tests.txt`](./known-red-tests.txt) is empty, so any failure is new. **Gates the CI deploy** |
+| Unit tests | `pnpm exec vitest run` (whole repo, ~20 s, of which `packages/mcp-local` is ~10 s) | **721/721 pass** (2026-10-09, `c4c2414`). [`known-red-tests.txt`](./known-red-tests.txt) is empty, so any failure is new. **Gates the CI deploy** |
 | Unit tests, with jsdoc | `pnpm test` | Same as above, plus regenerating `doc.json` first. Use it when touching JSDoc in `packages/{core,mini,codemirror,csound,draw,tonal,transpiler,webaudio}` |
 | Lint | `pnpm run lint` | **0 errors** (2026-10-09, `b6eaad8`). **Gates the CI deploy** |
 | Format | `pnpm run format-check` (fix: `pnpm run codeformat`) | **Clean repo-wide** (2026-10-09, `7fbf4af`). **Gates the CI deploy** |

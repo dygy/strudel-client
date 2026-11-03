@@ -103,7 +103,7 @@ export function checkCodeTool(args: { code: string }): ToolResult {
     return fail(
       'use_local_helper',
       `The online check takes code up to ${CHECK_MAX_BYTES} bytes.`,
-      'For larger code, use the local helper: add it to your assistant with the command npx -y @dygy/strudel-mcp.',
+      'For larger code, use the local helper: add it to your assistant with the command npx -y strudel_mcp.',
     );
   }
   return ok({ ...checkCode(args.code, names()) });

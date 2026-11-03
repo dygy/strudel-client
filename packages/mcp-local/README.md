@@ -14,6 +14,7 @@ Any other MCP client: run `npx -y strudel_mcp` as a stdio server. Needs Node 20 
 |---|---|
 | `run_pattern` | `code`, `cycles` (default 4, max 64). Events with `start`, `end` and `values`, at most 2,000 with a `truncated` flag, plus a summary |
 | `summarize_pattern` | The same input. Sounds used, events per cycle, note range |
+| `check_code` | `code` of any size. Syntax mistakes, mini-notation mistakes and unknown function names with line and column. The same check as the online tool. It only parses, and never runs the code |
 
 Errors come back as `isError` results holding JSON: `code`, `message`, `line`, `column` and `next`.
 
@@ -25,7 +26,7 @@ Errors come back as `isError` results holding JSON: `code`, `message`, `line`, `
 
 Code runs in [QuickJS](https://github.com/justjake/quickjs-emscripten) compiled to WebAssembly, with a fresh context per run. The sandbox receives no host functions, so code has no way to reach files, the network or other programs.
 
-A run stops after 9 seconds or 256 MB. `STRUDEL_MCP_TIME_LIMIT_MS` can shorten the time limit, but can't extend it.
+A run stops after 8 seconds or 256 MB. `STRUDEL_MCP_TIME_LIMIT_MS` can shorten the time limit, but can't extend it.
 
 ## License
 

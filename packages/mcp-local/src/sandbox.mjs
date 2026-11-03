@@ -1,25 +1,29 @@
 import { newQuickJSWASMModule, RELEASE_SYNC } from 'quickjs-emscripten';
 import { MAX_RESULT_CHARS, MEMORY_LIMIT_BYTES, QUICKJS_STACK_BYTES } from './limits.mjs';
+import { stopForError, stopWithoutAnswer } from './stop.mjs';
 
 // Function() wraps its body in two extra lines inside QuickJS.
 const FUNCTION_WRAPPER_LINES = 2;
-
-const isOutOfMemory = (message) => /out of memory/i.test(message);
 
 /**
  * Opens a fresh QuickJS context holding the engine. The only things passed in are the strings and
  * numbers of each call: no host function is ever given to the sandbox. The interrupt handler and the
  * limits belong to the runtime, outside anything the code can reach.
  * Nothing is disposed: the worker this runs in ends with the run.
- * @param {{guestSource: string, deadline: number}} options the bundle, and the time to stop at
+ * @param {{guestSource: string, deadline: number, budgetMs: number}} options the bundle, the time by which everything must stop, and how long the code itself may run once the engine has loaded
  * @returns {Promise<{run: function(string, number): object, unknownNames: function(string[]): string[]}>} the sandbox
  */
-export async function openSandbox({ guestSource, deadline }) {
+export async function openSandbox({ guestSource, deadline: lastDeadline, budgetMs }) {
+  let deadline = lastDeadline;
+  let interrupted = false;
   const QuickJS = await newQuickJSWASMModule(RELEASE_SYNC);
   const runtime = QuickJS.newRuntime();
   runtime.setMemoryLimit(MEMORY_LIMIT_BYTES);
   runtime.setMaxStackSize(QUICKJS_STACK_BYTES);
-  runtime.setInterruptHandler(() => Date.now() >= deadline);
+  runtime.setInterruptHandler(() => {
+    interrupted ||= Date.now() >= deadline;
+    return interrupted;
+  });
   const context = runtime.newContext();
 
   const unwrap = (result) => {
@@ -53,12 +57,8 @@ export async function openSandbox({ guestSource, deadline }) {
     return length > MAX_RESULT_CHARS ? { done: true, tooLarge: true } : { done: true, text: context.getString(handle) };
   };
 
-  const stopReason = (message) => {
-    if (Date.now() >= deadline || /interrupted/.test(message)) {
-      return { code: 'time_limit' };
-    }
-    return isOutOfMemory(message) ? { code: 'memory_limit' } : undefined;
-  };
+  const stopReason = (message) => stopForError({ interrupted, message });
+  deadline = Math.min(lastDeadline, Date.now() + budgetMs);
 
   const run = (code, cycles) => {
     try {
@@ -89,12 +89,13 @@ export async function openSandbox({ guestSource, deadline }) {
           const { message } = dumpError(jobs.error);
           return { stopped: stopReason(message) ?? { code: 'sandbox_failure' } };
         }
-        // Interrupting an async function can leave no error and no jobs, so check the time first.
-        if (Date.now() >= deadline) {
-          return { stopped: { code: 'time_limit' } };
-        }
-        if (jobs.value === 0) {
-          return { stopped: { code: 'never_finished' } };
+        const stopped = stopWithoutAnswer({
+          interrupted,
+          jobsPending: jobs.value,
+          pastDeadline: Date.now() >= deadline,
+        });
+        if (stopped) {
+          return { stopped };
         }
       }
     } catch (err) {

@@ -5,6 +5,9 @@ The helper as a user gets it: built, packed, unpacked outside the repo and drive
 stdio client, so each test also proves the published files are complete. Every server is its own
 process, which keeps it clear of the suite's isolate:false shared module state.
 
+One pack and one oracle run serve the whole file. The tests run concurrently, across a pool of servers,
+because each server runs patterns one at a time and this file runs on every push.
+
 STRUDEL_MCP_TEST_NPX=1 replaces the unpacked copy with a real `npx --package <tarball> strudel-mcp`,
 which installs the dependencies from the registry.
 */
@@ -15,6 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { checkCodeTool, CHECK_MAX_BYTES } from '../../mcp-worker/src/knowledge';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { getDefaultEnvironment, StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -22,17 +26,23 @@ const execFile = promisify(execFileCallback);
 const packageDir = fileURLToPath(new URL('..', import.meta.url));
 const SECRET = `secret-${process.pid}-c0ffee`;
 const REAL_LIMIT_BOUND_MS = 10_000;
+const POOL_SIZE = 4;
+/** Must be well over the time a simple run needs on a loaded CI runner, and is spent only in parallel. */
+const SHORT_LIMIT_MS = 1_500;
+/** Below the real limit, so passing shows that the shorter one applied. */
+const SHORT_LIMIT_BOUND_MS = 7_500;
 
 // Generous for a loaded 2-vCPU CI runner: the limits under test have their own, tighter bounds.
-const TIMEOUT = { timeout: 60_000 };
+const SUITE = { concurrent: true, timeout: 60_000 };
 
 let workDir;
 let cliPath;
 let tarballPath;
 let manifest;
 let secretFile;
-let server;
-let shortLimitServer;
+const pool = [];
+let nextServer = 0;
+const anyServer = () => pool[nextServer++ % pool.length];
 
 async function packTarball() {
   const { stdout } = await execFile('pnpm', ['pack', '--pack-destination', workDir], {
@@ -68,7 +78,7 @@ async function connect(cliPath, env = {}) {
 }
 
 const call = (client, name, args) => client.callTool({ name, arguments: args }, undefined, { timeout: 30_000 });
-const run = (code, cycles, client = server) =>
+const run = (code, cycles, client = anyServer()) =>
   call(client, 'run_pattern', cycles === undefined ? { code } : { code, cycles });
 const errorOf = (result) => {
   expect(result.isError).toBe(true);
@@ -80,17 +90,15 @@ beforeAll(async () => {
   secretFile = join(workDir, 'secret.txt');
   await writeFile(secretFile, SECRET);
   cliPath = await packTarball();
-  server = await connect(cliPath);
-  shortLimitServer = await connect(cliPath, { STRUDEL_MCP_TIME_LIMIT_MS: '1200' });
+  pool.push(...(await Promise.all(Array.from({ length: POOL_SIZE }, () => connect(cliPath)))));
 }, 300_000);
 
 afterAll(async () => {
-  await server?.close();
-  await shortLimitServer?.close();
+  await Promise.all(pool.map((client) => client.close()));
   await rm(workDir, { recursive: true, force: true });
 });
 
-describe('the published package', TIMEOUT, () => {
+describe('the published package', SUITE, () => {
   it('has the name, license, engines and bin the spec asks for', () => {
     expect(manifest).toMatchObject({
       name: 'strudel_mcp',
@@ -101,6 +109,36 @@ describe('the published package', TIMEOUT, () => {
     expect(JSON.stringify(manifest)).not.toContain('workspace:');
     expect(Object.keys(manifest.dependencies)).toContain('quickjs-emscripten');
     expect(Object.keys(manifest.dependencies).filter((name) => name.startsWith('@strudel/'))).toEqual([]);
+  });
+
+  it('packs only what a user needs', async () => {
+    const { stdout } = await execFile('tar', ['-tzf', tarballPath]);
+    const files = stdout
+      .trim()
+      .split('\n')
+      .map((name) => name.replace(/^package\//, ''))
+      .sort();
+    const code = files.filter((name) => name.startsWith('dist/') && name.endsWith('.mjs'));
+    expect(files).toEqual(
+      [
+        'LICENSE',
+        'README.md',
+        'package.json',
+        'dist/THIRD-PARTY-NOTICES.guest.txt',
+        'dist/THIRD-PARTY-NOTICES.host.txt',
+        'dist/guest.js',
+        ...code,
+      ].sort(),
+    );
+    expect(code).toEqual(expect.arrayContaining(['dist/check-worker.mjs', 'dist/cli.mjs', 'dist/worker.mjs']));
+  });
+
+  it('does not need the Worker package at run time', async () => {
+    const root = join(workDir, 'unpacked', 'package');
+    expect(JSON.stringify(manifest)).not.toContain('mcp-worker');
+    const checkWorker = await readFile(join(root, 'dist', 'check-worker.mjs'), 'utf8');
+    expect(checkWorker).not.toMatch(/from ["'][^"']*mcp-worker/);
+    expect(checkWorker).not.toMatch(/from ["']@strudel\//);
   });
 
   it('ships the license and the notices for the code it bundles', async () => {
@@ -115,14 +153,16 @@ describe('the published package', TIMEOUT, () => {
   });
 });
 
-describe('the tools', TIMEOUT, () => {
-  it('lists exactly run_pattern and summarize_pattern, read-only, with input and output schemas', async () => {
-    const { tools } = await server.listTools();
-    expect(tools.map((tool) => tool.name).sort()).toEqual(['run_pattern', 'summarize_pattern']);
+describe('the tools', SUITE, () => {
+  it('lists exactly check_code, run_pattern and summarize_pattern, read-only, with input and output schemas', async () => {
+    const { tools } = await anyServer().listTools();
+    expect(tools.map((tool) => tool.name).sort()).toEqual(['check_code', 'run_pattern', 'summarize_pattern']);
     for (const tool of tools) {
       expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false, openWorldHint: false });
       expect(tool.inputSchema.properties.code).toBeDefined();
-      expect(tool.inputSchema.properties.cycles).toMatchObject({ default: 4, maximum: 64 });
+      if (tool.name !== 'check_code') {
+        expect(tool.inputSchema.properties.cycles).toMatchObject({ default: 4, maximum: 64 });
+      }
       expect(tool.outputSchema.type).toBe('object');
     }
   });
@@ -153,7 +193,7 @@ describe('the tools', TIMEOUT, () => {
   });
 
   it('summarize_pattern gives sounds, events per cycle and the note range, without the events', async () => {
-    const result = await call(server, 'summarize_pattern', {
+    const result = await call(anyServer(), 'summarize_pattern', {
       code: `$: s("bd*2")\n$: note("c3 <e4 g2>").s("piano")`,
       cycles: 2,
     });
@@ -174,17 +214,17 @@ describe('the tools', TIMEOUT, () => {
   });
 
   it('counts a note with no sound as the triangle the browser plays', async () => {
-    const result = await call(server, 'summarize_pattern', { code: 'note("c3")', cycles: 1 });
+    const result = await call(anyServer(), 'summarize_pattern', { code: 'note("c3")', cycles: 1 });
     expect(result.structuredContent.sounds).toEqual(['triangle']);
   });
 
   it('names a banked sound as the browser resolves it', async () => {
-    const result = await call(server, 'summarize_pattern', { code: 's("bd").bank("tr808")', cycles: 1 });
+    const result = await call(anyServer(), 'summarize_pattern', { code: 's("bd").bank("tr808")', cycles: 1 });
     expect(result.structuredContent.sounds).toEqual(['tr808_bd']);
   });
 });
 
-describe('errors', TIMEOUT, () => {
+describe('errors', SUITE, () => {
   it('a syntax error returns its line and column, and the server carries on', async () => {
     const error = errorOf(await run('s("bd")\n  .fast(2)\nlet = = 3'));
     expect(error).toMatchObject({ code: 'syntax_error', line: 3, column: 7 });
@@ -239,7 +279,7 @@ describe('errors', TIMEOUT, () => {
   });
 });
 
-describe('the time limit', TIMEOUT, () => {
+describe('the time limit', SUITE, () => {
   it('a bare while(true){} is refused like in the browser, whose transpiler needs a last expression', async () => {
     const started = performance.now();
     const error = errorOf(await run('while(true){}'));
@@ -263,6 +303,15 @@ describe('the time limit', TIMEOUT, () => {
     }
   });
 
+  const withShortLimit = async (use) => {
+    const client = await connect(cliPath, { STRUDEL_MCP_TIME_LIMIT_MS: String(SHORT_LIMIT_MS) });
+    try {
+      await use(client);
+    } finally {
+      await client.close();
+    }
+  };
+
   it.each([
     ['a loop a catch cannot survive', 'while(true){ try { while(true){} } catch (e) {} }\ns("bd")'],
     ['a loop after an await', 'await 1;\nwhile(true){}\ns("bd")'],
@@ -272,15 +321,17 @@ describe('the time limit', TIMEOUT, () => {
     ['a native call that never ends', `'a'.repeat(4e6).indexOf('a'.repeat(2e6) + 'b')\ns("bd")`],
     ['an await loop that never ends', 'await (async () => { for (;;) await 0 })();\ns("bd")'],
   ])('stops %s, and the next run works', async (_name, code) => {
-    const started = performance.now();
-    const error = errorOf(await run(code, 1, shortLimitServer));
-    expect(error.code).toBe('time_limit');
-    expect(performance.now() - started).toBeLessThan(6_000);
-    expect((await run('s("bd")', 1, shortLimitServer)).structuredContent.events).toHaveLength(1);
+    await withShortLimit(async (client) => {
+      const started = performance.now();
+      const error = errorOf(await run(code, 1, client));
+      expect(error.code).toBe('time_limit');
+      expect(performance.now() - started).toBeLessThan(SHORT_LIMIT_BOUND_MS);
+      expect((await run('s("bd")', 1, client)).structuredContent.events).toHaveLength(1);
+    });
   });
 });
 
-describe('the memory limit', TIMEOUT, () => {
+describe('the memory limit', SUITE, () => {
   it('stops code that eats memory, and the next run works', async () => {
     const error = errorOf(await run('const a = []; while (true) a.push(new Array(1e6).fill(0));\ns("bd")'));
     expect(error.code).toBe('memory_limit');
@@ -305,7 +356,7 @@ describe('the memory limit', TIMEOUT, () => {
   });
 });
 
-describe('the sandbox', TIMEOUT, () => {
+describe('the sandbox', SUITE, () => {
   const answerText = (result) => JSON.stringify(result);
 
   it.each([
@@ -386,7 +437,7 @@ describe('the sandbox', TIMEOUT, () => {
   });
 });
 
-describe('the event cap', TIMEOUT, () => {
+describe('the event cap', SUITE, () => {
   it('over 2,000 events gives the first 2,000 and says it was cut off', async () => {
     const result = await run('s("bd*1000")', 4);
     const { events, truncated, summary } = result.structuredContent;
@@ -414,7 +465,7 @@ describe('the event cap', TIMEOUT, () => {
   });
 });
 
-describe('loaders and things with no effect on events', TIMEOUT, () => {
+describe('loaders and things with no effect on events', SUITE, () => {
   it('samples() and other loaders are stubs, reported as skipped', async () => {
     const result = await run(
       `samples('github:tidalcycles/dirt-samples');
@@ -443,7 +494,77 @@ s("bd")`,
   });
 });
 
-describe('parity with the real engine', TIMEOUT, () => {
+describe('check_code', SUITE, () => {
+  const check = (code) => call(anyServer(), 'check_code', { code });
+
+  // Each of these at the size the online tool accepts.
+  const small = [
+    's("bd sd").lpf(300)',
+    's("bd")\n  .fast(2)\nlet = = 3',
+    'stack(\n  s("bd"),\n  s("sd [hh")\n)',
+    's("bd").lowpas(300)',
+    's("bd").lowpass(300).nosuchthing(1)\nmyfn(2)',
+    'const myfn = (x) => x;\nmyfn(s("bd"))',
+    '$: s("bd*4")\n$: note("c3 <e3").slow(2)',
+  ];
+
+  it.each(small)('answers as the online tool for %j', async (code) => {
+    const local = await check(code);
+    const online = checkCodeTool({ code });
+    expect(online.isError).toBeFalsy();
+    expect(local.isError).toBeFalsy();
+    expect(local.structuredContent).toEqual(online.structuredContent);
+    expect(JSON.parse(local.content[0].text)).toEqual(online.structuredContent);
+  });
+
+  it("reports the spec's cases with line and column", async () => {
+    const { structuredContent: misspelt } = await check('s("bd")\n  .lowpas(300)');
+    expect(misspelt).toMatchObject({
+      ok: true,
+      warnings: [{ kind: 'unknown_function', line: 2, column: 4, suggestion: 'lpf' }],
+    });
+    const { structuredContent: mini } = await check('s("bd")\ns("sd [hh")');
+    expect(mini.ok).toBe(false);
+    expect(mini.errors).toMatchObject([{ kind: 'mini', line: 2 }]);
+    const { structuredContent: syntax } = await check('s("bd")\nlet = = 3');
+    expect(syntax.errors).toMatchObject([{ kind: 'syntax', line: 2, column: 7 }]);
+  });
+
+  it('takes code of any size, and finds a mistake at the end of it', async () => {
+    const lines = 150_000;
+    const code = `${'s("bd*2 [sd hh]").fast(2)\n'.repeat(lines)}s("bd").lowpas(1)\ns("sd [")`;
+    expect(code.length).toBeGreaterThan(CHECK_MAX_BYTES * 1000);
+    expect(checkCodeTool({ code }).isError).toBe(true);
+    const { structuredContent, isError } = await check(code);
+    expect(isError).toBeFalsy();
+    expect(structuredContent.warnings).toMatchObject([{ suggestion: 'lpf', line: lines + 1 }]);
+    expect(structuredContent.errors).toMatchObject([{ kind: 'mini', line: lines + 2 }]);
+  });
+
+  it('never runs the code', async () => {
+    const marker = join(workDir, 'ran.txt');
+    const code = `require('node:fs').writeFileSync('${marker}', 'x'); process.exit(1); while (true) {} s("bd")`;
+    const { isError, structuredContent } = await check(code);
+    expect(isError).toBeFalsy();
+    expect(structuredContent.ok).toBe(true);
+    await expect(readFile(marker)).rejects.toThrow(/ENOENT/);
+    // a bare loop, which a run would refuse, is simply well-formed code here
+    expect((await check('while (true) {}')).structuredContent).toEqual({ ok: true, errors: [], warnings: [] });
+  });
+
+  it('ignores the run time limit, and refuses empty code', async () => {
+    const client = await connect(cliPath, { STRUDEL_MCP_TIME_LIMIT_MS: '1' });
+    try {
+      const result = await call(client, 'check_code', { code: 's("bd")' });
+      expect(result.structuredContent).toEqual({ ok: true, errors: [], warnings: [] });
+      expect((await call(client, 'check_code', { code: '' })).isError).toBe(true);
+    } finally {
+      await client.close();
+    }
+  });
+});
+
+describe('parity with the real engine', SUITE, () => {
   const tunes = [
     { code: 's("bd sd")', cycles: 2 },
     { code: 's("bd*2 [sd hh] ~ <cp rim>")', cycles: 8 },

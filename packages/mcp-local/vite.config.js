@@ -13,7 +13,11 @@ export default defineConfig({
     target: 'node20',
     minify: false,
     rollupOptions: {
-      input: { cli: resolve(__dirname, 'src/cli.mjs'), worker: resolve(__dirname, 'src/worker.mjs') },
+      input: {
+        cli: resolve(__dirname, 'src/cli.mjs'),
+        worker: resolve(__dirname, 'src/worker.mjs'),
+        'check-worker': resolve(__dirname, 'src/check-worker.mjs'),
+      },
       external: [/^node:/, ...Object.keys(dependencies).map((name) => new RegExp(`^${name}(/|$)`))],
       output: { format: 'es', entryFileNames: '[name].mjs', chunkFileNames: '[name].mjs' },
     },

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parentPort, workerData } from 'node:worker_threads';
-import { MAX_EVENTS } from './limits.mjs';
+import { MAX_EVENTS, READY_MESSAGE } from './limits.mjs';
 import { openSandbox } from './sandbox.mjs';
 import { lastStatementPosition, locateRuntimeError, transpile } from './transpile.mjs';
 
@@ -14,14 +14,24 @@ const STOP_MESSAGES = {
   sandbox_failure: 'The sandbox stopped working during this run.',
 };
 
-async function execute({ code, cycles, deadline }) {
+async function execute({ code, cycles, deadline, budgetMs }) {
   const transpiled = transpile(code);
   if (transpiled.error) {
     return { ok: false, error: transpiled.error };
   }
   const { output } = transpiled;
   const guestSource = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'guest.js'), 'utf8');
-  const sandbox = await openSandbox({ guestSource, deadline });
+  let sandbox;
+  try {
+    sandbox = await openSandbox({ guestSource, deadline, budgetMs });
+  } catch (err) {
+    // the engine itself didn't load in time: only a machine under extreme load gets here
+    if (Date.now() >= deadline) {
+      return { ok: false, error: { code: 'time_limit', message: STOP_MESSAGES.time_limit } };
+    }
+    throw err;
+  }
+  parentPort.postMessage(READY_MESSAGE);
   const answer = sandbox.run(output, cycles);
   if (answer.stopped) {
     return { ok: false, error: { code: answer.stopped.code, message: STOP_MESSAGES[answer.stopped.code] } };

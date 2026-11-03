@@ -26,7 +26,7 @@ It is a pnpm monorepo: `packages/*` (`@strudel/*`), `website/` (Astro + React RE
 ```sh
 pnpm i                      # setup (Node 24.12.0, pnpm 10)
 pnpm dev                    # REPL at http://localhost:4321 (Supabase needs website/.dev.vars — see .dev.vars.example)
-pnpm exec vitest run        # whole suite, ~3 s
+pnpm exec vitest run        # whole suite, ~20 s
 pnpm test                   # same + regenerates doc.json (jsdoc) first
 pnpm build:cloudflare       # the PROD build — must pass for any website-affecting change
 pnpm deploy:cloudflare:logs # wrangler tail on prod
@@ -93,7 +93,7 @@ A subagent starts cold, re-reads what you already know, and returns a *claim*.
 
 ## Hooks
 
-- **Push gate** (`PreToolUse`, blocking). Before a push to `main`, it runs the same checks CI gates on (~15 s): `pnpm run format-check`, `pnpm run lint`, and the whole vitest suite (refusing any failing file not in `known-red-tests.txt`, after re-running it alone to rule out a flake). It blocks only when the tree is clean.
+- **Push gate** (`PreToolUse`, blocking). Before a push to `main`, it runs the same checks CI gates on (~30 s): `pnpm run format-check`, `pnpm run lint`, and the whole vitest suite (refusing any failing file not in `known-red-tests.txt`, after re-running it alone to rule out a flake). It blocks only when the tree is clean.
   - It reports instead of blocking when the check can't run or the tree is dirty.
   - To bypass a single push, run `STRUDEL_SKIP_PUSH_GATE=1 git push …` and say so.
 - **Delivery reminder** (`PostToolUse`, advisory). After a successful push to `main`, it reminds you to:
