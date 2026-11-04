@@ -38,7 +38,7 @@ Last surveyed: 2026-10-08.
 |---|---|---|---|---|---|
 | CodeMirror editor: highlight, flash, sliders, themes, keybindings, tooltip | U | `packages/codemirror` | none | none | web |
 | Enhanced autocomplete (mini-notation, banks, samples) | F | `packages/codemirror/{autocomplete,miniNotationParser,positionDetector,sampleMatcher,hydra-docs}.mjs` | [010](../spec/010-enhanced-strudel-autocomplete/), [012](../spec/012-bank-autocomplete-mini-notation/) | `packages/codemirror/test/*` (4 files) | web |
-| Prettier formatting (worker, placeholder scheme, format on save) | F | `packages/codemirror/{prettierExtension,prettierWorker}.mjs`; `website/src/repl/formatEngine.ts` | [004](../spec/004-prettier-integration/), [011](../spec/011-prettier-strudel-dsl-formatting/) | `website/src/repl/__tests__/*format*` | web |
+| Prettier formatting (worker, placeholder scheme, format on save) | F | `packages/codemirror/{strudelFormat,protectTokens,prettierExtension,prettierWorker}.mjs`; `website/src/repl/formatEngine.ts` | [004](../spec/004-prettier-integration/), [011](../spec/011-prettier-strudel-dsl-formatting/) | `website/src/repl/__tests__/{*format*,formatEngine.*,prettierExtension.feedback}`; `packages/codemirror/test/{strudelFormat,formattedReplacement,prettierCommand}` | web |
 | Toggle and radio widgets | F | `packages/codemirror/{toggle,radio}.mjs` | none | none | web |
 | Shortcuts (Ctrl+U update, Ctrl+P play/pause) and the Shortcuts tab | F | `panel/ShortcutsTab.tsx` | none | none | web |
 

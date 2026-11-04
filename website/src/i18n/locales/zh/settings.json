@@ -41,7 +41,7 @@
   "codeFormatting": "代码格式化",
   "experimental": "实验性",
   "prettierEnabled": "启用 Prettier",
-  "prettierDescription": "保存时或使用 Ctrl+Q 时自动使用 Prettier 格式化代码。确保代码风格一致和可读性。",
+  "prettierDescription": "保存时或使用 Shift+Alt+F 时自动使用 Prettier 格式化代码。确保代码风格一致和可读性。",
   "prettierAutoFormatOnSave": "保存时自动格式化",
   "prettierTabWidth": "制表符宽度",
   "prettierUseTabs": "使用制表符",

@@ -39,7 +39,7 @@
   "codeFormatting": "עיצוב קוד",
   "experimental": "ניסיוני",
   "prettierEnabled": "הפעל Prettier",
-  "prettierDescription": "עצב את הקוד שלך אוטומטית עם Prettier בעת שמירה או באמצעות Ctrl+Q. מבטיח סגנון קוד עקבי וקריאות.",
+  "prettierDescription": "עצב את הקוד שלך אוטומטית עם Prettier בעת שמירה או באמצעות Shift+Alt+F. מבטיח סגנון קוד עקבי וקריאות.",
   "prettierAutoFormatOnSave": "עיצוב אוטומטי בשמירה",
   "prettierTabWidth": "רוחב טאב",
   "prettierUseTabs": "השתמש בטאבים",

@@ -39,7 +39,7 @@
   "codeFormatting": "Formateo de código",
   "experimental": "Experimental",
   "prettierEnabled": "Habilitar Prettier",
-  "prettierDescription": "Formatear automáticamente tu código con Prettier al guardar o usando Ctrl+Q. Asegura un estilo de código consistente y legibilidad.",
+  "prettierDescription": "Formatear automáticamente tu código con Prettier al guardar o usando Shift+Alt+F. Asegura un estilo de código consistente y legibilidad.",
   "prettierAutoFormatOnSave": "Auto-formatear al guardar",
   "prettierTabWidth": "Ancho de tabulación",
   "prettierUseTabs": "Usar tabulaciones",

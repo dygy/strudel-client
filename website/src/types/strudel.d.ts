@@ -132,6 +132,7 @@ declare module '@strudel/core' {
     setCps: (cps: number) => any;
     setPattern: (pattern: any, autostart?: boolean) => Promise<any>;
     setCode: (code: string) => void;
+    applyFormatted?: (code: string) => void;
     toggle: () => void;
     state: any;
   };
@@ -159,6 +160,7 @@ declare module '@strudel/codemirror' {
   export class StrudelMirror {
     constructor(options: any);
     setCode(code: string): void;
+    applyFormatted?(code: string): void;
     evaluate(): void;
     toggle(): void;
     updateSettings(settings: any): void;

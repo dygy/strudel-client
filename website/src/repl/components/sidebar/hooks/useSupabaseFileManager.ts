@@ -182,7 +182,12 @@ const UNAUTHENTICATED_STATIC_STATE = {
 
 interface ReplContext {
   activeCode?: string;
-  editorRef?: React.RefObject<{ code: string; setCode?: (code: string) => void }>;
+  editorRef?: React.RefObject<{
+    code: string;
+    setCode?: (code: string) => void;
+    applyFormatted?: (code: string) => void;
+    formatTouchesCursor?: (code: string) => boolean;
+  }>;
   handleUpdate: (update: { id?: string; code: string; [key: string]: any }, replace?: boolean) => void;
   setEditorTrackId?: (id: string | null | undefined) => void;
   replaceTrackId?: (oldId: string, newId: string) => void;
@@ -287,7 +292,7 @@ export function useSupabaseFileManager(
   // Hooks
   const { isAutosaveEnabled, autosaveInterval } = useSettings();
   const activePattern = useActivePattern();
-  const { t } = useTranslation(['files', 'common', 'tabs', 'auth']);
+  const { t } = useTranslation(['files', 'common', 'tabs', 'auth', 'messages']);
 
   /**
    * Every load comes through here: the baseline takes the rows as the server has them, and local state
@@ -909,10 +914,11 @@ export function useSupabaseFileManager(
       let codeToSave = currentCode;
       try {
         // Get current settings from the proper settings store
-        const { settingsMap } = await import('@src/settings');
+        const { settingsMap, parseBoolean } = await import('@src/settings');
         const settings = settingsMap.get();
 
-        if (settings?.isPrettierEnabled && settings?.prettierAutoFormatOnSave) {
+        // Raw store values: after a page reload these are the strings 'true' and 'false'.
+        if (parseBoolean(settings?.isPrettierEnabled) && parseBoolean(settings?.prettierAutoFormatOnSave)) {
           console.log('SupabaseFileManager - auto-formatting code before save');
 
           // Dynamically import the auto-format function
@@ -920,17 +926,29 @@ export function useSupabaseFileManager(
           const formatResult = await autoFormatOnSave(currentCode, settings);
 
           if (formatResult.success && formatResult.formattedCode) {
-            codeToSave = formatResult.formattedCode;
+            const formattedCode: string = formatResult.formattedCode;
 
             // Update the editor with formatted code if it's different. Only if it's still this text in
             // this step: formatting waited, and the user may have typed or moved on.
-            if (
-              codeToSave !== currentCode &&
+            const editorHoldsThisText =
+              formattedCode !== currentCode &&
               selectedTrackRef.current === trackId &&
               activeStepIndex(tracksRef.current[trackId] as never) === stepIndex &&
-              context.editorRef?.current?.code === currentCode
-            ) {
-              context.editorRef.current.setCode?.(codeToSave);
+              context.editorRef?.current?.code === currentCode;
+
+            // This can come right after a space was typed, and taking it away would join the next letter to the
+            // word before it. This save sends the code as typed, and a later one formats it.
+            if (!editorHoldsThisText || !context.editorRef?.current?.formatTouchesCursor?.(formattedCode)) {
+              codeToSave = formattedCode;
+              if (editorHoldsThisText) {
+                // Not setCode: this can happen while the user types, so the cursor and Undo must stay as they are
+                context.editorRef?.current?.applyFormatted?.(formattedCode);
+              }
+            }
+
+            // Only for a save someone asked for: an autosave would repeat it every interval
+            if (formatResult.rejected && showToast) {
+              toastActions.warning(t('messages:prettierSaveRejected'));
             }
 
             console.log('SupabaseFileManager - code auto-formatted successfully');
@@ -938,7 +956,9 @@ export function useSupabaseFileManager(
             console.warn('SupabaseFileManager - auto-format failed:', formatResult.error);
             // Continue with original code if formatting fails
             if (showToast) {
-              toastActions.warning(`Auto-format failed: ${formatResult.error}`);
+              toastActions.warning(
+                String(t('messages:prettierAutoFormatFailed')).replace('{error}', () => formatResult.error),
+              );
             }
           }
         }
@@ -946,7 +966,7 @@ export function useSupabaseFileManager(
         console.error('SupabaseFileManager - auto-format error:', error);
         // Continue with original code if formatting fails
         if (showToast) {
-          toastActions.warning('Auto-format failed, saving original code');
+          toastActions.warning(t('messages:prettierAutoFormatFailedSavingOriginal'));
         }
       }
 

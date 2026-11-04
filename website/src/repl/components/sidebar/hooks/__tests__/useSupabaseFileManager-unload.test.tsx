@@ -102,6 +102,7 @@ beforeAll(async () => {
   vi.doMock('@src/settings', () => ({
     useSettings: () => ({ isAutosaveEnabled: autosave.enabled, autosaveInterval: autosave.interval }),
     settingsMap: { get: () => settings },
+    parseBoolean: (value: unknown) => value === true || value === 'true',
   }));
   vi.doMock('@src/user_pattern_utils', () => ({
     useActivePattern: () => activePattern,
@@ -127,7 +128,13 @@ afterAll(() => {
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 let fetchMock: ReturnType<typeof vi.fn>;
-let editor: { code: string; setCode: ReturnType<typeof vi.fn>; evaluate: ReturnType<typeof vi.fn> };
+let editor: {
+  code: string;
+  setCode: ReturnType<typeof vi.fn>;
+  applyFormatted: ReturnType<typeof vi.fn>;
+  formatTouchesCursor: ReturnType<typeof vi.fn>;
+  evaluate: ReturnType<typeof vi.fn>;
+};
 let handleUpdate: ReturnType<typeof vi.fn>;
 let hook: ReturnType<typeof import('../useSupabaseFileManager').useSupabaseFileManager>;
 let ops: ReturnType<typeof import('../useFileManagerOperations').useFileManagerOperations>;
@@ -188,10 +195,18 @@ beforeEach(() => {
   autoFormatOnSave.mockClear();
   fetchMock = vi.fn(async () => ok(row({ code: 'any' })));
   vi.stubGlobal('fetch', fetchMock);
-  editor = { code: '', setCode: vi.fn(), evaluate: vi.fn() };
-  editor.setCode.mockImplementation((code: string) => {
+  editor = {
+    code: '',
+    setCode: vi.fn(),
+    applyFormatted: vi.fn(),
+    formatTouchesCursor: vi.fn(() => false),
+    evaluate: vi.fn(),
+  };
+  const putInEditor = (code: string) => {
     editor.code = code;
-  });
+  };
+  editor.setCode.mockImplementation(putInEditor);
+  editor.applyFormatted.mockImplementation(putInEditor);
   handleUpdate = vi.fn(async ({ code }: { code: string }) => {
     editor.code = code;
   });
@@ -402,6 +417,119 @@ describe('leaving the page with typed text', () => {
     window.dispatchEvent(new Event('pagehide'));
     expect(fetchMock).not.toHaveBeenCalled();
     expect(draftOf('t1')).toBeNull();
+  });
+});
+
+describe('format on save, with the settings as a page reload leaves them: strings', () => {
+  beforeEach(async () => {
+    remote = { updated_at: V1, code: 'saved', steps: [], name: 'one' };
+    await mount([plain('t1', 'one', 'saved')]);
+    await open('t1');
+    fetchMock.mockClear();
+    editor.code = 'typed';
+  });
+
+  it.each([
+    ['Prettier off', { isPrettierEnabled: 'false', prettierAutoFormatOnSave: 'true' }],
+    ['format on save off', { isPrettierEnabled: 'true', prettierAutoFormatOnSave: 'false' }],
+  ])('%s: the code goes out unchanged', async (_name, stored) => {
+    settings = stored;
+    await expect(save('t1')).resolves.toBe(true);
+    expect(autoFormatOnSave).not.toHaveBeenCalled();
+    expect(lastSent().updates.code).toBe('typed');
+  });
+
+  it('both on: it is formatted', async () => {
+    settings = { isPrettierEnabled: 'true', prettierAutoFormatOnSave: 'true' };
+    await expect(save('t1')).resolves.toBe(true);
+    expect(autoFormatOnSave).toHaveBeenCalledOnce();
+    expect(lastSent().updates.code).toBe('formatted typed');
+  });
+
+  it('the editor gets it as a format, keeping its place and Undo: no whole-text setCode', async () => {
+    settings = { isPrettierEnabled: 'true', prettierAutoFormatOnSave: 'true' };
+    editor.setCode.mockClear();
+    await save('t1');
+    expect(editor.applyFormatted).toHaveBeenCalledWith('formatted typed');
+    expect(editor.setCode).not.toHaveBeenCalled();
+  });
+
+  it('a format that would eat the whitespace at the cursor waits: sent as typed, the editor left alone', async () => {
+    settings = { isPrettierEnabled: 'true', prettierAutoFormatOnSave: 'true' };
+    editor.formatTouchesCursor.mockReturnValue(true);
+    await save('t1');
+    expect(editor.formatTouchesCursor).toHaveBeenCalledWith('formatted typed');
+    expect(editor.applyFormatted).not.toHaveBeenCalled();
+    expect(lastSent().updates.code).toBe('typed');
+    expect(editor.code).toBe('typed');
+
+    // The next save, with the cursor moved on, formats it
+    editor.formatTouchesCursor.mockReturnValue(false);
+    editor.code = 'typed more';
+    await save('t1');
+    expect(editor.applyFormatted).toHaveBeenCalledWith('formatted typed more');
+    expect(lastSent().updates.code).toBe('formatted typed more');
+  });
+
+  describe('a format the safety net refused', () => {
+    const on = { isPrettierEnabled: 'true', prettierAutoFormatOnSave: 'true' };
+    const refused = () =>
+      autoFormatOnSave.mockImplementationOnce(
+        async (code: string) => ({ success: true, formattedCode: code, rejected: true }) as never,
+      );
+
+    it('a save someone asked for: sent as typed, and told', async () => {
+      const { toastActions } = await import('@src/stores/toastStore');
+      const warning = vi.spyOn(toastActions, 'warning').mockImplementation(() => {});
+      settings = on;
+      refused();
+      await React.act(async () => {
+        await hook.saveSpecificTrack('t1', true);
+      });
+      expect(lastSent().updates.code).toBe('typed');
+      expect(warning).toHaveBeenCalledWith('messages:prettierSaveRejected');
+    });
+
+    it('an autosave: sent as typed, in silence, so it does not repeat every interval', async () => {
+      const { toastActions } = await import('@src/stores/toastStore');
+      const warning = vi.spyOn(toastActions, 'warning').mockImplementation(() => {});
+      settings = on;
+      refused();
+      await save('t1');
+      expect(lastSent().updates.code).toBe('typed');
+      expect(warning).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('a format that goes wrong never costs the text', () => {
+    const on = { isPrettierEnabled: 'true', prettierAutoFormatOnSave: 'true' };
+    const saveWithToast = async () => {
+      await React.act(async () => {
+        await hook.saveSpecificTrack('t1', true);
+      });
+    };
+
+    it('it fails: the text goes out, and the toast comes from the translations, with the reason', async () => {
+      const { toastActions } = await import('@src/stores/toastStore');
+      const warning = vi.spyOn(toastActions, 'warning').mockImplementation(() => {});
+      settings = on;
+      autoFormatOnSave.mockResolvedValueOnce({ success: false, formattedCode: 'typed', error: 'boom' } as never);
+      await saveWithToast();
+      expect(lastSent().updates.code).toBe('typed');
+      expect(warning).toHaveBeenCalledWith('messages:prettierAutoFormatFailed');
+    });
+
+    it('it throws: the text goes out, and the toast comes from the translations', async () => {
+      const { toastActions } = await import('@src/stores/toastStore');
+      const warning = vi.spyOn(toastActions, 'warning').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      settings = on;
+      autoFormatOnSave.mockRejectedValueOnce(new Error('boom'));
+      await saveWithToast();
+      expect(lastSent().updates.code).toBe('typed');
+      expect(editor.code).toBe('typed');
+      expect(warning).toHaveBeenCalledWith('messages:prettierAutoFormatFailedSavingOriginal');
+    });
   });
 });
 
@@ -838,6 +966,7 @@ describe('findings from the review of this work', () => {
     });
     await flush();
     expect(editor.setCode).not.toHaveBeenCalled();
+    expect(editor.applyFormatted).not.toHaveBeenCalled();
     expect(editor.code).toBe('beta');
   });
 
@@ -862,7 +991,57 @@ describe('findings from the review of this work', () => {
       await saving;
     });
     expect(editor.setCode).not.toHaveBeenCalled();
+    expect(editor.applyFormatted).not.toHaveBeenCalled();
     expect(editor.code).toBe('typed and typing');
+  });
+
+  it('a format finishing after a switch to a track with the same text leaves the editor alone', async () => {
+    settings = { isPrettierEnabled: true, prettierAutoFormatOnSave: true };
+    let finishFormat: (value: { success: boolean; formattedCode: string }) => void = () => {};
+    autoFormatOnSave.mockImplementationOnce(() => new Promise((resolve) => (finishFormat = resolve)));
+    remote = { updated_at: V1, code: 'saved', steps: [], name: 'one' };
+    await mount([plain('t1', 'one', 'saved'), plain('t2', 'two', 'typed')]);
+    await open('t1');
+    answerWith();
+    editor.code = 'typed';
+    let saving: Promise<boolean> = Promise.resolve(false);
+    await React.act(async () => {
+      saving = hook.saveSpecificTrack('t1', false);
+    });
+    await flush();
+    remote = { updated_at: V1, code: 'typed', steps: [], name: 'two' };
+    await open('t2');
+    expect(editor.code).toBe('typed');
+    await React.act(async () => {
+      finishFormat({ success: true, formattedCode: 'FORMATTED' });
+      await saving;
+    });
+    expect(editor.applyFormatted).not.toHaveBeenCalled();
+    expect(editor.code).toBe('typed');
+  });
+
+  it('a format finishing after a switch to a step with the same text leaves the editor alone', async () => {
+    settings = { isPrettierEnabled: true, prettierAutoFormatOnSave: true };
+    let finishFormat: (value: { success: boolean; formattedCode: string }) => void = () => {};
+    autoFormatOnSave.mockImplementationOnce(() => new Promise((resolve) => (finishFormat = resolve)));
+    await mount([multi()]);
+    await open('m1');
+    answerWith();
+    editor.code = 'beta';
+    let saving: Promise<boolean> = Promise.resolve(false);
+    await React.act(async () => {
+      saving = hook.saveSpecificTrack('m1', false);
+    });
+    await flush();
+    await React.act(async () => ops.switchToStep('m1', 1));
+    await flush();
+    expect(editor.code).toBe('beta');
+    await React.act(async () => {
+      finishFormat({ success: true, formattedCode: 'FORMATTED' });
+      await saving;
+    });
+    expect(editor.applyFormatted).not.toHaveBeenCalled();
+    expect(editor.code).toBe('beta');
   });
 
   it('finding 12: a save-before-switch that fails keeps the text in a draft, offered on the way back', async () => {

@@ -6,7 +6,7 @@
 // Import Prettier and plugins
 import * as prettier from 'prettier';
 import * as parserBabel from 'prettier/plugins/babel';
-import { splitGluedAfterNumbers } from './splitGlued.mjs';
+import { formatStrudelCode, formatStrudelSelection, isStrudelCode } from './strudelFormat.mjs';
 import * as parserTypeScript from 'prettier/plugins/typescript';
 import * as parserEstree from 'prettier/plugins/estree';
 
@@ -46,242 +46,40 @@ function getPrettierConfig(options) {
 /**
  * Validates JavaScript/TypeScript syntax
  */
-function validateSyntax(code) {
+export async function validateSyntax(code) {
   try {
     // Try to parse with Babel parser (supports both JS and TS)
-    prettier.format(code, {
+    await prettier.format(code, {
       parser: 'babel',
-      plugins: [parserBabel, parserTypeScript],
+      plugins: [parserBabel, parserEstree],
     });
     return true;
-  } catch (error) {
+  } catch {
     // Try TypeScript parser as fallback
     try {
-      prettier.format(code, {
+      await prettier.format(code, {
         parser: 'typescript',
-        plugins: [parserTypeScript],
+        plugins: [parserTypeScript, parserEstree],
       });
       return true;
-    } catch (tsError) {
+    } catch {
       return false;
     }
   }
 }
 
 /**
- * Detects if code contains Strudel-specific syntax
- */
-function isStrudelCode(code) {
-  // Check for common Strudel patterns
-  const strudelPatterns = [
-    /\$:/, // Strudel pattern syntax
-    /\.s\(/, // .s() method
-    /\.sound\(/, // .sound() method
-    /\.note\(/, // .note() method
-    /\.scale\(/, // .scale() method
-    /\.euclidRot\(/, // .euclidRot() method
-    /\._pianoroll\(/, // ._pianoroll() method
-    /setcps\(/, // setcps() function
-    /samples\(/, // samples() function
-    /initHydra\(/, // initHydra() function
-    /\.gain\(/, // .gain() method
-    /\.lpf\(/, // .lpf() method
-    /\.room\(/, // .room() method
-    /\.slow\(/, // .slow() method
-    /\.fast\(/, // .fast() method
-    /\.rev\(/, // .rev() method
-    /\.sometimes\(/, // .sometimes() method
-    /\.every\(/, // .every() method
-    /\.bank\(/, // .bank() method
-    /\.crush\(/, // .crush() method
-    /\.distort\(/, // .distort() method
-    /\.delay\(/, // .delay() method
-    /\.sustain\(/, // .sustain() method
-    /\.legato\(/, // .legato() method
-    /\.clip\(/, // .clip() method
-    /\.pan\(/, // .pan() method
-    /\.speed\(/, // .speed() method
-    /\.decay\(/, // .decay() method
-    /\.add\(/, // .add() method
-    /\.color\(/, // .color() method (Hydra)
-    /\.rotate\(/, // .rotate() method (Hydra)
-    /\.kaleid\(/, // .kaleid() method (Hydra)
-    /\.modulate\(/, // .modulate() method (Hydra)
-    /\.brightness\(/, // .brightness() method (Hydra)
-    /\.blend\(/, // .blend() method (Hydra)
-    /\.out\(/, // .out() method (Hydra)
-    /shape\(/, // shape() function (Hydra)
-    /osc\(/, // osc() function (Hydra)
-    /src\(/, // src() function (Hydra)
-    /sine\.range\(/, // sine.range() (Strudel)
-    /perlin\.range\(/, // perlin.range() (Strudel)
-    /<[^>]*>/, // Mini notation patterns like <0 1 2>
-    /\[[^\]]*\]/, // Array-like patterns [c5 e5 g5]
-    /@\d+/, // Duration patterns like @3
-    /!\d+/, // Repeat patterns like !4
-    /~+/, // Rest patterns
-    /gm_\w+/, // General MIDI sounds
-    /RolandTR\d+/, // Roland drum machine sounds
-  ];
-
-  return strudelPatterns.some((pattern) => pattern.test(code));
-}
-
-/**
- * Formats Strudel code with basic formatting while preserving DSL syntax
- */
-function formatStrudelCode(code, options) {
-  // First, protect strings from preprocessing by replacing them with placeholders
-  // Use placeholders with format that won't match preprocessing regexes (no numbers followed by letters)
-  const globalStringParts = [];
-  let globalStringIndex = 0;
-
-  let protectedCode = code.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
-    // Use format: XSTRUDELSTRINGXAXSTRUDELSTRINGX, XSTRUDELSTRINGXBXSTRUDELSTRINGX, etc.
-    // Convert index to letter sequence: 0=A, 1=B, ..., 25=Z, 26=AA, 27=AB, etc.
-    let letterCode = '';
-    let num = globalStringIndex;
-    do {
-      letterCode = String.fromCharCode(65 + (num % 26)) + letterCode;
-      num = Math.floor(num / 26) - 1;
-    } while (num >= 0);
-
-    const placeholder = `XSTRUDELSTRINGX${letterCode}XSTRUDELSTRINGX`;
-    globalStringParts[globalStringIndex] = match;
-    globalStringIndex++;
-    return placeholder;
-  });
-
-  // Now apply line break preprocessing to the protected code
-  let preprocessedCode = protectedCode
-    // Add line breaks after function calls that end with ) followed by await/let/const/var/function
-    .replace(/\)(await|let|const|var|function)\s/g, ')\n$1 ')
-    // Add line breaks after semicolons followed by await/let/const/var/function
-    .replace(/;(await|let|const|var|function)\s/g, ';\n$1 ')
-    // Add line breaks after ) followed by any identifier (more general)
-    .replace(/\)([a-zA-Z_$][a-zA-Z0-9_$]*)/g, ')\n$1')
-    // Add line breaks before Strudel patterns (identifier:) when they follow )
-    .replace(/\)([a-zA-Z_$][a-zA-Z0-9_$]*\s*:)/g, ')\n$1')
-    // Add line breaks after } followed by identifiers
-    .replace(/\}([a-zA-Z_$][a-zA-Z0-9_$]*)/g, '}\n$1');
-  // Add line breaks after numbers followed by a glued statement (like "175let"), never inside a literal
-  preprocessedCode = splitGluedAfterNumbers(preprocessedCode);
-
-  // DON'T restore strings yet - keep placeholders through formatting
-  const lines = preprocessedCode.split('\n');
-  const formattedLines = [];
-  let indentLevel = 0;
-  const indentStr = options.useTabs ? '\t' : ' '.repeat(options.tabWidth);
-
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i].trim();
-
-    if (line === '') {
-      formattedLines.push('');
-      continue;
-    }
-
-    // Handle closing brackets/parentheses - decrease indent before the line
-    if (line.match(/^[})\]]/)) {
-      indentLevel = Math.max(0, indentLevel - 1);
-    }
-
-    // Apply current indentation
-    let indentedLine = indentStr.repeat(indentLevel) + line;
-
-    // Add proper spacing around operators and after commas
-    let spacedLine = indentedLine;
-
-    // Split by strings to avoid modifying content inside quotes
-    // Also protect global placeholders from being modified
-    const stringParts = [];
-    let tempLine = spacedLine;
-    let stringIndex = 0;
-
-    // First protect global placeholders (now with letter codes)
-    tempLine = tempLine.replace(/XSTRUDELSTRINGX[A-Z]+XSTRUDELSTRINGX/g, (match) => {
-      const placeholder = `__STRING_${stringIndex}__`;
-      stringParts[stringIndex] = match;
-      stringIndex++;
-      return placeholder;
-    });
-
-    // Then protect actual strings (improved regex to handle all quote types)
-    tempLine = tempLine.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
-      const placeholder = `__STRING_${stringIndex}__`;
-      stringParts[stringIndex] = match;
-      stringIndex++;
-      return placeholder;
-    });
-
-    // Apply formatting to non-string parts only
-    tempLine = tempLine
-      .replace(/([^=!<>+\-*/])=([^=>])/g, '$1 = $2') // Add spaces around = (but not ==, !=, =>, +=, -=, *=, /=)
-      .replace(/([0-9])\s*([+\-*/])\s*([0-9])/g, '$1 $2 $3') // Add spaces around math operators between numbers only
-      .replace(/,([^\s])/g, ', $1') // Add space after commas
-      .replace(/\s+/g, ' ') // Normalize multiple spaces to single
-      .replace(/\s*;\s*/g, ';') // Normalize semicolons
-      .replace(/\(\s+/g, '(') // Remove space after opening parentheses
-      .replace(/\s+\)/g, ')') // Remove space before closing parentheses
-      .replace(/\{\s+/g, '{ ') // Normalize space after opening braces
-      .replace(/\s+\}/g, ' }'); // Normalize space before closing braces
-
-    // Restore strings (this preserves original content including URLs)
-    for (let i = 0; i < stringParts.length; i++) {
-      tempLine = tempLine.replace(`__STRING_${i}__`, stringParts[i]);
-    }
-
-    spacedLine = tempLine;
-
-    // Handle opening brackets/parentheses - increase indent after the line
-    if (line.match(/[{([]$/)) {
-      indentLevel++;
-    }
-
-    // Handle method chaining - add proper indentation for continued lines
-    if (line.startsWith('.') && i > 0) {
-      // This is a chained method, add extra indentation
-      spacedLine = indentStr.repeat(Math.max(0, indentLevel - 1)) + indentStr + line;
-    }
-
-    formattedLines.push(spacedLine);
-  }
-
-  let result = formattedLines.join('\n');
-
-  // Restore global strings at the very end
-  for (let i = 0; i < globalStringParts.length; i++) {
-    // Convert index back to letter code
-    let letterCode = '';
-    let num = i;
-    do {
-      letterCode = String.fromCharCode(65 + (num % 26)) + letterCode;
-      num = Math.floor(num / 26) - 1;
-    } while (num >= 0);
-
-    const placeholder = `XSTRUDELSTRINGX${letterCode}XSTRUDELSTRINGX`;
-    result = result.replaceAll(placeholder, globalStringParts[i]);
-  }
-
-  return result;
-}
-
-/**
  * Formats code using Prettier
  */
-async function formatCode(code, options) {
+export async function formatCode(code, options) {
   try {
     // Check if this is Strudel code
     if (isStrudelCode(code)) {
-      const formattedCode = formatStrudelCode(code, options);
-      return {
-        success: true,
-        formattedCode: formattedCode,
-      };
+      return { success: true, ...formatStrudelCode(code, options) };
     }
 
     // Validate syntax first
-    if (!validateSyntax(code)) {
+    if (!(await validateSyntax(code))) {
       return {
         success: false,
         error: 'Invalid JavaScript/TypeScript syntax',
@@ -309,19 +107,14 @@ async function formatCode(code, options) {
 /**
  * Formats a selection of code
  */
-async function formatSelection(code, start, end, options) {
+export async function formatSelection(code, start, end, options) {
   try {
     // Extract the selected text
     const selectedText = code.substring(start, end);
 
     // Check if the full code or selection contains Strudel syntax
     if (isStrudelCode(code) || isStrudelCode(selectedText)) {
-      console.log('[PrettierWorker] Strudel code detected in selection, applying Strudel-specific formatting');
-      const formattedCode = formatStrudelCode(code, options);
-      return {
-        success: true,
-        formattedCode: formattedCode,
-      };
+      return { success: true, ...formatStrudelSelection(code, start, end, options) };
     }
 
     // Format only the selection
@@ -368,7 +161,7 @@ self.onmessage = async function (e) {
       case 'validate':
         result = {
           success: true,
-          isValid: validateSyntax(data.code),
+          isValid: await validateSyntax(data.code),
         };
         break;
 

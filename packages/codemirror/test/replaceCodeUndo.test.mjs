@@ -37,6 +37,29 @@ const pressUndo = (instance) =>
     },
   });
 
+describe('StrudelMirror.formatTouchesCursor', () => {
+  it('asks about the text in the editor, where its cursor is', () => {
+    const instance = mirror('let a=1 ');
+    instance.setCursorLocation('let a=1 '.length);
+    expect(instance.formatTouchesCursor('let a = 1')).toBe(true);
+    instance.setCursorLocation(3);
+    expect(instance.formatTouchesCursor('let a = 1')).toBe(false);
+  });
+});
+
+describe('StrudelMirror.applyFormatted', () => {
+  it('puts formatted text in the editor, as a step of its own, with the cursor on the same code', () => {
+    const instance = mirror('let a=1\nfoo()');
+    instance.setCode('let a=1\nfoo();');
+    instance.setCursorLocation('let a=1\nfoo'.length);
+    instance.applyFormatted('let a = 1\nfoo();');
+    expect(text(instance)).toBe('let a = 1\nfoo();');
+    expect(instance.getCursorLocation()).toBe('let a = 1\nfoo'.length);
+    pressUndo(instance);
+    expect(text(instance)).toBe('let a=1\nfoo();');
+  });
+});
+
 describe('StrudelMirror.replaceCode', () => {
   it("puts the assistant's code in the editor, and Undo brings back what was typed just before", () => {
     const instance = mirror('saved');

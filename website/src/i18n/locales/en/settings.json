@@ -41,7 +41,7 @@
   "codeFormatting": "Code Formatting",
   "experimental": "Experimental",
   "prettierEnabled": "Enable Prettier",
-  "prettierDescription": "Automatically format your code with Prettier on save or using Ctrl+Q. Ensures consistent code style and readability.",
+  "prettierDescription": "Automatically format your code with Prettier on save or using Shift+Alt+F. Ensures consistent code style and readability.",
   "prettierAutoFormatOnSave": "Auto-format on Save",
   "prettierTabWidth": "Tab Width",
   "prettierUseTabs": "Use Tabs",

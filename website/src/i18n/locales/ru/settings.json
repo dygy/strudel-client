@@ -39,7 +39,7 @@
   "codeFormatting": "Форматирование кода",
   "experimental": "Экспериментальный",
   "prettierEnabled": "Включить Prettier",
-  "prettierDescription": "Автоматически форматировать код с помощью Prettier при сохранении или используя Ctrl+Q. Обеспечивает согласованный стиль кода и читаемость.",
+  "prettierDescription": "Автоматически форматировать код с помощью Prettier при сохранении или используя Shift+Alt+F. Обеспечивает согласованный стиль кода и читаемость.",
   "prettierAutoFormatOnSave": "Автоформатирование при сохранении",
   "prettierTabWidth": "Ширина табуляции",
   "prettierUseTabs": "Использовать табуляцию",

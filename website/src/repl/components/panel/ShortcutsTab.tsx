@@ -97,7 +97,7 @@ export function ShortcutsTab() {
             icon={<CommandLineIcon className="w-4 h-4" />}
           />
           <ShortcutItem
-            keys={[modKey, 'Q']}
+            keys={['Shift', isMac ? 'Option' : 'Alt', 'F']}
             description={t('shortcuts:format', 'Format code with Prettier')}
             icon={<CommandLineIcon className="w-4 h-4" />}
           />

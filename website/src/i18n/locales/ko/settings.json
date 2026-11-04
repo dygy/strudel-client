@@ -41,7 +41,7 @@
   "codeFormatting": "코드 포맷팅",
   "experimental": "실험적",
   "prettierEnabled": "Prettier 활성화",
-  "prettierDescription": "저장 시 또는 Ctrl+Q를 사용하여 Prettier로 코드를 자동 포맷합니다. 일관된 코드 스타일과 가독성을 보장합니다.",
+  "prettierDescription": "저장 시 또는 Shift+Alt+F를 사용하여 Prettier로 코드를 자동 포맷합니다. 일관된 코드 스타일과 가독성을 보장합니다.",
   "prettierAutoFormatOnSave": "저장 시 자동 포맷",
   "prettierTabWidth": "탭 너비",
   "prettierUseTabs": "탭 사용",

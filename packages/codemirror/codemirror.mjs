@@ -28,7 +28,7 @@ import { widgetPlugin, updateWidgets } from './widget.mjs';
 import { isSignatureHelpEnabled } from './signature.mjs';
 import { isLinterEnabled } from './diagnostics.mjs';
 import { prettierExtension } from './prettierExtension.mjs';
-import { wholeDocumentReplacement } from './replaceCode.mjs';
+import { formatTouchesCursor, formattedReplacement, wholeDocumentReplacement } from './replaceCode.mjs';
 import { persistentAtom } from '@nanostores/persistent';
 import { basicSetup } from './basicSetup.mjs';
 
@@ -427,6 +427,15 @@ export class StrudelMirror {
   // user may be typing. A plain `setCode` can join the previous step, so Undo would skip what was typed.
   replaceCode(code) {
     this.editor.dispatch(wholeDocumentReplacement(this.editor.state, code));
+  }
+  // Formatted text in place of what's there: the cursor, the selection and the scroll position stay on the same code,
+  // and it's one Undo step of its own, like `replaceCode`.
+  applyFormatted(code) {
+    this.editor.dispatch(formattedReplacement(this.editor, code));
+  }
+  // Whether `applyFormatted` would take away whitespace the cursor is at, which the user may have just typed.
+  formatTouchesCursor(code) {
+    return formatTouchesCursor(this.editor.state, code);
   }
   clear() {
     this.onStartRepl && document.removeEventListener('start-repl', this.onStartRepl);

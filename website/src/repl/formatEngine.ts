@@ -2,7 +2,11 @@ import * as prettier from 'prettier';
 import * as parserBabel from 'prettier/plugins/babel';
 import * as parserTypeScript from 'prettier/plugins/typescript';
 import * as parserEstree from 'prettier/plugins/estree';
-import { splitGluedAfterNumbers } from '../../../packages/codemirror/splitGlued.mjs';
+import {
+  formatStrudelCode,
+  formatStrudelSelection,
+  isStrudelCode,
+} from '../../../packages/codemirror/strudelFormat.mjs';
 
 // Prettier configuration types
 export interface PrettierOptions {
@@ -23,6 +27,8 @@ export interface FormatResult {
   formattedCode?: string;
   error?: string;
   cursorOffset?: number;
+  // The formatter left the code as it was, because the result would not have been safe
+  rejected?: boolean;
 }
 
 // Format request interface
@@ -39,6 +45,14 @@ export interface FormatRequest {
 // Performance thresholds
 const LARGE_FILE_THRESHOLD = 5000; // characters
 const DEBOUNCE_DELAY = 300; // milliseconds
+const WORKER_TIMEOUT = 30000; // milliseconds
+
+// A request the worker hasn't answered yet
+interface PendingRequest {
+  resolve: (result: FormatResult) => void;
+  reject: (error: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
 
 /**
  * Core formatting engine that handles Prettier integration
@@ -47,7 +61,7 @@ export class FormatEngine {
   private static instance: FormatEngine;
   private configCache: Map<string, any> = new Map();
   private worker: Worker | null = null;
-  private workerPromises: Map<string, { resolve: Function; reject: Function }> = new Map();
+  private workerPromises: Map<string, PendingRequest> = new Map();
   private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
   private requestCounter = 0;
 
@@ -80,6 +94,7 @@ export class FormatEngine {
 
           if (promise) {
             this.workerPromises.delete(id);
+            clearTimeout(promise.timer);
 
             if (success) {
               promise.resolve(result);
@@ -91,8 +106,7 @@ export class FormatEngine {
 
         this.worker.onerror = (error) => {
           console.error('[FormatEngine] Worker error:', error);
-          // Fallback to main thread processing
-          this.worker = null;
+          this.dropWorker(new Error('Worker failed'));
         };
       } catch (error) {
         console.warn('[FormatEngine] Failed to initialize worker:', error);
@@ -112,22 +126,33 @@ export class FormatEngine {
     const id = `req_${++this.requestCounter}`;
 
     return new Promise((resolve, reject) => {
-      this.workerPromises.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        // A worker that hangs on one request will on the next: no one should wait for it again
+        this.dropWorker(new Error('Worker request timeout'));
+      }, WORKER_TIMEOUT);
+
+      this.workerPromises.set(id, { resolve, reject, timer });
 
       this.worker!.postMessage({
         id,
         type,
         data,
       });
-
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        if (this.workerPromises.has(id)) {
-          this.workerPromises.delete(id);
-          reject(new Error('Worker request timeout'));
-        }
-      }, 30000);
     });
+  }
+
+  /**
+   * Stops using the worker: what was waiting for it is rejected now, and from here on the main thread does the work
+   */
+  private dropWorker(reason: Error): void {
+    this.worker?.terminate();
+    this.worker = null;
+
+    for (const promise of this.workerPromises.values()) {
+      clearTimeout(promise.timer);
+      promise.reject(reason);
+    }
+    this.workerPromises.clear();
   }
 
   /**
@@ -182,7 +207,11 @@ export class FormatEngine {
         // Use web worker for large files
         if (this.shouldUseWorker(code)) {
           console.log('[FormatEngine] Using web worker for large file formatting');
-          return await this.sendToWorker('format', { code, options });
+          try {
+            return await this.sendToWorker('format', { code, options });
+          } catch (error: unknown) {
+            console.warn('[FormatEngine] Worker failed, formatting on the main thread:', error);
+          }
         }
 
         // Use main thread for smaller files
@@ -205,424 +234,16 @@ export class FormatEngine {
   }
 
   /**
-   * Detects if code contains Strudel-specific syntax
-   */
-  private isStrudelCode(code: string): boolean {
-    // Check for common Strudel patterns
-    const strudelPatterns = [
-      /\$:/, // Strudel pattern syntax
-      /\bs\(/, // s() function
-      /\.s\(/, // .s() method
-      /\barrange\(/, // arrange() function
-      /\bstack\(/, // stack() function
-      /\.stack\(/, // .stack() method
-      /\.sound\(/, // .sound() method
-      /\.note\(/, // .note() method
-      /\.scale\(/, // .scale() method
-      /\.euclidRot\(/, // .euclidRot() method
-      /\._pianoroll\(/, // ._pianoroll() method
-      /setcps\(/, // setcps() function
-      /samples\(/, // samples() function
-      /initHydra\(/, // initHydra() function
-      /\.gain\(/, // .gain() method
-      /\.lpf\(/, // .lpf() method
-      /\.room\(/, // .room() method
-      /\.slow\(/, // .slow() method
-      /\.fast\(/, // .fast() method
-      /\.rev\(/, // .rev() method
-      /\.sometimes\(/, // .sometimes() method
-      /\.every\(/, // .every() method
-      /\.bank\(/, // .bank() method
-      /\.crush\(/, // .crush() method
-      /\.distort\(/, // .distort() method
-      /\.delay\(/, // .delay() method
-      /\.sustain\(/, // .sustain() method
-      /\.legato\(/, // .legato() method
-      /\.clip\(/, // .clip() method
-      /\.pan\(/, // .pan() method
-      /\.speed\(/, // .speed() method
-      /\.decay\(/, // .decay() method
-      /\.add\(/, // .add() method
-      /\.color\(/, // .color() method (Hydra)
-      /\.rotate\(/, // .rotate() method (Hydra)
-      /\.kaleid\(/, // .kaleid() method (Hydra)
-      /\.modulate\(/, // .modulate() method (Hydra)
-      /\.brightness\(/, // .brightness() method (Hydra)
-      /\.blend\(/, // .blend() method (Hydra)
-      /\.out\(/, // .out() method (Hydra)
-      /shape\(/, // shape() function (Hydra)
-      /osc\(/, // osc() function (Hydra)
-      /src\(/, // src() function (Hydra)
-      /sine\.range\(/, // sine.range() (Strudel)
-      /perlin\.range\(/, // perlin.range() (Strudel)
-      /<[^>]*>/, // Mini notation patterns like <0 1 2>
-      /\[[^\]]*\]/, // Array-like patterns [c5 e5 g5]
-      /@\d+/, // Duration patterns like @3
-      /!\d+/, // Repeat patterns like !4
-      /~+/, // Rest patterns
-      /gm_\w+/, // General MIDI sounds
-      /RolandTR\d+/, // Roland drum machine sounds
-    ];
-
-    return strudelPatterns.some((pattern) => pattern.test(code));
-  }
-
-  /**
-   * Formats arrange() and stack() function calls with multi-line argument lists
-   */
-  private formatCompositionFunctions(code: string, options: PrettierOptions): string {
-    // Detect arrange() and stack() function calls (both standalone and chained)
-    // Pattern matches: arrange(...), stack(...), .stack(...)
-    const functionPattern = /(\b(arrange|stack)|\.stack)\s*\(/g;
-
-    let result = code;
-    const processedRanges = new Set<string>(); // Track processed function calls to avoid infinite loop
-
-    let match: RegExpExecArray | null;
-    functionPattern.lastIndex = 0;
-
-    while ((match = functionPattern.exec(result)) !== null) {
-      const functionName = match[1]; // 'arrange', 'stack', or '.stack'
-      const startIndex = match.index;
-      const openParenIndex = match.index + match[0].length - 1;
-
-      // Find the matching closing parenthesis
-      let depth = 1;
-      let closeParenIndex = -1;
-
-      for (let i = openParenIndex + 1; i < result.length; i++) {
-        const char = result[i];
-
-        // Skip string content to avoid counting parentheses inside strings
-        if (char === '"' || char === "'" || char === '`') {
-          const quote = char;
-          i++; // Move past opening quote
-          while (i < result.length) {
-            if (result[i] === '\\') {
-              i += 2; // Skip escaped character
-              continue;
-            }
-            if (result[i] === quote) {
-              break; // Found closing quote
-            }
-            i++;
-          }
-          continue;
-        }
-
-        if (char === '(') {
-          depth++;
-        } else if (char === ')') {
-          depth--;
-          if (depth === 0) {
-            closeParenIndex = i;
-            break;
-          }
-        }
-      }
-
-      if (closeParenIndex === -1) {
-        // No matching closing parenthesis found, skip this function call
-        continue;
-      }
-
-      // Create a unique key for this function call to track if we've processed it
-      const rangeKey = `${startIndex}-${closeParenIndex}`;
-      if (processedRanges.has(rangeKey)) {
-        // Already processed this function call, skip it
-        continue;
-      }
-
-      // Extract the full function call
-      const fullCall = result.substring(startIndex, closeParenIndex + 1);
-      const argsContent = result.substring(openParenIndex + 1, closeParenIndex);
-
-      // Check if already formatted as multi-line (contains newlines in args)
-      if (argsContent.includes('\n')) {
-        // Already multi-line formatted, skip it
-        processedRanges.add(rangeKey);
-        continue;
-      }
-
-      // Count arguments by counting commas at depth 0 (not inside nested parentheses/brackets)
-      let argCount = 0;
-      let argDepth = 0;
-      let hasNonWhitespace = false;
-
-      for (let i = 0; i < argsContent.length; i++) {
-        const char = argsContent[i];
-
-        // Skip string content
-        if (char === '"' || char === "'" || char === '`') {
-          const quote = char;
-          i++; // Move past opening quote
-          hasNonWhitespace = true;
-          while (i < argsContent.length) {
-            if (argsContent[i] === '\\') {
-              i += 2; // Skip escaped character
-              continue;
-            }
-            if (argsContent[i] === quote) {
-              break; // Found closing quote
-            }
-            i++;
-          }
-          continue;
-        }
-
-        if (char === '(' || char === '[' || char === '{') {
-          argDepth++;
-          hasNonWhitespace = true;
-        } else if (char === ')' || char === ']' || char === '}') {
-          argDepth--;
-          hasNonWhitespace = true;
-        } else if (char === ',' && argDepth === 0) {
-          argCount++;
-        } else if (char.trim() !== '') {
-          hasNonWhitespace = true;
-        }
-      }
-
-      // If there's any non-whitespace content, we have at least one argument
-      if (hasNonWhitespace) {
-        argCount++;
-      }
-
-      // Determine if multi-line formatting is needed
-      const shouldFormatMultiLine = argCount > 1 || fullCall.length > options.printWidth;
-
-      if (!shouldFormatMultiLine) {
-        // Skip formatting for single-argument or short calls
-        continue;
-      }
-
-      // Apply multi-line formatting
-      // Split arguments by commas at depth 0
-      const args: string[] = [];
-      let currentArg = '';
-      argDepth = 0;
-
-      for (let i = 0; i < argsContent.length; i++) {
-        const char = argsContent[i];
-
-        // Handle string content
-        if (char === '"' || char === "'" || char === '`') {
-          const quote = char;
-          currentArg += char;
-          i++; // Move past opening quote
-          while (i < argsContent.length) {
-            currentArg += argsContent[i];
-            if (argsContent[i] === '\\') {
-              i++; // Skip next character
-              if (i < argsContent.length) {
-                currentArg += argsContent[i];
-              }
-              i++;
-              continue;
-            }
-            if (argsContent[i] === quote) {
-              break; // Found closing quote
-            }
-            i++;
-          }
-          continue;
-        }
-
-        if (char === '(' || char === '[' || char === '{') {
-          argDepth++;
-          currentArg += char;
-        } else if (char === ')' || char === ']' || char === '}') {
-          argDepth--;
-          currentArg += char;
-        } else if (char === ',' && argDepth === 0) {
-          // Found argument separator
-          args.push(currentArg.trim());
-          currentArg = '';
-        } else {
-          currentArg += char;
-        }
-      }
-
-      // Add the last argument
-      if (currentArg.trim()) {
-        args.push(currentArg.trim());
-      }
-
-      // Build multi-line formatted version
-      // Detect current indentation level by looking at the line containing the function call
-      const lineStart = result.lastIndexOf('\n', startIndex) + 1;
-      const currentLinePrefix = result.substring(lineStart, startIndex);
-      const baseIndent = currentLinePrefix.match(/^(\s*)/)?.[1] || '';
-      const indentStr = options.useTabs ? '\t' : ' '.repeat(options.tabWidth);
-      const argIndent = baseIndent + indentStr;
-      const formattedArgs = args.map((arg) => `${argIndent}${arg}`).join(',\n');
-      const formattedCall = `${functionName}(\n${formattedArgs}\n${baseIndent})`;
-
-      // Replace in result
-      result = result.substring(0, startIndex) + formattedCall + result.substring(closeParenIndex + 1);
-
-      // Mark this range as processed
-      processedRanges.add(rangeKey);
-
-      // Reset the regex to search from the beginning since we modified the string
-      functionPattern.lastIndex = 0;
-    }
-
-    return result;
-  }
-
-  /**
-   * Formats Strudel code with basic formatting while preserving DSL syntax
-   */
-  private formatStrudelCode(code: string, options: PrettierOptions): string {
-    // First, protect strings from preprocessing by replacing them with placeholders
-    // Use unique placeholders that won't conflict with actual code
-    const globalStringParts: string[] = [];
-    let globalStringIndex = 0;
-
-    let protectedCode = code.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
-      // Encode index as letters (A=0, B=1, etc.) to avoid digit-adjacent-to-letter
-      // patterns that would be split by preprocessing regexes
-      const idxLetters = String(globalStringIndex)
-        .split('')
-        .map((c) => String.fromCharCode(65 + Number(c)))
-        .join('');
-      const placeholder = `XSTRX${idxLetters}XENDX`;
-      globalStringParts[globalStringIndex] = match;
-      globalStringIndex++;
-      return placeholder;
-    });
-
-    // Now apply line break preprocessing to the protected code
-    let preprocessedCode = protectedCode
-      // Add line breaks after function calls that end with ) followed by await/let/const/var/function
-      .replace(/\)(await|let|const|var|function)\s/g, ')\n$1 ')
-      // Add line breaks after semicolons followed by await/let/const/var/function
-      .replace(/;(await|let|const|var|function)\s/g, ';\n$1 ')
-      // Add line breaks after ) followed by any identifier (more general)
-      .replace(/\)([a-zA-Z_$][a-zA-Z0-9_$]*)/g, ')\n$1')
-      // Add line breaks before Strudel patterns (identifier:) when they follow )
-      .replace(/\)([a-zA-Z_$][a-zA-Z0-9_$]*\s*:)/g, ')\n$1')
-      // Add line breaks after } followed by identifiers
-      .replace(/\}([a-zA-Z_$][a-zA-Z0-9_$]*)/g, '}\n$1');
-    // Add line breaks after numbers followed by a glued statement (like "175let"), never inside a literal
-    preprocessedCode = splitGluedAfterNumbers(preprocessedCode);
-
-    // Restore global strings after preprocessing
-    for (let i = 0; i < globalStringParts.length; i++) {
-      const idxLetters = String(i)
-        .split('')
-        .map((c) => String.fromCharCode(65 + Number(c)))
-        .join('');
-      const placeholder = `XSTRX${idxLetters}XENDX`;
-      preprocessedCode = preprocessedCode.replace(new RegExp(placeholder, 'g'), globalStringParts[i]);
-    }
-
-    const lines = preprocessedCode.split('\n');
-    const formattedLines: string[] = [];
-    let indentLevel = 0;
-    const indentStr = options.useTabs ? '\t' : ' '.repeat(options.tabWidth);
-
-    for (let i = 0; i < lines.length; i++) {
-      let line = lines[i].trim();
-
-      if (line === '') {
-        formattedLines.push('');
-        continue;
-      }
-
-      // Handle closing brackets/parentheses - decrease indent before the line
-      if (line.match(/^[\}\)\]]/)) {
-        indentLevel = Math.max(0, indentLevel - 1);
-      }
-
-      // Apply current indentation
-      let indentedLine = indentStr.repeat(indentLevel) + line;
-
-      // Add proper spacing around operators and after commas
-      let spacedLine = indentedLine;
-
-      // Split by strings to avoid modifying content inside quotes
-      const localStringParts: string[] = [];
-      let tempLine = spacedLine;
-      let localStringIndex = 0;
-
-      // Replace strings with temporary placeholders for this line only
-      tempLine = tempLine.replace(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, (match) => {
-        const placeholder = `__LOCAL_STRING_${localStringIndex}__`;
-        localStringParts[localStringIndex] = match;
-        localStringIndex++;
-        return placeholder;
-      });
-
-      // Apply formatting to non-string parts only
-      // First, extract leading whitespace so normalization doesn't collapse indentation
-      const leadingWS = tempLine.match(/^(\s*)/)?.[1] || '';
-      let contentPart = tempLine.substring(leadingWS.length);
-      contentPart = contentPart
-        .replace(/([^=!<>+\-*\/])=([^=>])/g, '$1 = $2') // Add spaces around = (but not ==, !=, =>, +=, -=, *=, /=)
-        .replace(/([0-9])\s*([\+\-\*\/])\s*([0-9])/g, '$1 $2 $3') // Add spaces around math operators between numbers only
-        .replace(/,([^\s])/g, ', $1') // Add space after commas
-        .replace(/\s+/g, ' ') // Normalize multiple spaces to single
-        .replace(/\s*;\s*/g, ';') // Normalize semicolons
-        .replace(/\(\s+/g, '(') // Remove space after opening parentheses
-        .replace(/\s+\)/g, ')') // Remove space before closing parentheses
-        .replace(/\{\s+/g, '{ ') // Normalize space after opening braces
-        .replace(/\s+\}/g, ' }'); // Normalize space before closing braces
-      tempLine = leadingWS + contentPart;
-
-      // Restore local strings immediately (this preserves original content including URLs)
-      for (let j = 0; j < localStringParts.length; j++) {
-        tempLine = tempLine.replace(new RegExp(`__LOCAL_STRING_${j}__`, 'g'), localStringParts[j]);
-      }
-
-      spacedLine = tempLine;
-
-      // Handle opening brackets/parentheses - increase indent after the line
-      if (line.match(/[\{\(\[]$/)) {
-        indentLevel++;
-      }
-
-      // Handle method chaining - add proper indentation for continued lines
-      if (line.startsWith('.') && i > 0) {
-        // This is a chained method, add extra indentation
-        spacedLine = indentStr.repeat(Math.max(0, indentLevel - 1)) + indentStr + line;
-      }
-
-      formattedLines.push(spacedLine);
-    }
-
-    // Join all lines - at this point all strings should already be restored
-    let result = formattedLines.join('\n');
-
-    // Format arrange() and stack() calls (AFTER line-by-line formatting)
-    result = this.formatCompositionFunctions(result, options);
-
-    // Final verification: ensure no placeholders remain
-    if (result.includes('XSTRX') || result.includes('__LOCAL_STRING_')) {
-      console.error('[FormatEngine] String placeholder restoration failed!');
-      // Return original code if restoration failed
-      return code;
-    }
-
-    return result;
-  }
-
-  /**
    * Formats code on the main thread
    */
   private async formatCodeMainThread(code: string, options: PrettierOptions): Promise<FormatResult> {
     // Check if this is Strudel code
-    if (this.isStrudelCode(code)) {
-      const formattedCode = this.formatStrudelCode(code, options);
-      return {
-        success: true,
-        formattedCode: formattedCode,
-      };
+    if (isStrudelCode(code)) {
+      return { success: true, ...formatStrudelCode(code, options) };
     }
 
     // Validate syntax first
-    if (!this.validateSyntax(code)) {
+    if (!(await this.validateSyntax(code))) {
       return {
         success: false,
         error: 'Invalid JavaScript/TypeScript syntax',
@@ -662,7 +283,11 @@ export class FormatEngine {
         // Use web worker for large files
         if (this.shouldUseWorker(code)) {
           console.log('[FormatEngine] Using web worker for large selection formatting');
-          return await this.sendToWorker('formatSelection', { code, start, end, options });
+          try {
+            return await this.sendToWorker('formatSelection', { code, start, end, options });
+          } catch (error: unknown) {
+            console.warn('[FormatEngine] Worker failed, formatting on the main thread:', error);
+          }
         }
 
         // Use main thread for smaller files
@@ -697,13 +322,8 @@ export class FormatEngine {
     const selectedText = code.substring(start, end);
 
     // Check if the full code or selection contains Strudel syntax
-    if (this.isStrudelCode(code) || this.isStrudelCode(selectedText)) {
-      console.log('[FormatEngine] Strudel code detected in selection, applying Strudel-specific formatting');
-      const formattedCode = this.formatStrudelCode(code, options);
-      return {
-        success: true,
-        formattedCode: formattedCode,
-      };
+    if (isStrudelCode(code) || isStrudelCode(selectedText)) {
+      return { success: true, ...formatStrudelSelection(code, start, end, options) };
     }
 
     // Format only the selection
@@ -728,25 +348,25 @@ export class FormatEngine {
   /**
    * Validates JavaScript/TypeScript syntax
    * @param code - Code to validate
-   * @returns boolean indicating if syntax is valid
+   * @returns Promise of whether the code parses
    */
-  public validateSyntax(code: string): boolean {
+  public async validateSyntax(code: string): Promise<boolean> {
     try {
       // Try to parse with Babel parser (supports both JS and TS)
-      prettier.format(code, {
+      await prettier.format(code, {
         parser: 'babel',
-        plugins: [parserBabel, parserTypeScript],
+        plugins: [parserBabel, parserEstree],
       });
       return true;
-    } catch (error) {
+    } catch {
       // Try TypeScript parser as fallback
       try {
-        prettier.format(code, {
+        await prettier.format(code, {
           parser: 'typescript',
-          plugins: [parserTypeScript],
+          plugins: [parserTypeScript, parserEstree],
         });
         return true;
-      } catch (tsError) {
+      } catch {
         return false;
       }
     }
@@ -832,17 +452,8 @@ export class FormatEngine {
     }
     this.debounceTimers.clear();
 
-    // Reject all pending worker promises
-    for (const promise of this.workerPromises.values()) {
-      promise.reject(new Error('FormatEngine disposed'));
-    }
-    this.workerPromises.clear();
-
-    // Terminate worker
-    if (this.worker) {
-      this.worker.terminate();
-      this.worker = null;
-    }
+    // Reject all pending worker promises and terminate the worker
+    this.dropWorker(new Error('FormatEngine disposed'));
 
     // Clear cache
     this.configCache.clear();
@@ -852,16 +463,20 @@ export class FormatEngine {
 // Export singleton instance
 export const formatEngine = FormatEngine.getInstance();
 
+// settingsMap is persisted, so booleans come back from a page reload as the strings 'true' and 'false'. Not
+// parseBoolean: settings.ts pulls in repl/util.ts and every @strudel package with it.
+const isOn = (value: unknown): boolean => value === true || value === 'true';
+
 // Helper function to create prettier options from settings
 export function createPrettierOptions(settings: any): PrettierOptions {
   return {
     tabWidth: Number(settings.prettierTabWidth) || 2,
-    useTabs: Boolean(settings.prettierUseTabs),
-    semi: settings.prettierSemi !== undefined ? Boolean(settings.prettierSemi) : true,
-    singleQuote: Boolean(settings.prettierSingleQuote),
+    useTabs: isOn(settings.prettierUseTabs),
+    semi: settings.prettierSemi !== undefined ? isOn(settings.prettierSemi) : true,
+    singleQuote: isOn(settings.prettierSingleQuote),
     quoteProps: settings.prettierQuoteProps || 'as-needed',
     trailingComma: settings.prettierTrailingComma || 'es5',
-    bracketSpacing: settings.prettierBracketSpacing !== undefined ? Boolean(settings.prettierBracketSpacing) : true,
+    bracketSpacing: settings.prettierBracketSpacing !== undefined ? isOn(settings.prettierBracketSpacing) : true,
     arrowParens: settings.prettierArrowParens || 'always',
     printWidth: Number(settings.prettierPrintWidth) || 80,
   };
