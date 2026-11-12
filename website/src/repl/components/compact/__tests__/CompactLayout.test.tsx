@@ -151,12 +151,14 @@ describe('REPL shell on a phone (390x844)', () => {
     expect(desktopHeader()).toBeNull();
   });
 
-  it('the control bar holds Play, Update, Library and Settings, each 44x44 with a label', () => {
+  it('the control bar holds Play, Update, Scratch, Library and Settings, each 44x44 with a label', () => {
     renderRepl();
     const buttons = [...controlBar()!.querySelectorAll<HTMLButtonElement>('button')];
     expect(buttons.map((b) => Object.keys(b.dataset)[0])).toEqual([
       'barPlay',
       'barUpdate',
+      // Spec 019: the floating scratch platter, next to the transition picker.
+      'scratchButton',
       'barLibrary',
       'barSettings',
     ]);

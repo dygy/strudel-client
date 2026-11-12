@@ -8,13 +8,15 @@
  *
  * Audio chain:
  *   previewRepl → previewSuperdough(controller) → previewController.output
- *     → destinationGain → equalizer → MediaStreamDest → HTMLAudioElement.setSinkId(headphones)
+ *     → channelMerger → [scratch node, spec 019] → destinationGain → equalizer
+ *     → MediaStreamDest → HTMLAudioElement.setSinkId(headphones)
  *
  * @class PreviewEngine
  * @license AGPL-3.0-or-later
  */
 
 import { AudioEqualizer, applyEqualizerSettings, loadEqualizerSettings } from '@strudel/equalizer';
+import { ScratchDeck } from './scratch/ScratchDeck.mjs';
 
 export class PreviewEngine {
   /**
@@ -35,6 +37,8 @@ export class PreviewEngine {
     this.equalizer = null; // Own AudioEqualizer
     this.audioElement = null; // HTMLAudioElement for device routing
     this.mediaStreamDest = null;
+    /** The headphone deck's scratch node (spec 019); created lazily by ensureScratchDeck(). */
+    this.scratchDeck = null;
     this.isInitialized = false;
     this.isPlaying = false;
     this.deviceId = null;
@@ -105,8 +109,28 @@ export class PreviewEngine {
       },
     });
 
+    // The headphone scratch deck (spec 019) is NOT created here: initialize() runs at page
+    // mount, before any user gesture. ensureScratchDeck() creates it when the preview starts.
+
     this.isInitialized = true;
     console.log('[PreviewEngine] initialized with independent audio chain and equalizer');
+  }
+
+  /**
+   * Create and attach the headphone scratch deck (spec 019) on first use: the worklet module
+   * and its 8-second ring are loaded only once the preview actually plays. evaluate() starts
+   * this; the website awaits it to register the deck. Repeated calls share one deck; a deck
+   * whose attach failed is retried.
+   * @returns {Promise<ScratchDeck|null>} The attached deck, or null when not initialized, when
+   *   the deck could not attach, or when destroy() ran meanwhile.
+   */
+  async ensureScratchDeck() {
+    if (!this.isInitialized || !this.controller) return null;
+    if (!this.scratchDeck) this.scratchDeck = new ScratchDeck(this.audioContext, this.controller);
+    const deck = this.scratchDeck;
+    const attached = await deck.attach();
+    if (this.scratchDeck !== deck) return null; // destroy() ran while the worklet loaded
+    return attached ? deck : null;
   }
 
   /**
@@ -152,6 +176,8 @@ export class PreviewEngine {
       throw new Error('PreviewEngine not initialized');
     }
     await this.ensurePlaying();
+    // After a gesture: create the scratch deck now, without delaying the preview start.
+    this.ensureScratchDeck();
     return this.replInstance.evaluate(code);
   }
 
@@ -170,6 +196,10 @@ export class PreviewEngine {
    */
   destroy() {
     this.stop();
+    if (this.scratchDeck) {
+      this.scratchDeck.destroy();
+      this.scratchDeck = null;
+    }
     if (this.audioElement) {
       this.audioElement.pause();
       this.audioElement.srcObject = null;

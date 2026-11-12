@@ -17,6 +17,7 @@
   "instantTransition": "Transition instantanée vers le direct",
   "crossfadeTransition": "Transition en fondu enchaîné vers le direct",
   "stopPreview": "Arrêter le flux de pré-écoute",
+  "scratch": "Scratch (maintenir) : tirer en arrière / pousser en avant",
   "tip": {
     "title": "Conseil Pro",
     "description": "Utilisez Ctrl+Entrée ou Ctrl+U fréquemment pendant le live coding pour entendre vos changements instantanément. Ctrl+P vous permet d'arrêter tout rapidement si nécessaire."

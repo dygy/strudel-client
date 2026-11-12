@@ -18,6 +18,8 @@ import {
 export type AudioEngineTarget = 'webaudio' | 'osc';
 export type SoundFilterType = 'user' | 'drums' | 'samples' | 'synths' | 'wavetables' | 'all' | 'importSounds';
 export type PanelPosition = 'right' | 'bottom';
+/** The deck a scratch acts on (spec 019): the speakers or the headphone preview. */
+export type ScratchDeckSetting = 'main' | 'preview';
 export type TogglePanelTrigger = 'click' | 'hover';
 export type Keybindings = 'codemirror' | 'vim' | 'emacs' | 'vscode';
 export type Theme = string; // Could be more specific if we know all theme names
@@ -105,6 +107,8 @@ export interface Settings {
   transitionSnap: TransitionSnap;
   transitionGlide: boolean;
   transitionMatchLoudness: boolean;
+  // Vinyl scratch control (spec 019): the deck the platter, keys and MIDI jog act on
+  scratchDeck: ScratchDeckSetting;
 }
 
 // Raw settings interface (as stored, with string values for booleans)
@@ -165,6 +169,7 @@ export interface RawSettings {
   transitionSnap: number | string;
   transitionGlide: boolean | string;
   transitionMatchLoudness: boolean | string;
+  scratchDeck: string;
 }
 
 export const audioEngineTargets = {
@@ -240,6 +245,7 @@ export const defaultSettings: RawSettings = {
   transitionSnap: DEFAULT_TRANSITION.snap,
   transitionGlide: DEFAULT_TRANSITION.glide,
   transitionMatchLoudness: DEFAULT_TRANSITION.matchLoudness,
+  scratchDeck: 'main',
 };
 
 let search: URLSearchParams | null = null;
@@ -458,6 +464,7 @@ export function useSettings(): Settings {
     prettierArrowParens: (state.prettierArrowParens || 'always') as PrettierArrowParens,
     prettierPrintWidth: Number(state.prettierPrintWidth),
     ...transitionFields(parseTransitionSettings(state)),
+    scratchDeck: parseScratchDeck(state.scratchDeck),
   };
 }
 
@@ -494,6 +501,18 @@ export function useTransitionSettings(): TransitionSettings {
   const state = useStore(settingsMap);
   return parseTransitionSettings(state);
 }
+
+/**
+ * The stored scratch deck (spec 019). Values come back from storage as strings, and anything
+ * unknown (an old or damaged save) means the speakers.
+ */
+export const parseScratchDeck = (value: unknown): ScratchDeckSetting => (value === 'preview' ? 'preview' : 'main');
+
+/** The scratch deck in force right now. */
+export const getScratchDeckSetting = (): ScratchDeckSetting => parseScratchDeck(settingsMap.get().scratchDeck);
+
+export const setScratchDeckSetting = (deck: ScratchDeckSetting): void =>
+  settingsMap.setKey('scratchDeck', parseScratchDeck(deck));
 
 // Settings update functions
 export const setActiveFooter = (tab: string): void => settingsMap.setKey('activeFooter', tab);

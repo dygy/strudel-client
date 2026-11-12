@@ -59,6 +59,9 @@ import { createEvaluationWatch, isMusicChanging } from './evaluationWatch';
 import { createTrackSwitchController, type UpdateOutcome } from './trackSwitch';
 import { settingsForSwitch, switchPath } from './transitionSettings';
 import { installMainEqualizerWhenReady } from './mainEqualizer';
+import { scratchRuntime } from './scratch/scratchRuntime';
+import { createScratchReplHooks } from './scratch/scratchReplHooks';
+import { installScratchShortcut } from './scratch/scratchShortcut';
 
 // Type definitions
 interface ReplState {
@@ -128,6 +131,8 @@ let presets: Promise<void> | undefined;
 let drawContext: CanvasRenderingContext2D | undefined;
 let clearCanvas: (() => void) | undefined;
 let audioReady: Promise<void> | undefined;
+// Spec 019: where the REPL lets go of the platter (see scratchReplHooks.ts).
+const scratchHooks = createScratchReplHooks(scratchRuntime);
 
 // Canvas cleanup utility
 const cleanupCanvasElements = async () => {
@@ -249,91 +254,95 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
 
     const drawTime = [-2, 2];
     const drawContext = getDrawContext();
-    const editor = new StrudelMirror({
-      sync: isSyncEnabled,
-      defaultOutput,
-      getTime,
-      setInterval,
-      clearInterval,
-      transpiler,
-      autodraw: false,
-      root: containerRef.current,
-      initialCode,
-      pattern: silence,
-      // Spec 017: every setPattern passes through the transition controller (a pure pass-through
-      // until the first switch; then the track origin shift, or the combined transition pattern).
-      editPattern: (pattern: any) => transitionControllerRef.current?.editPattern(pattern) ?? pattern,
-      drawTime,
-      drawContext,
-      readOnly,
-      prebake: async () => Promise.all([modulesLoading, presets]),
-      onUpdateState: (state: any) => {
-        setReplState({ ...state });
-      },
-      onToggle: (playing: boolean) => {
-        console.log('[canvas-cleanup] onToggle called, playing:', playing);
-        if (!playing) {
-          console.log('[canvas-cleanup] Pattern stopped, cleaning up canvas elements and resetting CPS');
+    // Spec 019 choke points: beforeEval (every evaluate) and onToggle (every start and stop) let go
+    // of the platter first.
+    const editor = new StrudelMirror(
+      scratchHooks.replOptions({
+        sync: isSyncEnabled,
+        defaultOutput,
+        getTime,
+        setInterval,
+        clearInterval,
+        transpiler,
+        autodraw: false,
+        root: containerRef.current,
+        initialCode,
+        pattern: silence,
+        // Spec 017: every setPattern passes through the transition controller (a pure pass-through
+        // until the first switch; then the track origin shift, or the combined transition pattern).
+        editPattern: (pattern: any) => transitionControllerRef.current?.editPattern(pattern) ?? pattern,
+        drawTime,
+        drawContext,
+        readOnly,
+        prebake: async () => Promise.all([modulesLoading, presets]),
+        onUpdateState: (state: any) => {
+          setReplState({ ...state });
+        },
+        onToggle: (playing: boolean) => {
+          console.log('[canvas-cleanup] onToggle called, playing:', playing);
+          if (!playing) {
+            console.log('[canvas-cleanup] Pattern stopped, cleaning up canvas elements and resetting CPS');
 
-          // Nothing is playing on the speakers any more.
-          trackSwitch.stopped();
-          // The next start is at cycle 0: drop the track origin, cancel a running transition.
-          transitionControllerRef.current?.stopped();
+            // Nothing is playing on the speakers any more.
+            trackSwitch.stopped();
+            // The next start is at cycle 0: drop the track origin, cancel a running transition.
+            transitionControllerRef.current?.stopped();
 
-          // Reset CPS to default to prevent BPM from carrying over between tracks
-          if (editor?.repl?.setCps) {
-            editor.repl.setCps(0.5);
-            console.log('[canvas-cleanup] Reset CPS to default 0.5');
+            // Reset CPS to default to prevent BPM from carrying over between tracks
+            if (editor?.repl?.setCps) {
+              editor.repl.setCps(0.5);
+              console.log('[canvas-cleanup] Reset CPS to default 0.5');
+            }
+
+            clearHydra();
+
+            // IMPORTANT: Don't clean up canvases when the instant switch restarts the scheduler:
+            // evaluateNewTrack runs its own (awaited) cleanup right after.
+            if (!isSmoothTransitioningRef.current) {
+              // Clean up canvas elements when stopping
+              cleanupCanvasElements().catch((error) => {
+                console.warn('[canvas-cleanup] Error during cleanup:', error);
+              });
+            } else {
+              console.log('[canvas-cleanup] Skipping cleanup during smooth transition');
+            }
           }
+        },
+        beforeEval: () => audioReady,
+        afterEval: (all: any) => {
+          const { code } = all;
+          //post to iframe parent (like Udels) if it exists...
+          (window.parent as any)?.postMessage(code);
 
-          clearHydra();
+          // The main repl now plays this code; its track id was captured when the evaluate started.
+          trackSwitch.evaluated(code);
 
-          // IMPORTANT: Don't clean up canvases when the instant switch restarts the scheduler:
-          // evaluateNewTrack runs its own (awaited) cleanup right after.
-          if (!isSmoothTransitioningRef.current) {
-            // Clean up canvas elements when stopping
-            cleanupCanvasElements().catch((error) => {
-              console.warn('[canvas-cleanup] Error during cleanup:', error);
-            });
+          setLatestCode(code);
+          setDocumentTitle(code);
+          const viewingPatternData = getViewingPatternData();
+          setVersionDefaultsFrom(code);
+          const data = { ...viewingPatternData, code };
+          let id = data.id;
+          const isExamplePattern = viewingPatternData.collection !== userPattern.collection;
+
+          if (isExamplePattern) {
+            const codeHasChanged = code !== viewingPatternData.code;
+            if (codeHasChanged) {
+              // fork example
+              const newPattern = userPattern.duplicate(data);
+              id = newPattern.id;
+              setViewingPatternData(newPattern.data);
+            }
           } else {
-            console.log('[canvas-cleanup] Skipping cleanup during smooth transition');
+            id = userPattern.isValidID(id) ? id : createPatternID();
+            setViewingPatternData(userPattern.update(id, data).data);
           }
-        }
-      },
-      beforeEval: () => audioReady,
-      afterEval: (all: any) => {
-        const { code } = all;
-        //post to iframe parent (like Udels) if it exists...
-        (window.parent as any)?.postMessage(code);
-
-        // The main repl now plays this code; its track id was captured when the evaluate started.
-        trackSwitch.evaluated(code);
-
-        setLatestCode(code);
-        setDocumentTitle(code);
-        const viewingPatternData = getViewingPatternData();
-        setVersionDefaultsFrom(code);
-        const data = { ...viewingPatternData, code };
-        let id = data.id;
-        const isExamplePattern = viewingPatternData.collection !== userPattern.collection;
-
-        if (isExamplePattern) {
-          const codeHasChanged = code !== viewingPatternData.code;
-          if (codeHasChanged) {
-            // fork example
-            const newPattern = userPattern.duplicate(data);
-            id = newPattern.id;
-            setViewingPatternData(newPattern.data);
-          }
-        } else {
-          id = userPattern.isValidID(id) ? id : createPatternID();
-          setViewingPatternData(userPattern.update(id, data).data);
-        }
-        // NOTE: Don't set activePattern here - it should only be set by navigation actions
-        // setActivePattern(id); // REMOVED: This was overwriting URL-based activePattern
-      },
-      bgFill: false,
-    });
+          // NOTE: Don't set activePattern here - it should only be set by navigation actions
+          // setActivePattern(id); // REMOVED: This was overwriting URL-based activePattern
+        },
+        bgFill: false,
+      }),
+    );
 
     console.log('[repl] StrudelMirror created:', !!editor, 'root element:', !!containerRef.current);
     setEditorInstance(editor);
@@ -426,6 +435,14 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   const audioRecorder = useAudioRecorder(screenRecordingRef.current);
   const screenRecorder = useScreenRecorder(audioRecorder.isRecording);
 
+  // Spec 019: the platter turns (and can be grabbed) only while its deck plays.
+  useEffect(() => {
+    scratchRuntime.setPlaying('main', Boolean(started));
+  }, [started]);
+  useEffect(() => {
+    scratchRuntime.setPlaying('preview', isPreviewing);
+  }, [isPreviewing]);
+
   // Keep ref in sync so audioRecorder sees latest screen recording state
   useEffect(() => {
     screenRecordingRef.current = screenRecorder.isScreenRecording;
@@ -458,6 +475,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         });
 
         await engine.initialize();
+        // Spec 019: the headphone deck's scratch node, created by the engine.
+        scratchRuntime.attachPreview(engine);
 
         // Restore saved preview device from localStorage
         try {
@@ -482,12 +501,32 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     return () => {
       releaseMainEqualizer();
       if (mixerRef.current) {
+        scratchRuntime.detachPreview();
         mixerRef.current.destroy();
         mixerRef.current = null;
         setMixer(null);
       }
     };
   }, []);
+
+  // Vinyl scratch (spec 019): the speakers' scratch node goes in once audio is initialised (the
+  // worklet loads after the first click). A remembered MIDI jog reconnects right away.
+  useEffect(() => {
+    let cancelled = false;
+    scratchRuntime.restoreMidi().catch((error: unknown) => console.warn('[scratch] MIDI jog restore failed:', error));
+    audioReady
+      ?.then(async () => {
+        if (!cancelled) await scratchRuntime.attachMain(getAudioContext(), getSuperdoughAudioController());
+      })
+      .catch((error: unknown) => console.warn('[scratch] could not attach the speakers deck:', error));
+    return () => {
+      cancelled = true;
+      scratchRuntime.detachMain();
+    };
+  }, []);
+
+  // The scratch keys (Alt+Shift+←/→), installed once so a held key survives re-renders.
+  useEffect(() => installScratchShortcut(scratchRuntime), []);
 
   // Track transitions (spec 017). The controller itself is created on the first switch
   // (getTransitionController); here: its visuals cleanup and the error toasts.
@@ -741,6 +780,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   //   out and starting the new one at cycle 0.
   // - the same switch again while it is still in flight (double press): ignored.
   const runUpdate = async ({ reset = false }: { reset?: boolean } = {}): Promise<UpdateOutcome> => {
+    // Spec 019: an Update or a track switch never starts from a held platter.
+    scratchHooks.beforeUpdate();
     const outcome = await trackSwitch.update({
       reset,
       isPlaying: Boolean(editorRef.current?.repl?.scheduler?.started),
@@ -760,6 +801,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   };
 
   const handleEvaluate = async (): Promise<void> => {
+    // Spec 019: let go of the platter before the preview stops and the code evaluates.
+    scratchHooks.beforeEvaluate();
     // If previewing, "Update" means: stop preview, push code to live speakers
     if (isPreviewing && mixerRef.current) {
       mixerRef.current.stop();
@@ -915,6 +958,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         console.log('[Preview] Started — code playing on headphones, live untouched on speakers');
       } else {
         // Stop Preview: stop the preview engine, live continues
+        scratchHooks.previewStopping(engine);
         engine.stop();
         setIsPreviewing(false);
         console.log('[Preview] Stopped — headphones silent, speakers continue');

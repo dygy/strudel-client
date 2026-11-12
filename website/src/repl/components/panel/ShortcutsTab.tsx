@@ -15,7 +15,8 @@ function ShortcutItem({ keys, description, icon }: ShortcutItemProps) {
         {icon && <div className="text-purple-400 flex-shrink-0">{icon}</div>}
         <span className="text-gray-300 text-sm">{description}</span>
       </div>
-      <div className="flex items-center gap-1">
+      {/* Key combinations read left to right in RTL languages too (Alt + Shift + ←, not reversed) */}
+      <div dir="ltr" data-shortcut-keys="" className="flex items-center gap-1">
         {keys.map((key, index) => (
           <React.Fragment key={key}>
             {index > 0 && <span className="text-gray-500 text-xs mx-1">+</span>}
@@ -117,6 +118,11 @@ export function ShortcutsTab() {
             description={t('shortcuts:crossfadeTransition', 'Crossfade transition to live')}
           />
           <ShortcutItem keys={[modKey, 'Shift', 'S']} description={t('shortcuts:stopPreview', 'Stop preview stream')} />
+          {/* Spec 019: hold to scratch; not while typing in the editor */}
+          <ShortcutItem
+            keys={[isMac ? 'Option' : 'Alt', 'Shift', '← / →']}
+            description={t('shortcuts:scratch', 'Scratch (hold): pull back / push forwards')}
+          />
         </ShortcutSection>
 
         <div className="mt-8 p-4 bg-gray-800/30 rounded-lg">

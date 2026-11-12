@@ -7,6 +7,7 @@ import cx from '@src/cx';
 import { useTranslation } from '@src/i18n';
 import { useTransitionPhase } from '../transitionPhase';
 import { TransitionPicker } from './TransitionPicker';
+import { ScratchButton } from './scratch/ScratchButton';
 import { useSettings } from '../../settings';
 import { usePanelLayout } from './panel/panelLayout';
 import { AuthButton } from '../../components/auth/AuthButton';
@@ -304,6 +305,8 @@ export function Header({ context, embedded, trackName }: HeaderProps) {
         <div className="hidden sm:block">
           <TransitionPicker />
         </div>
+        {/* The floating scratch platter (spec 019 2.1) */}
+        <ScratchButton />
 
         {/* Preview (headphones) — only when mixer is available */}
         {context.mixer && (

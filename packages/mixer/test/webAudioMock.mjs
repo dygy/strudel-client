@@ -3,7 +3,8 @@
  *
  * Covers everything packages/mixer/*.mjs and @strudel/equalizer call on the
  * AudioContext: createGain, createBiquadFilter (10-band EQ), createAnalyser (loudness tap),
- * createMediaStreamDestination, currentTime/state/destination, resume/close, the node
+ * createMediaStreamDestination, audioWorklet.addModule + AudioWorkletNode (spec 019 scratch),
+ * currentTime/state/destination, resume/close, the node
  * constructors superdough's output uses (stubWebAudioNodeConstructors),
  * plus HTMLAudioElement (srcObject, paused, play, pause, setSinkId),
  * navigator.mediaDevices.enumerateDevices and localStorage.
@@ -75,11 +76,64 @@ export class MockMediaStream {
   }
 }
 
+/**
+ * A MessagePort stand-in: `posted` records every postMessage in order; `reply(data)` delivers a
+ * message to `onmessage` as the worklet would; `closed` flips on close().
+ */
+export class MockMessagePort {
+  constructor() {
+    this.posted = [];
+    this.onmessage = null;
+    this.closed = false;
+  }
+  postMessage(data) {
+    this.posted.push(data);
+  }
+  reply(data) {
+    this.onmessage?.({ data });
+  }
+  close() {
+    this.closed = true;
+  }
+}
+
+/** AudioWorkletNode: records its constructor arguments and has a {@link MockMessagePort}. */
+export class MockAudioWorkletNode {
+  constructor(context, name, options = {}) {
+    this.context = context;
+    this.name = name;
+    this.options = options;
+    this.port = new MockMessagePort();
+    this.connections = [];
+    this.disconnected = 0;
+    context?.workletNodes?.push(this);
+  }
+  connect(target) {
+    this.connections.push(target);
+    return target;
+  }
+  disconnect(target) {
+    this.disconnected++;
+    this.connections = target === undefined ? [] : this.connections.filter((c) => c !== target);
+  }
+}
+
 export class MockAudioContext {
   constructor() {
     this.currentTime = 0;
     this.state = 'running';
     this.destination = createNode({ channelCount: 2, maxChannelCount: 2 });
+    /** Every AudioWorkletNode created on this context. */
+    this.workletNodes = [];
+    /** `addModule` URLs, in call order. */
+    this.addedModules = [];
+    const ctx = this;
+    this.audioWorklet = {
+      addModule(url) {
+        ctx.addedModules.push(url);
+        return Promise.resolve();
+      },
+    };
   }
 
   createGain() {
@@ -172,6 +226,7 @@ export function createMemoryStorage() {
 /** Install fresh Web Audio / device / storage mocks for one test. */
 export function stubWebAudio() {
   vi.stubGlobal('AudioContext', MockAudioContext);
+  vi.stubGlobal('AudioWorkletNode', MockAudioWorkletNode);
   vi.stubGlobal('MediaStream', MockMediaStream);
   vi.stubGlobal('Audio', MockAudio);
   vi.stubGlobal('navigator', {

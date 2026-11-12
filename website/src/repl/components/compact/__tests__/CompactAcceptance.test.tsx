@@ -407,7 +407,14 @@ describe('the admin read-only view on a phone (spec 016 2.5)', () => {
   it('read-only: the control bar and the More menu hold no edit-only actions', () => {
     renderRepl(makeFileManagerHook(), true);
     const bar = [...$('[data-compact-control-bar]')!.querySelectorAll<HTMLButtonElement>('button')];
-    expect(bar.map((b) => Object.keys(b.dataset)[0])).toEqual(['barPlay', 'barUpdate', 'barLibrary', 'barSettings']);
+    // Scratch (spec 019 2.6) changes only what is heard, so the read-only view keeps it.
+    expect(bar.map((b) => Object.keys(b.dataset)[0])).toEqual([
+      'barPlay',
+      'barUpdate',
+      'scratchButton',
+      'barLibrary',
+      'barSettings',
+    ]);
     click('[data-compact-more]');
     const items = [...$('[data-compact-more-menu]')!.querySelectorAll<HTMLElement>('[role="menuitem"]')];
     expect(items.map((i) => Object.keys(i.dataset)[0])).toEqual([

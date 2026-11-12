@@ -237,6 +237,29 @@ export interface SettingsTranslations {
   transitionPickerLength: string;
   transitionWaiting: string;
   transitionNewTrackFailed: string;
+  // Vinyl scratch control (spec 019)
+  scratch: string;
+  scratchDescription: string;
+  scratchPlatter: string;
+  scratchDeck: string;
+  scratchDeckMain: string;
+  scratchDeckPreview: string;
+  scratchPreviewOff: string;
+  scratchNotPlaying: string;
+  scratchUnavailable: string;
+  scratchShortcutHint: string;
+  scratchShortcutWindowsNote: string;
+  scratchOpen: string;
+  scratchMidi: string;
+  scratchMidiLearn: string;
+  scratchMidiLearning: string;
+  scratchMidiForget: string;
+  scratchMidiNone: string;
+  scratchMidiAssigned: string;
+  scratchMidiLearnTimeout: string;
+  scratchMidiUnsupported: string;
+  scratchMidiDenied: string;
+  scratchMidiError: string;
 }
 
 export interface TabsTranslations {
@@ -333,6 +356,7 @@ export interface ShortcutsTranslations {
   playPause: string;
   save: string;
   comment: string;
+  scratch: string;
   tip: {
     title: string;
     description: string;

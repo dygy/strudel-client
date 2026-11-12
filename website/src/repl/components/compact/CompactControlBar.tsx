@@ -5,6 +5,7 @@ import cx from '@src/cx';
 import { useTranslation } from '@src/i18n';
 import { usePanelLayout } from '../panel/panelLayout';
 import { TransitionPicker } from '../TransitionPicker';
+import { ScratchButton } from '../scratch/ScratchButton';
 import { useTransitionPhase } from '../../transitionPhase';
 
 export interface CompactControlBarContext {
@@ -100,6 +101,8 @@ export function CompactControlBar({ context }: { context: CompactControlBarConte
       </BarButton>
       {/* The transition the next track switch uses, next to Update (spec 017 2.4) */}
       <TransitionPicker touch className="shrink min-w-0" />
+      {/* The floating scratch platter, sized for a finger (spec 019 2.1) */}
+      <ScratchButton touch className="flex-1 max-w-24 flex justify-center" />
       <BarButton
         data-bar-library=""
         onClick={toggleFileManager}

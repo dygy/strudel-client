@@ -36,12 +36,14 @@
   "dependencies": {
     "@strudel/core": "workspace:*",
     "@strudel/equalizer": "workspace:*",
+    "@strudel/midi": "workspace:*",
     "@strudel/webaudio": "workspace:*",
     "superdough": "workspace:*"
   },
   "devDependencies": {
     "fast-check": "^3.22.0",
     "vite": "^6.0.11",
+    "vite-plugin-bundle-audioworklet": "workspace:*",
     "vitest": "^3.0.4"
   }
 }

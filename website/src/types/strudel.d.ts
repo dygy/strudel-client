@@ -240,6 +240,13 @@ declare module '@strudel/mixer' {
     isInitialized: boolean;
     isPlaying: boolean;
     deviceId: string | null;
+    /** The headphone deck's scratch node (spec 019): null until ensureScratchDeck() creates it. */
+    scratchDeck: ScratchDeck | null;
+    /**
+     * Creates and attaches the headphone scratch deck (spec 019) once the preview plays.
+     * Idempotent; a failed attach is retried; null when not initialized, failed, or destroyed.
+     */
+    ensureScratchDeck(): Promise<ScratchDeck | null>;
 
     initialize(): Promise<void>;
     ensurePlaying(): Promise<void>;
@@ -306,4 +313,114 @@ declare module '@strudel/mixer' {
   export const TRANSITION_TYPES: readonly string[];
   export const TRANSITION_LENGTHS: readonly number[];
   export const TRANSITION_SNAPS: readonly number[];
+
+  // Vinyl scratch control (spec 019); see packages/mixer/scratch/*.
+  /** Which deck a scratch acts on: the speakers (main) or the headphone preview. */
+  export type ScratchDeckName = 'main' | 'preview';
+  /** Who holds the record: the deck lets go only when no source holds it. No argument = 'default'. */
+  export type ScratchSource = 'pointer' | 'key' | 'wheel' | 'midi' | 'default';
+
+  /** One deck's scratch node, inserted before the deck's destinationGain (pre-gain slot). */
+  export class ScratchDeck {
+    constructor(audioContext: BaseAudioContext, superdoughController: unknown);
+    readonly isAttached: boolean;
+    readonly isGrabbed: boolean;
+    /**
+     * Loads the worklet and inserts the node. Never rejects: false when the controller has no
+     * pre-gain slot, the worklet failed, or the deck was destroyed meanwhile.
+     */
+    attach(): Promise<boolean>;
+    /** Returns whether the deck is now held (false when not attached). */
+    grab(): boolean;
+    /** Moves the held record by `seconds` of audio (negative: backwards). */
+    moveBy(seconds: number): void;
+    /** Keeps the held record turning at `rate` (±1 keyboard, 0 still; clamped to ±8). */
+    setMotor(rate: number): void;
+    /** Lets go. Idempotent, and safe before attach() resolves. */
+    release(): void;
+    destroy(): void;
+    /** Test hook: the worklet's mix (0 live … 1 scratch), grab state and position (s, ≤ 0). */
+    getDebugState(): Promise<{ mix: number; grabbed: boolean; pos: number } | null>;
+    on(event: 'change', listener: (deck: ScratchDeck) => void): () => void;
+  }
+
+  export interface ScratchControllerState {
+    /** Any deck is held. */
+    grabbed: boolean;
+    selected: ScratchDeckName;
+    /** Which decks are attached. */
+    available: { main: boolean; preview: boolean };
+  }
+
+  /** Every scratch input (platter, wheel, keys, MIDI) goes through this, aimed at the selected deck. */
+  export class ScratchController {
+    constructor();
+    setDeck(name: ScratchDeckName, deck: ScratchDeck | null): void;
+    getDeck(name: ScratchDeckName): ScratchDeck | null;
+    selected: ScratchDeckName;
+    readonly state: ScratchControllerState;
+    readonly isGrabbed: boolean;
+    /** The sources holding the selected deck. */
+    readonly holders: ScratchSource[];
+    grab(source?: ScratchSource): boolean;
+    /** Re-arms only `source`'s pending auto-release. */
+    moveBy(seconds: number, source?: ScratchSource): void;
+    setMotor(rate: number, source?: ScratchSource): void;
+    /** `source` lets go; the deck is released only when no other source holds it. */
+    release(source?: ScratchSource): void;
+    /** Every source, every deck, every timer. */
+    releaseAll(): void;
+    /** `source` lets go `ms` after its last move (wheel and MIDI jog: 250 ms). */
+    autoRelease(ms: number, source?: ScratchSource): void;
+    on(event: 'change', listener: (state: ScratchControllerState) => void): () => void;
+  }
+
+  export const SCRATCH_DECKS: readonly ScratchDeckName[];
+  export const SCRATCH_SOURCES: readonly ScratchSource[];
+  /** One platter turn in seconds of audio (33⅓ rpm). */
+  export const SCRATCH_SECONDS_PER_TURN: number;
+  /** One mouse-wheel notch (100 px of deltaY) in seconds of audio. */
+  export const SCRATCH_WHEEL_SECONDS_PER_NOTCH: number;
+  /** How far back the record reaches from the moment of the grab. */
+  export const SCRATCH_BUFFER_SECONDS: number;
+  export const SCRATCH_MAX_MOTOR_RATE: number;
+
+  export type MidiJogEncoding = 'twos-complement' | 'binary-offset';
+
+  export interface MidiJogMapping {
+    inputName: string;
+    channel: number;
+    controller: number;
+    encoding: MidiJogEncoding;
+  }
+
+  export type MidiJogState = 'off' | 'ready' | 'learning' | 'unavailable';
+
+  export interface MidiJog {
+    /** Assigns the next turned control. Resolves null on timeout (the old mapping is kept) or without MIDI. */
+    learn(): Promise<MidiJogMapping | null>;
+    forget(): void;
+    readonly mapping: MidiJogMapping | null;
+    readonly state: MidiJogState;
+    /** Set only while unavailable. */
+    readonly reason?: 'unsupported' | 'denied' | 'failed';
+    readonly detail?: string;
+    readonly ready: Promise<void>;
+    on(event: 'change', listener: (jog: MidiJog) => void): () => void;
+    destroy(): void;
+  }
+
+  export function createMidiJog(
+    controller: ScratchController,
+    options?: { loadMidi?: () => Promise<unknown>; storage?: Storage },
+  ): MidiJog;
+  export function decodeRelativeCC(value: number, encoding?: MidiJogEncoding): number;
+  export function detectRelativeEncoding(values: number[]): MidiJogEncoding;
+  export const MIDI_JOG_STORAGE_KEY: string;
+  export const MIDI_JOG_SECONDS_PER_TICK: number;
+  export const MIDI_JOG_RELEASE_MS: number;
+  export const MIDI_JOG_LEARN_TIMEOUT_MS: number;
+  export const MIDI_JOG_ENCODINGS: readonly MidiJogEncoding[];
+  /** Adds the scratch processor to the context, once per context. */
+  export function loadScratchWorklet(audioContext: BaseAudioContext): Promise<void>;
 }

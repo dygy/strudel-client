@@ -4,6 +4,7 @@ import { getAudioDevices } from '@strudel/webaudio';
 import { EqualizerUI } from './EqualizerUI';
 import { usePanelViewport } from './panelViewport';
 import { TransitionSettingsSection } from './TransitionSettingsSection';
+import { ScratchSection } from '../scratch/ScratchSection';
 
 const PREVIEW_DEVICE_KEY = 'strudel-preview-device';
 
@@ -95,6 +96,8 @@ export function MixerSettings({ mixer, isDisabled = false }: MixerSettingsProps)
     return (
       <div className="space-y-4">
         <TransitionSettingsSection />
+        {/* Vinyl scratch (spec 019): the speakers only, without the preview mixer */}
+        <ScratchSection withPreview={false} />
         <div className="p-4 bg-lineHighlight rounded-lg">
           <div className="flex items-center gap-2 text-foreground opacity-70">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -131,6 +134,9 @@ export function MixerSettings({ mixer, isDisabled = false }: MixerSettingsProps)
 
       {/* Track transitions (spec 017): usable while playing, so never isDisabled */}
       <TransitionSettingsSection />
+
+      {/* Vinyl scratch (spec 019): usable while playing, so never isDisabled */}
+      <ScratchSection />
 
       <div>
         <label className="block text-sm font-medium text-foreground mb-2">{t('mixerPreviewDevice')}</label>

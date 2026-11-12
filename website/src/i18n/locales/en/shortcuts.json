@@ -17,6 +17,7 @@
   "instantTransition": "Instant transition to live",
   "crossfadeTransition": "Crossfade transition to live",
   "stopPreview": "Stop preview stream",
+  "scratch": "Scratch (hold): pull back / push forwards",
   "tip": {
     "title": "Pro Tip",
     "description": "Use Ctrl+Enter or Ctrl+U frequently during live coding to hear your changes instantly. Ctrl+P lets you quickly stop everything when needed."

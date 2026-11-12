@@ -1,6 +1,9 @@
 import { defineConfig } from 'vitest/config';
+import bundleAudioWorkletPlugin from 'vite-plugin-bundle-audioworklet';
 
 export default defineConfig({
+  // scratch/scratchWorklet.mjs imports the processor with ?audioworklet (spec 019).
+  plugins: [bundleAudioWorkletPlugin()],
   test: {
     globals: true,
     environment: 'jsdom',

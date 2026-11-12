@@ -17,6 +17,7 @@
   "instantTransition": "立即切换到现场",
   "crossfadeTransition": "交叉淡入淡出切换到现场",
   "stopPreview": "停止预听流",
+  "scratch": "搓碟（按住）：向后拉 / 向前推",
   "tip": {
     "title": "专业提示",
     "description": "在实时编程时经常使用 Ctrl+Enter 或 Ctrl+U 来立即听到您的更改。需要时使用 Ctrl+P 快速停止所有内容。"

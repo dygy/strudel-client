@@ -33,3 +33,23 @@ export {
   OVERLAPPING_TYPES,
 } from './transitions/buildTransition.mjs';
 export { LoudnessMeter, computeTrim, applyTrim, trimFactorAt } from './transitions/loudness.mjs';
+// Vinyl scratch control (spec 019): the DSP runs in the `scratch-processor` AudioWorklet.
+export {
+  ScratchDeck,
+  SCRATCH_SECONDS_PER_TURN,
+  SCRATCH_WHEEL_SECONDS_PER_NOTCH,
+  SCRATCH_BUFFER_SECONDS,
+  SCRATCH_MAX_MOTOR_RATE,
+} from './scratch/ScratchDeck.mjs';
+export { ScratchController, SCRATCH_DECKS, SCRATCH_SOURCES } from './scratch/ScratchController.mjs';
+export {
+  createMidiJog,
+  decodeRelativeCC,
+  detectRelativeEncoding,
+  MIDI_JOG_STORAGE_KEY,
+  MIDI_JOG_SECONDS_PER_TICK,
+  MIDI_JOG_RELEASE_MS,
+  MIDI_JOG_LEARN_TIMEOUT_MS,
+  MIDI_JOG_ENCODINGS,
+} from './scratch/midiJog.mjs';
+export { loadScratchWorklet } from './scratch/scratchWorklet.mjs';

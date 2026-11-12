@@ -121,6 +121,9 @@ export class SuperdoughOutput {
   // fork addition (strudel-client spec 008): where destinationGain plays into instead of
   // audioContext.destination (e.g. the main EQ). Kept across reset() / initializeAudio().
   outputInsert = null;
+  // fork addition (strudel-client spec 019): a node between channelMerger and destinationGain
+  // (the vinyl scratch node). Kept across reset() / initializeAudio().
+  preGainInsert = null;
 
   constructor(audioContext) {
     this.audioContext = audioContext;
@@ -133,8 +136,68 @@ export class SuperdoughOutput {
     this.audioContext.destination.channelCount = maxChannelCount;
     this.channelMerger = new ChannelMergerNode(audioContext, { numberOfInputs: audioContext.destination.channelCount });
     this.destinationGain = new GainNode(audioContext);
-    this.channelMerger.connect(this.destinationGain);
+    this.connectPreGain(this.preGainInsert); // fork: channelMerger → [insert] → destinationGain (spec 019)
     this.destinationGain.connect(this.outputInsert ?? audioContext.destination); // fork: insert (spec 008)
+  }
+
+  /** @private Fork addition (spec 019): wire channelMerger → node → destinationGain, or the direct edge. */
+  connectPreGain(node) {
+    if (node) {
+      this.channelMerger.connect(node);
+      node.connect(this.destinationGain);
+    } else {
+      this.channelMerger.connect(this.destinationGain);
+    }
+  }
+
+  /** @private Fork addition (spec 019): remove only the edges connectPreGain(node) made. */
+  disconnectPreGain(node) {
+    const edges = node
+      ? [
+          [this.channelMerger, node],
+          [node, this.destinationGain],
+        ]
+      : [[this.channelMerger, this.destinationGain]];
+    for (const [from, to] of edges) {
+      try {
+        from.disconnect(to);
+      } catch {
+        // was not connected
+      }
+    }
+  }
+
+  /**
+   * Fork addition (strudel-client spec 019). Put `node` between `channelMerger` and
+   * `destinationGain` (`channelMerger → node → destinationGain`); `null` restores the direct
+   * edge. The insert is kept across `reset()`, which rebuilds the merger and the gain, and only
+   * the insert's own two edges are ever touched: its other connections stay as they are. Without
+   * an insert the graph is the upstream one. Everything on `destinationGain` (gain ramps,
+   * recorders, `setOutputInsert`) is after this insert, so it hears and shapes what `node` outputs.
+   * @param {AudioNode|null} node
+   * @noAutocomplete
+   */
+  setPreGainInsert(node) {
+    const next = node ?? null;
+    if (next === this.preGainInsert) {
+      return;
+    }
+    const previous = this.preGainInsert;
+    this.preGainInsert = next;
+    if (this.channelMerger && this.destinationGain) {
+      // New path first, then drop the old one.
+      this.connectPreGain(next);
+      this.disconnectPreGain(previous);
+    }
+  }
+
+  /**
+   * Fork addition (strudel-client spec 019). The node set by `setPreGainInsert`, or null.
+   * @returns {AudioNode|null}
+   * @noAutocomplete
+   */
+  getPreGainInsert() {
+    return this.preGainInsert;
   }
 
   /**
@@ -170,6 +233,10 @@ export class SuperdoughOutput {
     this.initializeAudio();
   }
   disconnect() {
+    // fork (spec 019): the pre-gain insert outlives this merger/gain; drop only its edge into the old gain.
+    if (this.preGainInsert) {
+      this.disconnectPreGain(this.preGainInsert);
+    }
     this.channelMerger.disconnect();
     this.destinationGain.disconnect();
     this.destinationGain = null;
@@ -209,6 +276,25 @@ export class SuperdoughAudioController {
    */
   setOutputInsert(node) {
     this.output.setOutputInsert(node);
+  }
+
+  /**
+   * Fork addition (strudel-client spec 019). See `SuperdoughOutput.setPreGainInsert`: `node` sits
+   * between the orbits' merger and the destination gain (the vinyl scratch node); `null` removes it.
+   * @param {AudioNode|null} node
+   * @noAutocomplete
+   */
+  setPreGainInsert(node) {
+    this.output.setPreGainInsert(node);
+  }
+
+  /**
+   * Fork addition (strudel-client spec 019). The current pre-gain insert, or null.
+   * @returns {AudioNode|null}
+   * @noAutocomplete
+   */
+  getPreGainInsert() {
+    return this.output.getPreGainInsert();
   }
 
   reset() {
