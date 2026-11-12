@@ -104,3 +104,18 @@
   | 2.6 Stop while held releases | scratchReplWiring.test, scratchRuntime.test |
   | 2.6 decks independent | scratchSuperdough.test (preview on its own controller) |
   | 2.7 9 locales | scratchKeys.test |
+
+## 2026-11-12 — Steps 9–11: push gate, deploy, prod verified
+
+- **Push gate:** the owner chose to push after the spec 008 EQ fix was out. ada694c was pushed by the 008 session; run 43316432975 passed.
+- **Pushed:** `git push origin worktree-019-scratch:main`, ada694c..6718ab5 (2064968, 1163dac, 6718ab5).
+- **Deploy run 43317158236** (headSha 6718ab5): Format, lint, test passed; Build and deploy to Cloudflare passed.
+- **Prod verified** (strudel.dygy.app/embed, Playwright, real UI; worklet state read through an injected AudioWorkletNode wrapper plus the processor's `debug` message):
+  - After Play, 1 scratch node; context `running`; live RMS 0.073.
+  - Mouse grab, held still: mix 1, RMS 0.
+  - Dragging 2.5 rad counter-clockwise moves the read head to −0.714 s (expected 0.716). Reverse RMS 0.073.
+  - On release: mix 0, grabbed false, RMS 0.071.
+  - Stop afterwards leaves it released. No new nodes. Console: 0 errors, 0 warnings.
+- **Bookkeeping:** roadmap ticked (Phase 2), specs set to Completed, a feature-map row (already in 6718ab5), and memory notes.
+- **Extra commit 8035f1e:** vitest, ESLint and Prettier ignore `.claude/` worktrees. The probe was red without it and green with it. It was requested by the 008 session, which had to use STRUDEL_SKIP_PUSH_GATE once because of this worktree.
+- **Not verified on real hardware:** phone touch and a MIDI controller. A recording with a scratch hasn't been made either.

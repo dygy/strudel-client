@@ -1,7 +1,7 @@
 # Functional Specification: Vinyl Scratch Control
 
 - **Roadmap Item:** Not on the roadmap. The owner requested it in chat on 2026-11-12: "in DJ practice you spin the record back and forth, which funnily replays loops forwards and backwards — make that a control". The owner chose the "scratch the sound itself" variant over "jog the pattern's position". No GitHub issue.
-- **Status:** Approved
+- **Status:** Completed
 - **Author:** Claude (for the owner, Dygy)
 
 ---

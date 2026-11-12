@@ -106,7 +106,7 @@ Spec: [functional-spec.md](./functional-spec.md) · Tech: [technical-considerati
   - [x] 6.2 Acceptance coverage map: map every functional-spec criterion to a test or a named browser check, and list the gaps. **[Agent: strudel-test-engineer]**
   - Verify: the whole suite has no new failures against `known-red-tests.txt`, and also passes with `--maxWorkers=2` and on Node 24.12.0.
 
-- [ ] **Slice 7: Bookkeeping**
+- [x] **Slice 7: Bookkeeping**
   - [x] 7.1 Add a `context/product/feature-map.md` row: "Vinyl scratch control" with code paths, spec 019, tests, owner audio (UI: web). Inline.
   - [x] 7.2 Check that the i18n strings exist in all 9 locales (covered by 6.1). There is no migration file (no schema change). Inline.
-  - [ ] 7.3 Roadmap entry ticked and spec Status set to Completed after prod verification (/ship Step 11). Inline.
+  - [x] 7.3 Roadmap entry ticked and spec Status set to Completed after prod verification (/ship Step 11). Inline.
