@@ -26,6 +26,8 @@ export default defineConfig({
       '**/.{idea,git,cache,output,temp}/**',
       '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress}.config.*',
       '**/shared.test.mjs',
+      // Claude Code worktrees are nested checkouts of this repo; their files are not ours.
+      '**/.claude/**',
     ],
   },
 });

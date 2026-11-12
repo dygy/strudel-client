@@ -17,6 +17,7 @@ const compat = new FlatCompat({
 export default [
   {
     ignores: [
+      '**/.claude/**',
       '**/krill-parser.js',
       '**/krill.pegjs',
       '**/.eslintrc.json',
