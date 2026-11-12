@@ -203,6 +203,56 @@ describe('AudioEqualizer (spec 015 §2.2)', () => {
     });
   });
 
+  // Regression (spec 008 /fix 2026-11-12): the EQ is now on the speakers, and a band gain, Q or
+  // on/off change written with setValueAtTime (or `.value =`) is an instant step: a click.
+  describe('changes on the speakers glide, never jump', () => {
+    const jumps = (param: any) => param.calls.filter(([m]: [string]) => m === 'setValueAtTime' || m === 'value=');
+    const glides = (param: any) => param.calls.filter(([m]: [string]) => m === 'setTargetAtTime');
+    const clearCalls = () => chainOf(eq).forEach((f) => (f.gain.calls.length = f.Q.calls.length = 0));
+
+    it('a band gain change glides to its value over a few ms', () => {
+      clearCalls();
+      eq.setBand(BAND_1K, { gain: 6 });
+
+      const gain = chainOf(eq)[BAND_1K].gain;
+      expect(jumps(gain)).toEqual([]);
+      expect(glides(gain)).toHaveLength(1);
+      const [, target, , timeConstant] = glides(gain)[0];
+      expect(target).toBe(6);
+      expect(timeConstant).toBeGreaterThan(0);
+      expect(timeConstant).toBeLessThanOrEqual(0.02);
+    });
+
+    it('a Q change glides', () => {
+      clearCalls();
+      eq.setBand(BAND_1K, { Q: 2 });
+
+      const Q = chainOf(eq)[BAND_1K].Q;
+      expect(jumps(Q)).toEqual([]);
+      expect(glides(Q).map(([, v]: [string, number]) => v)).toEqual([2]);
+    });
+
+    it('switching off and on glides every band (to 0 dB, then back to the stored shape)', () => {
+      eq.applyPreset('rock');
+      clearCalls();
+
+      eq.setEnabled(false);
+      eq.setEnabled(true);
+
+      chainOf(eq).forEach((f, i) => {
+        expect(jumps(f.gain)).toEqual([]);
+        expect(glides(f.gain).map(([, v]: [string, number]) => v)).toEqual([0, EQUALIZER_PRESETS.rock.gains[i]]);
+      });
+    });
+
+    it('a preset glides all ten bands', () => {
+      clearCalls();
+      eq.applyPreset('bassBoost');
+
+      chainOf(eq).forEach((f) => expect(jumps(f.gain)).toEqual([]));
+    });
+  });
+
   describe('a non-numeric gain', () => {
     // Regression (spec 015 finding 7, fixed 2026-10-09): Math.max(-12, Math.min(12, NaN)) is NaN,
     // so setBand used to pass NaN to the filter (a real AudioParam throws) and store it.

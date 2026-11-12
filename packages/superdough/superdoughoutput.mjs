@@ -118,6 +118,9 @@ export class Orbit {
 export class SuperdoughOutput {
   channelMerger;
   destinationGain;
+  // fork addition (strudel-client spec 008): where destinationGain plays into instead of
+  // audioContext.destination (e.g. the main EQ). Kept across reset() / initializeAudio().
+  outputInsert = null;
 
   constructor(audioContext) {
     this.audioContext = audioContext;
@@ -131,7 +134,35 @@ export class SuperdoughOutput {
     this.channelMerger = new ChannelMergerNode(audioContext, { numberOfInputs: audioContext.destination.channelCount });
     this.destinationGain = new GainNode(audioContext);
     this.channelMerger.connect(this.destinationGain);
-    this.destinationGain.connect(audioContext.destination);
+    this.destinationGain.connect(this.outputInsert ?? audioContext.destination); // fork: insert (spec 008)
+  }
+
+  /**
+   * Fork addition (strudel-client spec 008). Route `destinationGain` into `node` instead of
+   * `audioContext.destination`; `null` (or the destination itself) restores the destination.
+   * The insert is kept across `reset()`, which rebuilds `destinationGain`. It is the caller's job to connect `node` onward
+   * (to the destination) and to keep its channel count mode non-`explicit`, so a multichannel
+   * merger is not downmixed. Taps on `destinationGain` (recorders, transitions) stay pre-insert.
+   * @param {AudioNode|null} node
+   * @noAutocomplete
+   */
+  setOutputInsert(node) {
+    // The destination itself is "no insert" (connecting it twice and then disconnecting the
+    // previous target would leave destinationGain connected to nothing).
+    const next = node == null || node === this.audioContext.destination ? null : node;
+    if (next === this.outputInsert) {
+      return;
+    }
+    const previous = this.outputInsert ?? this.audioContext.destination;
+    this.outputInsert = next;
+    if (this.destinationGain) {
+      this.destinationGain.connect(next ?? this.audioContext.destination);
+      try {
+        this.destinationGain.disconnect(previous);
+      } catch {
+        // was not connected to it
+      }
+    }
   }
 
   reset() {
@@ -168,6 +199,16 @@ export class SuperdoughAudioController {
   constructor(audioContext) {
     this.audioContext = audioContext;
     this.output = new SuperdoughOutput(audioContext);
+  }
+
+  /**
+   * Fork addition (strudel-client spec 008). See `SuperdoughOutput.setOutputInsert`: the main
+   * output plays into `node` (e.g. the main EQ's input) instead of the destination; `null` restores it.
+   * @param {AudioNode|null} node
+   * @noAutocomplete
+   */
+  setOutputInsert(node) {
+    this.output.setOutputInsert(node);
   }
 
   reset() {

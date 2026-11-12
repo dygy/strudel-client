@@ -154,7 +154,7 @@ export function MixerSettings({ mixer, isDisabled = false }: MixerSettingsProps)
 
       {/* Equalizer UI */}
       <div className="pt-4 border-t border-lineHighlight">
-        <EqualizerUI mixer={null} previewEngine={mixer} />
+        <EqualizerUI previewEngine={mixer} />
       </div>
     </div>
   );

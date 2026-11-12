@@ -91,6 +91,28 @@ function isValidBand(band: unknown): band is BandSettings {
   return isNumberIn(frequency, 1, 24000) && isNumberIn(gain, -12, 12) && isNumberIn(Q, 0.5, 4);
 }
 
+/** The part of AudioEqualizer that saved settings are applied to. */
+interface SettingsTarget {
+  setEnabled(enabled: boolean): void;
+  setBand(index: number, update: { gain?: number; Q?: number }): void;
+}
+
+/**
+ * Apply saved settings to an equalizer: on/off first, then every band, so an EQ saved as off
+ * stays silent (setBand only stores a gain while the EQ is off).
+ * @param equalizer - An AudioEqualizer (main or preview)
+ * @param settings - Settings from loadEqualizerSettings / getDefaultSettings
+ */
+export function applyEqualizerSettings(
+  equalizer: SettingsTarget,
+  settings: Pick<EqualizerSettings, 'isEnabled' | 'bands'>,
+): void {
+  equalizer.setEnabled(settings.isEnabled);
+  settings.bands.forEach((band, index) => {
+    equalizer.setBand(index, { gain: band.gain, Q: band.Q });
+  });
+}
+
 /**
  * Get default equalizer settings (Flat preset)
  * @returns Default settings

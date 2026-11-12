@@ -3,7 +3,8 @@
  *
  * Covers everything packages/mixer/*.mjs and @strudel/equalizer call on the
  * AudioContext: createGain, createBiquadFilter (10-band EQ), createAnalyser (loudness tap),
- * createMediaStreamDestination, currentTime/state/destination, resume/close,
+ * createMediaStreamDestination, currentTime/state/destination, resume/close, the node
+ * constructors superdough's output uses (stubWebAudioNodeConstructors),
  * plus HTMLAudioElement (srcObject, paused, play, pause, setSinkId),
  * navigator.mediaDevices.enumerateDevices and localStorage.
  *
@@ -42,6 +43,11 @@ export function createAudioParam(initial) {
       this.calls.push(['exponentialRampToValueAtTime', v, t]);
       current = v;
     },
+    // An exponential approach; `value` reads its target (where it settles).
+    setTargetAtTime(v, t, timeConstant) {
+      this.calls.push(['setTargetAtTime', v, t, timeConstant]);
+      current = v;
+    },
     cancelScheduledValues(t) {
       this.calls.push(['cancelScheduledValues', t]);
     },
@@ -73,7 +79,7 @@ export class MockAudioContext {
   constructor() {
     this.currentTime = 0;
     this.state = 'running';
-    this.destination = createNode({ channelCount: 2 });
+    this.destination = createNode({ channelCount: 2, maxChannelCount: 2 });
   }
 
   createGain() {
@@ -172,6 +178,25 @@ export function stubWebAudio() {
     mediaDevices: { enumerateDevices: () => Promise.resolve(MOCK_DEVICES.map((d) => ({ ...d }))) },
   });
   vi.stubGlobal('localStorage', createMemoryStorage());
+}
+
+/**
+ * Install the Web Audio node constructors superdough's output uses (`new GainNode(ac)`,
+ * `new ChannelMergerNode(ac, …)`, `new StereoPannerNode(ac)`, `new ChannelSplitterNode(ac, …)`),
+ * built on the mock context. Call after stubWebAudio; removed by unstubWebAudio.
+ */
+export function stubWebAudioNodeConstructors() {
+  const gain = function (ac, options = {}) {
+    return Object.assign(ac.createGain(), { kind: 'GainNode', options });
+  };
+  const plain = (kind) =>
+    function (_ac, options = {}) {
+      return createNode({ kind, options, channelCount: 2 });
+    };
+  vi.stubGlobal('GainNode', gain);
+  vi.stubGlobal('ChannelMergerNode', plain('ChannelMergerNode'));
+  vi.stubGlobal('StereoPannerNode', plain('StereoPannerNode'));
+  vi.stubGlobal('ChannelSplitterNode', plain('ChannelSplitterNode'));
 }
 
 /** Remove every global installed by stubWebAudio (and any other vi.stubGlobal). */

@@ -49,7 +49,7 @@ function render() {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-  act(() => root!.render(<EqualizerUI mixer={null} previewEngine={{ equalizer: eq }} />));
+  act(() => root!.render(<EqualizerUI previewEngine={{ equalizer: eq }} />));
   return container;
 }
 

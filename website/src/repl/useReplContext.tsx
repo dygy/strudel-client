@@ -58,6 +58,7 @@ import { listenForSmoothTransitionErrors } from './smoothTransitionNotifier';
 import { createEvaluationWatch, isMusicChanging } from './evaluationWatch';
 import { createTrackSwitchController, type UpdateOutcome } from './trackSwitch';
 import { settingsForSwitch, switchPath } from './transitionSettings';
+import { installMainEqualizerWhenReady } from './mainEqualizer';
 
 // Type definitions
 interface ReplState {
@@ -434,6 +435,12 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   // (its own SuperdoughAudioController + repl) for preview on headphones.
   // The live audio chain (main StrudelMirror repl) is untouched.
   useEffect(() => {
+    // The speakers' EQ (spec 008), with the saved settings applied, so it is heard without
+    // opening the settings panel. Installed once initAudio has applied the output device (it
+    // creates superdough's controller, which sizes the channels for that device); registered
+    // now, so it runs before beforeEval's await of the same promise, i.e. before the first note.
+    const releaseMainEqualizer = installMainEqualizerWhenReady(audioReady);
+
     const initPreview = async () => {
       try {
         const audioContext = getAudioContext();
@@ -473,6 +480,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     initPreview();
 
     return () => {
+      releaseMainEqualizer();
       if (mixerRef.current) {
         mixerRef.current.destroy();
         mixerRef.current = null;

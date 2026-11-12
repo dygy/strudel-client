@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useTranslation } from '@src/i18n';
 import {
+  type AudioEqualizer,
+  applyEqualizerSettings,
   EQUALIZER_PRESETS,
   saveEqualizerSettings,
   loadEqualizerSettings,
@@ -11,6 +13,7 @@ import {
   formatFrequency,
 } from '@strudel/equalizer';
 import { usePanelViewport } from './panelViewport';
+import { getMainEqualizer, subscribeMainEqualizer } from '../../mainEqualizer';
 import {
   EqualizerCompact,
   EQ_GAIN_MAX,
@@ -21,8 +24,10 @@ import {
 } from './EqualizerCompact';
 
 interface EqualizerUIProps {
-  mixer: any;
+  /** The headphone PreviewEngine (its own EQ); null when it is not ready. */
   previewEngine: any;
+  /** The main (speakers) EQ; defaults to the app's one from mainEqualizer.ts. */
+  mainEqualizer?: AudioEqualizer | null;
 }
 
 interface BandControl {
@@ -47,7 +52,7 @@ export function clampBandUpdate({ gain, Q }: CompactBandUpdate): CompactBandUpda
   return next;
 }
 
-export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
+export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) {
   const { t } = useTranslation('settings');
   const [isEnabled, setIsEnabled] = useState(true);
   const [bands, setBands] = useState<BandControl[]>([]);
@@ -56,33 +61,23 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
   const { compact } = usePanelViewport();
   const [selectedBand, setSelectedBand] = useState(0);
 
+  // Every EQ the panel drives: the speakers' (main) and the headphones' (preview engine).
+  // The app's main EQ is installed after the first click (once initAudio has picked the output
+  // device), so it can appear after the panel mounted: re-render then. It loads the saved settings
+  // itself, which include every change made here before it existed.
+  const appMainEqualizer = useSyncExternalStore(subscribeMainEqualizer, getMainEqualizer, () => null);
+  const equalizers = useCallback(
+    (): AudioEqualizer[] =>
+      [mainEqualizer ?? appMainEqualizer, previewEngine?.equalizer].filter((eq): eq is AudioEqualizer => !!eq),
+    [mainEqualizer, appMainEqualizer, previewEngine],
+  );
+
   const applySettingsToEqualizers = useCallback(
     (settings: any) => {
-      // Apply to live stream
-      if (mixer?.liveStream?.equalizer) {
-        mixer.liveStream.equalizer.setEnabled(settings.isEnabled);
-        settings.bands.forEach((band: any, index: number) => {
-          mixer.liveStream.equalizer.setBand(index, { gain: band.gain, Q: band.Q });
-        });
-      }
-
-      // Apply to preview stream
-      if (mixer?.previewStream?.equalizer) {
-        mixer.previewStream.equalizer.setEnabled(settings.isEnabled);
-        settings.bands.forEach((band: any, index: number) => {
-          mixer.previewStream.equalizer.setBand(index, { gain: band.gain, Q: band.Q });
-        });
-      }
-
-      // Apply to preview engine
-      if (previewEngine?.equalizer) {
-        previewEngine.equalizer.setEnabled(settings.isEnabled);
-        settings.bands.forEach((band: any, index: number) => {
-          previewEngine.equalizer.setBand(index, { gain: band.gain, Q: band.Q });
-        });
-      }
+      // On/off first, then the bands: an EQ saved as off stays silent.
+      equalizers().forEach((eq) => applyEqualizerSettings(eq, settings));
     },
-    [mixer, previewEngine],
+    [equalizers],
   );
 
   // Load saved settings on mount
@@ -96,7 +91,7 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
 
     // Apply to equalizers
     applySettingsToEqualizers(settings);
-  }, [mixer, previewEngine, applySettingsToEqualizers]);
+  }, [applySettingsToEqualizers]);
 
   // Update frequency response chart when bands change
   useEffect(() => {
@@ -261,10 +256,7 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
     const newEnabled = !isEnabled;
     setIsEnabled(newEnabled);
 
-    // Apply to all equalizers
-    mixer?.liveStream?.equalizer?.setEnabled(newEnabled);
-    mixer?.previewStream?.equalizer?.setEnabled(newEnabled);
-    previewEngine?.equalizer?.setEnabled(newEnabled);
+    equalizers().forEach((eq) => eq.setEnabled(newEnabled));
 
     saveEqualizerSettings({ isEnabled: newEnabled, bands, preset: activePreset });
   };
@@ -280,10 +272,7 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
     newBands[index] = { ...newBands[index], ...next };
     setBands(newBands);
 
-    // Apply to all equalizers
-    mixer?.liveStream?.equalizer?.setBand(index, next);
-    mixer?.previewStream?.equalizer?.setBand(index, next);
-    previewEngine?.equalizer?.setBand(index, next);
+    equalizers().forEach((eq) => eq.setBand(index, next));
 
     setActivePreset('custom');
     saveEqualizerSettings({ isEnabled, bands: newBands, preset: 'custom' });
@@ -301,10 +290,7 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
     setBands(newBands);
     setActivePreset(presetName);
 
-    // Apply to all equalizers
-    mixer?.liveStream?.equalizer?.applyPreset(presetName);
-    mixer?.previewStream?.equalizer?.applyPreset(presetName);
-    previewEngine?.equalizer?.applyPreset(presetName);
+    equalizers().forEach((eq) => eq.applyPreset(presetName));
 
     saveEqualizerSettings({ isEnabled, bands: newBands, preset: presetName });
   };
@@ -315,7 +301,7 @@ export function EqualizerUI({ mixer, previewEngine }: EqualizerUIProps) {
     }
   };
 
-  if (!mixer && !previewEngine) {
+  if (equalizers().length === 0) {
     return (
       <div className="p-4 bg-lineHighlight rounded-lg">
         <div className="flex items-center gap-2 text-foreground opacity-70">

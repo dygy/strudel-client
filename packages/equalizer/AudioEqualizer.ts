@@ -1,5 +1,8 @@
 import { EQUALIZER_PRESETS } from './presets.js';
 
+/** Seconds; gain/Q changes and on/off glide with this time constant (~15 ms to 95 %). */
+export const SMOOTHING_TIME_CONSTANT = 0.005;
+
 /**
  * Band configuration interface
  */
@@ -103,6 +106,14 @@ export class AudioEqualizer {
   }
 
   /**
+   * Move a filter parameter to `value` without a click: an exponential approach starting now
+   * (time constant SMOOTHING_TIME_CONSTANT, ~95 % there after 3 constants).
+   */
+  private glide(param: AudioParam, value: number): void {
+    param.setTargetAtTime(value, this.audioContext.currentTime, SMOOTHING_TIME_CONSTANT);
+  }
+
+  /**
    * Connect audio source to equalizer input
    */
   getInput(): GainNode {
@@ -129,19 +140,11 @@ export class AudioEqualizer {
   setEnabled(enabled: boolean): void {
     this.isEnabled = enabled;
 
-    if (enabled) {
-      // Restore band gains from config
-      this.bands.forEach((band, index) => {
-        const now = this.audioContext.currentTime;
-        band.filter.gain.setValueAtTime(band.config.gain, now);
-      });
-    } else {
-      // Set all bands to 0 dB (flat/bypass)
-      this.bands.forEach((band) => {
-        const now = this.audioContext.currentTime;
-        band.filter.gain.setValueAtTime(0, now);
-      });
-    }
+    // Restore the stored band gains, or glide every band to 0 dB (flat/bypass). Smoothed: the EQ
+    // sits on the speakers, and a jump in a filter gain clicks.
+    this.bands.forEach((band) => {
+      this.glide(band.filter.gain, enabled ? band.config.gain : 0);
+    });
   }
 
   /**
@@ -175,7 +178,6 @@ export class AudioEqualizer {
     if (index < 0 || index >= this.bands.length) return;
 
     const band = this.bands[index];
-    const now = this.audioContext.currentTime;
 
     // Ignore non-finite values (damaged settings, bad input): an AudioParam rejects them
     // and Math.max/min would turn them into NaN instead of clamping. Warn, so a caller that
@@ -194,14 +196,14 @@ export class AudioEqualizer {
       // While the EQ is off every filter stays at 0 dB (pass-through). The new
       // value is only remembered and is applied by setEnabled(true).
       if (this.isEnabled) {
-        band.filter.gain.setValueAtTime(clampedGain, now);
+        this.glide(band.filter.gain, clampedGain);
       }
     }
 
     if (Q !== undefined && Number.isFinite(Q)) {
       // Clamp Q to [0.5, 4.0] range
       const clampedQ = Math.max(0.5, Math.min(4.0, Q));
-      band.filter.Q.setValueAtTime(clampedQ, now);
+      this.glide(band.filter.Q, clampedQ);
       band.config.Q = clampedQ;
     }
   }

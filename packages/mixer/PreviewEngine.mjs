@@ -14,7 +14,7 @@
  * @license AGPL-3.0-or-later
  */
 
-import { AudioEqualizer } from '@strudel/equalizer';
+import { AudioEqualizer, applyEqualizerSettings, loadEqualizerSettings } from '@strudel/equalizer';
 
 export class PreviewEngine {
   /**
@@ -61,8 +61,17 @@ export class PreviewEngine {
       /* may not be connected */
     }
 
-    // Create equalizer
+    // Create equalizer, with the saved settings applied now: the headphones hear the EQ without
+    // the settings panel having been opened (spec 008).
     this.equalizer = new AudioEqualizer(ac);
+    try {
+      const saved = loadEqualizerSettings();
+      if (saved) {
+        applyEqualizerSettings(this.equalizer, saved);
+      }
+    } catch (err) {
+      console.warn('[PreviewEngine] could not apply saved EQ settings:', err);
+    }
 
     // Connect: destGain → equalizer → mediaStreamDest
     destGain.connect(this.equalizer.getInput());
