@@ -7,6 +7,7 @@ import {
   type EqualizerSettings,
   applyEqualizerSettings,
   EQUALIZER_PRESETS,
+  EQUALIZER_PRESET_FAMILIES,
   HIGH_CUT_RANGE,
   LOW_CUT_RANGE,
   OUTPUT_GAIN_RANGE,
@@ -30,6 +31,7 @@ import {
   type CompactBandUpdate,
 } from './EqualizerCompact';
 import { EqualizerStripControls } from './EqualizerStripControls';
+import { EqualizerPresetDescription } from './EqualizerPresetDescription';
 
 interface EqualizerUIProps {
   /** The headphone PreviewEngine (its own EQ); null when it is not ready. */
@@ -53,6 +55,37 @@ const CHART_GRID_DB = [-24, -18, -12, -6, 0, 6, 12, 18, 24];
 export const LIMITING_THRESHOLD_DB = -1;
 /** …and stays lit this long after, so a pumping limiter does not flicker it (ms). */
 const LIMITING_HOLD_MS = 250;
+
+/** Preset key → its label key, e.g. 'flat' → 'equalizerPresetFlat'. */
+const presetTranslationKey = (key: string) => `equalizerPreset${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+
+const FAMILY_LABELS = {
+  brazilianLatin: 'equalizerFamilyBrazilianLatin',
+  phonkHipHop: 'equalizerFamilyPhonkHipHop',
+  electronic: 'equalizerFamilyElectronic',
+  liveOther: 'equalizerFamilyLiveOther',
+} as const;
+
+/**
+ * The picker's groups (spec 021): the four genre families in order, then the listening profiles.
+ * Within a group, presets keep their order in EQUALIZER_PRESETS.
+ */
+export const PICKER_GROUPS: { id: string; label: string; keys: string[] }[] = [
+  ...EQUALIZER_PRESET_FAMILIES.map((family) => ({
+    id: family,
+    label: FAMILY_LABELS[family],
+    keys: Object.entries(EQUALIZER_PRESETS)
+      .filter(([, preset]) => preset.group === 'genre' && preset.family === family)
+      .map(([key]) => key),
+  })),
+  {
+    id: 'profile',
+    label: 'equalizerGroupProfiles',
+    keys: Object.entries(EQUALIZER_PRESETS)
+      .filter(([, preset]) => preset.group === 'profile')
+      .map(([key]) => key),
+  },
+];
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
@@ -448,24 +481,13 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
             value={activePreset}
             onChange={(e) => handlePresetChange(e.target.value)}
           >
-            {(
-              [
-                ['genre', 'equalizerGroupGenres'],
-                ['profile', 'equalizerGroupProfiles'],
-              ] as const
-            ).map(([group, label]) => (
-              <optgroup key={group} label={t(label)} data-eq-group={group} className="bg-gray-800">
-                {Object.entries(EQUALIZER_PRESETS)
-                  .filter(([, preset]) => preset.group === group)
-                  .map(([key]) => {
-                    // Convert preset key to translation key (e.g., 'flat' -> 'equalizerPresetFlat')
-                    const translationKey = `equalizerPreset${key.charAt(0).toUpperCase()}${key.slice(1)}`;
-                    return (
-                      <option key={key} value={key} className="bg-gray-800">
-                        {t(translationKey)}
-                      </option>
-                    );
-                  })}
+            {PICKER_GROUPS.map(({ id, label, keys }) => (
+              <optgroup key={id} label={t(label)} data-eq-group={id} className="bg-gray-800">
+                {keys.map((key) => (
+                  <option key={key} value={key} className="bg-gray-800">
+                    {t(presetTranslationKey(key))}
+                  </option>
+                ))}
               </optgroup>
             ))}
             {activePreset === 'custom' && (
@@ -493,6 +515,14 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
             {t('equalizerCustomActive')}
           </div>
         )}
+        {/* What the settings do, and why for a genre preset (spec 021; both layouts) */}
+        <EqualizerPresetDescription
+          bands={bands}
+          lowCut={lowCut}
+          highCut={highCut}
+          outputGain={outputGain}
+          activePreset={activePreset}
+        />
       </div>
 
       {compact ? (

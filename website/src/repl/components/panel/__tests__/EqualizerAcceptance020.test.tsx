@@ -531,7 +531,8 @@ describe('§2.7 everyone gets the same EQ', () => {
     expect([bandSliders()[0].min, bandSliders()[0].max]).toEqual(['-24', '24']);
     expect(q('[data-eq-toggle="lowCut"]')).not.toBeNull();
     expect(q('[data-eq-toggle="highCut"]')).not.toBeNull();
-    expect(q('optgroup[data-eq-group="genre"]')!.querySelectorAll('option')).toHaveLength(12);
+    // Genre presets are grouped by family since spec 021: 59 across the four family groups.
+    expect(container!.querySelectorAll('optgroup:not([data-eq-group="profile"]) option')).toHaveLength(59);
   });
 
   // SettingsTab-eq020.test.tsx renders the settings tab signed out and read-only; this pins the rest

@@ -11,8 +11,10 @@ export {
   LIMITER,
 } from './AudioEqualizer.js';
 export type { EqualizerState, BandUpdate, CutConfig, CutUpdate } from './AudioEqualizer.js';
-export { EQUALIZER_PRESETS } from './presets.js';
-export type { EqualizerPreset, EqualizerPresetGroup } from './presets.js';
+export { EQUALIZER_PRESETS, EQUALIZER_PRESET_FAMILIES } from './presets.js';
+export type { EqualizerPreset, EqualizerPresetGroup, EqualizerPresetFamily } from './presets.js';
+export { describeSettings, EQUALIZER_REGIONS, DESCRIBE_REGION_THRESHOLD_DB } from './describe.js';
+export type { EqualizerRegion, DescribeSettingsInput, SettingsDescription } from './describe.js';
 export { generateLogFrequencies, frequencyToX, gainToY, formatFrequency } from './utils.js';
 export {
   BUTTERWORTH_Q,

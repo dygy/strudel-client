@@ -2,7 +2,7 @@
  * @spec: 020-eq-strong-control (functional §2.4 AC 5, tech §2.5, tasks 5.2)
  * Every new EQ label exists and is non-empty in all 9 settings.json files: the 12 genre preset
  * names, the cut / output / limiting / group labels, and the range and subtitle updated for ±24 dB
- * and 34 presets. Every preset the panel lists resolves to a key in every locale (the panel builds
+ * (the subtitle's preset count is 81 since spec 021). Every preset the panel lists resolves to a key in every locale (the panel builds
  * the key as `equalizerPreset<Key>`), so no preset shows a raw key in any language.
  */
 import { readFileSync } from 'node:fs';
@@ -64,14 +64,14 @@ describe('EQ strong control labels (spec 020)', () => {
     expect(missing).toEqual([]);
   });
 
-  it.each(LANGUAGES)('%s shows the range as ±24 dB and the subtitle counts 34 presets', (lang) => {
+  it.each(LANGUAGES)('%s shows the range as ±24 dB and the subtitle counts 81 presets (spec 021)', (lang) => {
     const settings = readSettings(lang);
     const range = String(settings.equalizerRange);
     expect(range).toMatch(/-\s?24/);
     expect(range).toMatch(/\+\s?24/);
     expect(range).not.toMatch(/12/);
-    expect(String(settings.equalizerSubtitle)).toMatch(/34/);
-    expect(String(settings.equalizerSubtitle)).not.toMatch(/22/);
+    expect(String(settings.equalizerSubtitle)).toMatch(/81/);
+    expect(String(settings.equalizerSubtitle)).not.toMatch(/22|34/);
   });
 
   it.each(LANGUAGES.filter((lang) => lang !== 'en'))(
@@ -85,11 +85,10 @@ describe('EQ strong control labels (spec 020)', () => {
     },
   );
 
-  it('the key list matches the presets: exactly the 12 genre presets have genre keys', () => {
+  it('the key list matches the presets: the 12 spec 020 genre presets are still genre presets', () => {
     const genres = Object.entries(EQUALIZER_PRESETS)
       .filter(([, preset]) => preset.group === 'genre')
-      .map(([key]) => presetKey(key))
-      .sort();
-    expect(genres).toEqual([...GENRE_KEYS].sort());
+      .map(([key]) => presetKey(key));
+    expect(genres).toEqual(expect.arrayContaining(GENRE_KEYS));
   });
 });

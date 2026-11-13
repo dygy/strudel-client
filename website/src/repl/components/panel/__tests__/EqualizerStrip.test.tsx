@@ -157,13 +157,80 @@ describe('EQ panel: cuts, output level, limiting (spec 020)', () => {
     expect(main.getState().bands[0].gain).toBe(24);
   });
 
-  it('presets are in two groups, Genres then Profiles', () => {
+  it('presets are in five groups: the four genre families (spec 021), then Profiles', () => {
     render();
     const groups = [...container!.querySelectorAll('optgroup')];
-    expect(groups.map((g) => g.getAttribute('data-eq-group'))).toEqual(['genre', 'profile']);
-    expect(groups[0].querySelectorAll('option')).toHaveLength(12);
-    expect(groups[1].querySelectorAll('option')).toHaveLength(22);
-    expect(groups[0].querySelector('option[value="phonk"]')).not.toBeNull();
+    expect(groups.map((g) => g.getAttribute('data-eq-group'))).toEqual([
+      'brazilianLatin',
+      'phonkHipHop',
+      'electronic',
+      'liveOther',
+      'profile',
+    ]);
+    // Exact members in order (functional spec §2.1), so moving a preset between two families of
+    // the same size fails; profiles keep the order of EQUALIZER_PRESETS.
+    const members = groups.map((g) => [...g.querySelectorAll('option')].map((o) => o.value));
+    expect(members).toEqual([
+      [
+        'brazilianFunk',
+        'automotivo',
+        'montagem',
+        'funkAgressivo',
+        'mandelao',
+        'bruxaria',
+        'mandelaoSlowed',
+        'funkCariocaOldSchool',
+        'baileFunk',
+        'reggaeton',
+        'dembow',
+        'cumbia',
+        'afroHouse',
+        'amapiano',
+      ],
+      [
+        'phonk',
+        'driftPhonk',
+        'trap',
+        'brazilianPhonk',
+        'housePhonk',
+        'memphis',
+        'boomBap',
+        'lofiHipHop',
+        'ukDrill',
+        'nyDrill',
+        'rage',
+        'plugg',
+        'cloudRap',
+        'jerseyClub',
+      ],
+      [
+        'electro',
+        'techno',
+        'drumAndBass',
+        'dubstep',
+        'house',
+        'deepHouse',
+        'techHouse',
+        'minimal',
+        'hardTechno',
+        'trance',
+        'psytrance',
+        'hardstyle',
+        'gabber',
+        'ukGarage',
+        'jungle',
+        'breakbeat',
+        'synthwave',
+        'hyperpop',
+        'futureBass',
+        'riddim',
+      ],
+      ['rockGenre', 'metal', 'punk', 'usFunk', 'disco', 'soul', 'reggae', 'dub', 'ambient', 'chillout', 'lofi'],
+      Object.entries(EQUALIZER_PRESETS)
+        .filter(([, p]) => p.group === 'profile')
+        .map(([key]) => key),
+    ]);
+    expect(members[4]).toHaveLength(22);
   });
 
   it('a genre preset sets the cuts and output; a band moved afterwards shows Custom; Pop clears the cuts', () => {
