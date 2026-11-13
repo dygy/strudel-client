@@ -1,7 +1,7 @@
 # Functional Specification: Vinyl Scratch That Behaves Like a Real Record
 
 - **Roadmap Item:** Not on the roadmap. Owner feedback in chat on 2026-11-13 about spec [019](../019-vinyl-scratch-control/), which shipped 2026-11-12: the platter "doesn't move anything, it's like a fake that plays reverse sound, not like vinyl DJs". The owner named three problems: the sound doesn't follow the hand, there is no inertia, and the track doesn't move after letting go. They chose "like vinyl, with quantize". No GitHub issue.
-- **Status:** Approved
+- **Status:** Completed
 - **Author:** Claude (for the owner)
 
 ---

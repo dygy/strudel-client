@@ -27,6 +27,7 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
     - [x] **Strong EQ control:** ±24 dB bands, 24 dB/oct low and high cut, output level with a limiter, 12 genre presets (Brazilian Funk, Automotivo, Montagem, Funk Agressivo, Mandelão, Phonk, Drift Phonk, Electro, Techno, Drum & Bass, Dubstep, Trap) ([020](../spec/020-eq-strong-control/), 6344a18, 2026-11-13).
     - [x] **Every genre, transparent:** 81 presets (59 genre in 4 families + 22 profiles); under the picker, what the settings do and why the genre wants it ([021](../spec/021-eq-genre-presets-transparency/), b72c1dd, 2026-11-13).
   - [x] **Vinyl scratch:** grab a platter (settings, header, compact bar), the wheel, Alt+Shift+←/→ or a learned MIDI jog to scratch the last 8 s forwards and backwards on speakers or headphones; letting go returns on the beat ([019](../spec/019-vinyl-scratch-control/), 1163dac, 2026-11-12).
+    - [x] **Scratch like a real record:** both directions from the grab, brake and motor spin-up, the track continues from where the record is (Snap to beat on by default), long notes restarted mid-note ([023](../spec/023-vinyl-scratch-realism/), 0ecdcad, 2026-11-13).
 
 ### Phase 3 — Editor and output (shipped)
 

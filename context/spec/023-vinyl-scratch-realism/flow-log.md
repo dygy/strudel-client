@@ -71,3 +71,15 @@
   - pads after the hand-over within 0.02 dB of the unscratched track;
   - an Update 0.1 s after release gives a 0.46 dB RMS step against 12 dB on steady material, and the offset is kept.
 - Suite (implementer): 194/194 files, 4093 tests; format, lint and build clean.
+
+## 2026-11-13 — delivered: 0ecdcad on prod
+- Rebased onto origin/main, which by then had specs 022 and 024. One conflict in the feature map; 024's row already contained 021, so I took that version.
+- Main-session suite on the rebased tree: Node 24.12, 2 workers, 214/214 files, 4436 tests. Format, lint and build:cloudflare clean.
+- The owner approved the superdough release-anchor fix, which also affects 017 transitions, and the push.
+- CI / Deploy run 43479900897 succeeded.
+- Prod check in Chrome: the served bundle contains `lagSettled`, `strudel-scratch-snap` and `_scratchrestart`, and the Scratch section shows "Snap to beat". The scratch sound itself was not played on prod; the audio checks are the Chromium measurements above.
+- Agents in this run: 3. The audio engineer did 3 rounds, the test engineer 1, and the reviewer 2 (review plus re-review).
+- Flow defects:
+  - spec, tech and tasks were written inline;
+  - spec number 022 was taken by a concurrent session;
+  - three sessions shared one main checkout, so pushes were coordinated by ping.
