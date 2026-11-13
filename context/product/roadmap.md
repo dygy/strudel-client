@@ -23,6 +23,8 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
   - [x] **Smooth transitions:** crossfade on update instead of a hard cut ([009](../spec/009-smooth-track-transitions/)).
   - [x] **Transition types:** pick how each track switch is mixed while playing: Dip, Cut, Crossfade, Filter sweep, Bass swap, Echo-out, Layered intro, with Snap, Tempo glide and Match loudness ([017](../spec/017-track-transition-types/), 2026-10-30).
   - [x] **10-band EQ:** presets and visualisation ([008](../spec/008-audio-equalizer/)).
+    - [x] **EQ on the speakers:** the panel used to shape only the headphone preview; it now shapes the speakers too, with saved settings applied at start (008 fix, ada694c, 2026-11-12).
+    - [x] **Strong EQ control:** ±24 dB bands, 24 dB/oct low and high cut, output level with a limiter, 12 genre presets (Brazilian Funk, Automotivo, Montagem, Funk Agressivo, Mandelão, Phonk, Drift Phonk, Electro, Techno, Drum & Bass, Dubstep, Trap) ([020](../spec/020-eq-strong-control/), 6344a18, 2026-11-13).
   - [x] **Vinyl scratch:** grab a platter (settings, header, compact bar), the wheel, Alt+Shift+←/→ or a learned MIDI jog to scratch the last 8 s forwards and backwards on speakers or headphones; letting go returns on the beat ([019](../spec/019-vinyl-scratch-control/), 1163dac, 2026-11-12).
 
 ### Phase 3 — Editor and output (shipped)

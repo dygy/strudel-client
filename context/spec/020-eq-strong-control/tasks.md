@@ -67,7 +67,7 @@ Areas:
   - [x] 5.2 i18n completeness test: every new EQ key exists in all 9 locales. **[Agent: strudel-test-engineer]**
   - [x] 5.3 Acceptance mapping: one test per testable criterion in functional-spec §2.1–2.7, citing the criterion. Manual or browser checks are listed in the flow log. **[Agent: strudel-test-engineer]**
 
-- [ ] **Slice 6: Bookkeeping**
+- [x] **Slice 6: Bookkeeping**
   - [x] 6.1 `context/product/feature-map.md` EQ row: code paths and tests. **[Agent: main]**
-  - [ ] 6.2 `context/product/roadmap.md`: add and tick the item; set the spec Status to Completed after prod verification. **[Agent: main]**
-  - [ ] 6.3 Memory: update the ranges in `eq-off-must-be-silent` and add the traps found in this run. **[Agent: main]**
+  - [x] 6.2 `context/product/roadmap.md`: add and tick the item; set the spec Status to Completed after prod verification. **[Agent: main]**
+  - [x] 6.3 Memory: update the ranges in `eq-off-must-be-silent` and add the traps found in this run. **[Agent: main]**

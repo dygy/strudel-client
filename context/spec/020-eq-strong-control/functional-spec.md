@@ -1,7 +1,7 @@
 # Functional Specification: Strong EQ Control: Wider Range, Low/High Cut, Genre Presets
 
 - **Roadmap Item:** Not on the roadmap. Requested by the owner in chat on 2026-11-12, right after the fix that put the EQ on the speakers ([008](../008-audio-equalizer/), ada694c). It extends the 10-band EQ. No GitHub issue.
-- **Status:** Approved
+- **Status:** Completed
 - **Author:** Claude (for the owner, Dygy)
 
 ---

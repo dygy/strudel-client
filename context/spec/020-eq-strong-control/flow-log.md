@@ -57,3 +57,13 @@
 - Acceptance coverage: every criterion in §2.1–2.7 maps to a test (test-engineer table); the criteria that need audio are browser-measured (above and in the implementation entry).
 - No second review of the fix round (the fixes are test-guarded; to save an agent).
 - Agents: audio engineer 1 (3 rounds), test engineer 1, reviewer 1.
+
+## 2026-11-13 — delivered: 1160b56 on prod
+- The push gate passed with no bypass. CI / Deploy run 43348888453 succeeded (Format, lint, test; Build and deploy to Cloudflare).
+- Prod check (Chrome, logged-in owner): the served bundle contains `setChannelCount`, `getLimiterReduction`, `onChannelCount` and `driftPhonk`. The panel shows "10-band parametric EQ with low/high cut and 34 presets". The owner's pre-020 save ("Bass Reducer") loaded as before, which covers AC 2.6.2 on prod. No console errors. Audio was not played on prod; the audible checks are the Chromium measurements above.
+- Bookkeeping: roadmap ticked, spec Completed, feature map updated (1160b56), memory `eq-strong-control-020` written and `eq-off-must-be-silent` ranges updated.
+- Agents this run: 3 (audio engineer, test engineer, reviewer).
+- Flow defects:
+  - `/awos:tech` was drafted inline instead of through Explore and a specialist;
+  - `--maxWorkers=2` needs `--minWorkers=1` on vitest 3.0.4;
+  - the local mcp-worker budget test is load-sensitive.
