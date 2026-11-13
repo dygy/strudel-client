@@ -104,6 +104,20 @@ CREATE TABLE IF NOT EXISTS public.folders (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Spec 022: a user's sets (ordered queues of tracks for a live set). Items are a JSONB array.
+-- Migration: supabase/migrations/20261113000000_set_lists.sql
+CREATE TABLE IF NOT EXISTS public.set_lists (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    items JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT set_lists_name_length CHECK (char_length(btrim(name)) BETWEEN 1 AND 100),
+    CONSTRAINT set_lists_items_array CHECK (jsonb_typeof(items) = 'array'),
+    CONSTRAINT unique_set_name_per_user UNIQUE (user_id, name)
+);
+
 -- Enable Row Level Security
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.file_system_nodes ENABLE ROW LEVEL SECURITY;
@@ -112,6 +126,7 @@ ALTER TABLE public.tree_relationships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tree_metadata ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tracks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.folders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.set_lists ENABLE ROW LEVEL SECURITY;
 
 -- Create policies for profiles
 CREATE POLICY "Users can view own profile" ON public.profiles
@@ -208,6 +223,19 @@ CREATE POLICY "Users can update own folders" ON public.folders
 CREATE POLICY "Users can delete own folders" ON public.folders
     FOR DELETE USING (auth.uid() = user_id);
 
+-- Create policies for set lists (UPDATE also has WITH CHECK: a row can't be handed to another user)
+CREATE POLICY "Users can view own set lists" ON public.set_lists
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own set lists" ON public.set_lists
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own set lists" ON public.set_lists
+    FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own set lists" ON public.set_lists
+    FOR DELETE USING (auth.uid() = user_id);
+
 -- Indexes for graph operations
 CREATE INDEX IF NOT EXISTS idx_nodes_user_id ON public.file_system_nodes(user_id);
 CREATE INDEX IF NOT EXISTS idx_nodes_parent_id ON public.file_system_nodes(parent_id);
@@ -234,6 +262,7 @@ CREATE INDEX IF NOT EXISTS tracks_modified_idx ON public.tracks(modified DESC);
 CREATE INDEX IF NOT EXISTS tracks_folder_idx ON public.tracks(folder);
 CREATE INDEX IF NOT EXISTS folders_user_id_idx ON public.folders(user_id);
 CREATE INDEX IF NOT EXISTS folders_parent_idx ON public.folders(parent);
+CREATE INDEX IF NOT EXISTS set_lists_user_updated_idx ON public.set_lists(user_id, updated_at DESC);
 
 -- Function to handle user profile creation
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -279,11 +308,16 @@ CREATE TRIGGER update_folders_updated_at
     BEFORE UPDATE ON public.folders
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
+CREATE TRIGGER update_set_lists_updated_at
+    BEFORE UPDATE ON public.set_lists
+    FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
 -- Grant necessary permissions
 GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT ALL ON public.profiles TO authenticated;
 GRANT ALL ON public.tracks TO authenticated;
 GRANT ALL ON public.folders TO authenticated;
+GRANT ALL ON public.set_lists TO authenticated;
 GRANT ALL ON public.file_system_nodes TO authenticated;
 GRANT ALL ON public.tree_nodes TO authenticated;
 GRANT ALL ON public.tree_relationships TO authenticated;

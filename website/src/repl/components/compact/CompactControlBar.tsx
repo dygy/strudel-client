@@ -6,6 +6,7 @@ import { useTranslation } from '@src/i18n';
 import { usePanelLayout } from '../panel/panelLayout';
 import { TransitionPicker } from '../TransitionPicker';
 import { ScratchButton } from '../scratch/ScratchButton';
+import { SetBar } from '../set/SetBar';
 import { useTransitionPhase } from '../../transitionPhase';
 
 export interface CompactControlBarContext {
@@ -100,9 +101,12 @@ export function CompactControlBar({ context }: { context: CompactControlBarConte
         <ArrowPathIcon className={cx('w-6 h-6 opacity-80', waiting && 'animate-pulse')} />
       </BarButton>
       {/* The transition the next track switch uses, next to Update (spec 017 2.4) */}
-      <TransitionPicker touch className="shrink min-w-0" />
+      {/* At least 44px wide, also with a set playing (its Cue/Go button sits in this row too). */}
+      <TransitionPicker touch className="shrink min-w-11" />
       {/* The floating scratch platter, sized for a finger (spec 019 2.1) */}
       <ScratchButton touch className="flex-1 max-w-24 flex justify-center" />
+      {/* While a set plays: its Cue/Go button, sized for a finger (spec 022 2.3) */}
+      <SetBar touch className="shrink-0" />
       <BarButton
         data-bar-library=""
         onClick={toggleFileManager}

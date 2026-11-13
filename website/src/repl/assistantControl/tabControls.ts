@@ -63,8 +63,10 @@ export function createTabControls({ live, enabled, phase }: TabControlSources): 
     },
     replaceCode: (code) => editor().replaceCode(code),
     start: () => editor().evaluate(),
-    // The same Update as a person's. It doesn't wait for a switch's evaluate on the Off type, so this
-    // does, on its own, to answer honestly. The caller limits how long.
+    // The same Update as a person's. runUpdate resolves once its own evaluate is done on every path
+    // (since spec 022 the instant Off switch waits for it too); evaluationsSettled also covers an
+    // evaluate started elsewhere at the same moment (Ctrl+Enter), so the answer stays honest. The
+    // caller limits how long.
     update: async () => {
       const outcome = await live().context.runUpdate();
       if (outcome !== 'ignored') await live().context.evaluationsSettled?.();

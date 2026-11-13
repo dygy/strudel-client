@@ -123,6 +123,11 @@ export function ShortcutsTab() {
             keys={[isMac ? 'Option' : 'Alt', 'Shift', '← / →']}
             description={t('shortcuts:scratch', 'Scratch (hold): pull back / push forwards')}
           />
+          {/* Spec 022: the set's next key; works in the editor too */}
+          <ShortcutItem
+            keys={[isMac ? 'Option' : 'Alt', 'Shift', 'N']}
+            description={t('shortcuts:setNext', 'Set: cue the next track, then mix it in')}
+          />
         </ShortcutSection>
 
         <div className="mt-8 p-4 bg-gray-800/30 rounded-lg">

@@ -9,9 +9,11 @@ import {
   InformationCircleIcon,
   PencilIcon,
   PlusIcon,
+  QueueListIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
 import { useTranslation } from '@src/i18n';
+import { useSetPlayerContext } from '../../sets/useSetPlayer';
 import { WorkingContextMenu } from '../ui/WorkingContextMenu';
 import { BurgerMenuButton } from '../ui/BurgerMenuButton';
 import { tooltipActions } from '@src/stores/tooltipStore';
@@ -146,6 +148,8 @@ export function FileTree({
   isLoading = false,
 }: FileTreeProps) {
   const { t } = useTranslation(['files', 'common']);
+  // Spec 022: "Add to set" (absent outside the REPL, signed out, and in the read-only view).
+  const setPlayer = useSetPlayerContext();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['root'])); // Root is expanded by default
   const [draggedItem, setDraggedItem] = useState<{ id: string; type: 'track' | 'folder' } | null>(null);
   const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
@@ -479,6 +483,14 @@ export function FileTree({
           onClick: () => onTrackDuplicate?.(track),
         },
       );
+      // Spec 022: into the open set, or a chooser (this is the array the menu gets).
+      if (setPlayer?.enabled) {
+        baseItems.push({
+          label: t('files:addToSet'),
+          icon: <QueueListIcon className="w-4 h-4" />,
+          onClick: () => setPlayer.requestAddToSet({ trackId: track.id }),
+        });
+      }
 
       // Add multitrack-specific options
       if (track.isMultitrack) {
@@ -611,12 +623,19 @@ export function FileTree({
 
     // Only add edit/delete options if not in read-only mode
     if (!readOnly) {
+      items.push({
+        label: t('files:rename'),
+        icon: <PencilIcon className="w-4 h-4" />,
+        onClick: () => onRenameStep?.(trackId, stepIndex),
+      });
+      if (setPlayer?.enabled) {
+        items.push({
+          label: t('files:addToSet'),
+          icon: <QueueListIcon className="w-4 h-4" />,
+          onClick: () => setPlayer.requestAddToSet({ trackId, stepIndex }),
+        });
+      }
       items.push(
-        {
-          label: t('files:rename'),
-          icon: <PencilIcon className="w-4 h-4" />,
-          onClick: () => onRenameStep?.(trackId, stepIndex),
-        },
         { separator: true, label: '', onClick: () => {} },
         {
           label: t('files:delete'),

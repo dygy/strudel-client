@@ -28,5 +28,6 @@
   },
   "platform": {
     "mac": "En Mac, usa Cmd en lugar de Ctrl para todos los atajos"
-  }
+  },
+  "setNext": "Sesión: preescuchar la siguiente pista y luego mezclarla"
 }

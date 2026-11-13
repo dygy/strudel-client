@@ -38,6 +38,13 @@ export interface UpdateRequest {
    * a plain evaluate. With the same track playing it is still an in-place hot-swap.
    */
   reset?: boolean;
+  /**
+   * A set's Go (spec 022): always a real switch, even when the editor holds the track that is
+   * playing (a repeated item, two steps of one multitrack) or nothing plays (then it is the instant
+   * path: no transition). Only the set player passes it; a plain Update keeps the hot-swap rule.
+   * The in-flight repeat guard still applies.
+   */
+  force?: boolean;
   /** Whether the main (speakers) scheduler is running right now. */
   isPlaying: boolean;
   /** The editor's code, read at the moment of the Update. */
@@ -76,6 +83,8 @@ export function createTrackSwitchController() {
   const startedEvaluations = new Map<string, string | null>();
   let switchesInFlight = 0;
   let switchTarget: string | null = null;
+  // The code of the latest switch in flight (a forced Go with other code is a new switch).
+  let switchCode: string | null = null;
 
   const evaluationStarted = (code: string | undefined, trackId: string | null = editorTrackId) => {
     if (typeof code === 'string') {
@@ -142,11 +151,21 @@ export function createTrackSwitchController() {
       playingTrackId = null;
     },
 
-    /** Decide what Update does right now, without doing it. */
-    decide(isPlaying: boolean, reset = false): UpdateOutcome {
+    /**
+     * Decide what Update does right now, without doing it. `force`: a set's Go (see UpdateRequest);
+     * `code`: the editor's code, which tells a forced Go to the next step of the same track (a
+     * different code: queued as a switch) from a double press (the same code: ignored).
+     */
+    decide(isPlaying: boolean, reset = false, force = false, code?: string): UpdateOutcome {
       if (switchesInFlight > 0) {
         // The scheduler may be stopped mid-switch, so `isPlaying` is not meaningful here.
-        return editorTrackId !== null && editorTrackId === switchTarget ? 'ignored' : 'switch';
+        const sameTarget = editorTrackId !== null && editorTrackId === switchTarget;
+        if (!sameTarget) return 'switch';
+        if (force && code !== undefined && code !== switchCode) return 'switch';
+        return 'ignored';
+      }
+      if (force) {
+        return 'switch';
       }
       const action = getUpdateAction({ isPlaying, playingTrackId, editorTrackId });
       if (action === 'hot-swap' && reset && !isPlaying) {
@@ -156,8 +175,15 @@ export function createTrackSwitchController() {
     },
 
     /** Update / Ctrl+U / handleUpdate(…, true): hot-swap, switch, or ignore a repeat. */
-    async update({ reset = false, isPlaying, code, hotSwap, switchTrack }: UpdateRequest): Promise<UpdateOutcome> {
-      const outcome = controller.decide(isPlaying, reset);
+    async update({
+      reset = false,
+      force = false,
+      isPlaying,
+      code,
+      hotSwap,
+      switchTrack,
+    }: UpdateRequest): Promise<UpdateOutcome> {
+      const outcome = controller.decide(isPlaying, reset, force, code);
       if (outcome === 'ignored') {
         return outcome;
       }
@@ -169,12 +195,14 @@ export function createTrackSwitchController() {
       evaluationStarted(code, target);
       switchesInFlight++;
       switchTarget = target;
+      switchCode = code;
       try {
         await switchTrack(code, { reset });
       } finally {
         switchesInFlight = Math.max(0, switchesInFlight - 1);
         if (switchesInFlight === 0) {
           switchTarget = null;
+          switchCode = null;
         }
       }
       return 'switch';

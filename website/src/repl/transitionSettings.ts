@@ -199,6 +199,30 @@ export function switchPath({
  * is queued and begins when the running transition ends; `undefined` makes the controller read
  * the settings (its getSettings) at that moment.
  */
-export function settingsForSwitch(settings: TransitionSettings, busy: boolean): TransitionSettings | undefined {
-  return busy ? undefined : settings;
+export function settingsForSwitch(
+  settings: TransitionSettings,
+  busy: boolean,
+  explicit = false,
+): TransitionSettings | undefined {
+  // `explicit` (spec 022): a set item's own transition. A queued Go must keep it rather than read
+  // the global settings when it begins, so it is always passed.
+  return busy && !explicit ? undefined : settings;
+}
+
+/** A per-switch override of the type and length (spec 022: a set item's transition). */
+export interface TransitionOverride {
+  type: TransitionType;
+  length: TransitionLength;
+}
+
+/**
+ * The settings one switch uses: the global ones with `override`'s type and length (snap, glide and
+ * match loudness always stay global). No override (a set item on Default, or any non-set switch):
+ * the global settings unchanged.
+ */
+export function withTransitionOverride(
+  settings: TransitionSettings,
+  override: TransitionOverride | null | undefined,
+): TransitionSettings {
+  return override ? { ...settings, type: override.type, length: override.length } : settings;
 }

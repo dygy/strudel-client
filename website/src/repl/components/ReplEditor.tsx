@@ -25,6 +25,10 @@ import { useState, useEffect, memo, useRef } from 'react';
 import { getPendingCode, clearPendingCode, getEditorInstance, setPendingCode } from '../../stores/editorStore';
 import { globalSaveManager } from '../globalSaveManager';
 import { findTrackByFolderAndSlug } from '@src/lib/slugUtils';
+import { useAuth } from '@src/hooks/useAuth';
+import { SetPlayerContext, useSetPlayer } from '../sets/useSetPlayer';
+import type { SetBridge } from '../sets/setBridge';
+import { AddToSetChooser } from './set/AddToSetChooser';
 
 interface ReplContext {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -44,6 +48,7 @@ interface ReplContext {
   screenRecordingElapsedSeconds?: number;
   handleScreenRecordToggle?: () => void;
   isScreenRecordingSupported?: boolean;
+  setBridge?: SetBridge;
 }
 
 interface ReplEditorProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -60,6 +65,14 @@ interface ReplEditorProps extends React.HTMLAttributes<HTMLDivElement> {
 function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer, ...editorProps }: ReplEditorProps) {
   const { containerRef, editorRef, error, init, pending } = context;
   useAssistantControl(context, fileManagerHook, readOnly);
+  // Spec 022: the set playlist, once per REPL; the Set tab, the set bar and the library read it.
+  const { isAuthenticated } = useAuth();
+  const setPlayer = useSetPlayer({
+    bridge: context.setBridge,
+    signedIn: isAuthenticated && Boolean(fileManagerHook),
+    readOnly,
+    tracks: fileManagerHook && typeof fileManagerHook === 'object' ? fileManagerHook.tracks : undefined,
+  });
   const settings = useSettings();
   const { panelPosition, isZen } = settings;
   const { filesOpen: isFileManagerOpen, compact, panelOpen } = usePanelLayout();
@@ -406,74 +419,79 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
   }, [context, fileManagerHook]);
 
   return (
-    <div
-      className={cx(
-        'h-full flex flex-col relative',
-        // Spec 016 review #5: on a phone held sideways, keep the bars and the code out of the notch.
-        // env() is 0 without a notch (and on every desktop), and the class is absent when wide.
-        compact && 'pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]',
-      )}
-      {...editorProps}
-    >
-      <Loader active={pending} />
-      <Header context={context} trackName={currentTrackName(fileManagerHook)} />
-      {!readOnly && <TrackConflictNotice controller={fileManagerHook?.trackConflict ?? null} />}
+    <SetPlayerContext.Provider value={setPlayer}>
+      <div
+        className={cx(
+          'h-full flex flex-col relative',
+          // Spec 016 review #5: on a phone held sideways, keep the bars and the code out of the notch.
+          // env() is 0 without a notch (and on every desktop), and the class is absent when wide.
+          compact && 'pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]',
+        )}
+        {...editorProps}
+      >
+        <Loader active={pending} />
+        <Header context={context} trackName={currentTrackName(fileManagerHook)} />
+        {!readOnly && <TrackConflictNotice controller={fileManagerHook?.trackConflict ?? null} />}
 
-      <div className="grow flex relative overflow-hidden">
-        {/* Spec 016: compact drawer slot, desktop sidebar slot, then the editor. Each slot keeps its
+        <div className="grow flex relative overflow-hidden">
+          {/* Spec 016: compact drawer slot, desktop sidebar slot, then the editor. Each slot keeps its
             position whether it renders or not, so a layout switch (rotation, resize) never
             remounts the editor (#code); only the library moves between drawer and sidebar. */}
-        {!isZen && compact && (
-          <LibraryDrawer open={isFileManagerOpen} onClose={closeDrawer}>
-            <FileManager
-              context={context}
-              fileManagerHook={fileManagerHook}
-              readOnly={readOnly}
-              onAfterTrackSelect={closeDrawer}
-            />
-          </LibraryDrawer>
+          {!isZen && compact && (
+            <LibraryDrawer open={isFileManagerOpen} onClose={closeDrawer}>
+              <FileManager
+                context={context}
+                fileManagerHook={fileManagerHook}
+                readOnly={readOnly}
+                onAfterTrackSelect={closeDrawer}
+              />
+            </LibraryDrawer>
+          )}
+          {!isZen && !compact && (
+            <div
+              className="flex-shrink-0 overflow-hidden"
+              style={{
+                maxWidth: isFileManagerOpen ? 500 : 0,
+                transition: 'max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
+            >
+              <ResizableSidebar defaultWidth={300} minWidth={200} maxWidth={500}>
+                <FileManager context={context} fileManagerHook={fileManagerHook} readOnly={readOnly} />
+              </ResizableSidebar>
+            </div>
+          )}
+          {shouldShowWelcome ? (
+            <WelcomeScreen onCreateTrack={handleCreateTrack} onImportTracks={handleImportTracks} />
+          ) : (
+            <div className="flex-1 relative transition-all duration-200 flex flex-col overflow-hidden">
+              <Code key={codeComponentKey} containerRef={containerRef} editorRef={editorRef} init={init} />
+            </div>
+          )}
+          {!isZen && panelPosition === 'right' && showPanel && <VerticalPanel context={context} />}
+        </div>
+        <UserFacingErrorMessage error={error} />
+        {!isZen && panelPosition === 'bottom' && showPanel && <HorizontalPanel context={context} />}
+        {!isZen && compact && <CompactControlBar context={context} />}
+
+        {/* Global Toast Container */}
+        <GlobalToastContainer />
+
+        {/* "Add to set" with no set open: which set (spec 022 2.2) */}
+        {!readOnly && <AddToSetChooser />}
+
+        {/* Global Tooltip - Temporarily disabled for cleaner UX */}
+        {/* <GlobalTooltip /> */}
+
+        {/* Export Dialog — shown after a recording session ends (Req 5.1) */}
+        {(context as any).exportBlob && (
+          <ExportDialog
+            audioBlob={(context as any).exportBlob}
+            audioContext={getAudioContext()}
+            onClose={() => (context as any).clearExport?.()}
+          />
         )}
-        {!isZen && !compact && (
-          <div
-            className="flex-shrink-0 overflow-hidden"
-            style={{
-              maxWidth: isFileManagerOpen ? 500 : 0,
-              transition: 'max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
-          >
-            <ResizableSidebar defaultWidth={300} minWidth={200} maxWidth={500}>
-              <FileManager context={context} fileManagerHook={fileManagerHook} readOnly={readOnly} />
-            </ResizableSidebar>
-          </div>
-        )}
-        {shouldShowWelcome ? (
-          <WelcomeScreen onCreateTrack={handleCreateTrack} onImportTracks={handleImportTracks} />
-        ) : (
-          <div className="flex-1 relative transition-all duration-200 flex flex-col overflow-hidden">
-            <Code key={codeComponentKey} containerRef={containerRef} editorRef={editorRef} init={init} />
-          </div>
-        )}
-        {!isZen && panelPosition === 'right' && showPanel && <VerticalPanel context={context} />}
       </div>
-      <UserFacingErrorMessage error={error} />
-      {!isZen && panelPosition === 'bottom' && showPanel && <HorizontalPanel context={context} />}
-      {!isZen && compact && <CompactControlBar context={context} />}
-
-      {/* Global Toast Container */}
-      <GlobalToastContainer />
-
-      {/* Global Tooltip - Temporarily disabled for cleaner UX */}
-      {/* <GlobalTooltip /> */}
-
-      {/* Export Dialog — shown after a recording session ends (Req 5.1) */}
-      {(context as any).exportBlob && (
-        <ExportDialog
-          audioBlob={(context as any).exportBlob}
-          audioContext={getAudioContext()}
-          onClose={() => (context as any).clearExport?.()}
-        />
-      )}
-    </div>
+    </SetPlayerContext.Provider>
   );
 }
 

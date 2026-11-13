@@ -1,4 +1,4 @@
-import { registerTrackSelect } from '../../assistantControl/openTrack';
+import { registerStepSelect, registerTrackSelect } from '../../assistantControl/openTrack';
 import React from 'react';
 import { FileTree } from './FileTree';
 import { InfoModal } from '../ui/InfoModal';
@@ -140,10 +140,18 @@ export function FileManagerRefactored({
   // Spec 018: an assistant opens a track the same way as a press in this list.
   const selectTrackRef = React.useRef(operations.handleTrackSelect);
   selectTrackRef.current = operations.handleTrackSelect;
+  // Spec 022: a set opens a multitrack step the same way as a click on the step (switchToStep saves
+  // the track being left first, loads the step and updates the URL).
+  const switchStepRef = React.useRef(operations.switchToStep);
+  switchStepRef.current = operations.switchToStep;
   React.useEffect(() => {
     if (readOnly) return undefined;
     registerTrackSelect((track) => selectTrackRef.current(track as never));
-    return () => registerTrackSelect(null);
+    registerStepSelect(({ trackId, stepIndex }) => switchStepRef.current(trackId, stepIndex));
+    return () => {
+      registerTrackSelect(null);
+      registerStepSelect(null);
+    };
   }, [readOnly]);
 
   // If no fileManagerHook (unauthenticated), show sign-in prompt

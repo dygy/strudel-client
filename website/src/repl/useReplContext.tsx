@@ -57,12 +57,27 @@ import { useScreenRecorder } from './recording/useScreenRecorder';
 import { listenForSmoothTransitionErrors } from './smoothTransitionNotifier';
 import { createEvaluationWatch, isMusicChanging } from './evaluationWatch';
 import { createTrackSwitchController, type UpdateOutcome } from './trackSwitch';
-import { settingsForSwitch, switchPath } from './transitionSettings';
+import type { TransitionOverride } from './transitionSettings';
+import {
+  evaluateNewTrack as runEvaluateNewTrack,
+  type EvaluateNewTrackOptions,
+  type SwitchResult,
+} from './evaluateNewTrack';
 import { installMainEqualizerWhenReady } from './mainEqualizer';
 import { playingCodeEvaluated, playingStopped } from './playingEqProfile';
 import { scratchRuntime } from './scratch/scratchRuntime';
 import { createScratchReplHooks } from './scratch/scratchReplHooks';
 import { installScratchShortcut } from './scratch/scratchShortcut';
+import { createSetBridge, type SetBridge } from './sets/setBridge';
+import { announceTrackIdReplaced } from './sets/trackIdRemap';
+import { libraryCanOpen, libraryOpenStep, libraryOpenTrack } from './assistantControl/openTrack';
+
+/** Options of one Update / switch. `force` and `transition`: a set's Go (spec 022). */
+export interface UpdateOptions {
+  reset?: boolean;
+  force?: boolean;
+  transition?: TransitionOverride | null;
+}
 
 // Type definitions
 interface ReplState {
@@ -112,7 +127,9 @@ interface ReplContext {
   /** For assistants: resolves when the evaluates going now have finished. Nothing else waits for it. */
   evaluationsSettled?: () => Promise<void>;
   /** Update, without what the button also does to a headphone preview. */
-  runUpdate?: (options?: { reset?: boolean }) => Promise<UpdateOutcome>;
+  runUpdate?: (options?: UpdateOptions) => Promise<UpdateOutcome>;
+  /** What a playing set may do to the REPL (spec 022): open, cue on the headphones, Go. */
+  setBridge?: SetBridge;
   /** The editor now holds track `id` without going through handleUpdate (e.g. same code already loaded). */
   setEditorTrackId?: (id: string | null | undefined) => void;
   replaceTrackId?: (oldId: string, newId: string) => void;
@@ -321,6 +338,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
           trackSwitch.evaluated(code);
           // Spec 024: the EQ panel offers this code's `// @eq-profile` recommendation (never applied by itself).
           playingCodeEvaluated(code);
+          // A set's Go moves on as soon as its code plays (spec 022).
+          setBridgeRef.current?.evaluated(code);
 
           setLatestCode(code);
           setDocumentTitle(code);
@@ -433,7 +452,15 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   const [trackSwitch] = useState(createTrackSwitchController);
   const [evaluationWatch] = useState(() => createEvaluationWatch());
   const [mixer, setMixer] = useState<PreviewEngine | null>(null);
-  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isPreviewing, setIsPreviewingState] = useState(false);
+  // Read by the set bridge and by callbacks that outlive a render.
+  const isPreviewingRef = useRef(false);
+  const setIsPreviewing = (previewing: boolean) => {
+    isPreviewingRef.current = previewing;
+    setIsPreviewingState(previewing);
+  };
+  // Spec 022: the set bridge, one per component life (see below where it is built).
+  const setBridgeRef = useRef<SetBridge | null>(null);
 
   // Audio & screen recorder hooks (Req 8.1, 8.2: mutual exclusion via ref)
   const screenRecordingRef = useRef(false);
@@ -690,6 +717,13 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   };
 
   const handleTogglePlay = async (): Promise<void> => {
+    // Spec 022: while a set item is cued the editor's evaluate plays on the headphones; Play always
+    // means the speakers.
+    const bridge = setBridgeRef.current;
+    if (bridge?.isRedirected() && !editorRef.current?.repl?.scheduler?.started) {
+      await bridge.evaluateOnSpeakers();
+      return;
+    }
     editorRef.current?.toggle();
   };
 
@@ -784,19 +818,33 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   // - a DIFFERENT track while one is playing: a switch (evaluateNewTrack), fading the old track
   //   out and starting the new one at cycle 0.
   // - the same switch again while it is still in flight (double press): ignored.
-  const runUpdate = async ({ reset = false }: { reset?: boolean } = {}): Promise<UpdateOutcome> => {
+  // - a set's Go (spec 022): `force` makes it a switch even on the same track id, and `transition`
+  //   is the item's type and length for this switch only.
+  //   `onSwitchResult` hears whether a switch's new code evaluated (the set player's Go needs it).
+  const runUpdate = async (
+    { reset = false, force = false, transition = null }: UpdateOptions = {},
+    onSwitchResult?: (result: SwitchResult) => void,
+  ): Promise<UpdateOutcome> => {
     // Spec 019: an Update or a track switch never starts from a held platter.
     scratchHooks.beforeUpdate();
     const outcome = await trackSwitch.update({
       reset,
+      force,
       isPlaying: Boolean(editorRef.current?.repl?.scheduler?.started),
       code: editorRef.current?.code,
       hotSwap: async () => {
         await editorRef.current?.evaluate?.();
       },
-      switchTrack: (code, { reset: resetOldTrack }) => {
+      switchTrack: async (code, { reset: resetOldTrack }) => {
         console.log('[repl] Update: track switch', { from: trackSwitch.playingTrackId, to: trackSwitch.editorTrackId });
-        return evaluateNewTrack(code, { restart: true, prepare: resetOldTrack ? resetEditor : undefined });
+        const result = await evaluateNewTrack(code, {
+          restart: true,
+          prepare: resetOldTrack ? resetEditor : undefined,
+          transition,
+          // A set's Go never silences the speakers for a broken track (spec 022 §2.5).
+          keepOldOnFailure: force,
+        });
+        onSwitchResult?.(result);
       },
     });
     if (outcome === 'ignored') {
@@ -806,10 +854,12 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   };
 
   const handleEvaluate = async (): Promise<void> => {
+    // Spec 022: Update while a set item is cued is the set's Go (its transition, and the set moves on).
+    if (setBridgeRef.current?.routeUpdate()) return;
     // Spec 019: let go of the platter before the preview stops and the code evaluates.
     scratchHooks.beforeEvaluate();
     // If previewing, "Update" means: stop preview, push code to live speakers
-    if (isPreviewing && mixerRef.current) {
+    if (isPreviewingRef.current && mixerRef.current) {
       mixerRef.current.stop();
       setIsPreviewing(false);
       console.log('[Preview] Stopped preview, pushing code to live');
@@ -853,62 +903,25 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     resetDefaults();
   };
 
-  // Switch to a DIFFERENT track's `code` (spec 017). The transition settings are read once, now,
-  // as the switch begins:
-  // - Off, or nothing playing: the instant path. Restart (stop), reset, clean up, evaluate from
-  //   cycle 0.
-  // - any other type while playing: TrackTransitionController.switchTo. The old track keeps
-  //   playing until the transition is done; a broken new track never replaces it. While a
-  //   transition runs, every switch (also Off) goes to the controller, which queues the latest.
-  const evaluateNewTrack = async (
-    code: string,
-    { restart = false, prepare }: { restart?: boolean; prepare?: () => Promise<void> } = {},
-  ): Promise<void> => {
-    const repl = editorRef.current?.repl;
-    if (!repl) return;
-    const settings = getTransitionSettings();
-    const playing = Boolean(repl.scheduler?.started);
-    const busy = Boolean(transitionControllerRef.current?.busy);
-
-    if (switchPath({ type: settings.type, playing, busy }) === 'transition') {
-      const controller = getTransitionController();
-      if (controller) {
-        editorRef.current?.flash?.();
-        try {
-          await controller.switchTo(code, settingsForSwitch(settings, controller.busy), {
-            prepare: prepare ? resetBeforeTransition : undefined,
-          });
-          return;
-        } catch (error: unknown) {
-          if ((error as { evaluateFailed?: boolean } | null)?.evaluateFailed) {
-            // The new track has an error: the repl shows it, the old track keeps playing untouched
-            // and the notifier raised the toast. Evaluating it again would only fail again.
-            console.warn('[TrackTransition] New track failed to evaluate; the old track keeps playing');
-            return;
-          }
-          console.error('[TrackTransition] Transition failed, falling back to an instant switch:', error);
-        }
-      }
-    }
-
-    // Instant switch: restart first (onToggle's own cleanup is skipped; the awaited one below
-    // runs instead), reset, clean up, then evaluate from cycle 0.
-    const shouldRestart = restart && Boolean(repl.scheduler?.started);
-    if (shouldRestart) {
-      isSmoothTransitioningRef.current = true;
-      try {
-        repl.stop();
-      } finally {
-        isSmoothTransitioningRef.current = false;
-      }
-    }
-    if (prepare) {
-      await prepare();
-    }
-    await cleanupCanvasElements();
-    editorRef.current?.flash?.();
-    repl.evaluate(code);
-  };
+  // Switch to a DIFFERENT track's `code` (spec 017; the override and the result: spec 022). The
+  // logic lives in ./evaluateNewTrack.ts; here are the REPL's pieces it works with.
+  const evaluateNewTrack = (code: string, options: EvaluateNewTrackOptions = {}): Promise<SwitchResult> =>
+    runEvaluateNewTrack(
+      {
+        repl: editorRef.current?.repl,
+        globalSettings: getTransitionSettings,
+        controllerBusy: () => Boolean(transitionControllerRef.current?.busy),
+        getController: getTransitionController,
+        flash: () => editorRef.current?.flash?.(),
+        resetBeforeTransition,
+        cleanupCanvases: cleanupCanvasElements,
+        setRestarting: (restarting) => {
+          isSmoothTransitioningRef.current = restarting;
+        },
+      },
+      code,
+      options,
+    );
 
   const handleShuffle = async (): Promise<void> => {
     const patternData = await getRandomTune();
@@ -967,11 +980,59 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         engine.stop();
         setIsPreviewing(false);
         console.log('[Preview] Stopped — headphones silent, speakers continue');
+        // Spec 022: stopping the preview while a set item is cued cancels the cue.
+        setBridgeRef.current?.previewStoppedByUser();
       }
     } catch (err) {
       console.error('[Preview] Failed to toggle:', err);
     }
   };
+
+  // The set bridge (spec 022, tech §2.4): built once, reading the REPL through refs, so the set
+  // player can hold on to it across renders. Its runSwitch is the latest render's (the functions
+  // above close over refs only, so any render's will do).
+  const runUpdateRef = useRef(runUpdate);
+  runUpdateRef.current = runUpdate;
+  if (!setBridgeRef.current) {
+    setBridgeRef.current = createSetBridge({
+      previewEngine: () => mixerRef.current,
+      isPreviewing: () => isPreviewingRef.current,
+      setPreviewing: (previewing) => setIsPreviewing(previewing),
+      isPlaying: () => Boolean(editorRef.current?.repl?.scheduler?.started),
+      editor: () => editorRef.current,
+      runSwitch: async (options) => {
+        let result: SwitchResult = 'ok';
+        const outcome = await runUpdateRef.current(options, (switched) => {
+          result = switched;
+        });
+        return { outcome, result };
+      },
+      scratch: {
+        beforeEvaluate: () => scratchHooks.beforeEvaluate(),
+        previewStopping: (engine) => scratchHooks.previewStopping(engine as PreviewEngine),
+      },
+      canOpen: libraryCanOpen,
+      openTrack: (track) => libraryOpenTrack(track),
+      openStep: (target) => libraryOpenStep(target),
+      // The same decision runUpdate makes, without making it (review 022 #2).
+      goWouldBeIgnored: () =>
+        trackSwitch.decide(
+          Boolean(editorRef.current?.repl?.scheduler?.started),
+          false,
+          true,
+          editorRef.current?.code,
+        ) === 'ignored',
+    });
+  }
+  const setBridge = setBridgeRef.current;
+  // A recreated track is the same music: sets follow it too (useSets listens).
+  const replaceTrackId = useCallback(
+    (oldId: string, newId: string) => {
+      trackSwitch.replaceTrackId(oldId, newId);
+      announceTrackIdReplaced(oldId, newId);
+    },
+    [trackSwitch],
+  );
 
   // Global keyboard shortcuts - placed after function declarations
   useEffect(() => {
@@ -1044,7 +1105,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
       }),
     evaluationsSettled: () => evaluationWatch.settled(),
     runUpdate,
-    replaceTrackId: trackSwitch.replaceTrackId,
+    setBridge,
+    replaceTrackId,
     isRecording: audioRecorder.isRecording,
     recordingElapsedSeconds: audioRecorder.elapsedSeconds,
     handleRecordToggle: audioRecorder.handleRecordToggle,

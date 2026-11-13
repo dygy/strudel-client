@@ -191,5 +191,6 @@
     "folderCreated": "תיקייה '{{name}}' נוצרה בהצלחה",
     "itemMoved": "הפריט הועבר בהצלחה",
     "itemDeleted": "פריט '{{name}}' נמחק בהצלחה"
-  }
+  },
+  "addToSet": "הוספה לסט"
 }

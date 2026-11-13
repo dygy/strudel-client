@@ -28,5 +28,6 @@
   },
   "platform": {
     "mac": "Sur Mac, utilisez Cmd au lieu de Ctrl pour tous les raccourcis"
-  }
+  },
+  "setNext": "Set : pré-écouter la piste suivante, puis l'enchaîner"
 }

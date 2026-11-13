@@ -191,5 +191,6 @@
     "folderCreated": "Folder '{{name}}' created successfully",
     "itemMoved": "Item moved successfully",
     "itemDeleted": "Item '{{name}}' deleted successfully"
-  }
+  },
+  "addToSet": "Add to set"
 }

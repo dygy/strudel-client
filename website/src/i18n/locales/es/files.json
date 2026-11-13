@@ -191,5 +191,6 @@
     "folderCreated": "Carpeta '{{name}}' creada exitosamente",
     "itemMoved": "Elemento movido exitosamente",
     "itemDeleted": "Elemento '{{name}}' eliminado exitosamente"
-  }
+  },
+  "addToSet": "Añadir a la sesión"
 }

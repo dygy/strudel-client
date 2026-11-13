@@ -28,5 +28,6 @@
   },
   "platform": {
     "mac": "On Mac, use Cmd instead of Ctrl for all shortcuts"
-  }
+  },
+  "setNext": "Set: cue the next track, then mix it in"
 }

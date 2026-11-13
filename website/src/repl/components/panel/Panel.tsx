@@ -6,6 +6,8 @@ import { EnhancedReference } from './EnhancedReference';
 import { SettingsTab } from './SettingsTab';
 import { SoundsTab } from './SoundsTab';
 import { ShortcutsTab } from './ShortcutsTab';
+import { SetTab } from './SetTab';
+import { getTabNames } from './panelTabs';
 import { useLogger } from '../useLogger';
 import { WelcomeTab } from './WelcomeTab';
 import { PatternsTab } from './PatternsTab';
@@ -41,6 +43,7 @@ interface ReplContext {
   pending?: boolean;
   isDirty?: boolean;
   activeCode?: string;
+  readOnly?: boolean;
   handleTogglePlay: () => void;
   handleEvaluate: () => void;
   handleShuffle: () => void;
@@ -93,7 +96,7 @@ export function HorizontalPanel({ context }: PanelProps) {
         </div>
 
         <div className={cx('flex  justify-between min-h-12 max-h-12 grid-cols-2 items-center', compact && 'pe-16')}>
-          <Tabs setTab={setTab} tab={tab} />
+          <Tabs setTab={setTab} tab={tab} readOnly={context.readOnly} />
         </div>
       </PanelNav>
     </ToastContext.Provider>
@@ -184,7 +187,12 @@ export function VerticalPanel({ context }: PanelProps) {
             ref={panelRef}
           >
             <div className="flex items-center shrink-0 gap-1 border-b border-lineBackground">
-              <Tabs setTab={setTab} tab={tab} className="flex-1 min-w-0 overflow-x-auto pb-0" />
+              <Tabs
+                setTab={setTab}
+                tab={tab}
+                readOnly={context.readOnly}
+                className="flex-1 min-w-0 overflow-x-auto pb-0"
+              />
               <PanelActionButton settings={settings} onClose={closePanel} large />
             </div>
             <div className="overflow-auto flex-1 min-h-0">
@@ -223,7 +231,7 @@ export function VerticalPanel({ context }: PanelProps) {
 
             <div className={cx('flex flex-col h-full', isRTL ? 'pr-1' : 'pl-1')}>
               <div className="flex justify-between w-full ">
-                <Tabs setTab={setTab} tab={tab} className="min-w-0" />
+                <Tabs setTab={setTab} tab={tab} readOnly={context.readOnly} className="min-w-0" />
                 <PanelActionButton settings={settings} onClose={closePanel} />
               </div>
 
@@ -254,25 +262,6 @@ export function VerticalPanel({ context }: PanelProps) {
     </ToastContext.Provider>
   );
 }
-
-// Tab configuration - keys are used for internal routing, values are translation keys
-const getTabNames = (t: (key: string) => string) => {
-  const tabs: Record<string, string> = {
-    welcome: t('welcome'),
-    patterns: t('patterns'),
-    sounds: t('sounds'),
-    reference: t('reference'),
-    shortcuts: t('shortcuts'),
-    console: t('console'),
-    settings: t('settings'),
-  };
-
-  if (TAURI) {
-    tabs.files = t('files');
-  }
-
-  return tabs;
-};
 
 interface PanelNavProps {
   children: React.ReactNode;
@@ -357,6 +346,10 @@ function PanelContent({ context, tab }: PanelContentProps) {
         return <ShortcutsTab />;
       case 'files':
         return <FilesTab />;
+      case 'set':
+        // Never in the read-only admin view: an admin doesn't see anyone's sets.
+        if (!context.readOnly) return <SetTab />;
+        return <SettingsTab started={context.started} mixer={context.mixer} readOnly={context.readOnly} />;
       case 'settings':
       default:
         return <SettingsTab started={context.started} mixer={context.mixer} readOnly={context.readOnly} />;
@@ -411,11 +404,13 @@ interface TabsProps {
   setTab: (tab: string) => void;
   tab: string;
   className?: string;
+  /** The admin's read-only view: no Set tab. */
+  readOnly?: boolean;
 }
 
-function Tabs({ setTab, tab, className }: TabsProps) {
+function Tabs({ setTab, tab, className, readOnly = false }: TabsProps) {
   const { t } = useTranslation('tabs');
-  const tabNames = getTabNames(t);
+  const tabNames = getTabNames(t, { readOnly, tauri: Boolean(TAURI) });
 
   return (
     <div className={cx('flex select-none max-w-full overflow-auto pb-2', className)}>

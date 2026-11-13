@@ -191,5 +191,6 @@
     "folderCreated": "Dossier '{{name}}' créé avec succès",
     "itemMoved": "Élément déplacé avec succès",
     "itemDeleted": "Élément '{{name}}' supprimé avec succès"
-  }
+  },
+  "addToSet": "Ajouter au set"
 }

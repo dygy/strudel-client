@@ -1,5 +1,13 @@
 import { useEffect, useRef } from 'react';
-import { EyeIcon, MicrophoneIcon, ShareIcon, SparklesIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
+import {
+  EyeIcon,
+  MicrophoneIcon,
+  ShareIcon,
+  SparklesIcon,
+  StopIcon,
+  VideoCameraIcon,
+} from '@heroicons/react/24/outline';
+import { useSetPlayerContext } from '../../sets/useSetPlayer';
 import { useStore } from '@nanostores/react';
 import cx from '@src/cx';
 import { useTranslation } from '@src/i18n';
@@ -77,6 +85,7 @@ export function CompactMoreMenu({
 }) {
   const { t } = useTranslation('common');
   const { t: tSettings } = useTranslation('settings');
+  const setPlayer = useSetPlayerContext();
   const assistantOn = useStore(assistantControlOn);
   const assistantAvailable = useStore(assistantControlAvailable);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -150,6 +159,18 @@ export function CompactMoreMenu({
           }}
           icon={<EyeIcon className={cx('w-5 h-5', context.isPreviewing ? 'text-blue-400' : 'opacity-70')} />}
           label={context.isPreviewing ? t('stopPreview') : t('preview')}
+        />
+      )}
+      {/* Spec 022: End set for the compact layout (the touch set bar is only its Cue/Go button). */}
+      {setPlayer?.enabled && setPlayer.player.setId && (
+        <MenuItem
+          data-more-end-set=""
+          onClick={() => {
+            setPlayer.endSet();
+            onClose();
+          }}
+          icon={<StopIcon className="w-5 h-5 opacity-70" />}
+          label={tSettings('setListEnd')}
         />
       )}
       {assistantAvailable && (

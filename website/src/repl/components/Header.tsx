@@ -8,6 +8,7 @@ import { useTranslation } from '@src/i18n';
 import { useTransitionPhase } from '../transitionPhase';
 import { TransitionPicker } from './TransitionPicker';
 import { ScratchButton } from './scratch/ScratchButton';
+import { SetBar } from './set/SetBar';
 import { useSettings } from '../../settings';
 import { usePanelLayout } from './panel/panelLayout';
 import { AuthButton } from '../../components/auth/AuthButton';
@@ -307,6 +308,8 @@ export function Header({ context, embedded, trackName }: HeaderProps) {
         </div>
         {/* The floating scratch platter (spec 019 2.1) */}
         <ScratchButton />
+        {/* While a set plays: Now · Up next and the Cue/Go button (spec 022 2.3) */}
+        {!embedded && <SetBar />}
 
         {/* Preview (headphones) — only when mixer is available */}
         {context.mixer && (

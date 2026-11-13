@@ -33,7 +33,8 @@ export function TransitionPicker({ className, touch = false }: { className?: str
       <select
         aria-label={t('transitionPicker')}
         title={t('transitionPicker')}
-        className={cx(selectClass, 'max-w-[7.5rem]', touch && 'h-11 text-sm')}
+        // Touch: fills its box and never spills past it onto the next control when squeezed.
+        className={cx(selectClass, 'max-w-[7.5rem]', touch && 'h-11 text-sm w-full min-w-0')}
         value={type}
         onChange={(e) => {
           const next = e.target.value;

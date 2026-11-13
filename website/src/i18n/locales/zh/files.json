@@ -191,5 +191,6 @@
     "folderCreated": "文件夹 '{{name}}' 创建成功",
     "itemMoved": "项目移动成功",
     "itemDeleted": "项目 '{{name}}' 删除成功"
-  }
+  },
+  "addToSet": "添加到列表"
 }
