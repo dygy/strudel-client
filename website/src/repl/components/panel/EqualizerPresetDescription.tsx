@@ -33,6 +33,37 @@ export function formatDescribeHz(hz: number): string {
 /** `equalizerWhy<Key>`, for a preset key. */
 export const whyKey = (preset: string) => `equalizerWhy${preset.charAt(0).toUpperCase()}${preset.slice(1)}`;
 
+/** The settings a description is written from. */
+export interface DescribedSettings {
+  bands: { frequency: number; gain: number }[];
+  lowCut: CutConfig;
+  highCut: CutConfig;
+  outputGain: number;
+}
+
+/**
+ * The description's lines for `settings`, in the app language: `regions` ("Sub +16 dB · Low mids −4 dB")
+ * and `strip` (cuts and output), each '' when there is nothing in it, and `flat` when there is nothing
+ * at all. Used under the picker and in the track's recommendation (spec 024).
+ */
+export function describeLines(t: (key: string, options?: any) => string, settings: DescribedSettings) {
+  const description = describeSettings(settings);
+  const regions = description.regions.map(({ region, dB }) =>
+    t('equalizerDescribeRegion', { region: t(REGION_KEYS[region]), value: ltr(formatDescribeDb(dB)) }),
+  );
+  const strip: string[] = [];
+  if (description.lowCut !== undefined) {
+    strip.push(t('equalizerDescribeLowCut', { value: ltr(formatDescribeHz(description.lowCut)) }));
+  }
+  if (description.highCut !== undefined) {
+    strip.push(t('equalizerDescribeHighCut', { value: ltr(formatDescribeHz(description.highCut)) }));
+  }
+  if (description.outputGain !== undefined) {
+    strip.push(t('equalizerDescribeOutput', { value: ltr(formatDescribeDb(description.outputGain)) }));
+  }
+  return { flat: description.flat, regions: regions.join(' · '), strip: strip.join(' · ') };
+}
+
 interface EqualizerPresetDescriptionProps {
   bands: { frequency: number; gain: number }[];
   lowCut: CutConfig;
@@ -56,21 +87,7 @@ export function EqualizerPresetDescription({
   activePreset,
 }: EqualizerPresetDescriptionProps) {
   const { t } = useTranslation('settings');
-  const description = describeSettings({ bands, lowCut, highCut, outputGain });
-
-  const regions = description.regions.map(({ region, dB }) =>
-    t('equalizerDescribeRegion', { region: t(REGION_KEYS[region]), value: ltr(formatDescribeDb(dB)) }),
-  );
-  const strip: string[] = [];
-  if (description.lowCut !== undefined) {
-    strip.push(t('equalizerDescribeLowCut', { value: ltr(formatDescribeHz(description.lowCut)) }));
-  }
-  if (description.highCut !== undefined) {
-    strip.push(t('equalizerDescribeHighCut', { value: ltr(formatDescribeHz(description.highCut)) }));
-  }
-  if (description.outputGain !== undefined) {
-    strip.push(t('equalizerDescribeOutput', { value: ltr(formatDescribeDb(description.outputGain)) }));
-  }
+  const description = describeLines(t, { bands, lowCut, highCut, outputGain });
 
   const isGenre = EQUALIZER_PRESETS[activePreset]?.group === 'genre';
   const why = isGenre ? `${t('equalizerDescribeWhy')} ${t(whyKey(activePreset))}` : null;
@@ -80,7 +97,7 @@ export function EqualizerPresetDescription({
   // change (one announcement per gesture); the visible lines update at once.
   const lines = description.flat
     ? [t('equalizerDescribeFlat')]
-    : [regions.join(' · '), strip.join(' · ')].filter((line) => line !== '');
+    : [description.regions, description.strip].filter((line) => line !== '');
   const liveText = [...lines, ...(why ? [why] : [])].join('. ');
   const [announced, setAnnounced] = useState(liveText);
   useEffect(() => {
@@ -101,8 +118,8 @@ export function EqualizerPresetDescription({
           <div data-eq-describe="flat">{t('equalizerDescribeFlat')}</div>
         ) : (
           <>
-            {regions.length > 0 && <div data-eq-describe="regions">{regions.join(' · ')}</div>}
-            {strip.length > 0 && <div data-eq-describe="strip">{strip.join(' · ')}</div>}
+            {description.regions !== '' && <div data-eq-describe="regions">{description.regions}</div>}
+            {description.strip !== '' && <div data-eq-describe="strip">{description.strip}</div>}
           </>
         )}
         {isGenre && (

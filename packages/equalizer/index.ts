@@ -26,6 +26,22 @@ export {
 } from './response.js';
 export type { CutSettings, ResponseSettings, ResponseFilterType } from './response.js';
 export {
+  parseEqProfile,
+  resolveEqProfile,
+  matchingPreset,
+  sameEqSettings,
+  EQ_PROFILE_VERSION,
+  EQ_PROFILE_FREQUENCIES,
+  EQ_PROFILE_TEXT_LIMIT,
+} from './profile.js';
+export type {
+  EqProfile,
+  EqProfileBand,
+  EqProfileParseResult,
+  ResolvedEqProfile,
+  CurrentEqSettings,
+} from './profile.js';
+export {
   saveEqualizerSettings,
   loadEqualizerSettings,
   getDefaultSettings,
