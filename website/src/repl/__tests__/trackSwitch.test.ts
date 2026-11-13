@@ -230,3 +230,88 @@ describe('replaceTrackId (spec 018: a deleted track saved again under a new id)'
     expect(controller.playingTrackId).toBe('other');
   });
 });
+
+// @spec: 022-set-playlist (tech §2.4): a set's Go is a real switch even on the same track id.
+describe('force (spec 022: a set Go)', () => {
+  const forced = (t: ReturnType<typeof setup>, switchTrack: (code: string) => Promise<void> | void) =>
+    t.tracks.update({ force: true, isPlaying: t.repl.started, code: t.editor.code, hotSwap: t.hotSwap, switchTrack });
+
+  it('switches even when the editor holds the track that is playing (a repeated item, a second step)', async () => {
+    const t = setup();
+    await t.play('a', 's("bd")');
+    t.load('a', 's("bd*2")'); // another step of the same multitrack
+    const switchTrack = vi.fn();
+
+    expect(await forced(t, switchTrack)).toBe('switch');
+    expect(switchTrack).toHaveBeenCalledWith('s("bd*2")', { reset: false });
+    expect(t.hotSwap).not.toHaveBeenCalled();
+  });
+
+  it('a plain Update on the same track still hot-swaps (memory: update-must-hot-swap)', async () => {
+    const t = setup();
+    await t.play('a', 's("bd")');
+    t.load('a', 's("bd*2")');
+    const switchTrack = vi.fn();
+
+    expect(await t.update(switchTrack)).toBe('hot-swap');
+    expect(switchTrack).not.toHaveBeenCalled();
+  });
+
+  it('with nothing playing, a forced Go goes the switch path (the instant one, no transition)', async () => {
+    const t = setup();
+    t.load('a', 's("bd")');
+    const switchTrack = vi.fn();
+    expect(await forced(t, switchTrack)).toBe('switch');
+    expect(switchTrack).toHaveBeenCalledTimes(1);
+  });
+
+  it('a second forced Go for the same target while one is in flight is ignored', async () => {
+    const t = setup();
+    await t.play('a', 's("bd")');
+    t.load('a', 's("bd*2")');
+    const fade = deferred();
+    const switchTrack = vi.fn(async () => {
+      await fade.promise;
+    });
+    const first = forced(t, switchTrack);
+    expect(await forced(t, switchTrack)).toBe('ignored');
+    expect(switchTrack).toHaveBeenCalledTimes(1);
+    fade.resolve();
+    await first;
+  });
+
+  // Review 022 #2: the next step of the same multitrack (or a repeated track with edits) during a
+  // running transition was ignored because only the track id was compared.
+  it('a forced Go with other code for the same track while one is in flight is a (queued) switch', async () => {
+    const t = setup();
+    await t.play('a', 's("bd")');
+    t.load('a', 's("bd*2")'); // step 2 of multitrack a
+    const fade = deferred();
+    const switchTrack = vi.fn(async () => {
+      await fade.promise;
+    });
+    const first = forced(t, switchTrack);
+    t.load('a', 's("bd*4")'); // step 3 of the same multitrack, Go'd while step 2's transition runs
+    expect(t.tracks.decide(true, false, true, 's("bd*4")')).toBe('switch');
+    const second = forced(t, switchTrack);
+    expect(switchTrack).toHaveBeenCalledTimes(2);
+    expect(switchTrack).toHaveBeenLastCalledWith('s("bd*4")', { reset: false });
+    fade.resolve();
+    expect(await first).toBe('switch');
+    expect(await second).toBe('switch');
+  });
+
+  it('a plain Update for the same track while a switch is in flight is still ignored', async () => {
+    const t = setup();
+    await t.play('a', 's("bd")');
+    t.load('b', 's("hh")');
+    const fade = deferred();
+    const first = t.update(async () => {
+      await fade.promise;
+    });
+    t.load('b', 's("hh*2")');
+    expect(t.tracks.decide(true, false, false, 's("hh*2")')).toBe('ignored');
+    fade.resolve();
+    await first;
+  });
+});
