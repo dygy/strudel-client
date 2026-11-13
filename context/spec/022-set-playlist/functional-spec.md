@@ -1,7 +1,7 @@
 # Functional Specification: Set Playlist
 
 - **Roadmap Item:** Phase 6, item 1, "Set playlist": an ordered queue of tracks for a live set, with a transition per item and a "next" key that cues the next track on headphones and then mixes it onto the speakers. The owner picked it from the Phase 6 ideas in chat on 2026-11-13. No GitHub issue.
-- **Status:** Approved
+- **Status:** Completed
 - **Author:** Claude (for the owner, Dygy)
 
 ---

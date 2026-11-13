@@ -66,3 +66,18 @@
 
 ## Agents dispatched: 4 (Explore, strudel-web-engineer, strudel-test-engineer, strudel-reviewer)
 - Next: commit, rebase on `origin/main` (021 was pushed by the other session), then the push gate.
+
+## 2026-11-13: Push and prod
+- The first push, 9f1c6a2 (rebased onto 024's 36b8c4b; one conflict in the `useReplContext` afterEval, both calls kept), went red in CI. `CompactLayout.test.tsx` mocked `@src/lib/slugUtils` bare, and under `isolate:false` the mock leaked into `setUi.test.tsx` in CI's file order (19 failed). The deploy was skipped, so prod was untouched.
+- Fixed forward with bd99cdb, a test-only change: a partial mock via `importOriginal`. The leak reproduced locally with both files in one worker and was green after the fix. The full suite with shuffled files on 2 and 4 workers was green on all 6 runs.
+- Deploy run 43464881675 passed: check and deploy both green.
+- Prod verification at strudel.dygy.app, signed in as the owner:
+  - `/api/sets/list` answers 401 without a session (it was 404 before the deploy);
+  - the Set tab is present;
+  - created a set of lofi and phonky: Cue gave Go; Go put lofi on the speakers; Cue and Go again put phonky on, and the bar shows "End of set";
+  - console: 0 errors;
+  - the test set was deleted. The first delete hit `ERR_CONNECTION_CLOSED` during the 023 deploy window; the UI kept the set and the retry worked. A failed delete shows no toast (console only), which is a known limit.
+- Tracks written during verification: 0.
+- Bookkeeping done: Phase 6 in the roadmap, a feature-map row, spec Status set to Completed, memory notes.
+- Not done: architecture.md (`/awos:architecture` suggested).
+- Flow defect: `/ship` Step 10 assumes a green run follows a green local suite. CI's file order differs, so run shuffled seeds before the push gate.

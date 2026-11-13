@@ -50,6 +50,22 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
 
 ---
 
+### Phase 6 — Live sets (now)
+
+- [x] **Set playlist:** a prepared, ordered set of tracks and multitrack steps, each with its own transition type and length. Alt+Shift+N (or the set bar's button) Cues the next item on the headphones, then Goes: mixes it onto the speakers. Sets live in the account (Supabase `set_lists`) ([022](../spec/022-set-playlist/), bd99cdb, 2026-11-13).
+- [ ] **Tempo and phrase sync:** match the next track's tempo before a transition and start it on a phrase boundary (4/8/16 cycles).
+- [ ] **Performance mode:** full-screen view with large code, now and next, set timer, levels; guard against closing the tab.
+- [ ] **MIDI mapping for everything:** EQ, volume, crossfader, Cue/Go and transition, not just the scratch jog.
+- [ ] **Master FX:** filter, delay/reverb throw, beat-repeat and brake on the master bus.
+- [ ] **Loudness meter and analyser:** LUFS/RMS, spectrum before and after the EQ, clipping warning.
+- [ ] **Set recording with a tracklist:** timestamps of every Go written next to the recording.
+- [ ] **Track version history:** snapshots on save, diff and restore.
+- [ ] **Trash:** deleted tracks recoverable for 30 days.
+- [ ] **Tags, tempo and key on tracks**, with search and filters.
+- [ ] **Assistant in the set:** build or change a set through MCP.
+
+---
+
 ### Phase 4 — Make it safe to change (next)
 
 - [x] **A test suite that can gate deploys**
