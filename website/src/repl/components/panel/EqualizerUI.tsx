@@ -19,6 +19,8 @@ import {
   frequencyToX,
   gainToY,
   formatFrequency,
+  resolveEqProfile,
+  sameEqSettings,
 } from '@strudel/equalizer';
 import { usePanelViewport } from './panelViewport';
 import { getMainEqualizer, subscribeMainEqualizer } from '../../mainEqualizer';
@@ -32,6 +34,8 @@ import {
 } from './EqualizerCompact';
 import { EqualizerStripControls } from './EqualizerStripControls';
 import { EqualizerPresetDescription } from './EqualizerPresetDescription';
+import { EqualizerRecommendation } from './EqualizerRecommendation';
+import { getPlayingEqProfile, subscribePlayingEqProfile } from '../../playingEqProfile';
 
 interface EqualizerUIProps {
   /** The headphone PreviewEngine (its own EQ); null when it is not ready. */
@@ -432,6 +436,34 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     );
   };
 
+  // Spec 024: the playing track's recommendation, offered with Apply; never applied by itself.
+  const playingProfile = useSyncExternalStore(subscribePlayingEqProfile, getPlayingEqProfile, () => null);
+  const recommended =
+    playingProfile && bands.length > 0 ? resolveEqProfile(playingProfile, { bands, lowCut, highCut }) : null;
+  const recommendationApplied =
+    !!recommended && isEnabled && sameEqSettings(recommended, { bands, lowCut, highCut, outputGain });
+
+  // Apply: every value first (stored silently while the EQ is off), then switch it on, so the
+  // switch-on crossfade brings in the new curve and nothing is heard while it is off. Both EQs, saved.
+  const handleApplyProfile = () => {
+    if (!recommended) return;
+    const { preset, ...next } = recommended;
+    equalizers().forEach((eq) => {
+      next.bands.forEach((band, index) => eq.setBand(index, { gain: band.gain, Q: band.Q }));
+      eq.setLowCut(next.lowCut);
+      eq.setHighCut(next.highCut);
+      eq.setOutputGain(next.outputGain);
+      if (!isEnabled) eq.setEnabled(true);
+    });
+    setBands(next.bands);
+    setLowCut(next.lowCut);
+    setHighCut(next.highCut);
+    setOutputGain(next.outputGain);
+    setActivePreset(preset);
+    setIsEnabled(true);
+    saveEqualizerSettings(settingsWith({ ...next, preset, isEnabled: true }));
+  };
+
   const handleReset = () => {
     if (confirm(t('equalizerResetConfirm'))) {
       handlePresetChange('flat');
@@ -469,6 +501,19 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
           {isEnabled ? t('equalizerEnabled') : t('equalizerDisabled')}
         </button>
       </div>
+
+      {/* What the playing track recommends (spec 024; both layouts) */}
+      {recommended && playingProfile && (
+        <EqualizerRecommendation
+          settings={recommended}
+          preset={playingProfile.preset}
+          why={playingProfile.why}
+          applied={recommendationApplied}
+          isEnabled={isEnabled}
+          compact={compact}
+          onApply={handleApplyProfile}
+        />
+      )}
 
       {/* Preset selector */}
       <div>

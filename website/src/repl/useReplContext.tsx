@@ -59,6 +59,7 @@ import { createEvaluationWatch, isMusicChanging } from './evaluationWatch';
 import { createTrackSwitchController, type UpdateOutcome } from './trackSwitch';
 import { settingsForSwitch, switchPath } from './transitionSettings';
 import { installMainEqualizerWhenReady } from './mainEqualizer';
+import { playingCodeEvaluated, playingStopped } from './playingEqProfile';
 import { scratchRuntime } from './scratch/scratchRuntime';
 import { createScratchReplHooks } from './scratch/scratchReplHooks';
 import { installScratchShortcut } from './scratch/scratchShortcut';
@@ -285,6 +286,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
 
             // Nothing is playing on the speakers any more.
             trackSwitch.stopped();
+            // Spec 024: no recommendation while nothing plays.
+            playingStopped();
             // The next start is at cycle 0: drop the track origin, cancel a running transition.
             transitionControllerRef.current?.stopped();
 
@@ -316,6 +319,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
 
           // The main repl now plays this code; its track id was captured when the evaluate started.
           trackSwitch.evaluated(code);
+          // Spec 024: the EQ panel offers this code's `// @eq-profile` recommendation (never applied by itself).
+          playingCodeEvaluated(code);
 
           setLatestCode(code);
           setDocumentTitle(code);

@@ -1,7 +1,7 @@
 # Functional Specification: EQ Genre Presets for Every Family, and What Each Preset Does
 
 - **Roadmap Item:** Not on the roadmap. Requested by the owner in chat on 2026-11-13, after spec [020](../020-eq-strong-control/) shipped: "add all possible genres, let's be transparent". No GitHub issue.
-- **Status:** Approved
+- **Status:** Completed
 - **Author:** Claude (for the owner)
 
 ---
