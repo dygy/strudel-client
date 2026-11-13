@@ -92,7 +92,7 @@ export const stripLocations = (pat) => pat.withContext((context) => ({ ...contex
  * Queries that start at or after `oldEnd` never reach the old pattern, so a finished
  * transition costs nothing even while the combined pattern is still referenced.
  */
-function endAt(pat, oldEnd) {
+export function endAt(pat, oldEnd) {
   return new Pattern((state) => {
     if (state.span.begin.valueOf() >= oldEnd) {
       return [];
@@ -105,7 +105,7 @@ function endAt(pat, oldEnd) {
 }
 
 /** Events of a shifted pattern before its origin belong to its negative cycles: drop them. */
-const fromOrigin = (pat, origin) => pat.filterHaps((hap) => onsetOf(hap) >= origin);
+export const fromOrigin = (pat, origin) => pat.filterHaps((hap) => onsetOf(hap) >= origin);
 
 /** Old-track envelope per type, for one hap. */
 function shapeOld(type, hap, { T, L, oldEnd, echoFrom, cps }) {

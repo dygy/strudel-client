@@ -390,7 +390,7 @@ describe('createMidiJog', () => {
       { type: 'grab' },
       { type: 'move', delta: -MIDI_JOG_SECONDS_PER_TICK },
       { type: 'move', delta: -2 * MIDI_JOG_SECONDS_PER_TICK },
-      { type: 'release' },
+      { type: 'release', id: 1, beatSeconds: 0 }, // spec 023: id + snap beat (no tempo source: snap has no beat)
     ]);
     unstubWebAudio();
   });

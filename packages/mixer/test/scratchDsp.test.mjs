@@ -1,5 +1,8 @@
 /**
  * Spec 019 tech §2.2 / §4: the pure scratch DSP, fed known signals block by block.
+ * Spec 023 changed the grab (the ring keeps recording; a brake stops the record) and the
+ * release (spin-up, then a hand-over): those tests are adapted here, and the new behaviour is
+ * in scratchDsp023.test.mjs.
  */
 import { describe, it, expect } from 'vitest';
 import { ScratchDsp, SCRATCH_MAX_RATE } from '../scratch/scratchDsp.mjs';
@@ -87,7 +90,7 @@ describe('ScratchDsp: idle', () => {
     const { left, inLeft } = run(dsp, src, 20);
     expect(left).toEqual(inLeft);
     expect(dsp.mix).toBe(0);
-    expect(dsp.frozen).toBe(false);
+    expect(dsp.phase).toBe('live');
   });
 
   it('treats a missing input (nothing connected) as silence', () => {
@@ -101,12 +104,15 @@ describe('ScratchDsp: idle', () => {
 describe('ScratchDsp: grab ramp', () => {
   it('reaches mix 1 within 10 ms, one linear step per sample, never a bigger jump', () => {
     const dsp = new ScratchDsp(SR, 2);
-    // Constant live input 1 and a held (still) platter: out = (1 − mix), so out reveals mix.
-    const src = makeSource(() => 1);
+    const src = makeSource(sine(220));
     run(dsp, src, 10);
     dsp.grab();
-    const { left } = run(dsp, src, 8);
-    const mixes = left.map((v) => 1 - v);
+    // One-sample blocks, reading the mix after each.
+    const mixes = [];
+    for (let i = 0; i < 8 * BLOCK; i++) {
+      dsp.process(src.next(1), [new Float32Array(1), new Float32Array(1)], 1);
+      mixes.push(dsp.mix);
+    }
     const firstFull = mixes.findIndex((m) => m >= 1 - 1e-6);
     expect(firstFull).toBeGreaterThan(0);
     expect(firstFull).toBeLessThanOrEqual(RAMP); // ≤ 480 samples = 10 ms
@@ -122,7 +128,8 @@ describe('ScratchDsp: grab ramp', () => {
     const src = makeSource(sine(220));
     run(dsp, src, blocksFor(0.5));
     dsp.grab();
-    run(dsp, src, blocksFor(0.02)); // past the 10 ms ramp
+    // Past the 0.1 s brake, the velocity-gain fade and the DC blocker's 16 ms tail.
+    run(dsp, src, blocksFor(0.25));
     const { left, right } = run(dsp, src, blocksFor(0.2));
     expect(rms(left)).toBeLessThan(1e-4);
     expect(rms(right)).toBeLessThan(1e-4);
@@ -155,11 +162,11 @@ describe('ScratchDsp: playback', () => {
     const grabAt = before.length; // the record holds samples [0, grabAt)
     dsp.grab();
     dsp.setMotor(-1);
-    run(dsp, src, blocksFor(0.1)); // let the smoother and the velocity gain settle
+    run(dsp, src, blocksFor(0.1)); // the brake (0.1 s) is over: the hand alone turns it
     const { left } = run(dsp, src, blocksFor(0.1));
-    // The read head has travelled ~0.1 s back (minus the smoother lag) when the window starts.
-    const lo = grabAt - Math.round(0.12 * SR);
-    const hi = grabAt - Math.round(0.08 * SR);
+    // Brake (+0.05 s) and hand (−0.1 s): the read head is ~0.05 s before the grab point.
+    const lo = grabAt - Math.round(0.07 * SR);
+    const hi = grabAt - Math.round(0.03 * SR);
     const reverse = bestCorrelation(left, before, true, lo, hi);
     const forward = bestCorrelation(left, before, false, lo - 2 * left.length, hi);
     expect(reverse).toBeGreaterThan(0.98);
@@ -178,7 +185,8 @@ describe('ScratchDsp: playback', () => {
     const move = () => dsp.moveBy(-BLOCK / SR);
     run(dsp, src, blocksFor(0.1), move);
     const { left } = run(dsp, src, blocksFor(0.1), move);
-    const reverse = bestCorrelation(left, before, true, grabAt - Math.round(0.13 * SR), grabAt - Math.round(0.07 * SR));
+    // Brake (+0.05 s) and hand (−0.1 s, minus the 8 ms smoother): about 0.04 s before the grab point.
+    const reverse = bestCorrelation(left, before, true, grabAt - Math.round(0.08 * SR), grabAt - Math.round(0.02 * SR));
     expect(reverse).toBeGreaterThan(0.97);
   });
 
@@ -221,7 +229,7 @@ describe('ScratchDsp: record edges', () => {
     expect(rms(run(dsp, src, blocksFor(0.1)).left)).toBeGreaterThan(0.3);
   });
 
-  it('pushing forwards past the grab point is silent', () => {
+  it('pushing forwards past the newest sample ("now") is silent', () => {
     const dsp = new ScratchDsp(SR, 2);
     const src = makeSource(sine(220));
     run(dsp, src, blocksFor(1));
@@ -229,57 +237,37 @@ describe('ScratchDsp: record edges', () => {
     dsp.moveBy(+2);
     dsp.setMotor(4);
     run(dsp, src, blocksFor(0.03));
-    expect(dsp.posSeconds).toBe(0);
+    expect(dsp.posSeconds).toBeCloseTo(0, 3);
+    run(dsp, src, blocksFor(0.12)); // the velocity gain and the DC blocker's tail fade
     expect(rms(run(dsp, src, blocksFor(0.2)).left)).toBeLessThan(1e-4);
   });
 });
 
 describe('ScratchDsp: release', () => {
-  it('ramps back to live within 10 ms with no step bigger than one increment', () => {
-    const dsp = new ScratchDsp(SR, 2);
-    const src = makeSource(() => 1);
-    run(dsp, src, 10);
-    dsp.grab();
-    run(dsp, src, 10); // fully on the (still, silent) scratch
-    dsp.release();
-    const { left } = run(dsp, src, 8);
-    const firstLive = left.findIndex((v) => v >= 1 - 1e-6);
-    expect(firstLive).toBeGreaterThan(0);
-    expect(firstLive).toBeLessThanOrEqual(RAMP);
-    for (let i = 1; i < left.length; i++) {
-      expect(Math.abs(left[i] - left[i - 1])).toBeLessThanOrEqual(1 / RAMP + 1e-6);
-    }
-  });
-
-  it('live is continuous through the release ramp and bit-exact after it', () => {
+  it('after the spin-up and the hand-over the output is the live input again, bit-exact', () => {
     const dsp = new ScratchDsp(SR, 2);
     const src = makeSource(sine(440));
     run(dsp, src, blocksFor(1));
     dsp.grab();
     dsp.setMotor(-1);
     run(dsp, src, blocksFor(0.3));
-    dsp.release();
-    const { left, inLeft } = run(dsp, src, 8);
-    // Max slope of a 0.5-amplitude 440 Hz sine per sample, plus the scratch's own, plus one step.
-    const maxSlope = 2 * Math.PI * 440 * 0.5 * (2 / SR) + 1 / RAMP;
-    for (let i = 1; i < left.length; i++) {
-      expect(Math.abs(left[i] - left[i - 1])).toBeLessThanOrEqual(maxSlope + 1e-3);
-    }
-    // Past the ramp the output is the live input again, bit-exact.
-    expect(left.slice(RAMP + 1)).toEqual(inLeft.slice(RAMP + 1));
+    dsp.release({ id: 1, beatSeconds: 0 });
+    run(dsp, src, blocksFor(2)); // spin-up and correction: settled
+    expect(dsp.phase).toBe('settled');
+    dsp.handOver(1, dsp.n);
+    run(dsp, src, blocksFor(0.05)); // the 20 ms crossfade
+    expect(dsp.phase).toBe('live');
     const after = run(dsp, src, 5);
     expect(after.left).toEqual(after.inLeft);
     expect(dsp.active).toBe(false);
   });
 
-  it('writing resumes at once on release, so the next grab hears the newest audio', () => {
+  it('the ring keeps recording while held, so the next grab hears the newest audio', () => {
     const dsp = new ScratchDsp(SR, 2);
     const src = makeSource(sine(220));
     run(dsp, src, blocksFor(1));
     dsp.grab();
-    run(dsp, src, 5);
     const idx = dsp.writeIndex;
-    dsp.release();
     run(dsp, src, 4);
     expect(dsp.writeIndex).toBe((idx + 4 * BLOCK) % dsp.length);
   });
@@ -314,29 +302,39 @@ describe('ScratchDsp: guards', () => {
     dsp.setMotor(-1000);
     expect(dsp.motorRate).toBe(-SCRATCH_MAX_RATE);
     dsp.setMotor(0);
-    dsp.moveBy(-7); // a huge jump becomes at most 8 samples per sample
-    let prev = dsp.pos;
+    run(dsp, src, blocksFor(0.15)); // the brake is over
+    dsp.moveBy(-7); // a huge jump becomes at most 8× normal speed backwards
+    let prev = dsp.lag;
     for (let b = 0; b < 20; b++) {
       run(dsp, src, 1);
-      expect(prev - dsp.pos).toBeLessThanOrEqual(SCRATCH_MAX_RATE * BLOCK + 1e-6);
-      prev = dsp.pos;
+      expect(Math.abs(dsp.rate)).toBeLessThanOrEqual(SCRATCH_MAX_RATE + 1e-9);
+      // The lag grows by at most 1 + 8 samples per sample.
+      expect(dsp.lag - prev).toBeLessThanOrEqual((SCRATCH_MAX_RATE + 1) * BLOCK + 1e-6);
+      prev = dsp.lag;
     }
     expect(run(dsp, src, 20).left.every(Number.isFinite)).toBe(true);
   });
 
-  it('a re-grab during the release ramp keeps the read head on the same recorded sample', () => {
+  it('a re-grab during the spin-up keeps the read head on the same recorded sample', () => {
     const dsp = new ScratchDsp(SR, 2);
     const src = makeSource(sine(220));
     run(dsp, src, blocksFor(1));
     dsp.grab();
     dsp.setMotor(-1);
     run(dsp, src, blocksFor(0.2));
-    dsp.release();
-    run(dsp, src, 1);
-    const absBefore = dsp.grabIndex - 2 + dsp.pos;
-    const written = dsp.writtenSinceRelease;
+    dsp.setMotor(0); // held still, then let go: the motor spins it up from 0
+    run(dsp, src, blocksFor(0.05));
+    dsp.release({ id: 1 });
+    run(dsp, src, 4);
+    expect(dsp.phase).toBe('spinUp');
+    const lag = dsp.lag;
+    const rate = dsp.motor;
     dsp.grab();
-    expect(dsp.grabIndex - 2 + dsp.pos).toBeCloseTo(absBefore, 6);
-    expect(written).toBe(BLOCK);
+    expect(dsp.phase).toBe('held');
+    expect(dsp.lag).toBe(lag);
+    // The brake starts from the rate the motor had reached, not from a standstill or full speed.
+    expect(dsp.brakeFrom).toBe(rate);
+    expect(rate).toBeGreaterThan(0);
+    expect(rate).toBeLessThan(1);
   });
 });

@@ -144,6 +144,8 @@
   "scratchMidiNone": "할당된 조그 휠 없음",
   "scratchMidiAssigned": "{{device}} · 컨트롤 {{control}}, 채널 {{channel}}",
   "scratchMidiLearnTimeout": "돌린 컨트롤이 없습니다. 바뀐 것이 없습니다.",
+  "scratchSnap": "비트에 맞추기",
+  "scratchSnapHint": "스크래치 후 트랙의 새 위치를 가장 가까운 비트로 맞춰 박자를 유지합니다. 끄면 레코드가 있던 위치에서 그대로 이어집니다.",
   "scratchMidiUnsupported": "이 브라우저는 MIDI를 지원하지 않습니다. 플래터는 계속 작동합니다.",
   "scratchMidiDenied": "MIDI 접근이 거부되었습니다. 플래터는 계속 작동합니다.",
   "scratchMidiError": "MIDI를 시작할 수 없습니다. 플래터는 계속 작동합니다.",

@@ -245,6 +245,9 @@ declare module '@strudel/mixer' {
     deviceId: string | null;
     /** The headphone deck's scratch node (spec 019): null until ensureScratchDeck() creates it. */
     scratchDeck: ScratchDeck | null;
+    /** Spec 023: the headphone track's scratch offset (its repl's editPattern); reset on stop. */
+    scratchOffset: PatternOffset;
+    scratchHandOver: ScratchHandOver | null;
     /**
      * Creates and attaches the headphone scratch deck (spec 019) once the preview plays.
      * Idempotent; a failed attach is retried; null when not initialized, failed, or destroyed.
@@ -339,13 +342,132 @@ declare module '@strudel/mixer' {
     moveBy(seconds: number): void;
     /** Keeps the held record turning at `rate` (±1 keyboard, 0 still; clamped to ±8). */
     setMotor(rate: number): void;
-    /** Lets go. Idempotent, and safe before attach() resolves. */
+    /** Lets go: the motor spins up and the lag lands on the beat (snap) or stays. Idempotent. */
     release(): void;
     destroy(): void;
-    /** Test hook: the worklet's mix (0 live … 1 scratch), grab state and position (s, ≤ 0). */
-    getDebugState(): Promise<{ mix: number; grabbed: boolean; pos: number } | null>;
+    /** Spec 023: snap the lag to the nearest beat on release (default true). */
+    snap: boolean;
+    /** Spec 023: 'live' | 'held' | 'releasing' (spinning up) | 'settled' (lag reported). */
+    readonly phase: 'live' | 'held' | 'releasing' | 'settled';
+    readonly releaseId: number;
+    /** Spec 023: where the deck reads its tempo (cps) at a release, for snap to beat. */
+    setTempoSource(fn: (() => number | undefined) | null): void;
+    /** Spec 023: the released record settled `lagSeconds` behind live. */
+    onLagSettled(listener: (event: { id: number; lagSeconds: number }) => void): () => void;
+    /** Spec 023: the pattern is shifted; crossfade to live at `atSeconds` (context time); the shifted input starts at `shiftSeconds`. */
+    handOver(id: number, atSeconds: number, shiftSeconds?: number): void;
+    /** Spec 023: back to live now, dropping a release in progress (a held deck stays held). */
+    abort(): void;
+    /** Spec 023: cancel a release whose lag hasn't been reported yet; true when one was cancelled. */
+    cancelPending(): boolean;
+    /** Spec 023 review 4: apply a spinning-up release's planned lag now (Update); true when kept. */
+    commitPending(): boolean;
+    /** Spec 023 review: whether release `id`'s hand-over may still be sent. */
+    canHandOver(id: number): boolean;
+    /** Spec 023 review 2: the release's plan, once per release. */
+    onPlan(
+      listener: (plan: {
+        id: number;
+        targetSeconds: number;
+        upSeconds: number;
+        fromRate: number;
+        bumpSeconds: number;
+        bumpDepth: number;
+      }) => void,
+    ): () => void;
+    readonly plan: Record<string, number> | null;
+    /** Test hook: the worklet's mix (0 live … 1 scratch), grab state, position and lag (s), phase, rate. */
+    getDebugState(): Promise<{
+      mix: number;
+      grabbed: boolean;
+      pos: number;
+      phase?: string;
+      lag?: number;
+      rate?: number;
+    } | null>;
     on(event: 'change', listener: (deck: ScratchDeck) => void): () => void;
   }
+
+  /** Spec 023: a deck's persistent scratch offset in cycles, applied in its repl's editPattern. */
+  export class PatternOffset {
+    constructor(options?: { getRepl?: () => any; isBusy?: () => boolean });
+    cycles: number;
+    raw: any;
+    /** The repl's hook: runs `inner` (the spec 017 transition hook) and shifts the result late. */
+    editPattern(pattern: any, inner?: (pattern: any) => any): any;
+    /** Adds `cycles` and re-sets the pattern; false while busy, stopped or without a pattern. */
+    shift(cycles: number, options?: { onFirstQuery?: (cycle: number) => void }): boolean;
+    reset(): void;
+  }
+
+  /** Spec 023: shifts a deck's pattern, releases its stale voices and hands the record over to live. */
+  export class ScratchHandOver {
+    constructor(
+      deck: ScratchDeck,
+      options: {
+        getRepl: () => any;
+        offset: PatternOffset;
+        voices?: { getActiveSoundIds: () => unknown[]; releaseSounds: (...args: any[]) => unknown };
+        isBlocked?: () => boolean;
+        getAudioContext?: () => BaseAudioContext | undefined;
+      },
+    );
+    onLagSettled(event: { id: number; lagSeconds: number }): boolean;
+    destroy(): void;
+  }
+  export function scratchShiftTime(scheduler: any, now: number): number;
+
+  export const SCRATCH_BRAKE_SECONDS: number;
+  export const SCRATCH_SPINUP_SECONDS: number;
+  export const SCRATCH_HANDOVER_SECONDS: number;
+  export const SCRATCH_SNAP_BEAT_CYCLES: number;
+  export const SCRATCH_MIN_SHIFT_SECONDS: number;
+  export function scratchSmoothStep(x: number): number;
+  export function scratchBrakeRate(t: number, fromRate: number, seconds?: number): number;
+  export function scratchSpinUpRate(t: number, fromRate: number, seconds?: number): number;
+  export function scratchBeatSeconds(cps: number): number;
+  export function planScratchSpinUp(args: {
+    lagSeconds: number;
+    fromRate: number;
+    beatSeconds?: number;
+    maxLagSeconds?: number;
+  }): { targetSeconds: number; upSeconds: number; fromRate: number; nominalSeconds: number };
+  /** Spec 023 review: the whole release the worklet runs (spin-up + correction bump). */
+  export interface ScratchReleasePlan {
+    targetSeconds: number;
+    upSeconds: number;
+    fromRate: number;
+    nominalSeconds: number;
+    bumpSeconds: number;
+    bumpDepth: number;
+    settleSeconds: number;
+  }
+  export function planScratchRelease(args: {
+    lagSeconds: number;
+    fromRate: number;
+    beatSeconds?: number;
+    maxLagSeconds?: number;
+    minLagSeconds?: number;
+  }): ScratchReleasePlan;
+  export function scratchReleaseRate(
+    t: number,
+    plan: { upSeconds: number; bumpSeconds: number; bumpDepth: number; fromRate?: number },
+    fromRate?: number,
+  ): number;
+  export function scratchBumpSeconds(errorSeconds: number, toZero?: boolean): number;
+  export function scratchBumpDepth(errorSeconds: number, seconds: number): number;
+  export function scratchShiftArrival(scheduler: any): { cycle: number; time: number } | null;
+  export function scratchQueryTime(scheduler: any, cycle: number, now: number): number;
+  export function scratchMidNoteValue(
+    value: Record<string, unknown>,
+    elapsed: number,
+    deps?: Record<string, unknown>,
+  ): Record<string, unknown> | null;
+  export function scratchSoundingNotes(
+    pattern: any,
+    cycle: number,
+    cps: number,
+  ): Array<{ hap: any; value: Record<string, unknown>; elapsed: number; remaining: number }>;
 
   export interface ScratchControllerState {
     /** Any deck is held. */
@@ -372,7 +494,8 @@ declare module '@strudel/mixer' {
     /** `source` lets go; the deck is released only when no other source holds it. */
     release(source?: ScratchSource): void;
     /** Every source, every deck, every timer. */
-    releaseAll(): void;
+    /** `commitPending` (an Update is coming): a release already spinning up keeps its lag (spec 023). */
+    releaseAll(options?: { commitPending?: boolean }): void;
     /** `source` lets go `ms` after its last move (wheel and MIDI jog: 250 ms). */
     autoRelease(ms: number, source?: ScratchSource): void;
     on(event: 'change', listener: (state: ScratchControllerState) => void): () => void;

@@ -4,7 +4,7 @@ import cx from '@src/cx';
 import { useTranslation } from '@src/i18n';
 import { Platter } from './Platter';
 import { DeckSwitch, isScratchActive, platterStatusKey } from './ScratchSection';
-import { scratchRuntime, type ScratchRuntime } from '../../scratch/scratchRuntime';
+import { scratchRuntime, selectedSpin, type ScratchRuntime } from '../../scratch/scratchRuntime';
 
 /** A small record, for the button. */
 function RecordIcon({ className }: { className?: string }) {
@@ -113,6 +113,7 @@ export function ScratchButton({
               grabbed={state.grabbed}
               size={touch ? 'compact' : 'settings'}
               label={t('scratchPlatter')}
+              spin={selectedSpin(state)}
             />
           </div>
           <p

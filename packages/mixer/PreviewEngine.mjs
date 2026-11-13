@@ -16,7 +16,9 @@
  */
 
 import { AudioEqualizer, applyEqualizerSettings, loadEqualizerSettings } from '@strudel/equalizer';
+import { getActiveSoundIds, releaseSounds } from 'superdough';
 import { ScratchDeck } from './scratch/ScratchDeck.mjs';
+import { PatternOffset, ScratchHandOver } from './scratch/ScratchShift.mjs';
 
 export class PreviewEngine {
   /**
@@ -27,6 +29,8 @@ export class PreviewEngine {
    * @param {Function} deps.getTime - Time function for the repl scheduler
    * @param {new (ctx: AudioContext) => any} deps.SuperdoughAudioController - Controller class
    * @param {Function} [deps.transpiler] - Code transpiler
+   * @param {{getActiveSoundIds: Function, releaseSounds: Function}} [deps.voices] - superdough's
+   *   voice listing and release (spec 023; default: superdough's exports)
    */
   constructor(audioContext, deps) {
     this.audioContext = audioContext;
@@ -39,6 +43,10 @@ export class PreviewEngine {
     this.mediaStreamDest = null;
     /** The headphone deck's scratch node (spec 019); created lazily by ensureScratchDeck(). */
     this.scratchDeck = null;
+    /** Spec 023: the headphone track's scratch offset (its repl's editPattern), reset on stop. */
+    this.scratchOffset = new PatternOffset({ getRepl: () => this.replInstance });
+    /** @type {ScratchHandOver|null} */
+    this.scratchHandOver = null;
     this.isInitialized = false;
     this.isPlaying = false;
     this.deviceId = null;
@@ -103,8 +111,15 @@ export class PreviewEngine {
       defaultOutput: previewOutput,
       getTime,
       transpiler,
+      // Spec 023: a scratch moves the headphone track (and only it) later by its lag.
+      editPattern: (pattern) => this.scratchOffset.editPattern(pattern),
       onToggle: (started) => {
         this.isPlaying = started;
+        if (!started) {
+          // The next start is at cycle 0, and a record still spinning up has nothing to land on.
+          this.scratchOffset.reset();
+          this.scratchDeck?.abort();
+        }
         console.log(`[PreviewEngine] ${started ? 'started' : 'stopped'}`);
       },
     });
@@ -126,7 +141,23 @@ export class PreviewEngine {
    */
   async ensureScratchDeck() {
     if (!this.isInitialized || !this.controller) return null;
-    if (!this.scratchDeck) this.scratchDeck = new ScratchDeck(this.audioContext, this.controller);
+    if (!this.scratchDeck) {
+      this.scratchDeck = new ScratchDeck(this.audioContext, this.controller);
+      // Spec 023: the settled lag shifts this repl only; only this controller's voices are released.
+      const previewController = this.controller;
+      const voices = this.deps.voices ?? { getActiveSoundIds, releaseSounds };
+      this.scratchHandOver = new ScratchHandOver(this.scratchDeck, {
+        getRepl: () => this.replInstance,
+        offset: this.scratchOffset,
+        voices: {
+          getActiveSoundIds: () => voices.getActiveSoundIds(previewController),
+          releaseSounds: (...args) => voices.releaseSounds(...args),
+        },
+        // Long notes restarted after the shift play on the headphones too (review 1).
+        trigger: (value, t, duration, cps, cycle) =>
+          this.deps.superdough(value, t, duration, cps, cycle, previewController),
+      });
+    }
     const deck = this.scratchDeck;
     const attached = await deck.attach();
     if (this.scratchDeck !== deck) return null; // destroy() ran while the worklet loaded
@@ -196,6 +227,8 @@ export class PreviewEngine {
    */
   destroy() {
     this.stop();
+    this.scratchHandOver?.destroy();
+    this.scratchHandOver = null;
     if (this.scratchDeck) {
       this.scratchDeck.destroy();
       this.scratchDeck = null;

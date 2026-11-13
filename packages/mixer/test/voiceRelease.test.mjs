@@ -19,8 +19,11 @@ describe('releaseSoundHandle', () => {
     param.cancelAndHoldAtTime = vi.fn((t) => param.calls.push(['cancelAndHoldAtTime', t]));
     const voice = handle(param);
     releaseSoundHandle(voice, 10, 14);
+    // The event at the start anchors the ramp there (Chromium otherwise ramps from the last past
+    // event, fading the voice from the moment of the call: spec 023 re-review 4).
     expect(param.calls).toEqual([
       ['cancelAndHoldAtTime', 10],
+      ['setTargetAtTime', 0, 10, 4 / 6],
       ['linearRampToValueAtTime', 0, 14],
     ]);
     expect(voice.stop).toHaveBeenCalledWith(14);

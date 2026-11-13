@@ -7,6 +7,7 @@ import { Platter } from './Platter';
 import { usePanelViewport } from '../panel/panelViewport';
 import {
   isScratchActive,
+  selectedSpin,
   scratchRuntime,
   type ScratchMidiStatus,
   type ScratchRuntime,
@@ -226,6 +227,7 @@ export function ScratchSection({
             grabbed={state.grabbed}
             size={compact ? 'compact' : 'settings'}
             label={t('scratchPlatter')}
+            spin={selectedSpin(state)}
           />
           <p
             data-scratch-status=""
@@ -240,6 +242,19 @@ export function ScratchSection({
             <div className="text-sm font-medium text-foreground">{t('scratchDeck')}</div>
             <DeckSwitch runtime={runtime} state={state} withPreview={withPreview} touch={compact} />
           </div>
+          {/* Spec 023 2.4: the track's new position after a scratch is rounded to the beat. */}
+          <label className="flex items-start gap-2 cursor-pointer" data-scratch-snap="">
+            <input
+              type="checkbox"
+              className={cx('mt-0.5 accent-foreground', compact && 'w-5 h-5')}
+              checked={state.snap}
+              onChange={(event) => runtime.setSnap(event.target.checked)}
+            />
+            <span>
+              <span className="block text-sm text-foreground">{t('scratchSnap')}</span>
+              <span className="block text-xs text-foreground opacity-70">{t('scratchSnapHint')}</span>
+            </span>
+          </label>
           <MidiJogControls runtime={runtime} midi={state.midi} touch={compact} />
           <p data-scratch-shortcut-hint="" className="text-xs text-foreground opacity-70">
             {withLtrKeys(t('scratchShortcutHint'))}

@@ -10,6 +10,7 @@
  */
 
 import { loadScratchWorklet, SCRATCH_PROCESSOR } from './scratchWorklet.mjs';
+import { scratchBeatSeconds } from './scratchPhysics.mjs';
 
 /** Seconds of audio one full platter turn moves (33⅓ rpm). */
 export const SCRATCH_SECONDS_PER_TURN = 1.8;
@@ -51,6 +52,147 @@ export class ScratchDeck {
     this._listeners = new Set();
     this._debugId = 0;
     this._debugPending = new Map();
+    /**
+     * Spec 023: the deck's release state as the main thread sees it: `'live'`, `'held'`,
+     * `'releasing'` (spinning up, no lag reported yet), `'settled'` (lag reported, hand-over
+     * pending in the worklet).
+     */
+    this._phase = 'live';
+    this._releaseId = 0;
+    /** The release whose lag was accepted and whose hand-over isn't sent yet (sync mode). */
+    this._settledId = null;
+    this._lagListeners = new Set();
+    this._planListeners = new Set();
+    /** The latest release's plan from the worklet (see onPlan). */
+    this._plan = null;
+    /** Snap the lag to the beat on release (spec 023 2.4). */
+    this.snap = true;
+    /** @type {(() => number|undefined)|null} */
+    this._tempoSource = null;
+  }
+
+  /** Spec 023: `'live' | 'held' | 'releasing' | 'settled'` (see the constructor). */
+  get phase() {
+    return this._phase;
+  }
+
+  /** The id of the latest release (echoed by the worklet's `lagSettled`). */
+  get releaseId() {
+    return this._releaseId;
+  }
+
+  /**
+   * Where the deck reads its tempo (cycles per second) at a release, for snap to beat.
+   * @param {(() => number|undefined)|null} fn
+   */
+  setTempoSource(fn) {
+    this._tempoSource = typeof fn === 'function' ? fn : null;
+  }
+
+  /**
+   * Called when a released record has settled at rate 1, `lagSeconds` behind live (spec 023).
+   * The listener shifts the deck's pattern and calls {@link handOver}. A deck without a
+   * listener goes back to live by itself.
+   * @param {(event: {id: number, lagSeconds: number}) => void} fn
+   * @returns {() => void} Unsubscribe.
+   */
+  onLagSettled(fn) {
+    if (typeof fn !== 'function') return () => {};
+    this._lagListeners.add(fn);
+    return () => this._lagListeners.delete(fn);
+  }
+
+  /**
+   * The release's plan (spec 023 review 2), once per release, as the worklet will run it:
+   * `{ id, targetSeconds, upSeconds, fromRate, bumpSeconds, bumpDepth }`. The platter follows it.
+   * @param {(plan: object) => void} fn
+   * @returns {() => void} Unsubscribe.
+   */
+  onPlan(fn) {
+    if (typeof fn !== 'function') return () => {};
+    this._planListeners.add(fn);
+    return () => this._planListeners.delete(fn);
+  }
+
+  /** The latest release's plan, or null. */
+  get plan() {
+    return this._plan;
+  }
+
+  /**
+   * Whether the hand-over of release `id` may still be sent: its lag was accepted and nothing
+   * (a stop, a newer release) has replaced it. A deck grabbed again meanwhile still takes it, so
+   * the worklet knows where the shifted input begins.
+   * @param {number} id
+   */
+  canHandOver(id) {
+    if (id !== this._releaseId || this._destroyed) return false;
+    return this._phase === 'settled' || (this._phase === 'held' && this._settledId === id);
+  }
+
+  /**
+   * The pattern has been shifted: the worklet crossfades from the record to live (20 ms) at
+   * context time `atSeconds`; the shifted live input starts at `shiftSeconds` (default
+   * `atSeconds`). Only for release `id`, while {@link canHandOver}.
+   * @param {number} id
+   * @param {number} atSeconds
+   * @param {number} [shiftSeconds]
+   */
+  handOver(id, atSeconds, shiftSeconds) {
+    if (!this.canHandOver(id)) return;
+    if (this._phase === 'settled') this._phase = 'live';
+    this._settledId = null;
+    const msg = { type: 'handOver', id, at: atSeconds };
+    if (Number.isFinite(shiftSeconds)) msg.shiftAt = shiftSeconds;
+    this._post(msg);
+  }
+
+  /**
+   * A same-track Update or Ctrl+Enter during the spin-up (spec 023 review 4): apply the planned
+   * lag now, as if it had settled, with a quick hand-over, so the track stays where the record
+   * is going. Without a plan yet (released a moment ago) the release is cancelled instead; a
+   * plan with lag 0 needs no shift and just runs on.
+   * @returns {boolean} Whether the release is kept (shifted, or running on to lag 0).
+   */
+  commitPending() {
+    if (this._phase !== 'releasing') return false;
+    const plan = this._plan;
+    if (!plan || plan.id !== this._releaseId) {
+      this.cancelPending();
+      return false;
+    }
+    if (!(plan.targetSeconds > 0)) return true;
+    const id = this._releaseId;
+    // When the record reaches its lag (re-review 4): the shift and the hand-over wait for it.
+    const start = Number.isFinite(plan.startTime) ? plan.startTime : this._releaseTime;
+    const settleAt = Number.isFinite(start) ? start + plan.upSeconds + (plan.bumpSeconds || 0) : undefined;
+    this._onLagSettled({ id, lagSeconds: plan.targetSeconds, settleAt });
+    // A refused shift aborted the release (and moved the id on).
+    return this._releaseId === id;
+  }
+
+  /**
+   * Back to live now (20 ms crossfade), dropping a release in progress: no lag is reported for
+   * it any more. Used on stop. A held deck stays held.
+   */
+  abort() {
+    if (!this.node || this._grabbed) return;
+    this._releaseId++;
+    this._phase = 'live';
+    this._settledId = null;
+    this._post({ type: 'abort' });
+  }
+
+  /**
+   * Cancel a release whose lag hasn't been reported yet (spec 023, before a switch or an
+   * Update): the deck goes back to live and a late `lagSettled` is ignored, so no stale shift
+   * is applied. A settled deck (shift applied, hand-over scheduled in the worklet) completes.
+   * @returns {boolean} Whether a release was cancelled.
+   */
+  cancelPending() {
+    if (this._phase !== 'releasing') return false;
+    this.abort();
+    return true;
   }
 
   /** True once the node is in the controller's insert slot. */
@@ -121,14 +263,19 @@ export class ScratchDeck {
   }
 
   /**
-   * Grab the platter: the deck crossfades (10 ms) from live to the frozen last 8 seconds,
-   * held still. No-op when not attached or already held.
+   * Grab the platter: the turning record brakes to a stop (~0.1 s) and the deck crossfades
+   * (10 ms) from live to it. No-op when not attached or already held.
    * @returns {boolean} Whether the deck is now held.
    */
   grab() {
     if (!this.node || this._destroyed) return false;
     if (this._grabbed) return true;
     this._grabbed = true;
+    // A release still spinning up is taken over by this grab: its lag will not be reported.
+    if (this._phase === 'releasing') this._releaseId++;
+    // A settled deck whose hand-over isn't sent yet keeps that release (canHandOver).
+    if (this._phase !== 'settled') this._settledId = null;
+    this._phase = 'held';
     this._post({ type: 'grab' });
     this._emit();
     return true;
@@ -155,18 +302,38 @@ export class ScratchDeck {
     this._post({ type: 'motor', rate: clamped });
   }
 
-  /** Let go: the deck crossfades (10 ms) back to live, on the beat. Idempotent; safe before attach resolves. */
+  /**
+   * Let go: the motor spins the record up (~0.4 s) and its lag lands on the nearest beat (snap
+   * on) or stays as it is (snap off); then the deck reports the lag (see {@link onLagSettled}).
+   * Idempotent; safe before attach resolves.
+   */
   release() {
     if (!this._grabbed) return;
     this._grabbed = false;
-    this._post({ type: 'release' });
+    let beatSeconds = 0;
+    if (this.snap) {
+      let cps;
+      try {
+        cps = this._tempoSource?.();
+      } catch (err) {
+        console.warn('[ScratchDeck] reading the tempo failed:', err?.message ?? err);
+      }
+      beatSeconds = scratchBeatSeconds(cps);
+    }
+    const id = ++this._releaseId;
+    this._releaseTime = this.audioContext?.currentTime;
+    this._phase = 'releasing';
+    this._settledId = null;
+    this._plan = null;
+    this._post({ type: 'release', id, beatSeconds });
     this._emit();
   }
 
   /**
    * Test hook: the worklet's own view, via a port round-trip. Resolves `null` when not attached
    * or when the worklet does not answer within a second.
-   * @returns {Promise<{mix: number, grabbed: boolean, pos: number}|null>} `pos` in seconds (≤ 0).
+   * @returns {Promise<{mix: number, grabbed: boolean, pos: number, phase?: string, lag?: number, rate?: number}|null>}
+   *   `pos` in seconds (≤ 0), `lag` in seconds, `rate` × normal speed.
    */
   getDebugState() {
     if (!this.node) return Promise.resolve(null);
@@ -218,6 +385,8 @@ export class ScratchDeck {
     this._debugPending.clear();
     this._emit();
     this._listeners.clear();
+    this._lagListeners.clear();
+    this._planListeners.clear();
   }
 
   /** @private */
@@ -240,12 +409,58 @@ export class ScratchDeck {
 
   /** @private */
   _onMessage(msg) {
+    if (msg?.type === 'lagSettled') {
+      this._onLagSettled(msg);
+      return;
+    }
+    if (msg?.type === 'plan') {
+      if (msg.id !== this._releaseId) return;
+      this._plan = { ...msg };
+      for (const fn of [...this._planListeners]) {
+        try {
+          fn(this._plan);
+        } catch (err) {
+          console.error('[ScratchDeck] plan listener failed:', err);
+        }
+      }
+      return;
+    }
+    if (msg?.type === 'idle') {
+      if (msg.id === this._releaseId && this._phase !== 'held') this._phase = 'live';
+      return;
+    }
     if (msg?.type !== 'debug') return;
     const pending = this._debugPending.get(msg.id);
     if (!pending) return;
     clearTimeout(pending.timer);
     this._debugPending.delete(msg.id);
-    pending.resolve({ mix: msg.mix, grabbed: msg.grabbed, pos: msg.pos });
+    const { mix, grabbed, pos, phase, lag, rate } = msg;
+    pending.resolve({ mix, grabbed, pos, phase, lag, rate });
+  }
+
+  /** @private Only the latest, still pending release counts: a cancelled one is ignored. */
+  _onLagSettled(msg) {
+    if (msg.id !== this._releaseId || this._phase !== 'releasing' || this._destroyed) return;
+    this._phase = 'settled';
+    this._settledId = msg.id;
+    const lagSeconds = Number(msg.lagSeconds);
+    if (this._lagListeners.size === 0 || !Number.isFinite(lagSeconds)) {
+      this.abort();
+      return;
+    }
+    let accepted = false;
+    for (const fn of [...this._lagListeners]) {
+      try {
+        const event = { id: msg.id, lagSeconds };
+        if (Number.isFinite(msg.settleAt)) event.settleAt = msg.settleAt;
+        if (fn(event) === true) accepted = true;
+      } catch (err) {
+        console.error('[ScratchDeck] lagSettled listener failed:', err);
+      }
+    }
+    // Nobody shifted the track (refused, blocked): back to live. A listener that shifted it but
+    // learns the arrival time later (sync mode) returns true and hands over then.
+    if (this._phase === 'settled' && !accepted) this.abort();
   }
 
   /** @private */

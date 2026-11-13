@@ -144,6 +144,8 @@
   "scratchMidiNone": "Aucune molette jog assignée",
   "scratchMidiAssigned": "{{device}} · contrôle {{control}}, canal {{channel}}",
   "scratchMidiLearnTimeout": "Aucun contrôle n'a été tourné. Rien n'a changé.",
+  "scratchSnap": "Caler sur le temps",
+  "scratchSnapHint": "Après un scratch, la nouvelle position du morceau est arrondie au temps le plus proche, pour rester dans la grille. Désactivé : il reprend exactement là où était le disque.",
   "scratchMidiUnsupported": "Ce navigateur ne prend pas en charge le MIDI. La platine fonctionne toujours.",
   "scratchMidiDenied": "L'accès MIDI a été refusé. La platine fonctionne toujours.",
   "scratchMidiError": "Le MIDI n'a pas pu démarrer. La platine fonctionne toujours.",

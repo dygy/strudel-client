@@ -400,6 +400,10 @@ export function releaseSoundHandle(handle, startTime, endTime) {
   try {
     if (gain && typeof gain.cancelAndHoldAtTime === 'function') {
       gain.cancelAndHoldAtTime(startTime);
+      // Chromium: a linear ramp after cancelAndHoldAtTime(future) starts from the last *past*
+      // event, so the voice would fade from the moment of this call instead of holding until
+      // startTime. An event at startTime anchors the ramp there (spec 023 re-review 4).
+      gain.setTargetAtTime(0, startTime, (end - startTime) / 6);
       gain.linearRampToValueAtTime(0, end);
     } else if (gain && typeof gain.setTargetAtTime === 'function') {
       // Drop the envelope's pending events (its sustain setValueAtTime at the note end would

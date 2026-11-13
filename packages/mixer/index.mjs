@@ -53,3 +53,29 @@ export {
   MIDI_JOG_ENCODINGS,
 } from './scratch/midiJog.mjs';
 export { loadScratchWorklet } from './scratch/scratchWorklet.mjs';
+// Spec 023: the record's physics (shared by the worklet and the platter) and the track shift.
+export {
+  SCRATCH_BRAKE_SECONDS,
+  SCRATCH_SPINUP_SECONDS,
+  SCRATCH_HANDOVER_SECONDS,
+  SCRATCH_SNAP_BEAT_CYCLES,
+  SCRATCH_MIN_SHIFT_SECONDS,
+  scratchSmoothStep,
+  scratchBrakeRate,
+  scratchSpinUpRate,
+  scratchBeatSeconds,
+  planScratchSpinUp,
+  planScratchRelease,
+  scratchReleaseRate,
+  scratchBumpSeconds,
+  scratchBumpDepth,
+} from './scratch/scratchPhysics.mjs';
+export {
+  PatternOffset,
+  ScratchHandOver,
+  scratchShiftTime,
+  scratchShiftArrival,
+  scratchQueryTime,
+  scratchMidNoteValue,
+  scratchSoundingNotes,
+} from './scratch/ScratchShift.mjs';

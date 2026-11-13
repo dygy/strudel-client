@@ -144,6 +144,8 @@
   "scratchMidiNone": "לא הוקצה גלגל ג'וג",
   "scratchMidiAssigned": "{{device}} · בקרה {{control}}, ערוץ {{channel}}",
   "scratchMidiLearnTimeout": "לא סובבה אף בקרה. שום דבר לא השתנה.",
+  "scratchSnap": "הצמדה לפעמה",
+  "scratchSnapHint": "אחרי סקרץ', המיקום החדש של הרצועה מעוגל לפעמה הקרובה, כך שהיא נשארת על הגריד. כבוי: היא ממשיכה בדיוק מהמקום שבו היה התקליט.",
   "scratchMidiUnsupported": "הדפדפן הזה לא תומך ב-MIDI. הפלטה עדיין עובדת.",
   "scratchMidiDenied": "הגישה ל-MIDI נדחתה. הפלטה עדיין עובדת.",
   "scratchMidiError": "לא ניתן היה להפעיל MIDI. הפלטה עדיין עובדת.",

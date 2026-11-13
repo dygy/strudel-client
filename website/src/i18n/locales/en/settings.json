@@ -144,6 +144,8 @@
   "scratchMidiNone": "No jog wheel assigned",
   "scratchMidiAssigned": "{{device}} · control {{control}}, channel {{channel}}",
   "scratchMidiLearnTimeout": "No control was turned. Nothing changed.",
+  "scratchSnap": "Snap to beat",
+  "scratchSnapHint": "After a scratch, the track's new position is rounded to the nearest beat, so it stays on the grid. Off: it continues exactly where the record was.",
   "scratchMidiUnsupported": "This browser has no MIDI support. The platter still works.",
   "scratchMidiDenied": "MIDI access was denied. The platter still works.",
   "scratchMidiError": "MIDI could not be started. The platter still works.",

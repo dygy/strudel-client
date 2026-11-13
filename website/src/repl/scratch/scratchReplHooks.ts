@@ -14,7 +14,10 @@
  */
 
 export interface ScratchReleaser {
-  releaseAll(): void;
+  /** `commitPending`: an evaluate is coming; a record already spinning up keeps its lag (023). */
+  releaseAll(options?: { commitPending?: boolean }): void;
+  /** Spec 023: the deck stopped (its scratch offset resets; a spin-up goes back to live). */
+  deckStopped?(deck: 'main' | 'preview'): void;
 }
 
 export interface ReleasingReplOptions {
@@ -30,20 +33,23 @@ export function createScratchReplHooks(runtime: ScratchReleaser) {
       return {
         ...options,
         beforeEval: (...args: never[]) => {
-          runtime.releaseAll();
+          // Spec 023 review 4: Ctrl+Enter / Update during a spin-up keeps the scratch.
+          runtime.releaseAll({ commitPending: true });
           return beforeEval?.(...args);
         },
         onToggle: (playing: boolean) => {
           runtime.releaseAll();
+          // Spec 023: the next start is at cycle 0, so the speakers' scratch offset resets.
+          if (!playing) runtime.deckStopped?.('main');
           onToggle?.(playing);
         },
       };
     },
     beforeUpdate(): void {
-      runtime.releaseAll();
+      runtime.releaseAll({ commitPending: true });
     },
     beforeEvaluate(): void {
-      runtime.releaseAll();
+      runtime.releaseAll({ commitPending: true });
     },
     previewStopping(engine: { scratchDeck?: { release(): void } | null } | null | undefined): void {
       engine?.scratchDeck?.release();

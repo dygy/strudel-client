@@ -177,10 +177,26 @@ export class ScratchController {
     if (this._holds.size === 0) this._decks[this._selected]?.release();
   }
 
-  /** Every source lets go of every deck (before stop, evaluate and track switches). */
-  releaseAll() {
+  /**
+   * Every source lets go of every deck (before stop, evaluate and track switches).
+   *
+   * A release that was already spinning up (spec 023) is cancelled by default: the deck goes
+   * back to live and its lag is never applied, so nothing pending can shift a pattern after a
+   * stop or switch. With `commitPending` (an Update or Ctrl+Enter is about to evaluate), its
+   * planned lag is applied now instead, with a quick hand-over, so the track keeps the scratch;
+   * a track switch then drops it anyway (the new track starts at its own cycle 0). A record
+   * still held when this is called is let go and its release cancelled either way.
+   * @param {{commitPending?: boolean}} [options]
+   */
+  releaseAll(options) {
     this._dropAllHolds();
-    for (const name of SCRATCH_DECKS) this._decks[name]?.release();
+    for (const name of SCRATCH_DECKS) {
+      const deck = this._decks[name];
+      const spinningUp = deck?.phase === 'releasing';
+      deck?.release();
+      if (options?.commitPending && spinningUp && typeof deck?.commitPending === 'function') deck.commitPending();
+      else deck?.cancelPending?.();
+    }
   }
 
   /**

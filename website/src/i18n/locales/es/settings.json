@@ -144,6 +144,8 @@
   "scratchMidiNone": "Ninguna rueda jog asignada",
   "scratchMidiAssigned": "{{device}} · control {{control}}, canal {{channel}}",
   "scratchMidiLearnTimeout": "No se giró ningún control. No ha cambiado nada.",
+  "scratchSnap": "Ajustar al pulso",
+  "scratchSnapHint": "Tras un scratch, la nueva posición de la pista se redondea al pulso más cercano, así sigue a tiempo. Desactivado: continúa justo donde quedó el disco.",
   "scratchMidiUnsupported": "Este navegador no admite MIDI. El plato sigue funcionando.",
   "scratchMidiDenied": "Se denegó el acceso MIDI. El plato sigue funcionando.",
   "scratchMidiError": "No se pudo iniciar MIDI. El plato sigue funcionando.",

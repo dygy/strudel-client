@@ -288,7 +288,9 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         pattern: silence,
         // Spec 017: every setPattern passes through the transition controller (a pure pass-through
         // until the first switch; then the track origin shift, or the combined transition pattern).
-        editPattern: (pattern: any) => transitionControllerRef.current?.editPattern(pattern) ?? pattern,
+        // Spec 023: then the speakers' scratch offset (0 until a scratch moves the track).
+        editPattern: (pattern: any) =>
+          scratchRuntime.editMainPattern(pattern, (p: any) => transitionControllerRef.current?.editPattern(p) ?? p),
         drawTime,
         drawContext,
         readOnly,
@@ -374,6 +376,10 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     trackSwitch.attachEditor(editor);
     // Only so that assistants can tell (spec 018): it watches, and changes nothing about an evaluate.
     if (editor.repl) evaluationWatch.watch(editor.repl);
+    // Spec 023: a settled scratch shifts this repl; never while a track switch is under way.
+    scratchRuntime.setMainRepl(editor.repl, {
+      isBusy: () => (transitionControllerRef.current?.getState().phase ?? 'idle') !== 'idle',
+    });
 
     // Store editor in editorRef for component access
     editorRef.current = editor;

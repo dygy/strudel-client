@@ -144,6 +144,8 @@
   "scratchMidiNone": "未分配飞梭轮",
   "scratchMidiAssigned": "{{device}} · 控制器 {{control}}，通道 {{channel}}",
   "scratchMidiLearnTimeout": "没有转动任何控制器。未做任何更改。",
+  "scratchSnap": "对齐节拍",
+  "scratchSnapHint": "搓碟之后，音轨的新位置会取整到最近的节拍，保持在节拍网格上。关闭时，从唱片所在的位置原样继续。",
   "scratchMidiUnsupported": "此浏览器不支持 MIDI。转盘仍可使用。",
   "scratchMidiDenied": "MIDI 访问被拒绝。转盘仍可使用。",
   "scratchMidiError": "无法启动 MIDI。转盘仍可使用。",

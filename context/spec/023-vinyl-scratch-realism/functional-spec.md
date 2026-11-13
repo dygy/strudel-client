@@ -60,8 +60,8 @@ Spec 019 lets the user grab a platter and hear the last 8 seconds moved by hand.
 - While it is off, the track continues exactly from where the record was: pure vinyl, and the beat can end up off the grid.
 - The setting is remembered on this device.
   - **Acceptance Criteria:**
-    - [ ] Given Snap to beat is on, when the user holds the record for about 1.8 beats and lets go, then the track ends up exactly 2 beats behind and the kick lands on the grid.
-    - [ ] Given Snap to beat is off, when the user holds the record for about 1.8 beats and lets go, then the track ends up 1.8 beats behind, off the grid.
+    - [ ] Given Snap to beat is on, when the user lets go of a record that has fallen about 1.8 beats behind (hold plus brake and spin-up), then the track ends up exactly 2 beats behind and the kick lands on the grid.
+    - [ ] Given Snap to beat is off, when the user lets go of a record that has fallen about 1.8 beats behind, then the track ends up 1.8 beats behind, off the grid.
     - [ ] When the user reloads the page, then the Snap to beat setting is as they left it.
 
 ### 2.5 Both decks, all inputs, no lost work
@@ -96,4 +96,4 @@ Spec 019 lets the user grab a platter and hear the last 8 seconds moved by hand.
 
 ## Change Log
 
-- (none yet)
+- 2026-11-13 — feature testing (023) — §2.4 criteria reworded: the lag counts the brake (+~0.05 s carried) and the spin-up (+~0.2 s lost), so "held 1.8 beats" is stated as "fallen 1.8 beats behind". §2.2's "within about half a second" applies with Snap off; with Snap on the spin-up stretches 0.2–0.8 s to land on the beat.

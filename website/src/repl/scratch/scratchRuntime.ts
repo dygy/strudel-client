@@ -7,7 +7,7 @@
  * track's code or a save path.
  */
 import { map, type MapStore } from 'nanostores';
-import { MIDI_JOG_STORAGE_KEY, ScratchController, ScratchDeck } from '@strudel/mixer';
+import { MIDI_JOG_STORAGE_KEY, PatternOffset, ScratchController, ScratchDeck, ScratchHandOver } from '@strudel/mixer';
 import type {
   MidiJog,
   MidiJogMapping,
@@ -42,6 +42,30 @@ export interface ScratchState {
   /** Headphones can be picked: the preview deck is attached and the preview is running. */
   previewAvailable: boolean;
   midi: ScratchMidiStatus;
+  /** Spec 023: snap the track's new position to the nearest beat (stored on this device). */
+  snap: boolean;
+  /**
+   * Spec 023 / tech §3: the deck can't be grabbed now. The speakers are blocked while a spec 017
+   * track switch evaluates, waits or runs (the platter is dimmed), so a scratch never fights a
+   * transition over the pattern's position.
+   */
+  blocked: { main: boolean; preview: boolean };
+  /**
+   * Spec 023 review 2: the latest release's plan from the worklet, so the platter spins up on
+   * the same curve as the sound (stretched spin-up, then the snap correction). Null until one.
+   */
+  spin: ScratchSpinPlan | null;
+}
+
+/** A release's plan, as the worklet runs it (see `planScratchRelease`). */
+export interface ScratchSpinPlan {
+  deck: ScratchDeckName;
+  id: number;
+  upSeconds: number;
+  fromRate: number;
+  bumpSeconds: number;
+  bumpDepth: number;
+  targetSeconds: number;
 }
 
 /** The part of ScratchController the runtime uses. */
@@ -53,7 +77,7 @@ export interface ScratchControllerLike {
   moveBy(seconds: number, source?: ScratchSource): void;
   setMotor(rate: number, source?: ScratchSource): void;
   release(source?: ScratchSource): void;
-  releaseAll(): void;
+  releaseAll(options?: { commitPending?: boolean }): void;
   autoRelease(ms: number, source?: ScratchSource): void;
   on(event: 'change', listener: (state: ScratchControllerState) => void): () => void;
 }
@@ -64,6 +88,30 @@ export interface ScratchDeckLike {
   release(): void;
   destroy(): void;
   getDebugState?(): Promise<ScratchDebugState | null>;
+  /** Spec 023: snap the lag to the beat on release. */
+  snap?: boolean;
+  /** Spec 023: back to live now, dropping a release in progress. */
+  abort?(): void;
+  /** Spec 023 review 2: the release's plan, once per release. */
+  onPlan?(listener: (plan: Omit<ScratchSpinPlan, 'deck'>) => void): () => void;
+}
+
+/** Spec 023: the speakers' scratch offset (the main repl's editPattern wraps the transition hook). */
+export interface PatternOffsetLike {
+  editPattern(pattern: unknown, inner?: (pattern: unknown) => unknown): unknown;
+  reset(): void;
+  readonly cycles: number;
+}
+
+/** Spec 023: what applies a settled scratch to the speakers' repl. */
+export interface ScratchHandOverLike {
+  destroy(): void;
+}
+
+/** Spec 023: the main repl, as the runtime needs it for the track shift. */
+export interface MainReplLike {
+  setPattern?(pattern: unknown, autostart?: boolean): unknown;
+  scheduler?: { cps?: number; started?: boolean } | null;
 }
 
 /** The part of PreviewEngine the runtime uses: the headphone deck, created when the preview plays. */
@@ -75,6 +123,10 @@ export interface ScratchDebugState {
   mix: number;
   grabbed: boolean;
   pos: number;
+  /** Spec 023: the worklet's phase, lag (s) and record rate. */
+  phase?: string;
+  lag?: number;
+  rate?: number;
 }
 
 export interface ScratchRuntimeDeps {
@@ -86,6 +138,18 @@ export interface ScratchRuntimeDeps {
   writeSelected: (deck: ScratchDeckName) => void;
   midiSupported: () => boolean;
   hasStoredMidiMapping: () => boolean;
+  /** Spec 023: the stored Snap to beat setting (default on) and its writer. */
+  readSnap?: () => boolean;
+  writeSnap?: (snap: boolean) => void;
+  /** Spec 023: the speakers' scratch offset. */
+  createPatternOffset?: (options: { getRepl: () => MainReplLike | null; isBusy: () => boolean }) => PatternOffsetLike;
+  /** Spec 023: applies the speakers deck's settled lag (shift, stale voices, hand-over). */
+  createHandOver?: (
+    deck: ScratchDeckLike,
+    options: { getRepl: () => MainReplLike | null; offset: PatternOffsetLike; isBlocked: () => boolean },
+  ) => ScratchHandOverLike;
+  /** Where spec 017's track-transition-* events are dispatched (default: window). */
+  eventTarget?: EventTarget | null;
 }
 
 /**
@@ -102,8 +166,25 @@ export interface ScratchActions {
 
 export interface ScratchRuntime extends ScratchActions {
   readonly store: MapStore<ScratchState>;
+  /** Spec 023: turn Snap to beat on or off (stored; applies to the next release on both decks). */
+  setSnap(snap: boolean): void;
+  /**
+   * Spec 023: the main repl's editPattern. Runs `inner` (spec 017's transition hook) and shifts
+   * the result by the speakers' scratch offset; with offset 0 it returns `inner`'s result as is.
+   */
+  editMainPattern<T>(pattern: T, inner?: (pattern: T) => T): T;
+  /** Spec 023: the main repl (for the shift) and whether a track switch is busy (blocks grabs). */
+  setMainRepl(repl: MainReplLike | null, options?: { isBusy?: () => boolean }): void;
+  /** Spec 023: a deck stopped: its offset resets and a record spinning up goes back to live. */
+  deckStopped(deck: ScratchDeckName): void;
+  /** Spec 023: re-read whether a track switch blocks the speakers deck (and dim the platter). */
+  refreshBlocked(): void;
   setMotor(rate: number, source?: ScratchSource): void;
-  releaseAll(): void;
+  /**
+   * Let go of everything. `commitPending` (an Update or Ctrl+Enter): a record already spinning
+   * up keeps its planned lag (spec 023 review 4); by default (stop, switch) it is dropped.
+   */
+  releaseAll(options?: { commitPending?: boolean }): void;
   select(deck: ScratchDeckName): void;
   setPlaying(deck: ScratchDeckName, playing: boolean): void;
   /**
@@ -130,6 +211,30 @@ export interface ScratchRuntime extends ScratchActions {
 
 const finite = (value: number): boolean => typeof value === 'number' && Number.isFinite(value);
 
+/** Spec 023: where Snap to beat is stored on this device. */
+export const SCRATCH_SNAP_STORAGE_KEY = 'strudel-scratch-snap';
+
+/** Spec 023: the stored Snap to beat setting; on unless it was turned off. */
+export function readScratchSnap(): boolean {
+  try {
+    return typeof localStorage === 'undefined' || localStorage.getItem(SCRATCH_SNAP_STORAGE_KEY) !== 'false';
+  } catch (error: unknown) {
+    return true;
+  }
+}
+
+/** Spec 023: store Snap to beat. */
+export function writeScratchSnap(snap: boolean): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(SCRATCH_SNAP_STORAGE_KEY, snap ? 'true' : 'false');
+  } catch (error: unknown) {
+    console.warn('[scratch] could not store Snap to beat:', error);
+  }
+}
+
+/** The spec 017 events that start and end a track switch's waiting and running phases. */
+const TRANSITION_EVENTS = ['waiting', 'start', 'end', 'error'].map((name) => `track-transition-${name}`);
+
 /** The deck inputs act on: the stored choice, but the headphones only while their preview runs. */
 export const effectiveDeck = (preferred: ScratchDeckName, previewAvailable: boolean): ScratchDeckName =>
   preferred === 'preview' && previewAvailable ? 'preview' : 'main';
@@ -138,8 +243,13 @@ export const effectiveDeck = (preferred: ScratchDeckName, previewAvailable: bool
  * The selected deck can be scratched now: attached and playing. The one check every input uses
  * (platter, wheel, keys, MIDI), so nothing scratches the tail of a stopped track.
  */
-export const isScratchActive = (state: Pick<ScratchState, 'available' | 'playing' | 'selected'>): boolean =>
-  state.available[state.selected] && state.playing[state.selected];
+export const isScratchActive = (
+  state: Pick<ScratchState, 'available' | 'playing' | 'selected'> & Partial<Pick<ScratchState, 'blocked'>>,
+): boolean => state.available[state.selected] && state.playing[state.selected] && !state.blocked?.[state.selected];
+
+/** Spec 023 review 2: the plan the platter follows, the selected deck's latest release. */
+export const selectedSpin = (state: Pick<ScratchState, 'selected'> & Partial<Pick<ScratchState, 'spin'>>) =>
+  state.spin && state.spin.deck === state.selected ? state.spin : null;
 
 export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
   const midiSupported = deps.midiSupported();
@@ -154,7 +264,48 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
     midi: midiSupported
       ? { state: 'off', mapping: null }
       : { state: 'unavailable', reason: 'unsupported', mapping: null },
+    snap: deps.readSnap ? deps.readSnap() : true,
+    blocked: { main: false, preview: false },
+    spin: null,
   });
+  // Spec 023 review 2: each deck's plan reaches the store (the platter of the selected deck reads it).
+  const unsubscribePlan: Partial<Record<ScratchDeckName, () => void>> = {};
+  const watchPlan = (name: ScratchDeckName, deck: ScratchDeckLike | null) => {
+    unsubscribePlan[name]?.();
+    delete unsubscribePlan[name];
+    if (!deck?.onPlan) return;
+    unsubscribePlan[name] = deck.onPlan((plan) => {
+      if (!plan) return;
+      update({
+        spin: {
+          deck: name,
+          id: plan.id,
+          upSeconds: plan.upSeconds,
+          fromRate: plan.fromRate,
+          bumpSeconds: plan.bumpSeconds,
+          bumpDepth: plan.bumpDepth,
+          targetSeconds: plan.targetSeconds,
+        },
+      });
+    });
+  };
+
+  // Spec 023: the speakers' track shift.
+  let mainRepl: MainReplLike | null = null;
+  let mainBusy: () => boolean = () => false;
+  const isMainBusy = (): boolean => {
+    try {
+      return Boolean(mainBusy());
+    } catch (error: unknown) {
+      console.warn('[scratch] reading the transition state failed:', error);
+      return false;
+    }
+  };
+  const mainOffset: PatternOffsetLike | null =
+    deps.createPatternOffset?.({ getRepl: () => mainRepl, isBusy: isMainBusy }) ?? null;
+  let mainHandOver: ScratchHandOverLike | null = null;
+  let transitionTarget: EventTarget | null = null;
+  const onTransitionEvent = () => runtime.refreshBlocked();
 
   let controller: ScratchControllerLike | null = null;
   let mainDeck: ScratchDeckLike | null = null;
@@ -233,6 +384,8 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
     store,
 
     grab(source) {
+      // Spec 023 tech §3: never while a track switch evaluates, waits or runs on the speakers.
+      if (store.get().selected === 'main' && isMainBusy() !== store.get().blocked.main) runtime.refreshBlocked();
       // Not while the deck is stopped (spec 2.1): the stopped track's tail must not play.
       if (!isScratchActive(store.get())) return false;
       // ScratchDeck.grab() is idempotent: the wheel and the jog call this on every move.
@@ -261,10 +414,11 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
       update({ grabbed: state ? Boolean(state.grabbed) : false });
     },
 
-    releaseAll() {
+    releaseAll(options) {
       // Called before every stop, Update and track switch: nothing to do before the first scratch.
       if (!controller) return;
-      controller.releaseAll();
+      if (options) controller.releaseAll(options);
+      else controller.releaseAll();
       update({ grabbed: false });
     },
 
@@ -319,6 +473,15 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
             return;
           }
           mainDeck = deck;
+          deck.snap = store.get().snap;
+          watchPlan('main', deck);
+          if (mainOffset && deps.createHandOver) {
+            mainHandOver = deps.createHandOver(deck, {
+              getRepl: () => mainRepl,
+              offset: mainOffset,
+              isBlocked: isMainBusy,
+            });
+          }
           getController().setDeck('main', deck);
           syncAvailability();
         })
@@ -344,6 +507,9 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
       mainOwner = null;
       const deck = mainDeck;
       mainDeck = null;
+      mainHandOver?.destroy();
+      mainHandOver = null;
+      watchPlan('main', null);
       if (!deck) return;
       deck.release();
       controller?.setDeck('main', null);
@@ -369,6 +535,8 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
       // Detached (or replaced) meanwhile, failed (retried on the next preview start), or already in.
       if (previewEngine !== engine || !deck || deck === previewDeck) return;
       previewDeck = deck;
+      deck.snap = store.get().snap;
+      watchPlan('preview', deck);
       getController().setDeck('preview', deck);
       syncAvailability();
     },
@@ -378,9 +546,55 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
       if (!previewDeck) return;
       previewDeck.release();
       previewDeck = null;
+      watchPlan('preview', null);
       controller?.setDeck('preview', null);
       syncAvailability();
       if (!controller?.state) update({ available: { ...store.get().available, preview: false } });
+    },
+
+    setSnap(snap) {
+      const next = Boolean(snap);
+      deps.writeSnap?.(next);
+      if (mainDeck) mainDeck.snap = next;
+      if (previewDeck) previewDeck.snap = next;
+      if (store.get().snap !== next) update({ snap: next });
+    },
+
+    editMainPattern(pattern, inner) {
+      if (!mainOffset) return inner ? inner(pattern) : pattern;
+      return mainOffset.editPattern(pattern, inner as ((p: unknown) => unknown) | undefined) as typeof pattern;
+    },
+
+    setMainRepl(repl, options) {
+      mainRepl = repl ?? null;
+      mainBusy = options?.isBusy ?? (() => false);
+      const target = deps.eventTarget !== undefined ? deps.eventTarget : typeof window !== 'undefined' ? window : null;
+      if (target && target !== transitionTarget) {
+        for (const name of TRANSITION_EVENTS) {
+          transitionTarget?.removeEventListener(name, onTransitionEvent);
+          target.addEventListener(name, onTransitionEvent);
+        }
+        transitionTarget = target;
+      }
+      runtime.refreshBlocked();
+    },
+
+    deckStopped(deck) {
+      if (deck === 'main') {
+        mainOffset?.reset();
+        mainDeck?.abort?.();
+      } else {
+        previewDeck?.abort?.();
+      }
+    },
+
+    refreshBlocked() {
+      const main = isMainBusy();
+      const current = store.get().blocked;
+      if (current.main === main) return;
+      // A transition starting while the record is held: let go (it never fights the switch).
+      if (main && store.get().selected === 'main') controller?.releaseAll();
+      update({ blocked: { ...current, main } });
     },
 
     async midiLearn() {
@@ -446,6 +660,15 @@ export const scratchRuntime: ScratchRuntime = createScratchRuntime({
   writeSelected: setScratchDeckSetting,
   midiSupported: browserMidiSupported,
   hasStoredMidiMapping: storedMidiMapping,
+  readSnap: readScratchSnap,
+  writeSnap: writeScratchSnap,
+  createPatternOffset: (options) => new PatternOffset(options),
+  createHandOver: (deck, options) =>
+    new ScratchHandOver(deck as unknown as ScratchDeck, {
+      getRepl: options.getRepl,
+      offset: options.offset as unknown as PatternOffset,
+      isBlocked: options.isBlocked,
+    }),
 });
 
 if (typeof window !== 'undefined' && import.meta.env?.DEV) {

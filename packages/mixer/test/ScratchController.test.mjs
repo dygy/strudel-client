@@ -62,7 +62,7 @@ describe('ScratchController', () => {
       { type: 'grab' },
       { type: 'move', delta: -0.1 },
       { type: 'motor', rate: -1 },
-      { type: 'release' },
+      { type: 'release', id: 1, beatSeconds: 0 }, // spec 023: id + snap beat (no tempo source: snap has no beat)
     ]);
     expect(preview.node.port.posted).toEqual([]);
 

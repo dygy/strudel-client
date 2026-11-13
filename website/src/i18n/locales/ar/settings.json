@@ -144,6 +144,8 @@
   "scratchMidiNone": "لم تُعيَّن عجلة جوغ",
   "scratchMidiAssigned": "{{device}} · عنصر التحكم {{control}}، القناة {{channel}}",
   "scratchMidiLearnTimeout": "لم يُدَر أي عنصر تحكم. لم يتغير شيء.",
+  "scratchSnap": "المحاذاة مع النبضة",
+  "scratchSnapHint": "بعد الخدش، يُقرَّب الموضع الجديد للمقطع إلى أقرب نبضة فيبقى على الإيقاع. عند الإيقاف: يتابع تمامًا من حيث كانت الأسطوانة.",
   "scratchMidiUnsupported": "هذا المتصفح لا يدعم MIDI. القرص ما زال يعمل.",
   "scratchMidiDenied": "تم رفض الوصول إلى MIDI. القرص ما زال يعمل.",
   "scratchMidiError": "تعذّر تشغيل MIDI. القرص ما زال يعمل.",
