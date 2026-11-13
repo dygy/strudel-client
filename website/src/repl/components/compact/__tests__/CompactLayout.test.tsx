@@ -27,7 +27,12 @@ vi.mock('@src/repl/components/WelcomeScreen', () => ({ WelcomeScreen: () => <div
 vi.mock('@src/components/GlobalToastContainer', () => ({ GlobalToastContainer: () => null }));
 vi.mock('@src/components/auth/AuthButton', () => ({ AuthButton: () => <span data-auth-button="" /> }));
 vi.mock('@src/user_pattern_utils', () => ({ userPattern: {} }));
-vi.mock('@src/lib/slugUtils', () => ({ findTrackByFolderAndSlug: () => null }));
+// Partial mock: the rest of slugUtils stays real. Under isolate:false a bare mock leaks into later
+// files in the same worker (spec 022: the set bar resolves step names with trackNameToSlug).
+vi.mock('@src/lib/slugUtils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@src/lib/slugUtils')>()),
+  findTrackByFolderAndSlug: () => null,
+}));
 vi.mock('@src/repl/globalSaveManager', () => ({ globalSaveManager: { register: () => {}, unregister: () => {} } }));
 vi.mock('@src/hooks/useTracks', () => ({
   useTracks: () => ({
