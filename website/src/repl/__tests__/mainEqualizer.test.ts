@@ -28,15 +28,12 @@ import {
 
 const BAND_125 = 2;
 
-/** What each band's filter applies (audible), in band order: input → band0 → … → band9 → output. */
+/**
+ * What each band's filter applies (audible), in band order. The bands sit on the EQ's wet path
+ * (spec 020: input → cuts → bands → … → output, plus a dry bypass), so read them from the EQ.
+ */
 function appliedGains(eq: any): number[] {
-  const gains: number[] = [];
-  let node = eq.getInput().connections[0];
-  while (node && node !== eq.getOutput()) {
-    gains.push(node.gain.value);
-    node = node.connections[0];
-  }
-  return gains;
+  return eq.bands.map((b: any) => b.filter.gain.value);
 }
 
 function saveWithBand125(gain: number, isEnabled: boolean) {
@@ -52,13 +49,19 @@ describe('main (speakers) equalizer', () => {
   beforeEach(() => {
     stubWebAudio(); // fresh localStorage, read by loadEqualizerSettings at call time
     stubWebAudioNodeConstructors();
+    // superdough fades an insert swap and cleans up on a timer (spec 020): settle() runs it.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     ac = new MockAudioContext();
     controller = new SuperdoughAudioController(ac);
   });
   afterEach(() => {
     destroyMainEqualizer();
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
     unstubWebAudio();
   });
+  /** Let superdough's insert swap finish (fade, then the bare edge back) and a removed EQ be destroyed. */
+  const settle = () => vi.runOnlyPendingTimers();
 
   it('applies the saved settings when it is created, without the settings panel', () => {
     saveWithBand125(12, true);
@@ -86,6 +89,7 @@ describe('main (speakers) equalizer', () => {
 
   it('superdough’s destinationGain plays into the EQ, and the EQ into the destination', () => {
     const eq = initMainEqualizer(ac, controller);
+    settle();
 
     const destinationGain = controller.output.destinationGain;
     expect(destinationGain.connections).toEqual([eq.getInput()]);
@@ -95,6 +99,7 @@ describe('main (speakers) equalizer', () => {
 
   it('stays in the path after resetGlobalEffects() rebuilds destinationGain', () => {
     const eq = initMainEqualizer(ac, controller);
+    settle();
 
     controller.reset();
 
@@ -104,6 +109,7 @@ describe('main (speakers) equalizer', () => {
   it('is created once: a second init returns the same EQ and connects nothing twice', () => {
     const eq = initMainEqualizer(ac, controller);
     expect(initMainEqualizer(ac, controller)).toBe(eq);
+    settle();
     expect(getMainEqualizer()).toBe(eq);
     expect(controller.output.destinationGain.connections).toEqual([eq.getInput()]);
     expect(eq.getOutput().connections).toEqual([ac.destination]);
@@ -111,13 +117,42 @@ describe('main (speakers) equalizer', () => {
 
   it('teardown restores the destination and disconnects the EQ', () => {
     const eq = initMainEqualizer(ac, controller);
+    settle();
 
     destroyMainEqualizer();
-
     expect(getMainEqualizer()).toBeNull();
+    settle(); // the EQ is disconnected once its path has faded out
+
     expect(controller.output.destinationGain.connections).toEqual([ac.destination]);
     expect(eq.getOutput().connections).toEqual([]);
     expect(eq.getInput().connections).toEqual([]);
+  });
+
+  // Review finding (spec 020): the EQ's limiter layout was fixed when the EQ was built; a reset that
+  // grows the output's channels (a sink whose maxChannelCount is known late) left channels 3+ downmixed.
+  it('the EQ follows the channel count when superdough’s output reset changes it', () => {
+    const eq = initMainEqualizer(ac, controller);
+    settle();
+    expect(eq.getChannelCount()).toBe(2);
+
+    ac.destination.maxChannelCount = 6;
+    controller.reset();
+    settle();
+
+    expect(eq.getChannelCount()).toBe(6);
+    expect(controller.output.destinationGain.connections[0] === eq.getInput()).toBe(true);
+  });
+
+  // Spec 020: superdough fades the EQ path out on removal; disconnecting the EQ at once would cut it.
+  it('a removed EQ stays connected until its path has faded out, then is disconnected', () => {
+    const eq = initMainEqualizer(ac, controller);
+    settle();
+
+    destroyMainEqualizer();
+    expect(eq.getOutput().connections[0] === ac.destination).toBe(true); // still fading through it
+
+    settle();
+    expect(eq.getOutput().connections.length).toBe(0);
   });
 
   describe('shared by several useReplContext instances (reference count)', () => {
@@ -125,6 +160,7 @@ describe('main (speakers) equalizer', () => {
       const eq = initMainEqualizer(ac, controller); // Repl.tsx's instance
       expect(initMainEqualizer(ac, controller)).toBe(eq); // AuthenticatedReplEditor's instance
 
+      settle();
       releaseMainEqualizer();
       expect(getMainEqualizer()).toBe(eq);
       expect(controller.output.destinationGain.connections).toEqual([eq.getInput()]);
@@ -132,6 +168,7 @@ describe('main (speakers) equalizer', () => {
 
       releaseMainEqualizer();
       expect(getMainEqualizer()).toBeNull();
+      settle();
       expect(controller.output.destinationGain.connections).toEqual([ac.destination]);
       expect(eq.getOutput().connections).toEqual([]);
     });
@@ -176,8 +213,9 @@ describe('main EQ on the global superdough controller, after audioReady', () => 
   }
   const flush = () => new Promise((r) => setTimeout(r, 0));
 
-  it('initMainEqualizer() installs on the controller the app plays through', () => {
+  it('initMainEqualizer() installs on the controller the app plays through', async () => {
     const eq = me.initMainEqualizer();
+    await new Promise((r) => setTimeout(r, 80)); // superdough's insert swap settles (spec 020)
     expect(webaudio.getSuperdoughAudioController().output.outputInsert).toBe(eq.getInput());
     expect(webaudio.getSuperdoughAudioController().output.destinationGain.connections).toEqual([eq.getInput()]);
     expect(eq.getOutput().connections).toEqual([webaudio.getAudioContext().destination]);

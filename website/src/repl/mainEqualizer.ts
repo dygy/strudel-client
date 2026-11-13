@@ -20,14 +20,24 @@
  * panel) are picked up. The panel re-renders when it appears (subscribeMainEqualizer).
  *
  * Channels: the EQ's nodes keep the default 'max' channel count mode, so a multichannel merger
- * (multiChannelOrbits) passes through without a downmix.
+ * (multiChannelOrbits) passes through without a downmix; its limiter stage is sized per stereo pair
+ * and resized when superdough's output reset changes the channel count (spec 020).
+ *
+ * Latency (spec 020): the EQ delays the speakers by its limiter look-ahead (LIMITER.lookahead, 6 ms),
+ * on and off alike. The MIDI default latency includes it. Sound written by `.dough()` / the dsp
+ * worklet goes straight to the destination, skips the EQ, and so plays 6 ms early relative to
+ * superdough's sounds.
  */
 import { AudioEqualizer, applyEqualizerSettings, loadEqualizerSettings } from '@strudel/equalizer';
 import { getAudioContext, getSuperdoughAudioController } from '@strudel/webaudio';
 
 /** What the main EQ needs from superdough's controller (SuperdoughAudioController). */
 export interface OutputInsertHost {
-  setOutputInsert(node: AudioNode | null): void;
+  /**
+   * Returns the seconds until the previous target is silent (superdough fades the swap, spec 020);
+   * `onChannelCount` is called when superdough's output reset changes the channel count.
+   */
+  setOutputInsert(node: AudioNode | null, options?: { onChannelCount?: (channelCount: number) => void }): number | void;
 }
 
 let mainEqualizer: AudioEqualizer | null = null;
@@ -59,7 +69,9 @@ export function initMainEqualizer(
     applyEqualizerSettings(eq, saved); // on/off first, then each band: saved-as-off stays silent
   }
   eq.getOutput().connect(audioContext.destination);
-  controller.setOutputInsert(eq.getInput());
+  // The limiter stage follows the output's channel count when superdough's output reset changes it
+  // (spec 020), so a multichannel output is never downmixed in the wet path.
+  controller.setOutputInsert(eq.getInput(), { onChannelCount: (channels) => eq.setChannelCount(channels) });
 
   mainEqualizer = eq;
   installedOn = controller;
@@ -125,14 +137,18 @@ export function destroyMainEqualizer(): void {
 }
 
 function teardown(): void {
+  let fade = 0;
   if (installedOn) {
     try {
-      installedOn.setOutputInsert(null);
+      fade = Number(installedOn.setOutputInsert(null)) || 0;
     } catch (err) {
       console.warn('[mainEqualizer] could not restore the output:', err);
     }
   }
-  mainEqualizer?.destroy();
+  // superdough fades the EQ path out (spec 020): disconnect the EQ once it is silent, not mid-fade.
+  const eq = mainEqualizer;
+  if (eq && fade > 0) setTimeout(() => eq.destroy(), (fade + 0.02) * 1000);
+  else eq?.destroy();
   mainEqualizer = null;
   installedOn = null;
   installedContext = null;

@@ -1,6 +1,6 @@
 import { useRef, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import { useTranslation } from '@src/i18n';
-import { frequencyToX, formatFrequency } from '@strudel/equalizer';
+import { EQ_GAIN_LIMIT, EQ_Q_RANGE, frequencyToX, formatFrequency } from '@strudel/equalizer';
 
 export interface CompactBand {
   frequency: number;
@@ -13,12 +13,12 @@ export interface CompactBandUpdate {
   Q?: number;
 }
 
-/** The same ranges the desktop slider offers and AudioEqualizer.setBand clamps to. */
-export const EQ_GAIN_MIN = -12;
-export const EQ_GAIN_MAX = 12;
+/** The same ranges the desktop slider offers and AudioEqualizer.setBand clamps to (±24 dB, spec 020). */
+export const EQ_GAIN_MIN = -EQ_GAIN_LIMIT;
+export const EQ_GAIN_MAX = EQ_GAIN_LIMIT;
 export const EQ_GAIN_STEP = 0.5;
-export const EQ_Q_MIN = 0.5;
-export const EQ_Q_MAX = 4;
+export const EQ_Q_MIN = EQ_Q_RANGE.min;
+export const EQ_Q_MAX = EQ_Q_RANGE.max;
 
 /**
  * The band whose marker is nearest to x (in canvas pixels), using the same frequency-to-x mapping
@@ -64,6 +64,7 @@ interface EqualizerCompactProps {
 /**
  * The phone layout of the EQ: the whole curve at the sheet's width, band chips 1-10, and a large
  * gain slider for the one selected band. UI only: every change goes through the desktop band setter.
+ * The cuts and the output level (spec 020) follow below it, in EqualizerStripControls at 44px targets.
  */
 export function EqualizerCompact({
   bands,

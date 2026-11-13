@@ -1,5 +1,6 @@
 /**
- * AudioEqualizer (spec 015 §2.2): chain wiring, per-band gain, clamps, presets, on/off.
+ * AudioEqualizer (spec 015 §2.2, updated for spec 020's channel strip): chain wiring, per-band gain,
+ * clamps, presets, on/off.
  * Runs on the shared Web Audio mock; no real AudioContext.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -11,16 +12,28 @@ import { MockAudioContext, stubWebAudio, unstubWebAudio } from '../../mixer/test
 const FREQUENCIES = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 const BAND_1K = 5;
 
-/** Walk the graph from the input node: input → band0 → … → band9 → output. */
-function chainOf(eq: AudioEqualizer): any[] {
+/**
+ * The wet path (spec 020): from the input, follow the connection that is not the dry delay, up to
+ * the output. input → 2× highpass → 10 bands → 2× lowpass → outputGain → limiter → trim → clipper
+ * → wetGain → output. Every node on it has exactly one onward connection.
+ */
+function wetPath(eq: AudioEqualizer): any[] {
   const nodes: any[] = [];
-  let node: any = eq.getInput();
+  const input: any = eq.getInput();
+  expect(input.connections).toHaveLength(2); // the wet chain and the dry delay
+  let node: any = input.connections.find((n: any) => n.kind !== 'Delay');
   while (node && node !== eq.getOutput()) {
+    nodes.push(node);
     expect(node.connections).toHaveLength(1);
     node = node.connections[0];
-    if (node !== eq.getOutput()) nodes.push(node);
   }
+  expect(node).toBe(eq.getOutput());
   return nodes;
+}
+
+/** The 10 band filters, in order, as wired on the wet path (the cuts are the highpass/lowpass stages). */
+function chainOf(eq: AudioEqualizer): any[] {
+  return wetPath(eq).filter((n) => n.kind === 'BiquadFilter' && n.type !== 'highpass' && n.type !== 'lowpass');
 }
 
 /** What each filter actually applies (the audible gain), in band order. */
@@ -37,12 +50,26 @@ describe('AudioEqualizer (spec 015 §2.2)', () => {
   afterEach(() => unstubWebAudio());
 
   describe('the 10 filters are chained in order', () => {
-    it('input → 31 Hz → … → 16 kHz → output, one connection per node', () => {
+    it('input → low cut → 31 Hz → … → 16 kHz → high cut → output level → limiter → wet → output', () => {
+      const path = wetPath(eq);
       const filters = chainOf(eq);
 
       expect(filters.map((f) => f.frequency.value)).toEqual(FREQUENCIES);
       expect(filters.map((f) => f.type)).toEqual(['lowshelf', ...Array(8).fill('peaking'), 'highshelf']);
-      expect(filters.at(-1).connections).toEqual([eq.getOutput()]);
+      expect(path.map((n) => (n.kind === 'BiquadFilter' ? n.type : n.kind))).toEqual([
+        'highpass',
+        'highpass',
+        'lowshelf',
+        ...Array(8).fill('peaking'),
+        'highshelf',
+        'lowpass',
+        'lowpass',
+        'Gain', // output level
+        'DynamicsCompressor', // limiter
+        'Gain', // makeup trim
+        'WaveShaper', // safety clipper
+        'Gain', // wet
+      ]);
     });
 
     it('the input is not wired straight to the output, bypassing the bands', () => {
@@ -79,23 +106,25 @@ describe('AudioEqualizer (spec 015 §2.2)', () => {
     });
   });
 
-  describe('gain is clamped to ±12 dB', () => {
-    it('+20 dB stops at +12 dB and −20 dB stops at −12 dB', () => {
-      eq.setBand(0, { gain: 20 });
-      eq.setBand(9, { gain: -20 });
+  describe('gain is clamped to ±24 dB (spec 020; was ±12)', () => {
+    it('+30 dB stops at +24 dB and −30 dB stops at −24 dB', () => {
+      eq.setBand(0, { gain: 30 });
+      eq.setBand(9, { gain: -30 });
 
-      expect(storedGains(eq)[0]).toBe(12);
-      expect(appliedGains(eq)[0]).toBe(12);
-      expect(storedGains(eq)[9]).toBe(-12);
-      expect(appliedGains(eq)[9]).toBe(-12);
+      expect(storedGains(eq)[0]).toBe(24);
+      expect(appliedGains(eq)[0]).toBe(24);
+      expect(storedGains(eq)[9]).toBe(-24);
+      expect(appliedGains(eq)[9]).toBe(-24);
     });
 
-    it('the exact limits ±12 dB and in-range values are not altered', () => {
-      eq.setBand(0, { gain: 12 });
-      eq.setBand(1, { gain: -12 });
-      eq.setBand(2, { gain: -3.5 });
+    it('the exact limits ±24 dB and in-range values beyond the old ±12 are not altered', () => {
+      eq.setBand(0, { gain: 24 });
+      eq.setBand(1, { gain: -24 });
+      eq.setBand(2, { gain: 20 });
+      eq.setBand(3, { gain: -3.5 });
 
-      expect(storedGains(eq).slice(0, 3)).toEqual([12, -12, -3.5]);
+      expect(storedGains(eq).slice(0, 4)).toEqual([24, -24, 20, -3.5]);
+      expect(appliedGains(eq).slice(0, 4)).toEqual([24, -24, 20, -3.5]);
     });
   });
 

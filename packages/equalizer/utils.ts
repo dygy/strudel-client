@@ -33,14 +33,14 @@ export function frequencyToX(freq, width) {
 }
 
 /**
- * Convert gain to Y coordinate (linear scale)
+ * Convert gain to Y coordinate (linear scale, +range dB at the top, −range dB at the bottom)
  * @param {number} gain - Gain in dB
  * @param {number} height - Canvas height
+ * @param {number} [range=12] - The chart's dB range either side of 0 (the EQ panel uses 24)
  * @returns {number} Y coordinate
  */
-export function gainToY(gain, height) {
-  // -12 dB to +12 dB
-  const normalized = (gain + 12) / 24; // 0 to 1
+export function gainToY(gain, height, range = 12) {
+  const normalized = (gain + range) / (2 * range); // 0 to 1
   return height - normalized * height;
 }
 

@@ -112,7 +112,7 @@ describe('EqualizerUI drives the main (speakers) EQ', () => {
 
     it('works before the headphone preview engine is ready (the speakers EQ is still there)', () => {
       render(null);
-      expect(container!.querySelectorAll('input[type="range"]')).toHaveLength(10);
+      expect(container!.querySelectorAll('input[type="range"]:not([data-eq-slider])')).toHaveLength(10);
 
       drag(container!.querySelectorAll<HTMLInputElement>('input[type="range"]')[5], '-3');
       expect(applied(main)[5]).toBe(-3);
@@ -172,6 +172,6 @@ describe('EqualizerUI before the main EQ exists', () => {
       main = initMainEqualizer(ac, { setOutputInsert: vi.fn() });
     });
 
-    expect(container!.querySelectorAll('input[type="range"]')).toHaveLength(10);
+    expect(container!.querySelectorAll('input[type="range"]:not([data-eq-slider])')).toHaveLength(10);
   });
 });

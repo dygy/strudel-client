@@ -66,7 +66,7 @@ $: note("c a f e").midi('IAC Driver', { isController: true, midimap: 'default'})
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | isController | boolean | false | When true, disables sending note messages. Useful for MIDI controllers |
-| latencyMs | number | 34 | Latency in milliseconds to align MIDI with audio engine |
+| latencyMs | number | 40 | Latency in milliseconds to align MIDI with audio engine (includes the EQ's 6 ms look-ahead) |
 | noteOffsetMs | number | 10 | Offset in milliseconds for note-off messages to prevent glitching |
 | midichannel | number | 1 | Default MIDI channel (1-16) |
 | velocity | number | 0.9 | Default note velocity (0-1) |

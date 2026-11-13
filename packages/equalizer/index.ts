@@ -1,8 +1,28 @@
-export { AudioEqualizer } from './AudioEqualizer.js';
-export type { EqualizerState, BandUpdate } from './AudioEqualizer.js';
+export {
+  AudioEqualizer,
+  EQ_GAIN_LIMIT,
+  EQ_Q_RANGE,
+  LOW_CUT_RANGE,
+  HIGH_CUT_RANGE,
+  OUTPUT_GAIN_RANGE,
+  DEFAULT_LOW_CUT_FREQUENCY,
+  DEFAULT_HIGH_CUT_FREQUENCY,
+  LOW_CUT_OFF_FREQUENCY,
+  LIMITER,
+} from './AudioEqualizer.js';
+export type { EqualizerState, BandUpdate, CutConfig, CutUpdate } from './AudioEqualizer.js';
 export { EQUALIZER_PRESETS } from './presets.js';
-export type { EqualizerPreset } from './presets.js';
+export type { EqualizerPreset, EqualizerPresetGroup } from './presets.js';
 export { generateLogFrequencies, frequencyToX, gainToY, formatFrequency } from './utils.js';
+export {
+  BUTTERWORTH_Q,
+  BUTTERWORTH_Q_DB,
+  bandType,
+  biquadMagnitude,
+  equalizerResponseDb,
+  pinkNoiseLoudnessDb,
+} from './response.js';
+export type { CutSettings, ResponseSettings, ResponseFilterType } from './response.js';
 export {
   saveEqualizerSettings,
   loadEqualizerSettings,

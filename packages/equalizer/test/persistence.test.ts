@@ -87,7 +87,7 @@ describe('EQ persistence (spec 015 §2.2)', () => {
         bands: shapedBands().map((b, i) => (i === 2 ? { gain: b.gain, Q: b.Q } : b)),
       }),
     ],
-    ['a gain beyond +12 dB', JSON.stringify({ isEnabled: true, preset: 'x', bands: withBand0({ gain: 50 }) })],
+    ['a gain beyond +24 dB', JSON.stringify({ isEnabled: true, preset: 'x', bands: withBand0({ gain: 50 }) })],
     ['a zero frequency', JSON.stringify({ isEnabled: true, preset: 'x', bands: withBand0({ frequency: 0 }) })],
     ['a Q of 0', JSON.stringify({ isEnabled: true, preset: 'x', bands: withBand0({ Q: 0 }) })],
   ])('damaged saved settings with the right shape (%s) fall back to a flat EQ', (_label, raw) => {

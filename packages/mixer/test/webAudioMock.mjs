@@ -2,7 +2,9 @@
  * Web Audio boundary mock for @strudel/mixer tests.
  *
  * Covers everything packages/mixer/*.mjs and @strudel/equalizer call on the
- * AudioContext: createGain, createBiquadFilter (10-band EQ), createAnalyser (loudness tap),
+ * AudioContext: createGain, createBiquadFilter (10-band EQ and the cuts), createDynamicsCompressor
+ * (the EQ limiter: `reduction` is settable), createDelay, createWaveShaper, createChannelSplitter,
+ * createChannelMerger, createAnalyser (loudness tap),
  * createMediaStreamDestination, audioWorklet.addModule + AudioWorkletNode (spec 019 scratch),
  * currentTime/state/destination, resume/close, the node
  * constructors superdough's output uses (stubWebAudioNodeConstructors),
@@ -55,16 +57,25 @@ export function createAudioParam(initial) {
   };
 }
 
+/**
+ * A node. `connections` lists its targets; `connect(target, output, input)` also records the
+ * channel indices in `routes` (for splitters and mergers). `disconnected` counts disconnect() calls.
+ */
 function createNode(extra = {}) {
   return {
     connections: [],
-    connect(target) {
+    routes: [],
+    disconnected: 0,
+    connect(target, output = 0, input = 0) {
       this.connections.push(target);
+      this.routes.push({ target, output, input });
       return target;
     },
     // disconnect() drops every connection; disconnect(target) only that one (as in Web Audio).
     disconnect(target) {
+      this.disconnected++;
       this.connections = target === undefined ? [] : this.connections.filter((c) => c !== target);
+      this.routes = target === undefined ? [] : this.routes.filter((r) => r.target !== target);
     },
     ...extra,
   };
@@ -121,8 +132,11 @@ export class MockAudioWorkletNode {
 export class MockAudioContext {
   constructor() {
     this.currentTime = 0;
+    this.sampleRate = 48000;
     this.state = 'running';
     this.destination = createNode({ channelCount: 2, maxChannelCount: 2 });
+    /** Every node created through a create* method on this context, in creation order. */
+    this.createdNodes = [];
     /** Every AudioWorkletNode created on this context. */
     this.workletNodes = [];
     /** `addModule` URLs, in call order. */
@@ -136,21 +150,72 @@ export class MockAudioContext {
     };
   }
 
+  /** @private Record a node in `createdNodes`. */
+  _track(node) {
+    this.createdNodes.push(node);
+    return node;
+  }
+
   createGain() {
-    return createNode({ gain: createAudioParam(1) });
+    return this._track(createNode({ kind: 'Gain', gain: createAudioParam(1) }));
   }
 
   createBiquadFilter() {
-    return createNode({
-      type: 'lowpass',
-      frequency: createAudioParam(350),
-      gain: createAudioParam(0),
-      Q: createAudioParam(1),
-      getFrequencyResponse(freqs, mag, phase) {
-        mag.fill(1);
-        phase.fill(0);
-      },
-    });
+    return this._track(
+      createNode({
+        kind: 'BiquadFilter',
+        type: 'lowpass',
+        frequency: createAudioParam(350),
+        gain: createAudioParam(0),
+        Q: createAudioParam(1),
+        getFrequencyResponse(freqs, mag, phase) {
+          mag.fill(1);
+          phase.fill(0);
+        },
+      }),
+    );
+  }
+
+  /** A DynamicsCompressorNode: its params record automation; set `reduction` to fake limiting. */
+  createDynamicsCompressor() {
+    return this._track(
+      createNode({
+        kind: 'DynamicsCompressor',
+        channelCount: 2,
+        channelCountMode: 'clamped-max',
+        threshold: createAudioParam(-24),
+        knee: createAudioParam(30),
+        ratio: createAudioParam(12),
+        attack: createAudioParam(0.003),
+        release: createAudioParam(0.25),
+        reduction: 0,
+      }),
+    );
+  }
+
+  createDelay(maxDelayTime = 1) {
+    return this._track(createNode({ kind: 'Delay', maxDelayTime, delayTime: createAudioParam(0) }));
+  }
+
+  createWaveShaper() {
+    return this._track(createNode({ kind: 'WaveShaper', curve: null, oversample: 'none' }));
+  }
+
+  createChannelSplitter(numberOfOutputs = 6) {
+    return this._track(
+      createNode({
+        kind: 'ChannelSplitter',
+        numberOfOutputs,
+        channelCount: numberOfOutputs,
+        channelCountMode: 'explicit',
+      }),
+    );
+  }
+
+  createChannelMerger(numberOfInputs = 6) {
+    return this._track(
+      createNode({ kind: 'ChannelMerger', numberOfInputs, channelCount: 1, channelCountMode: 'explicit' }),
+    );
   }
 
   /**
@@ -242,7 +307,9 @@ export function stubWebAudio() {
  */
 export function stubWebAudioNodeConstructors() {
   const gain = function (ac, options = {}) {
-    return Object.assign(ac.createGain(), { kind: 'GainNode', options });
+    const node = Object.assign(ac.createGain(), { kind: 'GainNode', options });
+    if (options.gain !== undefined) node.gain = createAudioParam(options.gain);
+    return node;
   };
   const plain = (kind) =>
     function (_ac, options = {}) {

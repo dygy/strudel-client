@@ -170,7 +170,7 @@ describe('EqualizerUI on a phone (390x844)', () => {
     drag(slider('gain'), '40');
     drag(slider('gain'), '-40');
     for (const [, update] of setBand.mock.calls as [number, { gain?: number }][]) {
-      expect(Math.abs(update.gain!)).toBeLessThanOrEqual(12);
+      expect(Math.abs(update.gain!)).toBeLessThanOrEqual(24); // ±24 dB since spec 020
     }
     // A saved setting the loader accepts (an out-of-range save would reset the EQ to flat).
     expect(loadEqualizerSettings()).not.toBeNull();
@@ -230,7 +230,8 @@ describe('EqualizerUI on a laptop (1440x900)', () => {
     render();
     expect(q('[data-eq-compact]')).toBeNull();
     expect(q('.sm\\:grid-cols-10')).not.toBeNull();
-    expect(container!.querySelectorAll('input[type="range"]')).toHaveLength(10);
+    // 10 band sliders; the cut and output sliders (spec 020) are the strip's, outside the grid.
+    expect(container!.querySelectorAll('.sm\\:grid-cols-10 input[type="range"]')).toHaveLength(10);
     expect(q('select')!.className).not.toMatch(/min-h-11/);
   });
 
@@ -253,9 +254,10 @@ describe('the pure helpers', () => {
     expect(nearestBandIndex([], 100, 600)).toBe(-1);
   });
 
-  it('clampBandUpdate clamps to ±12 dB and Q 0.5–4, and drops non-finite values', () => {
-    expect(clampBandUpdate({ gain: 20 })).toEqual({ gain: 12 });
-    expect(clampBandUpdate({ gain: -20 })).toEqual({ gain: -12 });
+  it('clampBandUpdate clamps to ±24 dB (spec 020) and Q 0.5–4, and drops non-finite values', () => {
+    expect(clampBandUpdate({ gain: 30 })).toEqual({ gain: 24 });
+    expect(clampBandUpdate({ gain: -30 })).toEqual({ gain: -24 });
+    expect(clampBandUpdate({ gain: 20 })).toEqual({ gain: 20 });
     expect(clampBandUpdate({ Q: 10 })).toEqual({ Q: 4 });
     expect(clampBandUpdate({ Q: 0.1 })).toEqual({ Q: 0.5 });
     expect(clampBandUpdate({ gain: NaN, Q: Infinity })).toEqual({});

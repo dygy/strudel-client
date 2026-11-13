@@ -80,8 +80,11 @@ declare module '@strudel/webaudio' {
       destinationGain: GainNode;
       [key: string]: any;
     };
-    /** Fork addition (spec 008): play the main output into `node` instead of the destination. */
-    setOutputInsert(node: AudioNode | null): void;
+    /**
+     * Fork addition (spec 008): play the main output into `node` instead of the destination.
+     * Spec 020: click-free swap; returns seconds until the previous target is silent.
+     */
+    setOutputInsert(node: AudioNode | null, options?: { onChannelCount?: (channelCount: number) => void }): number;
     [key: string]: any;
   }
 

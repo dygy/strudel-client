@@ -309,7 +309,9 @@ Pattern.prototype.midi = function (midiport, options = {}) {
   let midiConfig = {
     // Default configuration values
     isController: false, // Disable sending notes for midi controllers
-    latencyMs: 34, // Default latency to get audio engine to line up in ms
+    // fork (strudel-client spec 020): 34 + 6. The speakers EQ delays the audio by its limiter
+    // look-ahead (6 ms, @strudel/equalizer LIMITER.lookahead), so MIDI waits 6 ms more to stay aligned.
+    latencyMs: 40, // Default latency to get audio engine to line up in ms
     noteOffsetMs: 10, // Default note-off offset to prevent glitching in ms
     midichannel: 1, // Default MIDI channel
     velocity: 0.9, // Default velocity

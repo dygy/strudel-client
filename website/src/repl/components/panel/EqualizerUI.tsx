@@ -2,12 +2,19 @@ import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from '
 import { useTranslation } from '@src/i18n';
 import {
   type AudioEqualizer,
+  type CutConfig,
+  type CutUpdate,
+  type EqualizerSettings,
   applyEqualizerSettings,
   EQUALIZER_PRESETS,
+  HIGH_CUT_RANGE,
+  LOW_CUT_RANGE,
+  OUTPUT_GAIN_RANGE,
   saveEqualizerSettings,
   loadEqualizerSettings,
   getDefaultSettings,
   generateLogFrequencies,
+  equalizerResponseDb,
   frequencyToX,
   gainToY,
   formatFrequency,
@@ -22,6 +29,7 @@ import {
   EQ_Q_MIN,
   type CompactBandUpdate,
 } from './EqualizerCompact';
+import { EqualizerStripControls } from './EqualizerStripControls';
 
 interface EqualizerUIProps {
   /** The headphone PreviewEngine (its own EQ); null when it is not ready. */
@@ -38,6 +46,13 @@ interface BandControl {
 
 const CANVAS_WIDTH = 600;
 const CANVAS_HEIGHT = 200;
+/** The chart's dB range either side of 0 (the band range, spec 020). */
+const CHART_RANGE = EQ_GAIN_MAX;
+const CHART_GRID_DB = [-24, -18, -12, -6, 0, 6, 12, 18, 24];
+/** The limiting indicator lights when the main EQ's limiter turns the sound down by more than this (dB)… */
+export const LIMITING_THRESHOLD_DB = -1;
+/** …and stays lit this long after, so a pumping limiter does not flicker it (ms). */
+const LIMITING_HOLD_MS = 250;
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
@@ -52,11 +67,24 @@ export function clampBandUpdate({ gain, Q }: CompactBandUpdate): CompactBandUpda
   return next;
 }
 
+const clampCut = (cut: CutConfig, update: CutUpdate, range: { min: number; max: number }): CutConfig => ({
+  enabled: typeof update.enabled === 'boolean' ? update.enabled : cut.enabled,
+  frequency:
+    update.frequency !== undefined && Number.isFinite(update.frequency)
+      ? clamp(update.frequency, range.min, range.max)
+      : cut.frequency,
+});
+
 export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) {
   const { t } = useTranslation('settings');
   const [isEnabled, setIsEnabled] = useState(true);
   const [bands, setBands] = useState<BandControl[]>([]);
   const [activePreset, setActivePreset] = useState('flat');
+  const defaults = getDefaultSettings();
+  const [lowCut, setLowCut] = useState<CutConfig>(defaults.lowCut!);
+  const [highCut, setHighCut] = useState<CutConfig>(defaults.highCut!);
+  const [outputGain, setOutputGain] = useState(0);
+  const [limiting, setLimiting] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { compact } = usePanelViewport();
   const [selectedBand, setSelectedBand] = useState(0);
@@ -84,19 +112,63 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   useEffect(() => {
     const saved = loadEqualizerSettings();
     const settings = saved || getDefaultSettings();
+    const fallback = getDefaultSettings();
 
     setIsEnabled(settings.isEnabled);
     setBands(settings.bands);
     setActivePreset(settings.preset);
+    setLowCut(settings.lowCut ?? fallback.lowCut!);
+    setHighCut(settings.highCut ?? fallback.highCut!);
+    setOutputGain(settings.outputGain ?? 0);
 
     // Apply to equalizers
     applySettingsToEqualizers(settings);
   }, [applySettingsToEqualizers]);
 
-  // Update frequency response chart when bands change
+  // The limiting indicator: poll the main (speakers) EQ's limiter once per frame while the panel is
+  // mounted (requestAnimationFrame also pauses in a hidden tab); stopped on unmount.
+  const speakersEqualizer = mainEqualizer ?? appMainEqualizer;
+  useEffect(() => {
+    // A new (or no) main EQ starts unlit: the poll's own `lit` starts false, so the state must too.
+    setLimiting(false);
+    if (!speakersEqualizer) return;
+    const raf =
+      typeof requestAnimationFrame === 'function'
+        ? // Called as plain functions: as methods of this object they throw "Illegal invocation".
+          { request: (cb: () => void) => requestAnimationFrame(cb), cancel: (id: number) => cancelAnimationFrame(id) }
+        : { request: (cb: () => void) => window.setTimeout(cb, 50), cancel: (id: number) => window.clearTimeout(id) };
+    let frame = 0;
+    let litAt = -Infinity;
+    let lit = false;
+    const poll = () => {
+      const now = Date.now();
+      if (speakersEqualizer.getLimiterReduction() < LIMITING_THRESHOLD_DB) litAt = now;
+      const next = now - litAt < LIMITING_HOLD_MS;
+      if (next !== lit) {
+        lit = next;
+        setLimiting(next);
+      }
+      frame = raf.request(poll);
+    };
+    frame = raf.request(poll);
+    return () => raf.cancel(frame);
+  }, [speakersEqualizer]);
+
+  // Update frequency response chart when anything it shows changes
   useEffect(() => {
     updateFrequencyResponseChart();
-  }, [bands, isEnabled, compact, selectedBand]);
+  }, [bands, isEnabled, compact, selectedBand, lowCut, highCut, outputGain]);
+
+  /** The full settings as saved, with `patch` applied (every control saves all of them). */
+  const settingsWith = (patch: Partial<EqualizerSettings>): EqualizerSettings => ({
+    isEnabled,
+    preset: activePreset,
+    bands,
+    lowCut,
+    highCut,
+    outputGain,
+    ...patch,
+  });
 
   const updateFrequencyResponseChart = () => {
     if (!canvasRef.current) return;
@@ -143,17 +215,17 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
       ctx.fillText(formatFrequency(freq), x, height - 5);
     });
 
-    // Gain lines
-    const gains = [-12, -6, 0, 6, 12];
-    gains.forEach((gain) => {
-      const y = gainToY(gain, height);
+    // Gain lines, every 6 dB over the ±24 dB range
+    CHART_GRID_DB.forEach((gain) => {
+      const y = gainToY(gain, height, CHART_RANGE);
       ctx.strokeStyle = gain === 0 ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)';
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(width, y);
       ctx.stroke();
 
-      // Label
+      // Label (not on the ±24 dB edges: the top one is clipped, the bottom one hits the Hz labels)
+      if (Math.abs(gain) === CHART_RANGE) return;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'left';
@@ -165,11 +237,9 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     const numPoints = 200;
     const frequencies = generateLogFrequencies(20, 20000, numPoints);
 
-    // Calculate response for each frequency
-    const response = new Float32Array(numPoints);
-    for (let i = 0; i < numPoints; i++) {
-      response[i] = calculateResponseAtFrequency(frequencies[i]);
-    }
+    // The exact response of the bands, cuts and output level (the same biquads the browser runs)
+    const response = equalizerResponseDb({ bands, lowCut, highCut, outputGain }, frequencies);
+    const yOf = (db: number) => clamp(gainToY(db, height, CHART_RANGE), 0, height);
 
     // Draw the curve
     ctx.strokeStyle = '#1db954'; // Spotify green
@@ -178,7 +248,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
 
     for (let i = 0; i < numPoints; i++) {
       const x = frequencyToX(frequencies[i], width);
-      const y = gainToY(response[i], height);
+      const y = yOf(response[i]);
 
       if (i === 0) {
         ctx.moveTo(x, y);
@@ -196,35 +266,24 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     ctx.shadowBlur = 0;
   };
 
-  const calculateResponseAtFrequency = (freq: number): number => {
-    // Simple approximation of biquad filter response
-    let totalGain = 0;
-
-    bands.forEach((band) => {
-      const ratio = freq / band.frequency;
-      const logRatio = Math.log2(ratio);
-      const bandwidth = 1 / band.Q;
-
-      // Gaussian-like response for peaking filters
-      if (band.frequency === 31) {
-        // Low shelf
-        totalGain += freq < band.frequency ? band.gain : band.gain * Math.exp(-Math.pow(logRatio / bandwidth, 2));
-      } else if (band.frequency === 16000) {
-        // High shelf
-        totalGain += freq > band.frequency ? band.gain : band.gain * Math.exp(-Math.pow(logRatio / bandwidth, 2));
-      } else {
-        // Peaking
-        totalGain += band.gain * Math.exp(-Math.pow(logRatio / bandwidth, 2));
-      }
+  const drawBandMarkers = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    // The cut corners, when on
+    [lowCut, highCut].forEach((cut) => {
+      if (!cut.enabled) return;
+      const x = frequencyToX(cut.frequency, width);
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash?.([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+      ctx.setLineDash?.([]);
     });
 
-    return totalGain;
-  };
-
-  const drawBandMarkers = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     bands.forEach((band, index) => {
       const x = frequencyToX(band.frequency, width);
-      const y = gainToY(band.gain, height);
+      const y = gainToY(band.gain, height, CHART_RANGE);
 
       // Compact only: ring the band the sliders below are editing.
       if (compact && index === selectedBand) {
@@ -242,7 +301,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
       ctx.fill();
 
       // Draw line from zero to current gain
-      const zeroY = gainToY(0, height);
+      const zeroY = gainToY(0, height, CHART_RANGE);
       ctx.strokeStyle = 'rgba(29, 185, 84, 0.3)';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -258,7 +317,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
 
     equalizers().forEach((eq) => eq.setEnabled(newEnabled));
 
-    saveEqualizerSettings({ isEnabled: newEnabled, bands, preset: activePreset });
+    saveEqualizerSettings(settingsWith({ isEnabled: newEnabled }));
   };
 
   // The one band setter, used by the desktop grid and the compact sliders. setBand keeps the
@@ -275,7 +334,34 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     equalizers().forEach((eq) => eq.setBand(index, next));
 
     setActivePreset('custom');
-    saveEqualizerSettings({ isEnabled, bands: newBands, preset: 'custom' });
+    saveEqualizerSettings(settingsWith({ bands: newBands, preset: 'custom' }));
+  };
+
+  // The cuts and the output level: like a band, each change drives both EQs (stored always, heard
+  // only while on), makes the preset Custom and saves.
+  const handleCutChange = (which: 'low' | 'high', update: CutUpdate) => {
+    const current = which === 'low' ? lowCut : highCut;
+    const next = clampCut(current, update, which === 'low' ? LOW_CUT_RANGE : HIGH_CUT_RANGE);
+    if (next.enabled === current.enabled && next.frequency === current.frequency) return;
+
+    if (which === 'low') setLowCut(next);
+    else setHighCut(next);
+    equalizers().forEach((eq) => (which === 'low' ? eq.setLowCut(next) : eq.setHighCut(next)));
+
+    setActivePreset('custom');
+    saveEqualizerSettings(settingsWith({ [which === 'low' ? 'lowCut' : 'highCut']: next, preset: 'custom' }));
+  };
+
+  const handleOutputGainChange = (db: number) => {
+    if (!Number.isFinite(db)) return;
+    const next = clamp(db, OUTPUT_GAIN_RANGE.min, OUTPUT_GAIN_RANGE.max);
+    if (next === outputGain) return;
+
+    setOutputGain(next);
+    equalizers().forEach((eq) => eq.setOutputGain(next));
+
+    setActivePreset('custom');
+    saveEqualizerSettings(settingsWith({ outputGain: next, preset: 'custom' }));
   };
 
   const handlePresetChange = (presetName: string) => {
@@ -286,13 +372,31 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
       ...band,
       gain: preset.gains[i],
     }));
+    // A preset sets the cuts and the output too; one without cuts (a listening profile) turns them
+    // off (keeping their frequencies) at 0 dB output. Same rule as AudioEqualizer.applyPreset.
+    const newLowCut =
+      preset.lowCut != null ? { enabled: true, frequency: preset.lowCut } : { ...lowCut, enabled: false };
+    const newHighCut =
+      preset.highCut != null ? { enabled: true, frequency: preset.highCut } : { ...highCut, enabled: false };
+    const newOutputGain = preset.outputGain ?? 0;
 
     setBands(newBands);
+    setLowCut(newLowCut);
+    setHighCut(newHighCut);
+    setOutputGain(newOutputGain);
     setActivePreset(presetName);
 
     equalizers().forEach((eq) => eq.applyPreset(presetName));
 
-    saveEqualizerSettings({ isEnabled, bands: newBands, preset: presetName });
+    saveEqualizerSettings(
+      settingsWith({
+        bands: newBands,
+        lowCut: newLowCut,
+        highCut: newHighCut,
+        outputGain: newOutputGain,
+        preset: presetName,
+      }),
+    );
   };
 
   const handleReset = () => {
@@ -344,15 +448,26 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
             value={activePreset}
             onChange={(e) => handlePresetChange(e.target.value)}
           >
-            {Object.keys(EQUALIZER_PRESETS).map((key) => {
-              // Convert preset key to translation key (e.g., 'flat' -> 'equalizerPresetFlat')
-              const translationKey = `equalizerPreset${key.charAt(0).toUpperCase()}${key.slice(1)}`;
-              return (
-                <option key={key} value={key} className="bg-gray-800">
-                  {t(translationKey)}
-                </option>
-              );
-            })}
+            {(
+              [
+                ['genre', 'equalizerGroupGenres'],
+                ['profile', 'equalizerGroupProfiles'],
+              ] as const
+            ).map(([group, label]) => (
+              <optgroup key={group} label={t(label)} data-eq-group={group} className="bg-gray-800">
+                {Object.entries(EQUALIZER_PRESETS)
+                  .filter(([, preset]) => preset.group === group)
+                  .map(([key]) => {
+                    // Convert preset key to translation key (e.g., 'flat' -> 'equalizerPresetFlat')
+                    const translationKey = `equalizerPreset${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+                    return (
+                      <option key={key} value={key} className="bg-gray-800">
+                        {t(translationKey)}
+                      </option>
+                    );
+                  })}
+              </optgroup>
+            ))}
             {activePreset === 'custom' && (
               <option value="custom" className="bg-gray-800">
                 {t('equalizerCustom')}
@@ -447,16 +562,16 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
                             : ''
                       }`}
                       style={{
-                        top: band.gain > 0 ? `${50 - (band.gain / 12) * 50}%` : '50%',
-                        bottom: band.gain < 0 ? `${50 - (Math.abs(band.gain) / 12) * 50}%` : '50%',
+                        top: band.gain > 0 ? `${50 - (band.gain / EQ_GAIN_MAX) * 50}%` : '50%',
+                        bottom: band.gain < 0 ? `${50 - (Math.abs(band.gain) / EQ_GAIN_MAX) * 50}%` : '50%',
                       }}
                     />
 
                     {/* Slider input */}
                     <input
                       type="range"
-                      min="-12"
-                      max="12"
+                      min={EQ_GAIN_MIN}
+                      max={EQ_GAIN_MAX}
                       step="0.5"
                       value={band.gain}
                       onChange={(e) => handleBandChange(index, { gain: parseFloat(e.target.value) })}
@@ -472,7 +587,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
                         band.gain === 0 ? 'bg-gray-400' : 'bg-green-400 shadow-lg shadow-green-500/50'
                       }`}
                       style={{
-                        top: `${50 - (band.gain / 12) * 50}%`,
+                        top: `${50 - (band.gain / EQ_GAIN_MAX) * 50}%`,
                         transform: 'translate(-50%, -50%)',
                       }}
                     />
@@ -498,6 +613,18 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
           </div>
         </>
       )}
+
+      {/* Low cut, high cut, output level and the limiting indicator (both layouts) */}
+      <EqualizerStripControls
+        lowCut={lowCut}
+        highCut={highCut}
+        outputGain={outputGain}
+        limiting={limiting}
+        compact={compact}
+        onLowCutChange={(update) => handleCutChange('low', update)}
+        onHighCutChange={(update) => handleCutChange('high', update)}
+        onOutputGainChange={handleOutputGainChange}
+      />
 
       {/* Reset button */}
       <button

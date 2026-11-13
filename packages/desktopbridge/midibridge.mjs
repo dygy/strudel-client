@@ -9,7 +9,8 @@ Pattern.prototype.midi = function (output) {
   return this.onTrigger((hap, currentTime, cps, targetTime) => {
     let { note, nrpnn, nrpv, ccn, ccv, velocity = 0.9, gain = 1 } = hap.value;
     //magic number to get audio engine to line up, can probably be calculated somehow
-    const latencyMs = 34;
+    // fork (strudel-client spec 020): 34 + the speakers EQ's 6 ms look-ahead, as in @strudel/midi.
+    const latencyMs = 40;
     const offset = getEventOffsetMs(targetTime, currentTime) + latencyMs;
     velocity = Math.floor(gain * velocity * 100);
     const duration = Math.floor((hap.duration.valueOf() / cps) * 1000 - 10);

@@ -59,7 +59,9 @@ describe('ScratchDeck on the real superdough output', () => {
 
   it('coexists with the spec 008 output insert (main EQ)', async () => {
     const eq = ac.createGain();
+    ac.state = 'suspended'; // spec 020: an immediate switch (a swap while playing fades on a timer)
     controller.setOutputInsert(eq);
+    ac.state = 'running';
     const deck = new ScratchDeck(ac, controller);
     await deck.attach();
     const node = ac.workletNodes[0];

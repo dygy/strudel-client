@@ -5,6 +5,17 @@
  */
 
 import { EQUALIZER_PRESETS } from './presets';
+import {
+  DEFAULT_HIGH_CUT_FREQUENCY,
+  DEFAULT_LOW_CUT_FREQUENCY,
+  EQ_GAIN_LIMIT,
+  EQ_Q_RANGE,
+  HIGH_CUT_RANGE,
+  LOW_CUT_RANGE,
+  OUTPUT_GAIN_RANGE,
+  type CutUpdate,
+} from './AudioEqualizer.js';
+import type { CutSettings } from './response.js';
 
 const STORAGE_KEY = 'strudel-equalizer-settings';
 
@@ -24,7 +35,20 @@ export interface EqualizerSettings {
   isEnabled: boolean;
   preset: string;
   bands: BandSettings[];
+  /** Spec 020. Optional: saves from before it have none and load with the cut off at 80 Hz. */
+  lowCut?: CutSettings;
+  /** Spec 020. Optional: saves from before it have none and load with the cut off at 12 kHz. */
+  highCut?: CutSettings;
+  /** Spec 020, dB (−24…+6). Optional: saves from before it load with 0 dB. */
+  outputGain?: number;
 }
+
+/** The defaults a save without the spec 020 fields gets: both cuts off, output 0 dB. */
+const defaultStripSettings = () => ({
+  lowCut: { enabled: false, frequency: DEFAULT_LOW_CUT_FREQUENCY },
+  highCut: { enabled: false, frequency: DEFAULT_HIGH_CUT_FREQUENCY },
+  outputGain: 0,
+});
 
 /**
  * Save equalizer settings to localStorage
@@ -69,10 +93,30 @@ export function loadEqualizerSettings(): EqualizerSettings | null {
       return null;
     }
 
+    // Spec 020 fields: absent is fine (an older save), present but invalid means damaged.
+    const defaults = defaultStripSettings();
+    const lowCut = settings.lowCut === undefined ? defaults.lowCut : settings.lowCut;
+    const highCut = settings.highCut === undefined ? defaults.highCut : settings.highCut;
+    const outputGain = settings.outputGain === undefined ? defaults.outputGain : settings.outputGain;
+    if (
+      !isValidCut(lowCut, LOW_CUT_RANGE) ||
+      !isValidCut(highCut, HIGH_CUT_RANGE) ||
+      !isNumberIn(outputGain, OUTPUT_GAIN_RANGE.min, OUTPUT_GAIN_RANGE.max)
+    ) {
+      console.warn('[Equalizer] Damaged cut or output settings, using defaults');
+      return null;
+    }
+
     // An unknown preset name would leave the preset menu showing a preset that is not applied.
     const preset =
       typeof settings.preset === 'string' && settings.preset in EQUALIZER_PRESETS ? settings.preset : 'custom';
-    return { ...settings, preset };
+    return {
+      ...settings,
+      preset,
+      lowCut: { enabled: lowCut.enabled, frequency: lowCut.frequency },
+      highCut: { enabled: highCut.enabled, frequency: highCut.frequency },
+      outputGain,
+    };
   } catch (err) {
     console.warn('[Equalizer] Failed to load settings:', err);
     return null;
@@ -83,44 +127,64 @@ const isNumberIn = (v: unknown, min: number, max: number) =>
   typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
 
 // Ranges match what the UI can produce and the audio graph accepts (AudioEqualizer clamps
-// gain to ±12 dB and Q to 0.5–4). An out-of-range value would be clamped in the audio but
-// kept by the panel, so the sliders, the curve and what is heard would disagree.
+// gain to ±24 dB, Q to 0.5–4, the cuts to 20–1000 / 1000–20000 Hz and the output to −24…+6 dB).
+// An out-of-range value would be clamped in the audio but kept by the panel, so the sliders,
+// the curve and what is heard would disagree.
 function isValidBand(band: unknown): band is BandSettings {
   if (!band || typeof band !== 'object') return false;
   const { frequency, gain, Q } = band as Record<string, unknown>;
-  return isNumberIn(frequency, 1, 24000) && isNumberIn(gain, -12, 12) && isNumberIn(Q, 0.5, 4);
+  return (
+    isNumberIn(frequency, 1, 24000) &&
+    isNumberIn(gain, -EQ_GAIN_LIMIT, EQ_GAIN_LIMIT) &&
+    isNumberIn(Q, EQ_Q_RANGE.min, EQ_Q_RANGE.max)
+  );
+}
+
+function isValidCut(cut: unknown, range: { min: number; max: number }): cut is CutSettings {
+  if (!cut || typeof cut !== 'object') return false;
+  const { enabled, frequency } = cut as Record<string, unknown>;
+  return typeof enabled === 'boolean' && isNumberIn(frequency, range.min, range.max);
 }
 
 /** The part of AudioEqualizer that saved settings are applied to. */
 interface SettingsTarget {
   setEnabled(enabled: boolean): void;
   setBand(index: number, update: { gain?: number; Q?: number }): void;
+  setLowCut(update: CutUpdate): void;
+  setHighCut(update: CutUpdate): void;
+  setOutputGain(db: number): void;
 }
 
 /**
- * Apply saved settings to an equalizer: on/off first, then every band, so an EQ saved as off
- * stays silent (setBand only stores a gain while the EQ is off).
+ * Apply saved settings to an equalizer: on/off first, then every band, the cuts and the output
+ * level, so an EQ saved as off stays silent (each setter only stores a value while the EQ is off).
+ * Settings without the spec 020 fields get both cuts off and output 0 dB.
  * @param equalizer - An AudioEqualizer (main or preview)
  * @param settings - Settings from loadEqualizerSettings / getDefaultSettings
  */
 export function applyEqualizerSettings(
   equalizer: SettingsTarget,
-  settings: Pick<EqualizerSettings, 'isEnabled' | 'bands'>,
+  settings: Pick<EqualizerSettings, 'isEnabled' | 'bands' | 'lowCut' | 'highCut' | 'outputGain'>,
 ): void {
+  const defaults = defaultStripSettings();
   equalizer.setEnabled(settings.isEnabled);
   settings.bands.forEach((band, index) => {
     equalizer.setBand(index, { gain: band.gain, Q: band.Q });
   });
+  equalizer.setLowCut({ ...(settings.lowCut ?? defaults.lowCut) });
+  equalizer.setHighCut({ ...(settings.highCut ?? defaults.highCut) });
+  equalizer.setOutputGain(settings.outputGain ?? defaults.outputGain);
 }
 
 /**
- * Get default equalizer settings (Flat preset)
+ * Get default equalizer settings (Flat preset: bands at 0 dB, both cuts off, output 0 dB)
  * @returns Default settings
  */
 export function getDefaultSettings(): EqualizerSettings {
   return {
     isEnabled: true,
     preset: 'flat',
+    ...defaultStripSettings(),
     bands: [
       { frequency: 31, gain: 0, Q: 1.0 },
       { frequency: 62, gain: 0, Q: 1.0 },
