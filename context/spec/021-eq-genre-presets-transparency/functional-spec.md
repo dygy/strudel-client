@@ -33,7 +33,7 @@ Spec 020 added 12 genre presets, and the owner liked them ("Phonk sounds great")
     - [ ] When the user opens the preset picker, then they see five groups in this order: Brazilian & Latin, Phonk, Hip-Hop & Trap, Electronic & Club, Live & Other, and Profiles; each group contains exactly the presets listed above.
     - [ ] When the user picks Amapiano, then the bands, the cuts and the output level change to Amapiano's values and the picker shows Amapiano.
     - [ ] Given the user had Phonk selected before this change, when they reload, then Phonk is still selected and sounds the same as before.
-    - [ ] Given music is playing, when the user picks any two presets one after the other, then the change is smooth, with no click and no loudness jump of more than 3 dB compared with Flat.
+    - [ ] Given music is playing, when the user picks any two presets one after the other, then the change is smooth, with no click, and every genre preset plays within 3 dB of Flat's loudness (the 22 listening profiles keep their spec 008 values, some of which are up to about 3.7 dB louder).
 
 ### 2.2 What the preset does
 
@@ -79,4 +79,4 @@ Spec 020 added 12 genre presets, and the owner liked them ("Phonk sounds great")
 
 ## Change Log
 
-- (none yet)
+- 2026-11-13 — feature testing (021) — AC 2.1.4 narrowed to genre presets: four listening profiles (acoustic +3.24, bassBoost +3.71, piano +3.47, rnb +3.62 dB vs Flat) predate this spec and their values are out of scope (§3).
