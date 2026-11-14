@@ -50,3 +50,16 @@
   - Shuffled seed 7 green; lint 0; format-check clean; `pnpm build:cloudflare` OK, `_worker.js` 2.7 MB.
 - **Browser:** harness page (the real TransitionSettingsSection) at desktop en/he and 390 px; screenshots `docs/screenshots/027-{desktop-en,desktop-he,compact-390-en-he}.png` (untracked). The live tempo check (cps over time during a Match switch) is planned on prod after deploy, because /repl needs Google sign-in locally.
 - Next: commit, then the push gate.
+
+## 2026-11-14 — push, deploy, prod check
+- Owner said yes at the push gate. `git push origin feat/tempo-phrase-sync:main`: 29b2bc6..c886f14 (96a419c spec, f598e3f feature, facfe5b i18n flake test fix, c886f14 docs). Push gate passed. Deploy run 43599455783 for c886f14: `success`.
+- Prod check in the owner's signed-in Chrome (the Playwright profile was signed out):
+  - **Migration on real data:** the stored `transitionGlide: "true"` had become `transitionTempo: "glide"` on first load.
+  - **UI:** Settings → Transition shows 5 Snap choices (Off … Next 16 cycles), the description "Phrases are counted from where the playing track began.", and 4 Tempo choices with descriptions. Selecting Crossfade / 4 / Off / Match, then glide stored `transitionTempo: "match"`.
+  - **Live tempo measurement not done.** The main repl's scheduler isn't reachable from the page: the `window.scheduler`/`repl` globals are module exports, and the fiber walk found only the non-started preview schedulers. The tab group then closed during the search. The Match/Keep tempo behaviour is covered by the acceptance tests through the real repl and Cyclist (`transitionAcceptance.test.mjs`), not by a prod measurement.
+  - Two temporary tracks (`zz-027-a-120`, `zz-027-b-140`) were created for that check and deleted.
+- **Owner's transition settings were changed for the check** (Filter sweep / 2 / Next cycle / Glide during → Crossfade / 4 / Off / Match, then glide) and not restored, because the tab closed. Flagged to the owner.
+- Bookkeeping: feature-map transition row (Snap 16 and phrase origin, Tempo modes, `getTrackShift`, migration, wiring test), roadmap ticked, spec and tech Status Completed, task 5.1.
+- Follow-ups:
+  - the production fix for the language sync race (`settings.ts` timer plus un-awaited `changeLanguage`) was taken by the 028/029 session;
+  - the rare EqualizerCompact render-null is unexplained.

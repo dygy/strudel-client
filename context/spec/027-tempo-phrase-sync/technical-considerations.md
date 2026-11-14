@@ -1,7 +1,7 @@
 # Technical Specification: Tempo and Phrase Sync
 
 - **Functional Specification:** [functional-spec.md](./functional-spec.md)
-- **Status:** Approved
+- **Status:** Completed
 - **Author(s):** Claude (for the owner)
 
 ---

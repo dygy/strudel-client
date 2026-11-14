@@ -47,5 +47,5 @@ Spec: [functional-spec.md](./functional-spec.md) · Tech: [technical-considerati
     - RED-validated.
     - **[Agent: strudel-test-engineer]**
 
-- [ ] **Slice 5: Bookkeeping**
-  - [ ] 5.1 `context/product/feature-map.md` transition row; roadmap tick; spec Status Completed; memory (after prod). **[Agent: main]**
+- [x] **Slice 5: Bookkeeping**
+  - [x] 5.1 `context/product/feature-map.md` transition row; roadmap tick; spec Status Completed; memory (after prod). **[Agent: main]**

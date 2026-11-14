@@ -1,7 +1,7 @@
 # Functional Specification: Tempo and Phrase Sync
 
 - **Roadmap Item:** Phase 6 — Live sets: "Tempo and phrase sync: match the next track's tempo before a transition and start it on a phrase boundary (4/8/16 cycles)". No GitHub issue.
-- **Status:** Approved
+- **Status:** Completed
 - **Author:** Claude (for the owner). The owner chose these on 2026-11-14: a 4-way Tempo choice (Jump / Glide during / Match then glide / Keep set tempo), and phrases counted from the playing track's own start, with 16 added.
 
 ---
