@@ -28,7 +28,9 @@ export const UPLOAD_EXTENSIONS = ['.strudel', '.js'];
 export const libraryUrl = () => process.env.STRUDEL_MCP_LIBRARY_URL || DEFAULT_LIBRARY_URL;
 
 export function authFile() {
-  const base = process.env.STRUDEL_MCP_CONFIG_DIR || join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'strudel-mcp');
+  const base =
+    process.env.STRUDEL_MCP_CONFIG_DIR ||
+    join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'strudel-mcp');
   return join(base, 'auth.json');
 }
 
@@ -89,7 +91,16 @@ export function fileAuthProvider(o) {
     },
     invalidateCredentials: async (scope) => {
       const current = await load();
-      const drop = scope === 'all' ? ['client', 'tokens', 'verifier'] : scope === 'client' ? ['client'] : scope === 'tokens' ? ['tokens'] : scope === 'verifier' ? ['verifier'] : [];
+      const drop =
+        scope === 'all'
+          ? ['client', 'tokens', 'verifier']
+          : scope === 'client'
+            ? ['client']
+            : scope === 'tokens'
+              ? ['tokens']
+              : scope === 'verifier'
+                ? ['verifier']
+                : [];
       const store = await readStore(file);
       store[o.serverUrl] = Object.fromEntries(Object.entries(current).filter(([k]) => !drop.includes(k)));
       await writeStore(file, store);
@@ -105,7 +116,12 @@ export class NotSignedIn extends Error {
 }
 
 function openInBrowser(url) {
-  const [cmd, args] = process.platform === 'darwin' ? ['open', [url]] : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : ['xdg-open', [url]];
+  const [cmd, args] =
+    process.platform === 'darwin'
+      ? ['open', [url]]
+      : process.platform === 'win32'
+        ? ['cmd', ['/c', 'start', '', url]]
+        : ['xdg-open', [url]];
   try {
     spawn(cmd, args, { stdio: 'ignore', detached: true }).unref();
   } catch {
@@ -130,7 +146,9 @@ export async function login(o = {}) {
       if (url.pathname !== '/callback') return void res.writeHead(404).end();
       const got = url.searchParams.get('code');
       const error = url.searchParams.get('error');
-      res.writeHead(got ? 200 : 400, { 'content-type': 'text/plain; charset=utf-8' }).end(got ? 'Signed in. You can close this tab.' : `Sign-in failed: ${error ?? 'no code'}`);
+      res
+        .writeHead(got ? 200 : 400, { 'content-type': 'text/plain; charset=utf-8' })
+        .end(got ? 'Signed in. You can close this tab.' : `Sign-in failed: ${error ?? 'no code'}`);
       clearTimeout(timer);
       if (got) resolve(got);
       else reject(new Error(`Sign-in failed: ${url.searchParams.get('error_description') ?? error ?? 'no code'}`));
@@ -150,7 +168,8 @@ export async function login(o = {}) {
     await provider.invalidateCredentials('all');
     if ((await auth(provider, { serverUrl })) === 'AUTHORIZED') return;
     const authorizationCode = await code;
-    if ((await auth(provider, { serverUrl, authorizationCode })) !== 'AUTHORIZED') throw new Error('Sign-in did not complete');
+    if ((await auth(provider, { serverUrl, authorizationCode })) !== 'AUTHORIZED')
+      throw new Error('Sign-in did not complete');
     log(`Signed in to ${serverUrl}. Tokens: ${o.file ?? authFile()}`);
   } finally {
     listener.close();
@@ -166,7 +185,9 @@ export async function callLibrary(name, args, o = {}) {
   const provider = fileAuthProvider({ serverUrl, file: o.file });
   if (!(await provider.tokens())) throw new NotSignedIn();
   const client = new Client({ name: 'strudel-mcp-local', version: '1' });
-  await client.connect(new StreamableHTTPClientTransport(new URL(serverUrl), { authProvider: provider, fetch: o.fetch }));
+  await client.connect(
+    new StreamableHTTPClientTransport(new URL(serverUrl), { authProvider: provider, fetch: o.fetch }),
+  );
   try {
     const r = await client.callTool({ name, arguments: args });
     const text = r.content?.find((c) => c.type === 'text')?.text;
@@ -196,10 +217,14 @@ export async function callLibrary(name, args, o = {}) {
 export async function uploadTrack(input, o = {}) {
   const call = o.call ?? ((name, args) => callLibrary(name, args, o));
   const ext = extname(input.path).toLowerCase();
-  if (!UPLOAD_EXTENSIONS.includes(ext)) throw new Error(`Only Strudel files (${UPLOAD_EXTENSIONS.join(', ')}) are uploaded, not ${ext || 'a file without an extension'}`);
+  if (!UPLOAD_EXTENSIONS.includes(ext))
+    throw new Error(
+      `Only Strudel files (${UPLOAD_EXTENSIONS.join(', ')}) are uploaded, not ${ext || 'a file without an extension'}`,
+    );
   const info = await stat(input.path);
   if (!info.isFile()) throw new Error(`${input.path} is not a file`);
-  if (info.size > MAX_TRACK_BYTES) throw new Error(`${input.path} is ${info.size} bytes; a track holds at most ${MAX_TRACK_BYTES}`);
+  if (info.size > MAX_TRACK_BYTES)
+    throw new Error(`${input.path} is ${info.size} bytes; a track holds at most ${MAX_TRACK_BYTES}`);
   const code = await readFile(input.path, 'utf8');
   if (!code.trim()) throw new Error(`${input.path} is empty`);
   if (input.trackId) {

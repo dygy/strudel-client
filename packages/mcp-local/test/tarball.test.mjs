@@ -156,7 +156,12 @@ describe('the published package', SUITE, () => {
 describe('the tools', SUITE, () => {
   it('lists exactly check_code, run_pattern and summarize_pattern, read-only, with input and output schemas, plus upload_track', async () => {
     const { tools: all } = await anyServer().listTools();
-    expect(all.map((tool) => tool.name).sort()).toEqual(['check_code', 'run_pattern', 'summarize_pattern', 'upload_track']);
+    expect(all.map((tool) => tool.name).sort()).toEqual([
+      'check_code',
+      'run_pattern',
+      'summarize_pattern',
+      'upload_track',
+    ]);
     // upload_track writes to the online library: it is the one tool that is not read-only or closed-world
     const upload = all.find((tool) => tool.name === 'upload_track');
     expect(upload.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, openWorldHint: true });
