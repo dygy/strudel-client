@@ -1,0 +1,21 @@
+# Flow log — 026 EQ listening tools
+
+- **2026-11-14 — spec, tech and tasks.** Spec dir committed in 3a0c5ef. The MIDI-latency suggestion was dropped: the 6 ms look-ahead is present with the EQ on and off (`mainEqualizer.ts` header).
+- **Implement** (strudel-audio-engineer, 1 dispatch):
+  - profiles: output −0.5 / −1 / −0.5 / −1 dB for acoustic / bassBoost / piano / rnb, now at +2.74 / +2.71 / +2.97 / +2.62 dB vs Flat;
+  - `slots.ts` and the A|B control in a shared `EqualizerListeningControls`;
+  - `createAnalyserTap` and the spectrum;
+  - `recordingTap.ts` with Record as heard;
+  - a recorder connection leak fixed in `AudioRecorderEngine`.
+- **Browser:**
+  - The analyser changes no output sample (max diff 0).
+  - An A/B switch peaks at 1.05× / 1.21× a clean sine's step, so no click.
+  - A 200 Hz low cut takes 30–100 Hz from −76.5 to −117 dB.
+  - Frames: 125/s while playing and 0 while stopped.
+  - A post-EQ recording has +18.9 dB at 50 Hz vs +7.0 dB pre-EQ.
+  - Opus overshoot is +0.15 dBFS in the file, so AC 2.3.2 was reworded (spec change log).
+- **Feature testing:** every AC is mapped. New test: `recordingTapMidRecording026.test.tsx` (3/3 red with a cached option, then green).
+- **Review:**
+  - Minor: a slot repair was not persisted, so the speakers and the panel could diverge. Sent back to the audio engineer.
+  - Major, in the shared tree: a docs commit from another session swept in the chore's staged deletions. It was rebuilt as flow-log only before any push.
+- **Next:** push gate.

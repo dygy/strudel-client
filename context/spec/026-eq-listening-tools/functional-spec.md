@@ -52,7 +52,7 @@ Spec 026 does not change the MIDI latency. A proposal to add the EQ's 6 ms look-
 - The option is remembered. Changing it during a recording applies to the next recording.
   - **Acceptance Criteria:**
     - [ ] Given the option is off, a recording is identical to today's: before the EQ.
-    - [ ] Given the option is on and a +12 dB bass boost, when the user records, then the file has the boosted bass. Its peaks stay under 0 dBFS because of the limiter.
+    - [ ] Given the option is on and a +12 dB bass boost, when the user records, then the file has the boosted bass. The sound handed to the recorder peaks under 0 dBFS because of the limiter. The lossy encoder (WebM/Opus) may overshoot by a fraction of a dB in the file (measured +0.15 dBFS), as any lossy codec can.
     - [ ] Given the option is on, when the user records a screen capture, then its audio is after the EQ too.
     - [ ] Given the option is on but the main EQ is not installed yet (audio not started), the recording falls back to the pre-EQ tap and doesn't fail.
 
@@ -85,3 +85,10 @@ Spec 026 does not change the MIDI latency. A proposal to add the EQ's 6 ms look-
 - A spectrum of the headphone preview or of the input before the EQ.
 - Changing the MIDI latency (dropped; see §1).
 - Recording the headphone preview.
+
+---
+
+## Change Log
+
+- 2026-11-14 — implementation (026). AC 2.3.2 now separates the recorder's input, which the limiter keeps under 0 dBFS (measured peak 0.9989), from the encoded file, where Opus overshoots slightly (measured +0.15 dBFS). The limiter is left unchanged for recordings.
+- 2026-11-14 — implementation (026). The A/B, Spectrum and Record-as-heard controls live in a shared `EqualizerListeningControls` component, used by both the desktop and the compact panel. Record as heard sits in the EQ panel because the app has no recording-options panel.

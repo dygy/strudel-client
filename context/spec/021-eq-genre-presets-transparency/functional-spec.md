@@ -80,3 +80,4 @@ Spec 020 added 12 genre presets, and the owner liked them ("Phonk sounds great")
 ## Change Log
 
 - 2026-11-13 — feature testing (021) — AC 2.1.4 narrowed to genre presets: four listening profiles (acoustic +3.24, bassBoost +3.71, piano +3.47, rnb +3.62 dB vs Flat) predate this spec and their values are out of scope (§3).
+- 2026-11-14 — spec 026 — AC 2.1.4 restored to every preset. The four loud profiles got a lower output level (acoustic −0.5, bassBoost −1, piano −0.5, rnb −1 dB) with the bands unchanged, and all 81 presets now measure within ±3 dB of Flat.

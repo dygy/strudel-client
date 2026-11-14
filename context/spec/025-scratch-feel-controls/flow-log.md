@@ -1,0 +1,19 @@
+# Flow log — 025 scratch feel controls
+
+- **2026-11-14 — spec, tech and tasks.** Owner: "go do all please", covering the suggestions after 023. Spec dir committed in 3a0c5ef.
+- **Implement** (strudel-audio-engineer, 1 dispatch):
+  - physics: snap grid, feel ranges, planner stretch 0.5×–2×;
+  - DSP and deck: `feel` message, `spinUpSeconds`, `snapGrid`;
+  - runtime: migration of `strudel-scratch-snap`, new `strudel-scratch-feel`;
+  - ScratchSection: select, sliders, Reset;
+  - 8 new keys plus 2 reworded keys, in 9 locales.
+  - RED→GREEN evidence is in the agent report (25/31 failed on HEAD sources, 35/36 on the reverted runtime and UI).
+- **Browser** (headless Chromium, `/embed`), brake / spin-up (full lengths):
+  - 0.1 / 0.4: ~105 / ~405 ms
+  - 0.5 / 1.5: ~502 / ~1497 ms
+  - 0.02 / 0.1: ~22 / ~105 ms
+  - With Bar snap, the track landed exactly 1 bar (2 s) behind.
+- **Feature testing** (strudel-test-engineer, shared with 026): every AC is mapped (2.1.1–2.3.3). New test: `ScratchFeelLanguages025.test.tsx` (16/17 red with a hardcoded label, then green).
+- **Review** (strudel-reviewer, shared with 026 and the chore): no 025 findings.
+- **Suite:** 224 files / 4619 tests green, with `--maxWorkers=2`, on Node 24.12 shuffled (seeds 3 and 7, before the last test files were added). Lint, format and `build:cloudflare` are clean.
+- **Next:** push gate.
