@@ -17,3 +17,10 @@
 - **Review** (strudel-reviewer, shared with 026 and the chore): no 025 findings.
 - **Suite:** 224 files / 4619 tests green, with `--maxWorkers=2`, on Node 24.12 shuffled (seeds 3 and 7, before the last test files were added). Lint, format and `build:cloudflare` are clean.
 - **Next:** push gate.
+- **2026-11-14 — prod.** Pushed 344139e..13e31c5. Deploy run 43557338214 is green (Format, lint, test; Build and deploy). The budget test ran on CI and passed.
+- **Prod check** on strudel.dygy.app, read-only:
+  - The bundle has `strudel-eq-slots`, `strudel-eq-spectrum`, `strudel-record-post-eq` and `strudel-scratch-feel`, and no `AudioMixer`.
+  - The UI shows Snap Off/½ beat/Beat/Bar (the legacy `'true'` shows Beat), the Brake 0.02–1 and Spin-up 0.1–2 sliders, Reset, Copy A→B, Spectrum and Record as heard.
+  - The owner's EQ migrated to slot A, with B a copy.
+  - No console errors.
+  - Sound was not played on the owner's speakers; audio was measured locally (see above).

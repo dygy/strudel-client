@@ -22,5 +22,5 @@ Area: **audio** (`packages/equalizer`, the EQ panel, `mainEqualizer`, recording;
 - [x] **Slice 5: Feature Testing**
   - [x] 5.1 Map each acceptance criterion in functional-spec §2.1–2.5 to a test, or list it as browser-measured. Everything is RED-validated. **[Agent: strudel-test-engineer]**
 
-- [ ] **Slice 6: Bookkeeping**
-  - [ ] 6.1 Feature map row, roadmap, spec Status Completed, the spec 021 change log (AC 2.1.4 restored), and memory notes `eq-strong-control-020` / `eq-genre-presets-021`. **[Agent: main]**
+- [x] **Slice 6: Bookkeeping**
+  - [x] 6.1 Feature map row, roadmap, spec Status Completed, the spec 021 change log (AC 2.1.4 restored), and memory notes `eq-strong-control-020` / `eq-genre-presets-021`. **[Agent: main]**

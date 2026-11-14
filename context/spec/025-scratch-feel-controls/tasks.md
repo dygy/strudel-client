@@ -17,5 +17,5 @@ Area: **audio** (`packages/mixer/scratch`, scratch runtime and UI, as in 023) ow
 - [x] **Slice 3: Feature Testing**
   - [x] 3.1 Map each acceptance criterion in functional-spec §2.1–2.3 to a test, or list it as browser-measured. Everything is RED-validated. **[Agent: strudel-test-engineer]**
 
-- [ ] **Slice 4: Bookkeeping**
-  - [ ] 4.1 Feature map row, roadmap, spec Status Completed, memory `vinyl-scratch-019`. **[Agent: main]**
+- [x] **Slice 4: Bookkeeping**
+  - [x] 4.1 Feature map row, roadmap, spec Status Completed, memory `vinyl-scratch-019`. **[Agent: main]**

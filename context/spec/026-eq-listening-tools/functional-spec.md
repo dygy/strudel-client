@@ -1,7 +1,7 @@
 # Functional Specification: EQ Listening Tools
 
 - **Roadmap Item:** Not on the roadmap. It follows specs [020](../020-eq-strong-control/), [021](../021-eq-genre-presets-transparency/) and [024](../024-track-eq-profile/). On 2026-11-14 the owner asked for all the improvement suggestions (in Russian: "go do all please"). No GitHub issue.
-- **Status:** Approved
+- **Status:** Completed
 - **Author:** Claude (for the owner)
 
 ---
