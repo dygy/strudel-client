@@ -1,12 +1,15 @@
 import * as prettier from 'prettier';
 import * as parserBabel from 'prettier/plugins/babel';
 import * as parserTypeScript from 'prettier/plugins/typescript';
-import * as parserEstree from 'prettier/plugins/estree';
+import * as estreeModule from 'prettier/plugins/estree';
 import {
   formatStrudelCode,
   formatStrudelSelection,
   isStrudelCode,
 } from '../../../packages/codemirror/strudelFormat.mjs';
+
+// Prettier ships estree's typings as `export {}`, so name what it is: the same module object, typed.
+const parserEstree = estreeModule as prettier.Plugin;
 
 // Prettier configuration types
 export interface PrettierOptions {

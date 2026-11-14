@@ -31,7 +31,7 @@ const TOKEN = 'eyJ.test.token';
 const V1 = '2026-11-13T00:00:01.000001+00:00';
 const V2 = '2026-11-13T00:00:02.000002+00:00';
 
-type Route = (ctx: ReturnType<typeof apiContext>) => Promise<Response>;
+type Route = (ctx: ReturnType<typeof apiContext>) => Response | Promise<Response>;
 
 const call = (route: Route, method: string, body?: unknown, token: string | undefined = TOKEN) =>
   route(apiContext({ url: `http://test/api/sets/x`, method, token, body }));

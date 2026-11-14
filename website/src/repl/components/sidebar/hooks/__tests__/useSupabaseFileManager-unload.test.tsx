@@ -480,7 +480,7 @@ describe('format on save, with the settings as a page reload leaves them: string
 
     it('a save someone asked for: sent as typed, and told', async () => {
       const { toastActions } = await import('@src/stores/toastStore');
-      const warning = vi.spyOn(toastActions, 'warning').mockImplementation(() => {});
+      const warning = vi.spyOn(toastActions, 'warning').mockImplementation(() => '');
       settings = on;
       refused();
       await React.act(async () => {
@@ -492,7 +492,7 @@ describe('format on save, with the settings as a page reload leaves them: string
 
     it('an autosave: sent as typed, in silence, so it does not repeat every interval', async () => {
       const { toastActions } = await import('@src/stores/toastStore');
-      const warning = vi.spyOn(toastActions, 'warning').mockImplementation(() => {});
+      const warning = vi.spyOn(toastActions, 'warning').mockImplementation(() => '');
       settings = on;
       refused();
       await save('t1');
@@ -511,7 +511,7 @@ describe('format on save, with the settings as a page reload leaves them: string
 
     it('it fails: the text goes out, and the toast comes from the translations, with the reason', async () => {
       const { toastActions } = await import('@src/stores/toastStore');
-      const warning = vi.spyOn(toastActions, 'warning').mockImplementation(() => {});
+      const warning = vi.spyOn(toastActions, 'warning').mockImplementation(() => '');
       settings = on;
       autoFormatOnSave.mockResolvedValueOnce({ success: false, formattedCode: 'typed', error: 'boom' } as never);
       await saveWithToast();
@@ -521,7 +521,7 @@ describe('format on save, with the settings as a page reload leaves them: string
 
     it('it throws: the text goes out, and the toast comes from the translations', async () => {
       const { toastActions } = await import('@src/stores/toastStore');
-      const warning = vi.spyOn(toastActions, 'warning').mockImplementation(() => {});
+      const warning = vi.spyOn(toastActions, 'warning').mockImplementation(() => '');
       vi.spyOn(console, 'error').mockImplementation(() => {});
       settings = on;
       autoFormatOnSave.mockRejectedValueOnce(new Error('boom'));
@@ -760,7 +760,6 @@ describe('a multitrack', () => {
       trackId: 'm1',
       trackName: 'multi',
       kind: 'changed',
-      restored: false,
       busy: false,
       failed: false,
     });
@@ -783,7 +782,6 @@ describe('a multitrack', () => {
       trackId: 'm1',
       trackName: 'multi',
       kind: 'changed',
-      restored: false,
       busy: false,
       failed: false,
     });

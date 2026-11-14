@@ -127,7 +127,8 @@ async function mcpPost(request: Request, env: Env, deps: Deps, origin: string, s
   const token = bearerToken(request);
   if (!token) return finish(challenge(origin), 'auth', 'no_token');
   const check = await checkToken(token, env, deps.fetch);
-  if (!check.ok) {
+  // `=== false`, not `!check.ok`: website tests compile this file without strictNullChecks, which only narrows on equality.
+  if (check.ok === false) {
     if (check.reason === 'service_unavailable') {
       return finish(
         refusal(503, 'The sign-in service could not be reached. Try again.', { 'retry-after': '5' }),
@@ -213,7 +214,7 @@ async function tabSocket(request: Request, env: Env, deps: Deps, origin: string,
   const token = sessionCookie(request);
   if (!token) return finish(refusal(401, 'Sign in'), 'no_cookie');
   const check = await checkTabToken(token, env, deps.fetch);
-  if (!check.ok) {
+  if (check.ok === false) {
     return check.reason === 'service_unavailable'
       ? finish(refusal(503, 'Try again', { 'retry-after': '5' }), check.reason)
       : finish(refusal(401, 'Sign in'), check.reason);

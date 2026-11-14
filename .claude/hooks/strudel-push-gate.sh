@@ -9,6 +9,7 @@
 # goes out this runs the same three checks CI gates the deploy on (~15 s total):
 #   1. pnpm run format-check   (prettier, repo-wide clean since 7fbf4af)
 #   2. pnpm run lint           (eslint, 0 errors since b6eaad8)
+#      pnpm run typecheck      (tsc on website, 0 errors since 2026-11-14)
 #   3. the WHOLE vitest suite, compared against context/product/known-red-tests.txt
 # Format/lint failures in a clean tree block immediately; the test checks below
 # still run when the tree is dirty, and every note carries the format/lint result.
@@ -63,12 +64,24 @@ seg="$(printf '%s\n' "$cmd_nohd" | tr ';&|' '\n\n\n' | grep -E '^[[:space:]]*(\(
 printf '%s' "$seg" | grep -q 'STRUDEL_SKIP_PUSH_GATE=1' &&
   allow_note "Strudel push gate BYPASSED (STRUDEL_SKIP_PUSH_GATE=1) — say so in the report."
 
-# Which repo: honour `git -C <dir>`, else the session cwd.
+# Which repo: honour `git -C <dir>`, then a `cd <dir>` earlier in the same command (a push from
+# another worktree: `cd ../strudel-client-x && git push …`), else the session cwd. Without the cd,
+# a push from a worktree was checked against the session's checkout, often another branch.
 cwd="$(jqr '.cwd // ""')"
 [ -d "$cwd" ] || cwd="$PWD"
+while IFS= read -r s; do
+  [ "$s" = "$seg" ] && break
+  if printf '%s' "$s" | grep -qE '^[[:space:]]*\(?[[:space:]]*cd[[:space:]]+[^[:space:]]'; then
+    d="$(printf '%s' "$s" | sed -E 's/^[[:space:]]*\(?[[:space:]]*cd[[:space:]]+//; s/[[:space:]]*\)?[[:space:]]*$//')"
+    d="${d#\"}"; d="${d%\"}"; d="${d#\'}"; d="${d%\'}"
+    case "$d" in "~"*) d="$HOME${d#\~}" ;; /*) ;; *) d="$cwd/$d" ;; esac
+    [ -d "$d" ] && cwd="$d"
+  fi
+done < <(printf '%s\n' "$cmd_nohd" | tr ';&|' '\n\n\n')
 dir="$(printf '%s' "$seg" | grep -oE 'git[[:space:]]+-C[[:space:]]+[^[:space:]]+' | head -1 | awk '{print $3}')"
 [ -n "$dir" ] && { case "$dir" in /*) ;; *) dir="$cwd/$dir" ;; esac; [ -d "$dir" ] && cwd="$dir"; }
 root="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null)" || allow_quiet
+[ "${STRUDEL_PUSH_GATE_DEBUG:-}" = "1" ] && printf '%s\n' "$root" >"$state_dir/root.txt"
 case "$(git -C "$root" remote get-url origin 2>/dev/null)" in *strudel-client*) ;; *) allow_quiet ;; esac
 
 # Only pushes that land on main. Explicit refspec `x:main` / `main`, or a bare
@@ -99,6 +112,19 @@ if [ $fmt_rc -ne 0 ]; then
 ${files:-$(printf '%s\n' "$fmt_out" | tail -5)}
 "
 fi
+# tsc needs doc.json (the Reference panel imports it); a fresh worktree has none until a test run.
+tc_note=""
+if [ -f "$root/doc.json" ] && [ -f "$root/website/doc.json" ]; then
+  tc_out="$(cd "$root" && pnpm run typecheck 2>&1)"; tc_rc=$?
+else
+  tc_rc=0
+  tc_note=" Typecheck SKIPPED (no doc.json yet: run 'pnpm test' once, or 'pnpm run pretest') — CI runs it, so verify before calling it safe."
+fi
+if [ $tc_rc -ne 0 ]; then
+  style="${style}TYPES: tsc errors (pnpm run typecheck):
+$(printf '%s\n' "$tc_out" | grep -E 'error TS' | head -15)
+"
+fi
 if [ $lint_rc -ne 0 ]; then
   style="${style}LINT: eslint errors (pnpm run lint):
 $(printf '%s\n' "$lint_out" | grep -E '^/|error' | head -15)
@@ -121,7 +147,7 @@ out="$state_dir/vitest-$$.json"
 failing="$(jq -r --arg r "$root/" '.testResults[] | select(.status=="failed") | .name | ltrimstr($r)' "$out" 2>/dev/null | sort -u)"
 total="$(jq -r '.numTotalTests // 0' "$out" 2>/dev/null)"
 rm -f "$out"
-[ -n "$failing" ] || allow_note "Strudel push gate: format + lint + vitest green (${total} tests)."
+[ -n "$failing" ] || allow_note "Strudel push gate: format + lint + vitest green (${total} tests).${tc_note}"
 
 known="$root/context/product/known-red-tests.txt"
 new="$(printf '%s\n' "$failing" | grep -vxF -f <(grep -vE '^[[:space:]]*(#|$)' "$known" 2>/dev/null) 2>/dev/null)"

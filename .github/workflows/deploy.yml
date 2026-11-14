@@ -37,6 +37,9 @@ jobs:
 
       - run: pnpm run test
 
+      # After the tests: their pretest generates doc.json, which the Reference panel imports.
+      - run: pnpm run typecheck
+
   deploy:
     name: Build and deploy to Cloudflare
     needs: check

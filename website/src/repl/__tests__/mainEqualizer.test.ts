@@ -8,7 +8,6 @@
  * and by default on the GLOBAL controller the app plays through.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-// @ts-expect-error untyped upstream .mjs (superdough is not a website dependency; @strudel/webaudio re-exports it)
 import { SuperdoughAudioController } from '../../../../packages/superdough/superdoughoutput.mjs';
 import { saveEqualizerSettings, getDefaultSettings } from '@strudel/equalizer';
 import {
@@ -16,7 +15,6 @@ import {
   stubWebAudio,
   stubWebAudioNodeConstructors,
   unstubWebAudio,
-  // @ts-expect-error untyped .mjs test helper shared with @strudel/mixer
 } from '../../../../packages/mixer/test/webAudioMock.mjs';
 import {
   destroyMainEqualizer,
@@ -27,6 +25,9 @@ import {
 } from '../mainEqualizer';
 
 const BAND_125 = 2;
+
+/** What the mock node (webAudioMock.mjs) records as connected; the EQ's API types it as a plain AudioNode. */
+const connections = (node: AudioNode): unknown[] => (node as AudioNode & { connections: unknown[] }).connections;
 
 /**
  * What each band's filter applies (audible), in band order. The bands sit on the EQ's wet path
@@ -94,7 +95,7 @@ describe('main (speakers) equalizer', () => {
     const destinationGain = controller.output.destinationGain;
     expect(destinationGain.connections).toEqual([eq.getInput()]);
     expect(destinationGain.connections).not.toContain(ac.destination);
-    expect(eq.getOutput().connections).toEqual([ac.destination]);
+    expect(connections(eq.getOutput())).toEqual([ac.destination]);
   });
 
   it('stays in the path after resetGlobalEffects() rebuilds destinationGain', () => {
@@ -112,7 +113,7 @@ describe('main (speakers) equalizer', () => {
     settle();
     expect(getMainEqualizer()).toBe(eq);
     expect(controller.output.destinationGain.connections).toEqual([eq.getInput()]);
-    expect(eq.getOutput().connections).toEqual([ac.destination]);
+    expect(connections(eq.getOutput())).toEqual([ac.destination]);
   });
 
   it('teardown restores the destination and disconnects the EQ', () => {
@@ -124,8 +125,8 @@ describe('main (speakers) equalizer', () => {
     settle(); // the EQ is disconnected once its path has faded out
 
     expect(controller.output.destinationGain.connections).toEqual([ac.destination]);
-    expect(eq.getOutput().connections).toEqual([]);
-    expect(eq.getInput().connections).toEqual([]);
+    expect(connections(eq.getOutput())).toEqual([]);
+    expect(connections(eq.getInput())).toEqual([]);
   });
 
   // Review finding (spec 020): the EQ's limiter layout was fixed when the EQ was built; a reset that
@@ -149,10 +150,10 @@ describe('main (speakers) equalizer', () => {
     settle();
 
     destroyMainEqualizer();
-    expect(eq.getOutput().connections[0] === ac.destination).toBe(true); // still fading through it
+    expect(connections(eq.getOutput())[0] === ac.destination).toBe(true); // still fading through it
 
     settle();
-    expect(eq.getOutput().connections.length).toBe(0);
+    expect(connections(eq.getOutput()).length).toBe(0);
   });
 
   describe('shared by several useReplContext instances (reference count)', () => {
@@ -164,13 +165,13 @@ describe('main (speakers) equalizer', () => {
       releaseMainEqualizer();
       expect(getMainEqualizer()).toBe(eq);
       expect(controller.output.destinationGain.connections).toEqual([eq.getInput()]);
-      expect(eq.getOutput().connections).toEqual([ac.destination]);
+      expect(connections(eq.getOutput())).toEqual([ac.destination]);
 
       releaseMainEqualizer();
       expect(getMainEqualizer()).toBeNull();
       settle();
       expect(controller.output.destinationGain.connections).toEqual([ac.destination]);
-      expect(eq.getOutput().connections).toEqual([]);
+      expect(connections(eq.getOutput())).toEqual([]);
     });
 
     it('an extra release does nothing (the count never goes below zero)', () => {
@@ -218,7 +219,7 @@ describe('main EQ on the global superdough controller, after audioReady', () => 
     await new Promise((r) => setTimeout(r, 80)); // superdough's insert swap settles (spec 020)
     expect(webaudio.getSuperdoughAudioController().output.outputInsert).toBe(eq.getInput());
     expect(webaudio.getSuperdoughAudioController().output.destinationGain.connections).toEqual([eq.getInput()]);
-    expect(eq.getOutput().connections).toEqual([webaudio.getAudioContext().destination]);
+    expect(connections(eq.getOutput())).toEqual([webaudio.getAudioContext().destination]);
   });
 
   it('waits for audioReady: the controller is not built (channels not sized) before the device is set', async () => {

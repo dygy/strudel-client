@@ -4,7 +4,7 @@
  * up in the id-keyed folders map, so the input opened empty and Enter did nothing — and even a hit
  * only changed local state (re-keyed by path) without calling /api/folders/update.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 // Call the hook as a plain function: no renderer is needed for useCallback/useRef.
 vi.mock('react', async (importOriginal) => {
@@ -36,9 +36,15 @@ const BEATS = 'aB3dEfGhIjKlMnOpQrStU';
 type Map<T> = Record<string, T>;
 const apply = <T>(cur: Map<T>, u: Map<T> | ((p: Map<T>) => Map<T>)) => (typeof u === 'function' ? u(cur) : u);
 
+type UpdateFolder = NonNullable<Parameters<typeof useFileManagerOperations>[0]['updateFolder']>;
+
 function setup(
   renameValue: string,
-  updateFolder = vi.fn(async (id: string, u: { name?: string }) => ({ id, name: u.name!, path: u.name! })),
+  updateFolder: Mock<UpdateFolder> = vi.fn(async (id: string, u: { name?: string }) => ({
+    id,
+    name: u.name!,
+    path: u.name!,
+  })),
 ) {
   const state = {
     folders: {
