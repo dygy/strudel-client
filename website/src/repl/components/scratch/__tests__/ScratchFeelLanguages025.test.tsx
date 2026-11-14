@@ -18,6 +18,7 @@ vi.mock('@src/repl/util', () => ({ isUdels: () => false, isIframe: () => false }
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import i18n from '@src/i18n/i18n';
+import { settingsMap } from '@src/settings';
 import { ScratchSection } from '../ScratchSection';
 import { fakeRuntime } from './scratchFakes';
 
@@ -74,7 +75,12 @@ afterEach(async () => {
   container?.remove();
   root = null;
   container = null;
+  // Restore the store as well as i18n: settings.ts copies i18next's cached language into the store
+  // once, 10 ms after it loads, which can land while this file shows Spanish. A store left on 'es'
+  // switches i18n back to Spanish on the next settings write, in whatever file runs next
+  // (isolate:false).
   await i18n.changeLanguage('en');
+  if (settingsMap.get().language !== 'en') settingsMap.setKey('language', 'en');
 });
 
 describe('Scratch section labels in each language (025 §2.3)', () => {

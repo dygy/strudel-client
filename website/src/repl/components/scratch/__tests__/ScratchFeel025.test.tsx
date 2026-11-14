@@ -6,7 +6,7 @@
  * - Compact layout: 44 px touch targets for the choice and Reset.
  * - The on-screen platter brakes and spins up over the chosen times.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => {
   const jsdomStorage = (globalThis as { jsdom?: { window: Window } }).jsdom?.window.localStorage;
@@ -19,6 +19,8 @@ vi.mock('@src/repl/util', () => ({ isUdels: () => false, isIframe: () => false }
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import en from '@src/i18n/locales/en/settings.json';
+import i18n from '@src/i18n/i18n';
+import { settingsMap } from '@src/settings';
 import { ScratchSection, formatFeelSeconds } from '../ScratchSection';
 import { platterGrab, platterRate, platterRelease, type PlatterMotor } from '../Platter';
 import { fakeRuntime } from './scratchFakes';
@@ -38,6 +40,14 @@ function mount(node: React.ReactElement) {
   act(() => root!.render(node));
   return container;
 }
+
+// isolate:false: an earlier file can leave the settings store's language non-English (settings.ts
+// copies i18next's cached language into it once, 10 ms after it loads), and then any settings write
+// switches i18n to that language (the settings.ts subscription). Start each test in English.
+beforeEach(async () => {
+  await i18n.changeLanguage('en');
+  if (settingsMap.get().language !== 'en') settingsMap.setKey('language', 'en');
+});
 
 afterEach(() => {
   act(() => root?.unmount());

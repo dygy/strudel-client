@@ -5,7 +5,7 @@
  * switch (Headphones only while the headphone preview runs; absent without the mixer), MIDI
  * Learn / Forget with the assigned control, and Learn disabled with a note without MIDI.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Node >= 25 ships its own global `localStorage`, which shadows jsdom's; settings.ts reads it at
 // import time, so point it at jsdom's before imports.
@@ -20,6 +20,8 @@ vi.mock('@src/repl/util', () => ({ isUdels: () => false, isIframe: () => false }
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import en from '@src/i18n/locales/en/settings.json';
+import i18n from '@src/i18n/i18n';
+import { settingsMap } from '@src/settings';
 import type { ScratchRuntime } from '../../../scratch/scratchRuntime';
 import { ScratchSection, withLtrKeys } from '../ScratchSection';
 import { ShortcutsTab } from '../../panel/ShortcutsTab';
@@ -44,6 +46,14 @@ const q = <T extends Element = HTMLElement>(selector: string) => container!.quer
 const deckButton = (deck: string) => q<HTMLButtonElement>(`[data-scratch-deck="${deck}"]`);
 const platter = () => q('[data-scratch-platter]')!;
 const text = (selector: string) => q(selector)?.textContent ?? '';
+
+// isolate:false: an earlier file can leave the settings store's language non-English (settings.ts
+// copies i18next's cached language into it once, 10 ms after it loads), and then any settings write
+// switches i18n to that language (the settings.ts subscription). Start each test in English.
+beforeEach(async () => {
+  await i18n.changeLanguage('en');
+  if (settingsMap.get().language !== 'en') settingsMap.setKey('language', 'en');
+});
 
 afterEach(() => {
   act(() => root?.unmount());
