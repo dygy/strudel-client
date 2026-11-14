@@ -59,7 +59,7 @@ interface ReplEditorProps extends React.HTMLAttributes<HTMLDivElement> {
     folders: any[];
   } | null;
   readOnly?: boolean;
-  mixer?: any; // AudioMixer instance for dual-stream support
+  mixer?: any; // PreviewEngine instance (headphone preview)
 }
 
 function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer, ...editorProps }: ReplEditorProps) {

@@ -91,6 +91,19 @@ A subagent starts cold, re-reads what you already know, and returns a *claim*.
 - **A report is a claim.** Re-read the named lines or re-run the named command before acting on it.
 - **Budget:** typically 2–4 agents per feature. Past 6, stop and tell the user why.
 
+## Parallel sessions
+
+Several Claude sessions often work on this repo at once. Sharing one working tree costs real work:
+- Commits have to be split by hand.
+- The push gate reports another session's half-done files.
+- One session's test run sees the other's edits.
+
+So:
+- **One session, one worktree.** A second session starts with `git worktree add ../strudel-client-<topic> -b <topic> origin/main`. Put it outside the repo, not in `.claude/worktrees/`, which vitest, eslint and prettier would otherwise scan. It works on its branch, and lands with a rebase onto `origin/main`.
+- **Claim spec numbers** before allocating, by messaging the other sessions. Two sessions running `create-spec-directory.sh` from different trees get the same `NNN`.
+- **Ping before a push to `main`.** Whoever pushes second rebases.
+- Remove the worktree and its branch once they're merged.
+
 ## Hooks
 
 - **Push gate** (`PreToolUse`, blocking). Before a push to `main`, it runs the same checks CI gates on (~30 s): `pnpm run format-check`, `pnpm run lint`, and the whole vitest suite (refusing any failing file not in `known-red-tests.txt`, after re-running it alone to rule out a flake). It blocks only when the tree is clean.

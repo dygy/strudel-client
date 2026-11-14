@@ -46,6 +46,6 @@
     "@strudel/transpiler": "workspace:*",
     "acorn": "^8.14.0",
     "vite": "^6.0.11",
-    "vitest": "^3.0.4"
+    "vitest": "^3.2.7"
   }
 }

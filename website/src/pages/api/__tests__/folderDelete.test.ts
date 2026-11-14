@@ -146,7 +146,9 @@ describe('DELETE /api/folders/delete', () => {
   });
 
   it('asks the database for this folder only, so a large library can not hide a track', async () => {
-    const from = vi.spyOn(supabaseFake, 'from');
+    // supabaseFake.from is already a vi.fn: a spyOn on it can be restored to a plain function by another
+    // file's restoreAllMocks (isolate:false), which broke every later API test under vitest 3.2.
+    const from = supabaseFake.from;
     const builders: Array<{ table: string; builder: ReturnType<typeof defaultFrom> }> = [];
     from.mockImplementation((table: string) => {
       const builder = defaultFrom(table);
@@ -162,7 +164,9 @@ describe('DELETE /api/folders/delete', () => {
 
   it('puts the folder back and says so when a track got in as it was deleted', async () => {
     fakeState.tables.folders[0].created = 'when-it-was-made';
-    const from = vi.spyOn(supabaseFake, 'from');
+    // supabaseFake.from is already a vi.fn: a spyOn on it can be restored to a plain function by another
+    // file's restoreAllMocks (isolate:false), which broke every later API test under vitest 3.2.
+    const from = supabaseFake.from;
     from.mockImplementation((table: string) => {
       const builder = defaultFrom(table);
       const startDelete = builder.delete;
@@ -188,7 +192,9 @@ describe('DELETE /api/folders/delete', () => {
   });
 
   it('answers version_conflict when another write gets in just before the delete', async () => {
-    const from = vi.spyOn(supabaseFake, 'from');
+    // supabaseFake.from is already a vi.fn: a spyOn on it can be restored to a plain function by another
+    // file's restoreAllMocks (isolate:false), which broke every later API test under vitest 3.2.
+    const from = supabaseFake.from;
     from.mockImplementation((table: string) => {
       const builder = defaultFrom(table);
       const startDelete = builder.delete;
@@ -220,7 +226,9 @@ describe('PUT /api/folders/update with expectedVersion', () => {
   });
 
   it("answers with the trigger's version, not the time the route sent", async () => {
-    const from = vi.spyOn(supabaseFake, 'from');
+    // supabaseFake.from is already a vi.fn: a spyOn on it can be restored to a plain function by another
+    // file's restoreAllMocks (isolate:false), which broke every later API test under vitest 3.2.
+    const from = supabaseFake.from;
     from.mockImplementation((table: string) => {
       const builder = defaultFrom(table);
       const startUpdate = builder.update;

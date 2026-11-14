@@ -156,7 +156,7 @@ const fontFamilyOptions = {
 
 interface SettingsTabProps {
   started: boolean;
-  mixer?: any; // AudioMixer instance
+  mixer?: any; // PreviewEngine instance (headphone preview)
   /** The admin's view of another user: nothing here acts on any account. */
   readOnly?: boolean;
 }

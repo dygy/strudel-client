@@ -164,7 +164,22 @@ const FIXTURES: Array<{
 ];
 
 const RUNS = 7;
-const CPU_LIMIT_MS = 10;
+/**
+ * Workers stops a request at 10 ms of CPU. A GitHub runner's core is slower than a laptop's
+ * (the worst tool takes ~2.7 ms here), so CI checks twice that: still a clear guard against a
+ * real regression, without failing deploys on a slow runner. Prod's own figure: scripts/cpu-time.mjs.
+ */
+const CPU_LIMIT_MS = process.env.CI ? 20 : 10;
+
+/**
+ * CPU time this process has used, in ms (user + system), which is what Workers limits. Wall time
+ * (performance.now) also counts the time other processes hold the core, so it failed whenever the
+ * suite ran beside other work; CPU time doesn't.
+ */
+const cpuMs = () => {
+  const { user, system } = process.cpuUsage();
+  return (user + system) / 1000;
+};
 const token = assistantToken();
 
 async function fastestRun({ name, args, tracks, folders, site, relay }: (typeof FIXTURES)[number]) {
@@ -184,10 +199,10 @@ async function fastestRun({ name, args, tracks, folders, site, relay }: (typeof 
   const init = post(rpcBody('tools/call', { name, arguments: args }), withToken(token));
   let best = Infinity;
   for (let i = 0; i < RUNS; i++) {
-    const started = performance.now();
+    const started = cpuMs();
     const response = await w.fetch(MCP_URL, init);
     await response.text();
-    best = Math.min(best, performance.now() - started);
+    best = Math.min(best, cpuMs() - started);
   }
   return best;
 }
@@ -222,16 +237,17 @@ async function fastestRelayRun() {
       headers: { 'x-command': 'update_code', 'x-timeout-ms': '5000' },
       body,
     });
-    const started = performance.now();
+    const started = cpuMs();
     await (await relay.fetch(request)).text();
-    best = Math.min(best, performance.now() - started);
+    best = Math.min(best, cpuMs() - started);
   }
   return best;
 }
 
-// Timing, so only on a machine that isn't also running the sandbox tests on two cores: CI measured 42 ms
-// for what takes 2 here. The real figure comes from prod, with scripts/cpu-time.mjs.
-describe.skipIf(process.env.CI)('the CPU budget', () => {
+// Measured in CPU time (cpuMs), so other work on the machine doesn't count: wall time made CI measure
+// 42 ms for what takes 2, and a busy laptop fail at 10. The real figure comes from prod, with
+// scripts/cpu-time.mjs.
+describe('the CPU budget', () => {
   it('the relay passing the largest code to a tab stays inside 10 ms', async () => {
     vi.stubGlobal('crypto', webcrypto);
     const ms = await fastestRelayRun();
