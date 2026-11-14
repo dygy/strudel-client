@@ -19,3 +19,10 @@
   - Minor: a slot repair was not persisted, so the speakers and the panel could diverge. Sent back to the audio engineer.
   - Major, in the shared tree: a docs commit from another session swept in the chore's staged deletions. It was rebuilt as flow-log only before any push.
 - **Next:** push gate.
+- **2026-11-14 — prod.** Pushed 344139e..13e31c5. Deploy run 43557338214 is green (Format, lint, test; Build and deploy). The budget test ran on CI and passed.
+- **Prod check** on strudel.dygy.app, read-only:
+  - The bundle has `strudel-eq-slots`, `strudel-eq-spectrum`, `strudel-record-post-eq` and `strudel-scratch-feel`, and no `AudioMixer`.
+  - The UI shows Snap Off/½ beat/Beat/Bar (the legacy `'true'` shows Beat), the Brake 0.02–1 and Spin-up 0.1–2 sliders, Reset, Copy A→B, Spectrum and Record as heard.
+  - The owner's EQ migrated to slot A, with B a copy.
+  - No console errors.
+  - Sound was not played on the owner's speakers; audio was measured locally (see above).

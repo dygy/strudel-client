@@ -1,7 +1,7 @@
 # Functional Specification: Scratch Feel Controls
 
 - **Roadmap Item:** Not on the roadmap. This follows spec [023](../023-vinyl-scratch-realism/). On 2026-11-14 the owner asked for all the improvement suggestions from the end of the 023 session (in Russian: "go do all please"). Two of those suggestions are about the scratch: let the owner tune the feel (brake, motor) instead of fixed constants, and let them choose how coarse the snap is. No GitHub issue.
-- **Status:** Approved
+- **Status:** Completed
 - **Author:** Claude (for the owner)
 
 ---
