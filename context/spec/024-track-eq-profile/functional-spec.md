@@ -1,7 +1,7 @@
 # Functional Specification: A Track Recommends Its Listening EQ
 
 - **Roadmap Item:** Not on the roadmap. Requested by the owner on 2026-11-13 (in Russian): "track generation submits to Strudel the content profile, so we know how best to play the track". The owner chose "suggestion + Apply". No GitHub issue.
-- **Status:** Approved
+- **Status:** Completed
 - **Author:** Claude (for the owner)
 
 ---

@@ -18,5 +18,5 @@ Areas: **audio** (`packages/equalizer`, the EQ panel and its i18n) and **web** (
 - [x] **Slice 4: Feature Testing**
   - [x] 4.1 Map every acceptance criterion in functional-spec §2.1–2.4 to a test (store, wiring, panel on desktop and compact, Apply incl. EQ off, language). RED-validated. **[Agent: strudel-test-engineer]**
 
-- [ ] **Slice 5: Bookkeeping**
-  - [ ] 5.1 Feature map row (done), roadmap, spec Status Completed, memory (after prod). **[Agent: main]**
+- [x] **Slice 5: Bookkeeping**
+  - [x] 5.1 Feature map row (done), roadmap, spec Status Completed, memory (after prod). **[Agent: main]**

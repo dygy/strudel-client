@@ -1,7 +1,7 @@
 # Technical Specification: A Track Recommends Its Listening EQ
 
 - **Functional Specification:** [functional-spec.md](./functional-spec.md)
-- **Status:** Approved
+- **Status:** Completed
 - **Author(s):** Claude (for the owner)
 
 ## 1. High-Level Technical Approach
