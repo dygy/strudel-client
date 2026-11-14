@@ -10,7 +10,10 @@
  * - `{ type: 'grab' }`
  * - `{ type: 'move', delta }` — delta in seconds of audio, negative = backwards
  * - `{ type: 'motor', rate }` — × normal speed, 0 stops
- * - `{ type: 'release', id, beatSeconds }` — spec 023: spin up; snap the lag to `beatSeconds` (0 = off)
+ * - `{ type: 'release', id, beatSeconds, spinUpSeconds? }` — spec 023: spin up; snap the lag to
+ *   `beatSeconds` (0 = off). Spec 025: plan with `spinUpSeconds` (default: the latest `feel`)
+ * - `{ type: 'feel', brakeSeconds, spinUpSeconds }` — spec 025: the brake for the next grab and
+ *   the spin-up for the next release; a running brake or spin-up keeps its length
  * - `{ type: 'handOver', id, at, shiftAt }` — spec 023: hand over at context time `at` (s); the
  *   shifted live input starts at `shiftAt` (default `at`)
  * - `{ type: 'abort' }` — spec 023: back to live now (stop, a cancelled release)
@@ -56,7 +59,7 @@ class ScratchProcessor extends AudioWorkletProcessor {
         break;
       case 'release': {
         const wasHeld = this.dsp.grabbed;
-        this.dsp.release({ id: msg.id, beatSeconds: msg.beatSeconds });
+        this.dsp.release({ id: msg.id, beatSeconds: msg.beatSeconds, spinUpSeconds: msg.spinUpSeconds });
         // Spec 023 review 2: the release's plan, once, so the platter follows the same curve.
         if (wasHeld && this.dsp.phase === 'spinUp') {
           const d = this.dsp;
@@ -83,6 +86,9 @@ class ScratchProcessor extends AudioWorkletProcessor {
         break;
       case 'abort':
         this.dsp.abort();
+        break;
+      case 'feel':
+        this.dsp.setFeel({ brakeSeconds: msg.brakeSeconds, spinUpSeconds: msg.spinUpSeconds });
         break;
       case 'debug':
         this.port.postMessage({

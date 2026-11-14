@@ -3,10 +3,12 @@ import cx from '@src/cx';
 import {
   SCRATCH_SECONDS_PER_TURN,
   SCRATCH_WHEEL_SECONDS_PER_NOTCH,
+  SCRATCH_BRAKE_SECONDS,
   SCRATCH_SPINUP_SECONDS,
   scratchBrakeRate,
   scratchReleaseRate,
   scratchSpinUpRate,
+  type ScratchFeel,
 } from '@strudel/mixer';
 import type { ScratchActions } from '../../scratch/scratchRuntime';
 
@@ -49,6 +51,11 @@ export interface PlatterMotor {
   /** When it started (ms). */
   since: number;
   /**
+   * Spec 025: the curve's length in seconds (the feel's brake, or its spin-up until the plan
+   * arrives). Default: spec 023's 0.1 s / 0.4 s.
+   */
+  seconds?: number;
+  /**
    * Spec 023 review 2: the worklet's plan for this release (stretched spin-up, then the snap
    * correction). Without one the nominal 0.4 s spin-up is drawn until it arrives.
    */
@@ -66,10 +73,11 @@ export interface PlatterSpinPlan {
 /** The platter's motor rate (× normal speed) at `now` (ms). */
 export function platterRate(motor: PlatterMotor, now: number): number {
   const t = Math.max(0, (now - motor.since) / 1000);
-  if (motor.mode === 'brake') return scratchBrakeRate(t, motor.from);
+  if (motor.mode === 'brake') return scratchBrakeRate(t, motor.from, motor.seconds ?? SCRATCH_BRAKE_SECONDS);
   if (motor.mode === 'spin') {
     if (motor.plan) return scratchReleaseRate(t, { ...motor.plan, fromRate: motor.from }, motor.from);
-    return t >= SCRATCH_SPINUP_SECONDS ? 1 : scratchSpinUpRate(t, motor.from);
+    const up = motor.seconds ?? SCRATCH_SPINUP_SECONDS;
+    return t >= up ? 1 : scratchSpinUpRate(t, motor.from, up);
   }
   return 1;
 }
@@ -78,18 +86,23 @@ export function platterRate(motor: PlatterMotor, now: number): number {
 export const platterFollowPlan = (motor: PlatterMotor, plan: PlatterSpinPlan | null | undefined): PlatterMotor =>
   motor.mode === 'spin' && plan ? { ...motor, plan } : motor;
 
-/** Grabbed at `now`: brake from whatever rate the platter turns at. */
-export const platterGrab = (motor: PlatterMotor, now: number): PlatterMotor => ({
+/** Grabbed at `now`: brake (over `brakeSeconds`, spec 025) from whatever rate the platter turns at. */
+export const platterGrab = (motor: PlatterMotor, now: number, brakeSeconds?: number): PlatterMotor => ({
   mode: 'brake',
   from: platterRate(motor, now),
   since: now,
+  ...(brakeSeconds !== undefined && { seconds: brakeSeconds }),
 });
 
-/** Let go at `now`: spin up from whatever rate it turns at (0 after a hold). */
-export const platterRelease = (motor: PlatterMotor, now: number): PlatterMotor => ({
+/**
+ * Let go at `now`: spin up (over `spinUpSeconds`, spec 025, until the worklet's plan arrives) from
+ * whatever rate it turns at (0 after a hold).
+ */
+export const platterRelease = (motor: PlatterMotor, now: number, spinUpSeconds?: number): PlatterMotor => ({
   mode: 'spin',
   from: Math.max(0, Math.min(1, platterRate(motor, now))),
   since: now,
+  ...(spinUpSeconds !== undefined && { seconds: spinUpSeconds }),
 });
 
 const nowMs = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -115,6 +128,7 @@ export function Platter({
   label,
   className,
   spin,
+  feel,
 }: {
   actions: ScratchActions;
   /** The selected deck is attached and playing. */
@@ -126,13 +140,15 @@ export function Platter({
   className?: string;
   /** Spec 023 review 2: the selected deck's latest release plan (from the worklet). */
   spin?: PlatterSpinPlan | null;
+  /** Spec 025: the brake and spin-up the sound uses, so the picture follows them. */
+  feel?: ScratchFeel;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const discRef = useRef<SVGGElement>(null);
   const angleRef = useRef(0); // degrees, for the picture only
   const dragRef = useRef<{ pointerId: number; angle: number } | null>(null);
-  const latest = useRef({ actions, active, grabbed });
-  latest.current = { actions, active, grabbed };
+  const latest = useRef({ actions, active, grabbed, feel });
+  latest.current = { actions, active, grabbed, feel };
   const motorRef = useRef<PlatterMotor>({ mode: grabbed ? 'brake' : 'run', from: 0, since: 0 });
 
   // Spec 023: grabbing brakes the picture, letting go spins it up (the same curves as the sound).
@@ -141,7 +157,10 @@ export function Platter({
     if (grabbedBefore.current === grabbed) return;
     grabbedBefore.current = grabbed;
     const now = nowMs();
-    motorRef.current = grabbed ? platterGrab(motorRef.current, now) : platterRelease(motorRef.current, now);
+    const f = latest.current.feel;
+    motorRef.current = grabbed
+      ? platterGrab(motorRef.current, now, f?.brakeSeconds)
+      : platterRelease(motorRef.current, now, f?.spinUpSeconds);
   }, [grabbed]);
   // The plan arrives a few ms after the release: the picture follows it from the release on.
   useEffect(() => {

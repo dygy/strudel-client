@@ -9,11 +9,6 @@
  * @license AGPL-3.0-or-later
  */
 
-export { AudioMixer } from './AudioMixer.mjs';
-export { AudioStream } from './AudioStream.mjs';
-export { TransitionMixer } from './TransitionMixer.mjs';
-export { ErrorNotifier } from './ErrorNotifier.mjs';
-export { KeyboardShortcutManager } from './KeyboardShortcutManager.mjs';
 export { PreviewEngine } from './PreviewEngine.mjs';
 export {
   TrackTransitionController,
@@ -69,6 +64,17 @@ export {
   scratchReleaseRate,
   scratchBumpSeconds,
   scratchBumpDepth,
+  // Spec 025: the snap grid and the feel (brake, spin-up).
+  SCRATCH_SNAP_GRID,
+  SCRATCH_SNAP_GRIDS,
+  SCRATCH_SNAP_GRID_DEFAULT,
+  SCRATCH_FEEL_DEFAULTS,
+  SCRATCH_FEEL_RANGES,
+  SCRATCH_SPINUP_STRETCH_MIN,
+  SCRATCH_SPINUP_STRETCH_MAX,
+  sanitizeScratchFeel,
+  sanitizeScratchSnapGrid,
+  scratchSnapSeconds,
 } from './scratch/scratchPhysics.mjs';
 export {
   PatternOffset,

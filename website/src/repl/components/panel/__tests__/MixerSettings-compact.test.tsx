@@ -97,6 +97,8 @@ describe('mixer controls on a laptop (1440x900)', () => {
     for (const label of radioLabels(c)) expect(label.className).not.toMatch(/\bmin-h-11\b/);
     expect(previewDeviceSelect(c).className).toBe(DESKTOP_DEVICE_SELECT);
     expect(c.innerHTML).not.toMatch(/min-h-11|touch-none/);
-    expect(c.querySelectorAll('select')).toHaveLength(3);
+    // Preview device, output device, engine, and (spec 025) the Scratch section's Snap choice.
+    expect(c.querySelectorAll('select')).toHaveLength(4);
+    expect(c.querySelector('[data-scratch-snap] select')).not.toBeNull();
   });
 });

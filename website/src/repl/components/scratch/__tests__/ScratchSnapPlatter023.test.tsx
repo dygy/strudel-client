@@ -47,25 +47,32 @@ afterEach(() => {
 });
 
 describe('Scratch section: Snap to beat', () => {
-  it('shows the switch and its hint, on by default, and turning it off goes to the runtime (stored)', () => {
+  // Spec 025 replaced the switch with a Snap grid choice: 023's "on" is Beat, "off" is Off.
+  const choose = (select: HTMLSelectElement, value: string) =>
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(select, value);
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+  it('shows the choice and its hint, on (Beat) by default, and turning it off goes to the runtime (stored)', () => {
     const snaps: boolean[] = [];
     const { runtime } = fakeRuntime({ readSnap: () => true, writeSnap: (s) => snaps.push(s) });
     mount(<ScratchSection runtime={runtime} />);
     const label = container!.querySelector('[data-scratch-snap]')!;
     expect(label.textContent).toContain(en.scratchSnap);
     expect(label.textContent).toContain(en.scratchSnapHint);
-    const box = label.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
-    expect(box.checked).toBe(true);
-    act(() => box.click());
+    const select = label.querySelector<HTMLSelectElement>('select')!;
+    expect(select.value).toBe('beat');
+    choose(select, 'off');
     expect(snaps).toEqual([false]);
     expect(runtime.store.get().snap).toBe(false);
-    expect(box.checked).toBe(false);
+    expect(select.value).toBe('off');
   });
 
-  it('negative pair: a stored "off" renders unchecked', () => {
+  it('negative pair: a stored "off" renders Off', () => {
     const { runtime } = fakeRuntime({ readSnap: () => false });
     mount(<ScratchSection runtime={runtime} />);
-    expect(container!.querySelector<HTMLInputElement>('[data-scratch-snap] input')!.checked).toBe(false);
+    expect(container!.querySelector<HTMLSelectElement>('[data-scratch-snap] select')!.value).toBe('off');
   });
 
   it('the platter is dimmed while a track switch blocks the speakers', async () => {

@@ -7,15 +7,28 @@
  * track's code or a save path.
  */
 import { map, type MapStore } from 'nanostores';
-import { MIDI_JOG_STORAGE_KEY, PatternOffset, ScratchController, ScratchDeck, ScratchHandOver } from '@strudel/mixer';
+import {
+  MIDI_JOG_STORAGE_KEY,
+  PatternOffset,
+  SCRATCH_FEEL_DEFAULTS,
+  ScratchController,
+  ScratchDeck,
+  ScratchHandOver,
+  sanitizeScratchFeel,
+  sanitizeScratchSnapGrid,
+} from '@strudel/mixer';
 import type {
   MidiJog,
   MidiJogMapping,
   MidiJogState,
   ScratchControllerState,
   ScratchDeckName,
+  ScratchFeel,
+  ScratchSnapGrid,
   ScratchSource,
 } from '@strudel/mixer';
+
+export type { ScratchFeel, ScratchSnapGrid };
 import { getScratchDeckSetting, setScratchDeckSetting } from '../../settings';
 
 export interface ScratchMidiStatus {
@@ -42,8 +55,18 @@ export interface ScratchState {
   /** Headphones can be picked: the preview deck is attached and the preview is running. */
   previewAvailable: boolean;
   midi: ScratchMidiStatus;
-  /** Spec 023: snap the track's new position to the nearest beat (stored on this device). */
+  /**
+   * Spec 025: the grid the track's new position is rounded to after a scratch (stored on this
+   * device): 'off', 'half' (½ beat), 'beat' (spec 023's "on", the default) or 'bar'.
+   */
+  snapGrid: ScratchSnapGrid;
+  /**
+   * Spec 023: snap is on (any grid but 'off').
+   * @deprecated Since spec 025: read `snapGrid`. Kept in step with it.
+   */
   snap: boolean;
+  /** Spec 025: the brake and spin-up, in seconds (stored on this device; both decks). */
+  feel: ScratchFeel;
   /**
    * Spec 023 / tech §3: the deck can't be grabbed now. The speakers are blocked while a spec 017
    * track switch evaluates, waits or runs (the platter is dimmed), so a scratch never fights a
@@ -88,8 +111,15 @@ export interface ScratchDeckLike {
   release(): void;
   destroy(): void;
   getDebugState?(): Promise<ScratchDebugState | null>;
-  /** Spec 023: snap the lag to the beat on release. */
+  /**
+   * Spec 023: snap the lag to the beat on release.
+   * @deprecated Since spec 025: decks with `snapGrid` get that instead.
+   */
   snap?: boolean;
+  /** Spec 025: the snap grid for the next release. */
+  snapGrid?: ScratchSnapGrid;
+  /** Spec 025: the brake and spin-up for the next grab / release. */
+  setFeel?(feel: ScratchFeel): unknown;
   /** Spec 023: back to live now, dropping a release in progress. */
   abort?(): void;
   /** Spec 023 review 2: the release's plan, once per release. */
@@ -138,9 +168,18 @@ export interface ScratchRuntimeDeps {
   writeSelected: (deck: ScratchDeckName) => void;
   midiSupported: () => boolean;
   hasStoredMidiMapping: () => boolean;
-  /** Spec 023: the stored Snap to beat setting (default on) and its writer. */
+  /**
+   * Spec 023: the stored Snap to beat setting (default on) and its writer.
+   * @deprecated Since spec 025: used only when `readSnapGrid` / `writeSnapGrid` are not given.
+   */
   readSnap?: () => boolean;
   writeSnap?: (snap: boolean) => void;
+  /** Spec 025: the stored snap grid (default 'beat') and its writer. */
+  readSnapGrid?: () => ScratchSnapGrid;
+  writeSnapGrid?: (grid: ScratchSnapGrid) => void;
+  /** Spec 025: the stored feel (defaults when missing or damaged) and its writer. */
+  readFeel?: () => ScratchFeel;
+  writeFeel?: (feel: ScratchFeel) => void;
   /** Spec 023: the speakers' scratch offset. */
   createPatternOffset?: (options: { getRepl: () => MainReplLike | null; isBusy: () => boolean }) => PatternOffsetLike;
   /** Spec 023: applies the speakers deck's settled lag (shift, stale voices, hand-over). */
@@ -166,8 +205,20 @@ export interface ScratchActions {
 
 export interface ScratchRuntime extends ScratchActions {
   readonly store: MapStore<ScratchState>;
-  /** Spec 023: turn Snap to beat on or off (stored; applies to the next release on both decks). */
+  /**
+   * Spec 023: turn Snap to beat on or off (stored; applies to the next release on both decks).
+   * @deprecated Since spec 025: use `setSnapGrid`. true sets 'beat', false 'off'.
+   */
   setSnap(snap: boolean): void;
+  /** Spec 025: choose the snap grid (stored; applies to the next release on both decks). */
+  setSnapGrid(grid: ScratchSnapGrid): void;
+  /**
+   * Spec 025: set the brake and / or the spin-up (stored; both decks, from the next grab or
+   * release). A field left out keeps its value; an invalid one falls back to its default.
+   */
+  setFeel(feel: Partial<ScratchFeel>): void;
+  /** Spec 025: back to the default brake (0.1 s) and spin-up (0.4 s). */
+  resetFeel(): void;
   /**
    * Spec 023: the main repl's editPattern. Runs `inner` (spec 017's transition hook) and shifts
    * the result by the speakers' scratch offset; with offset 0 it returns `inner`'s result as is.
@@ -211,25 +262,70 @@ export interface ScratchRuntime extends ScratchActions {
 
 const finite = (value: number): boolean => typeof value === 'number' && Number.isFinite(value);
 
-/** Spec 023: where Snap to beat is stored on this device. */
+/**
+ * Where the snap setting is stored on this device. Spec 025: it holds the grid ('off', 'half',
+ * 'beat', 'bar'); spec 023's 'true' / 'false' are still read ('true' → 'beat', 'false' → 'off').
+ */
 export const SCRATCH_SNAP_STORAGE_KEY = 'strudel-scratch-snap';
+/** Spec 025: where the feel (brake, spin-up) is stored on this device, as JSON. */
+export const SCRATCH_FEEL_STORAGE_KEY = 'strudel-scratch-feel';
 
-/** Spec 023: the stored Snap to beat setting; on unless it was turned off. */
-export function readScratchSnap(): boolean {
+const storageGet = (key: string): string | null => {
   try {
-    return typeof localStorage === 'undefined' || localStorage.getItem(SCRATCH_SNAP_STORAGE_KEY) !== 'false';
+    return typeof localStorage === 'undefined' ? null : localStorage.getItem(key);
   } catch (error: unknown) {
-    return true;
+    return null;
+  }
+};
+
+const storageSet = (key: string, value: string, what: string): void => {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
+  } catch (error: unknown) {
+    console.warn(`[scratch] could not store ${what}:`, error);
+  }
+};
+
+/** Spec 025: the stored snap grid. Legacy 'false' → 'off'; 'true', nothing or unknown → 'beat'. */
+export function readScratchSnapGrid(): ScratchSnapGrid {
+  return sanitizeScratchSnapGrid(storageGet(SCRATCH_SNAP_STORAGE_KEY));
+}
+
+/** Spec 025: store the snap grid. */
+export function writeScratchSnapGrid(grid: ScratchSnapGrid): void {
+  storageSet(SCRATCH_SNAP_STORAGE_KEY, sanitizeScratchSnapGrid(grid), 'the snap grid');
+}
+
+/**
+ * Spec 023: the stored Snap to beat setting; on unless it was turned off.
+ * @deprecated Since spec 025: use `readScratchSnapGrid`.
+ */
+export function readScratchSnap(): boolean {
+  return readScratchSnapGrid() !== 'off';
+}
+
+/**
+ * Spec 023: store Snap to beat (as 'true' / 'false', which the grid reader maps to 'beat' / 'off').
+ * @deprecated Since spec 025: use `writeScratchSnapGrid`.
+ */
+export function writeScratchSnap(snap: boolean): void {
+  storageSet(SCRATCH_SNAP_STORAGE_KEY, snap ? 'true' : 'false', 'Snap to beat');
+}
+
+/** Spec 025: the stored feel; each field falls back to its default when missing or damaged. */
+export function readScratchFeel(): ScratchFeel {
+  const raw = storageGet(SCRATCH_FEEL_STORAGE_KEY);
+  if (raw === null) return sanitizeScratchFeel(null);
+  try {
+    return sanitizeScratchFeel(JSON.parse(raw));
+  } catch (error: unknown) {
+    return sanitizeScratchFeel(null);
   }
 }
 
-/** Spec 023: store Snap to beat. */
-export function writeScratchSnap(snap: boolean): void {
-  try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem(SCRATCH_SNAP_STORAGE_KEY, snap ? 'true' : 'false');
-  } catch (error: unknown) {
-    console.warn('[scratch] could not store Snap to beat:', error);
-  }
+/** Spec 025: store the feel. */
+export function writeScratchFeel(feel: ScratchFeel): void {
+  storageSet(SCRATCH_FEEL_STORAGE_KEY, JSON.stringify(sanitizeScratchFeel(feel)), 'the scratch feel');
 }
 
 /** The spec 017 events that start and end a track switch's waiting and running phases. */
@@ -254,6 +350,11 @@ export const selectedSpin = (state: Pick<ScratchState, 'selected'> & Partial<Pic
 export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
   const midiSupported = deps.midiSupported();
   const preferred = deps.readSelected();
+  const initialGrid: ScratchSnapGrid = deps.readSnapGrid
+    ? sanitizeScratchSnapGrid(deps.readSnapGrid())
+    : deps.readSnap
+      ? sanitizeScratchSnapGrid(deps.readSnap())
+      : 'beat';
   const store = map<ScratchState>({
     grabbed: false,
     selected: effectiveDeck(preferred, false),
@@ -264,7 +365,9 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
     midi: midiSupported
       ? { state: 'off', mapping: null }
       : { state: 'unavailable', reason: 'unsupported', mapping: null },
-    snap: deps.readSnap ? deps.readSnap() : true,
+    snapGrid: initialGrid,
+    snap: initialGrid !== 'off',
+    feel: sanitizeScratchFeel(deps.readFeel ? deps.readFeel() : null),
     blocked: { main: false, preview: false },
     spin: null,
   });
@@ -318,6 +421,20 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
   let previewEngine: PreviewEngineLike | null = null;
   let midi: MidiJog | null = null;
   let midiLoading: Promise<MidiJog | null> | null = null;
+
+  /** Spec 025: give a deck the current snap grid and feel (on attach and on every change). */
+  const applySettings = (deck: ScratchDeckLike | null) => {
+    if (!deck) return;
+    const { snapGrid, feel } = store.get();
+    // A spec 023 deck (no snapGrid) gets the boolean.
+    if ('snapGrid' in deck) deck.snapGrid = snapGrid;
+    else deck.snap = snapGrid !== 'off';
+    try {
+      deck.setFeel?.({ ...feel });
+    } catch (error: unknown) {
+      console.warn('[scratch] could not apply the feel:', error);
+    }
+  };
 
   const update = (patch: Partial<ScratchState>) => {
     const next = { ...store.get(), ...patch };
@@ -473,7 +590,7 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
             return;
           }
           mainDeck = deck;
-          deck.snap = store.get().snap;
+          applySettings(deck);
           watchPlan('main', deck);
           if (mainOffset && deps.createHandOver) {
             mainHandOver = deps.createHandOver(deck, {
@@ -535,7 +652,7 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
       // Detached (or replaced) meanwhile, failed (retried on the next preview start), or already in.
       if (previewEngine !== engine || !deck || deck === previewDeck) return;
       previewDeck = deck;
-      deck.snap = store.get().snap;
+      applySettings(deck);
       watchPlan('preview', deck);
       getController().setDeck('preview', deck);
       syncAvailability();
@@ -553,11 +670,32 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
     },
 
     setSnap(snap) {
-      const next = Boolean(snap);
-      deps.writeSnap?.(next);
-      if (mainDeck) mainDeck.snap = next;
-      if (previewDeck) previewDeck.snap = next;
-      if (store.get().snap !== next) update({ snap: next });
+      runtime.setSnapGrid(snap ? 'beat' : 'off');
+    },
+
+    setSnapGrid(grid) {
+      const next = sanitizeScratchSnapGrid(grid);
+      if (deps.writeSnapGrid) deps.writeSnapGrid(next);
+      // A runtime built with spec 023's boolean storage only (no grid writer).
+      else deps.writeSnap?.(next !== 'off');
+      if (store.get().snapGrid !== next) update({ snapGrid: next, snap: next !== 'off' });
+      applySettings(mainDeck);
+      applySettings(previewDeck);
+    },
+
+    setFeel(feel) {
+      const patch = feel && typeof feel === 'object' ? feel : {};
+      const next = sanitizeScratchFeel({ ...store.get().feel, ...patch });
+      const current = store.get().feel;
+      if (next.brakeSeconds === current.brakeSeconds && next.spinUpSeconds === current.spinUpSeconds) return;
+      deps.writeFeel?.(next);
+      update({ feel: next });
+      applySettings(mainDeck);
+      applySettings(previewDeck);
+    },
+
+    resetFeel() {
+      runtime.setFeel({ ...SCRATCH_FEEL_DEFAULTS });
     },
 
     editMainPattern(pattern, inner) {
@@ -660,8 +798,10 @@ export const scratchRuntime: ScratchRuntime = createScratchRuntime({
   writeSelected: setScratchDeckSetting,
   midiSupported: browserMidiSupported,
   hasStoredMidiMapping: storedMidiMapping,
-  readSnap: readScratchSnap,
-  writeSnap: writeScratchSnap,
+  readSnapGrid: readScratchSnapGrid,
+  writeSnapGrid: writeScratchSnapGrid,
+  readFeel: readScratchFeel,
+  writeFeel: writeScratchFeel,
   createPatternOffset: (options) => new PatternOffset(options),
   createHandOver: (deck, options) =>
     new ScratchHandOver(deck as unknown as ScratchDeck, {

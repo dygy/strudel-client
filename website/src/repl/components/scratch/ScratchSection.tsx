@@ -2,7 +2,14 @@ import { useState, type ReactNode } from 'react';
 import { useStore } from '@nanostores/react';
 import cx from '@src/cx';
 import { useTranslation } from '@src/i18n';
-import type { ScratchDeckName } from '@strudel/mixer';
+import {
+  SCRATCH_FEEL_DEFAULTS,
+  SCRATCH_FEEL_RANGES,
+  SCRATCH_SNAP_GRIDS,
+  type ScratchDeckName,
+  type ScratchFeel,
+  type ScratchSnapGrid,
+} from '@strudel/mixer';
 import { Platter } from './Platter';
 import { usePanelViewport } from '../panel/panelViewport';
 import {
@@ -53,6 +60,134 @@ export function platterStatusKey(state: ScratchState): SettingsKey | null {
   if (!state.available[state.selected]) return 'scratchUnavailable';
   if (!state.playing[state.selected]) return 'scratchNotPlaying';
   return null;
+}
+
+/** Spec 025: the label key of each snap grid choice. */
+export const SNAP_GRID_KEYS: Record<ScratchSnapGrid, SettingsKey> = {
+  off: 'scratchSnapOff',
+  half: 'scratchSnapHalf',
+  beat: 'scratchSnapBeat',
+  bar: 'scratchSnapBar',
+};
+
+/** Spec 025: the slider steps, in seconds. */
+export const FEEL_STEPS: Record<keyof ScratchFeel, number> = { brakeSeconds: 0.01, spinUpSeconds: 0.1 };
+
+/**
+ * Spec 025: a feel value as a readout in seconds, in the page's language: one decimal (0.1 s,
+ * 0.4 s), two when one would hide the value (0.02 s, 0.15 s).
+ */
+export function formatFeelSeconds(seconds: number, language?: string): string {
+  const digits = Math.abs(seconds * 10 - Math.round(seconds * 10)) < 1e-6 ? 1 : 2;
+  try {
+    return new Intl.NumberFormat(language || undefined, {
+      style: 'unit',
+      unit: 'second',
+      unitDisplay: 'short',
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    }).format(seconds);
+  } catch (error: unknown) {
+    return `${seconds.toFixed(digits)} s`;
+  }
+}
+
+/**
+ * Spec 025: Snap (Off / ½ beat / Beat / Bar), the Brake and Spin-up sliders with readouts, and
+ * Reset. Stored on this device; both decks, from the next grab or release.
+ */
+export function ScratchFeelControls({
+  runtime,
+  state,
+  touch,
+}: {
+  runtime: ScratchRuntime;
+  state: ScratchState;
+  touch: boolean;
+}) {
+  const { t, i18n } = useTranslation('settings');
+  const language = i18n?.language;
+  const slider = (key: keyof ScratchFeel, label: string) => {
+    const [min, max] = SCRATCH_FEEL_RANGES[key];
+    const value = state.feel[key];
+    const id = `scratch-feel-${key}`;
+    return (
+      <div className="space-y-1" data-scratch-feel={key}>
+        <div className="flex items-baseline justify-between gap-2">
+          <label htmlFor={id} className="text-sm text-foreground">
+            {label}
+          </label>
+          <output htmlFor={id} data-scratch-feel-value="" className="text-xs text-foreground opacity-70 tabular-nums">
+            {formatFeelSeconds(value, language)}
+          </output>
+        </div>
+        <input
+          id={id}
+          type="range"
+          min={min}
+          max={max}
+          step={FEEL_STEPS[key]}
+          value={value}
+          aria-valuetext={formatFeelSeconds(value, language)}
+          onChange={(event) => runtime.setFeel({ [key]: Number(event.target.value) })}
+          className={cx(
+            'w-full bg-lineHighlight rounded-lg appearance-none cursor-pointer accent-foreground',
+            touch ? 'h-3 my-2' : 'h-2',
+          )}
+        />
+      </div>
+    );
+  };
+  const isDefault =
+    state.feel.brakeSeconds === SCRATCH_FEEL_DEFAULTS.brakeSeconds &&
+    state.feel.spinUpSeconds === SCRATCH_FEEL_DEFAULTS.spinUpSeconds;
+  return (
+    <div className="space-y-3">
+      {/* Spec 023 2.4 / 025 2.1: the track's new position after a scratch is rounded to the grid. */}
+      <div className="space-y-1" data-scratch-snap="">
+        <label htmlFor="scratch-snap-grid" className="block text-sm text-foreground">
+          {t('scratchSnap')}
+        </label>
+        <select
+          id="scratch-snap-grid"
+          value={state.snapGrid}
+          onChange={(event) => runtime.setSnapGrid(event.target.value as ScratchSnapGrid)}
+          className={cx(
+            'w-full px-3 bg-background border border-lineHighlight rounded-md text-sm text-foreground cursor-pointer',
+            'focus:outline-none focus:ring-2 focus:ring-foreground',
+            touch ? 'min-h-11' : 'h-8',
+          )}
+        >
+          {SCRATCH_SNAP_GRIDS.map((grid) => (
+            <option key={grid} value={grid} className="bg-background text-foreground">
+              {t(SNAP_GRID_KEYS[grid])}
+            </option>
+          ))}
+        </select>
+        <span className="block text-xs text-foreground opacity-70">{t('scratchSnapHint')}</span>
+      </div>
+      {slider('brakeSeconds', t('scratchBrake'))}
+      {slider('spinUpSeconds', t('scratchSpinUp'))}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          data-scratch-feel-reset=""
+          disabled={isDefault}
+          onClick={() => runtime.resetFeel()}
+          className={cx(
+            'px-3 rounded-md text-sm border border-lineHighlight bg-background text-foreground',
+            'hover:border-foreground disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-lineHighlight',
+            touch ? 'min-h-11' : 'h-8',
+          )}
+        >
+          {t('scratchFeelReset')}
+        </button>
+      </div>
+      <p data-scratch-feel-hint="" className="text-xs text-foreground opacity-70">
+        {t('scratchFeelHint')}
+      </p>
+    </div>
+  );
 }
 
 export function DeckSwitch({
@@ -228,6 +363,7 @@ export function ScratchSection({
             size={compact ? 'compact' : 'settings'}
             label={t('scratchPlatter')}
             spin={selectedSpin(state)}
+            feel={state.feel}
           />
           <p
             data-scratch-status=""
@@ -242,19 +378,7 @@ export function ScratchSection({
             <div className="text-sm font-medium text-foreground">{t('scratchDeck')}</div>
             <DeckSwitch runtime={runtime} state={state} withPreview={withPreview} touch={compact} />
           </div>
-          {/* Spec 023 2.4: the track's new position after a scratch is rounded to the beat. */}
-          <label className="flex items-start gap-2 cursor-pointer" data-scratch-snap="">
-            <input
-              type="checkbox"
-              className={cx('mt-0.5 accent-foreground', compact && 'w-5 h-5')}
-              checked={state.snap}
-              onChange={(event) => runtime.setSnap(event.target.checked)}
-            />
-            <span>
-              <span className="block text-sm text-foreground">{t('scratchSnap')}</span>
-              <span className="block text-xs text-foreground opacity-70">{t('scratchSnapHint')}</span>
-            </span>
-          </label>
+          <ScratchFeelControls runtime={runtime} state={state} touch={compact} />
           <MidiJogControls runtime={runtime} midi={state.midi} touch={compact} />
           <p data-scratch-shortcut-hint="" className="text-xs text-foreground opacity-70">
             {withLtrKeys(t('scratchShortcutHint'))}

@@ -10,7 +10,16 @@
  */
 
 import { loadScratchWorklet, SCRATCH_PROCESSOR } from './scratchWorklet.mjs';
-import { scratchBeatSeconds } from './scratchPhysics.mjs';
+import {
+  SCRATCH_FEEL_DEFAULTS,
+  sanitizeScratchFeel,
+  sanitizeScratchSnapGrid,
+  scratchSnapSeconds,
+} from './scratchPhysics.mjs';
+
+const isDefaultFeel = (feel) =>
+  feel.brakeSeconds === SCRATCH_FEEL_DEFAULTS.brakeSeconds &&
+  feel.spinUpSeconds === SCRATCH_FEEL_DEFAULTS.spinUpSeconds;
 
 /** Seconds of audio one full platter turn moves (33⅓ rpm). */
 export const SCRATCH_SECONDS_PER_TURN = 1.8;
@@ -65,10 +74,61 @@ export class ScratchDeck {
     this._planListeners = new Set();
     /** The latest release's plan from the worklet (see onPlan). */
     this._plan = null;
-    /** Snap the lag to the beat on release (spec 023 2.4). */
-    this.snap = true;
+    /** Spec 025: the snap grid the lag is rounded to on release (spec 023's "on" is 'beat'). */
+    this._snapGrid = 'beat';
+    /** Spec 025: the brake and the spin-up, in seconds (the 023 values by default). */
+    this._feel = { ...SCRATCH_FEEL_DEFAULTS };
     /** @type {(() => number|undefined)|null} */
     this._tempoSource = null;
+  }
+
+  /**
+   * Spec 025: the snap grid: `'off' | 'half' | 'beat' | 'bar'`, used from the next release.
+   * Anything else (and spec 023's booleans) is mapped by `sanitizeScratchSnapGrid`.
+   * @type {'off'|'half'|'beat'|'bar'}
+   */
+  get snapGrid() {
+    return this._snapGrid;
+  }
+
+  set snapGrid(grid) {
+    this._snapGrid = sanitizeScratchSnapGrid(grid);
+  }
+
+  /**
+   * Spec 023's Snap to beat switch.
+   * @deprecated Since spec 025: use {@link snapGrid}. `true` sets `'beat'`, `false` `'off'`; reads
+   *   true unless the grid is `'off'`.
+   * @type {boolean}
+   */
+  get snap() {
+    return this._snapGrid !== 'off';
+  }
+
+  set snap(on) {
+    this._snapGrid = on ? 'beat' : 'off';
+  }
+
+  /** Spec 025: the current feel, `{ brakeSeconds, spinUpSeconds }` (a copy). */
+  get feel() {
+    return { ...this._feel };
+  }
+
+  /**
+   * Spec 025: set the brake (how long a grabbed record takes to stop, 0.02–1 s) and the spin-up
+   * (how long the motor takes to bring a released record to speed, 0.1–2 s). A field left out
+   * keeps its current value; an invalid one falls back to its default (0.1 s, 0.4 s). Applies
+   * from the next grab or release; a brake or spin-up already running is never cut short.
+   * @param {{brakeSeconds?: number, spinUpSeconds?: number}} feel
+   * @returns {{brakeSeconds: number, spinUpSeconds: number}} The feel now in use.
+   */
+  setFeel(feel) {
+    const patch = feel && typeof feel === 'object' ? feel : {};
+    const next = sanitizeScratchFeel({ ...this._feel, ...patch });
+    const changed = next.brakeSeconds !== this._feel.brakeSeconds || next.spinUpSeconds !== this._feel.spinUpSeconds;
+    this._feel = next;
+    if (changed) this._post({ type: 'feel', ...next });
+    return { ...next };
   }
 
   /** Spec 023: `'live' | 'held' | 'releasing' | 'settled'` (see the constructor). */
@@ -258,6 +318,8 @@ export class ScratchDeck {
       throw err;
     }
     this.node = node;
+    // Spec 025: a feel set before the node existed (the worklet starts with the defaults).
+    if (!isDefaultFeel(this._feel)) this._post({ type: 'feel', ...this._feel });
     this._emit();
     return true;
   }
@@ -303,29 +365,32 @@ export class ScratchDeck {
   }
 
   /**
-   * Let go: the motor spins the record up (~0.4 s) and its lag lands on the nearest beat (snap
-   * on) or stays as it is (snap off); then the deck reports the lag (see {@link onLagSettled}).
-   * Idempotent; safe before attach resolves.
+   * Let go: the motor spins the record up (~0.4 s, spec 025: the feel's spin-up) and its lag
+   * lands on the nearest step of the snap grid, or stays as it is (`'off'`); then the deck reports
+   * the lag (see {@link onLagSettled}). Idempotent; safe before attach resolves.
    */
   release() {
     if (!this._grabbed) return;
     this._grabbed = false;
     let beatSeconds = 0;
-    if (this.snap) {
+    if (this._snapGrid !== 'off') {
       let cps;
       try {
         cps = this._tempoSource?.();
       } catch (err) {
         console.warn('[ScratchDeck] reading the tempo failed:', err?.message ?? err);
       }
-      beatSeconds = scratchBeatSeconds(cps);
+      beatSeconds = scratchSnapSeconds(this._snapGrid, cps);
     }
     const id = ++this._releaseId;
     this._releaseTime = this.audioContext?.currentTime;
     this._phase = 'releasing';
     this._settledId = null;
     this._plan = null;
-    this._post({ type: 'release', id, beatSeconds });
+    const msg = { type: 'release', id, beatSeconds };
+    // Spec 025: the worklet plans with the same spin-up (the default message stays 023's).
+    if (this._feel.spinUpSeconds !== SCRATCH_FEEL_DEFAULTS.spinUpSeconds) msg.spinUpSeconds = this._feel.spinUpSeconds;
+    this._post(msg);
     this._emit();
   }
 

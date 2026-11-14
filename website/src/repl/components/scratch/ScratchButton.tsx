@@ -114,6 +114,7 @@ export function ScratchButton({
               size={touch ? 'compact' : 'settings'}
               label={t('scratchPlatter')}
               spin={selectedSpin(state)}
+              feel={state.feel}
             />
           </div>
           <p

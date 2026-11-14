@@ -10,7 +10,8 @@
  *
  * Phases:
  * - `live`: nobody holds the record. The input passes through bit-exact (and is written).
- * - `held`: grabbed. A brake stops the turning record over ~0.1 s (raised cosine); the hand
+ * - `held`: grabbed. A brake stops the turning record over ~0.1 s (raised cosine; spec 025: the
+ *   deck's `brakeSeconds`, see setFeel); the hand
  *   (moveBy, setMotor) moves it. Output crossfades (10 ms) from live to the record.
  * - `spinUp`: let go. The motor brings the record to rate 1 over ~0.4 s (stretched to land on
  *   the snapped lag), then a correction bump, if needed, lands the lag exactly on the target.
@@ -24,9 +25,9 @@
  */
 
 import {
-  SCRATCH_BRAKE_SECONDS,
   SCRATCH_HANDOVER_SECONDS,
   planScratchRelease,
+  sanitizeScratchFeel,
   scratchBumpSeconds,
   scratchSmoothStep,
 } from './scratchPhysics.mjs';
@@ -93,10 +94,15 @@ export class ScratchDsp {
     this.motorRate = 0;
     this.maxRate = SCRATCH_MAX_RATE;
 
-    // Brake.
+    // Spec 025: the deck's feel (setFeel). A grab reads brakeSeconds, a release spinUpSeconds.
+    const feel = sanitizeScratchFeel(null);
+    this.brakeSeconds = feel.brakeSeconds;
+    this.spinUpSeconds = feel.spinUpSeconds;
+
+    // Brake. Its length is fixed when it starts (startHold), so a feel change never cuts it short.
     this.brakeFrom = 0;
     this.brakeT = 0;
-    this.brakeLen = Math.max(1, Math.round(SCRATCH_BRAKE_SECONDS * sr));
+    this.brakeLen = Math.max(1, Math.round(this.brakeSeconds * sr));
 
     // Spin-up plan (samples).
     this.upFrom = 0;
@@ -173,6 +179,18 @@ export class ScratchDsp {
   }
 
   /**
+   * Spec 025: the deck's feel, used from the next grab (`brakeSeconds`) and the next release
+   * (`spinUpSeconds`). A brake or spin-up already running keeps the length it started with. A
+   * missing, non-finite or out-of-range field falls back to its default (0.1 s, 0.4 s).
+   * @param {{brakeSeconds?: number, spinUpSeconds?: number}} feel
+   */
+  setFeel(feel) {
+    const next = sanitizeScratchFeel(feel);
+    this.brakeSeconds = next.brakeSeconds;
+    this.spinUpSeconds = next.spinUpSeconds;
+  }
+
+  /**
    * Grab the platter. The turning record brakes to a stop (~0.1 s) and the output ramps to it.
    * A grab while held is a no-op.
    *
@@ -237,6 +255,7 @@ export class ScratchDsp {
     this.phase = 'held';
     this.brakeFrom = this.motor;
     this.brakeT = 0;
+    this.brakeLen = Math.max(1, Math.round(this.brakeSeconds * this.sampleRate));
     this.setMix(1, this.grabSteps);
   }
 
@@ -244,7 +263,9 @@ export class ScratchDsp {
    * Let go: the motor spins the record up and the lag lands on its target.
    * @param {object} [options]
    * @param {number} [options.id] - Echoed in `lagSettled` / `idle`.
-   * @param {number} [options.beatSeconds=0] - Snap to this beat; 0 = snap off.
+   * @param {number} [options.beatSeconds=0] - Snap to this step (seconds); 0 = snap off.
+   * @param {number} [options.spinUpSeconds] - Spec 025: the spin-up to plan with; default the
+   *   deck's feel (setFeel). The plan keeps it until the record is back to live.
    */
   release(options) {
     if (!this.grabbed) return;
@@ -263,6 +284,7 @@ export class ScratchDsp {
       lagSeconds: this.lag / sr,
       fromRate: this.rate,
       beatSeconds: options?.beatSeconds,
+      spinUpSeconds: Number.isFinite(options?.spinUpSeconds) ? options.spinUpSeconds : this.spinUpSeconds,
       maxLagSeconds: (this.maxLag - this.handOverSteps - this.spliceShift) / sr - 0.5,
       minLagSeconds: this.minLag / sr,
     });

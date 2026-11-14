@@ -23,6 +23,36 @@ export const SCRATCH_SPINUP_MAX_SECONDS = 0.8;
 export const SCRATCH_HANDOVER_SECONDS = 0.02;
 /** Snap to beat: one beat is this many cycles (a quarter cycle). */
 export const SCRATCH_SNAP_BEAT_CYCLES = 0.25;
+
+/**
+ * Spec 025: the snap grid choices, as the step in cycles the track's new position is rounded to
+ * after a release. `off` (0) doesn't round; `beat` is spec 023's "on"; `bar` is one cycle.
+ */
+export const SCRATCH_SNAP_GRID = Object.freeze({ off: 0, half: 0.125, beat: SCRATCH_SNAP_BEAT_CYCLES, bar: 1 });
+/** Spec 025: the snap grid choices, coarsest last. */
+export const SCRATCH_SNAP_GRIDS = Object.freeze(['off', 'half', 'beat', 'bar']);
+/** Spec 025: the default snap grid (spec 023's "Snap to beat" on). */
+export const SCRATCH_SNAP_GRID_DEFAULT = 'beat';
+
+/**
+ * Spec 025: the default feel, which reproduces spec 023 exactly: the brake ({@link
+ * SCRATCH_BRAKE_SECONDS}) and the nominal spin-up ({@link SCRATCH_SPINUP_SECONDS}), in seconds.
+ */
+export const SCRATCH_FEEL_DEFAULTS = Object.freeze({
+  brakeSeconds: SCRATCH_BRAKE_SECONDS,
+  spinUpSeconds: SCRATCH_SPINUP_SECONDS,
+});
+/** Spec 025: the allowed range of each feel setting, `[min, max]` in seconds (inclusive). */
+export const SCRATCH_FEEL_RANGES = Object.freeze({
+  brakeSeconds: Object.freeze([0.02, 1]),
+  spinUpSeconds: Object.freeze([0.1, 2]),
+});
+/**
+ * Spec 025: to land on the snapped lag the spin-up may be stretched to this fraction of the
+ * chosen spin-up at the least and this multiple at the most (0.2–0.8 s around 0.4 s, as in 023).
+ */
+export const SCRATCH_SPINUP_STRETCH_MIN = 0.5;
+export const SCRATCH_SPINUP_STRETCH_MAX = 2;
 /**
  * A lag shorter than this is not worth a pattern shift: the motor catches up instead (lag 0).
  * It also keeps the hand-over (crossfade plus margin) inside the window where the record and
@@ -75,37 +105,82 @@ export function scratchSpinUpRate(t, fromRate, seconds = SCRATCH_SPINUP_SECONDS)
 }
 
 /**
+ * Spec 025: a valid feel. Each field (`brakeSeconds`, `spinUpSeconds`) falls back to its default
+ * ({@link SCRATCH_FEEL_DEFAULTS}) when it is missing, not a finite number, or outside its range
+ * ({@link SCRATCH_FEEL_RANGES}). Accepts anything (a damaged stored value, null).
+ * @param {any} feel
+ * @returns {{ brakeSeconds: number, spinUpSeconds: number }}
+ */
+export function sanitizeScratchFeel(feel) {
+  const out = { ...SCRATCH_FEEL_DEFAULTS };
+  if (!feel || typeof feel !== 'object') return out;
+  for (const key of Object.keys(SCRATCH_FEEL_DEFAULTS)) {
+    const value = feel[key];
+    const [lo, hi] = SCRATCH_FEEL_RANGES[key];
+    if (typeof value === 'number' && Number.isFinite(value) && value >= lo && value <= hi) out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * Spec 025: a valid snap grid name. Spec 023's boolean (and its stored `'true'` / `'false'`) maps
+ * `true` to `'beat'` and `false` to `'off'`; anything else unknown is the default `'beat'`.
+ * @param {any} grid
+ * @returns {'off'|'half'|'beat'|'bar'}
+ */
+export function sanitizeScratchSnapGrid(grid) {
+  if (grid === false || grid === 'false') return 'off';
+  if (typeof grid === 'string' && SCRATCH_SNAP_GRIDS.includes(grid)) return grid;
+  return SCRATCH_SNAP_GRID_DEFAULT;
+}
+
+/**
+ * Spec 025: the snap step in seconds at `cps` for snap grid `grid`. 0 for `'off'` and when the
+ * tempo is unknown (no rounding).
+ * @param {'off'|'half'|'beat'|'bar'} grid
+ * @param {number} cps
+ */
+export function scratchSnapSeconds(grid, cps) {
+  const cycles = SCRATCH_SNAP_GRID[sanitizeScratchSnapGrid(grid)];
+  return cycles > 0 && Number.isFinite(cps) && cps > 0 ? cycles / cps : 0;
+}
+
+/**
  * Plan the spin-up after a release.
  *
- * The lag at the end of a nominal spin-up is `lag + (1 − fromRate)·0.4/2` (the raised cosine
- * averages ½). With snap on (`beatSeconds > 0`) the target is that rounded to the nearest beat;
- * with snap off it is that. A target under {@link SCRATCH_MIN_SHIFT_SECONDS} becomes 0 (the
- * motor catches up and no pattern shift is needed). The spin-up is stretched within
- * [0.2, 0.8] s to land on the target; what it can't reach is left to a correction bump (see
- * {@link scratchBumpSeconds}).
+ * The lag at the end of a nominal spin-up is `lag + (1 − fromRate)·spinUp/2` (the raised cosine
+ * averages ½). With snap on (`beatSeconds > 0`, the snap step) the target is that rounded to the
+ * nearest step; with snap off it is that. A target under {@link SCRATCH_MIN_SHIFT_SECONDS}
+ * becomes 0 (the motor catches up and no pattern shift is needed). The spin-up is stretched
+ * within [0.5×, 2×] of `spinUpSeconds` ([0.2, 0.8] s at the default 0.4 s) to land on the target;
+ * what it can't reach is left to a correction bump (see {@link scratchBumpSeconds}).
  *
  * @param {object} args
  * @param {number} args.lagSeconds - Lag at the release.
  * @param {number} args.fromRate - The record's rate at the release.
- * @param {number} [args.beatSeconds=0] - One beat in seconds; 0 = snap off.
+ * @param {number} [args.beatSeconds=0] - The snap step in seconds; 0 = snap off.
  * @param {number} [args.maxLagSeconds=Infinity] - The largest lag the record can hold.
+ * @param {number} [args.spinUpSeconds=0.4] - Spec 025: the chosen spin-up (0.1–2 s; otherwise 0.4).
  * @returns {{ targetSeconds: number, upSeconds: number, fromRate: number, nominalSeconds: number }}
  */
-export function planScratchSpinUp({ lagSeconds, fromRate, beatSeconds = 0, maxLagSeconds = Infinity }) {
+export function planScratchSpinUp({ lagSeconds, fromRate, beatSeconds = 0, maxLagSeconds = Infinity, spinUpSeconds }) {
   const lag = Number.isFinite(lagSeconds) && lagSeconds > 0 ? lagSeconds : 0;
   const v0 = Number.isFinite(fromRate) ? clamp(fromRate, -8, 8) : 0;
   const beat = Number.isFinite(beatSeconds) && beatSeconds > 0 ? beatSeconds : 0;
-  const nominal = lag + ((1 - v0) * SCRATCH_SPINUP_SECONDS) / 2;
+  const spinUp = sanitizeScratchFeel({ spinUpSeconds }).spinUpSeconds;
+  const nominal = lag + ((1 - v0) * spinUp) / 2;
   let target = beat ? Math.round(nominal / beat) * beat : nominal;
   if (target < SCRATCH_MIN_SHIFT_SECONDS) target = 0;
   if (Number.isFinite(maxLagSeconds) && target > maxLagSeconds) {
     target = beat ? Math.floor(maxLagSeconds / beat) * beat : maxLagSeconds;
     if (target < SCRATCH_MIN_SHIFT_SECONDS) target = 0;
   }
-  let up = SCRATCH_SPINUP_SECONDS;
+  let up = spinUp;
   if (Math.abs(1 - v0) > 1e-6) {
     const exact = (2 * (target - lag)) / (1 - v0);
-    up = Number.isFinite(exact) ? clamp(exact, SCRATCH_SPINUP_MIN_SECONDS, SCRATCH_SPINUP_MAX_SECONDS) : up;
+    const lo = spinUp * SCRATCH_SPINUP_STRETCH_MIN;
+    const hi = spinUp * SCRATCH_SPINUP_STRETCH_MAX;
+    up = Number.isFinite(exact) ? clamp(exact, lo, hi) : up;
   }
   return { targetSeconds: target, upSeconds: up, fromRate: v0, nominalSeconds: nominal };
 }

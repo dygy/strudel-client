@@ -144,8 +144,9 @@ describe('2.4 Snap to beat survives a reload', () => {
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^\s*\/\/.*$/gm, '');
     const singleton = source.slice(source.indexOf('export const scratchRuntime'));
-    expect(singleton).toMatch(/readSnap: readScratchSnap,/);
-    expect(singleton).toMatch(/writeSnap: writeScratchSnap,/);
+    // Spec 025: the singleton stores the snap grid (which still reads 023's 'true' / 'false').
+    expect(singleton).toMatch(/readSnapGrid: readScratchSnapGrid,/);
+    expect(singleton).toMatch(/writeSnapGrid: writeScratchSnapGrid,/);
   });
 });
 

@@ -262,27 +262,6 @@ declare module '@strudel/mixer' {
     destroy(): void;
   }
 
-  export class AudioMixer {
-    constructor(audioContext: AudioContext, options?: any);
-    [key: string]: any;
-  }
-  export class AudioStream {
-    constructor(name: string, audioContext: AudioContext);
-    [key: string]: any;
-  }
-  export class TransitionMixer {
-    constructor(audioContext: AudioContext, liveStream: any, previewStream: any);
-    [key: string]: any;
-  }
-  export class ErrorNotifier {
-    constructor();
-    [key: string]: any;
-  }
-  export class KeyboardShortcutManager {
-    constructor();
-    [key: string]: any;
-  }
-
   /** Settings for one track switch (spec 017); see packages/mixer/TrackTransitionController.mjs. */
   export interface TrackTransitionSettings {
     type?: string;
@@ -345,8 +324,17 @@ declare module '@strudel/mixer' {
     /** Lets go: the motor spins up and the lag lands on the beat (snap) or stays. Idempotent. */
     release(): void;
     destroy(): void;
-    /** Spec 023: snap the lag to the nearest beat on release (default true). */
+    /**
+     * Spec 023: snap the lag to the nearest beat on release (default true).
+     * @deprecated Since spec 025: use `snapGrid`. true sets 'beat', false 'off'.
+     */
     snap: boolean;
+    /** Spec 025: the grid the lag is rounded to on release (default 'beat'). */
+    snapGrid: ScratchSnapGrid;
+    /** Spec 025: the brake and spin-up in use (a copy). */
+    readonly feel: ScratchFeel;
+    /** Spec 025: set the brake / spin-up from the next grab / release; returns the feel in use. */
+    setFeel(feel: Partial<ScratchFeel> | null | undefined): ScratchFeel;
     /** Spec 023: 'live' | 'held' | 'releasing' (spinning up) | 'settled' (lag reported). */
     readonly phase: 'live' | 'held' | 'releasing' | 'settled';
     readonly releaseId: number;
@@ -417,6 +405,23 @@ declare module '@strudel/mixer' {
   }
   export function scratchShiftTime(scheduler: any, now: number): number;
 
+  /** Spec 025: the snap grid choices. */
+  export type ScratchSnapGrid = 'off' | 'half' | 'beat' | 'bar';
+  /** Spec 025: the record's brake and motor spin-up, in seconds. */
+  export interface ScratchFeel {
+    brakeSeconds: number;
+    spinUpSeconds: number;
+  }
+  export const SCRATCH_SNAP_GRID: Readonly<Record<ScratchSnapGrid, number>>;
+  export const SCRATCH_SNAP_GRIDS: readonly ScratchSnapGrid[];
+  export const SCRATCH_SNAP_GRID_DEFAULT: ScratchSnapGrid;
+  export const SCRATCH_FEEL_DEFAULTS: Readonly<ScratchFeel>;
+  export const SCRATCH_FEEL_RANGES: Readonly<Record<keyof ScratchFeel, readonly [number, number]>>;
+  export const SCRATCH_SPINUP_STRETCH_MIN: number;
+  export const SCRATCH_SPINUP_STRETCH_MAX: number;
+  export function sanitizeScratchFeel(feel: unknown): ScratchFeel;
+  export function sanitizeScratchSnapGrid(grid: unknown): ScratchSnapGrid;
+  export function scratchSnapSeconds(grid: ScratchSnapGrid, cps: number): number;
   export const SCRATCH_BRAKE_SECONDS: number;
   export const SCRATCH_SPINUP_SECONDS: number;
   export const SCRATCH_HANDOVER_SECONDS: number;
@@ -431,6 +436,7 @@ declare module '@strudel/mixer' {
     fromRate: number;
     beatSeconds?: number;
     maxLagSeconds?: number;
+    spinUpSeconds?: number;
   }): { targetSeconds: number; upSeconds: number; fromRate: number; nominalSeconds: number };
   /** Spec 023 review: the whole release the worklet runs (spin-up + correction bump). */
   export interface ScratchReleasePlan {
@@ -448,6 +454,7 @@ declare module '@strudel/mixer' {
     beatSeconds?: number;
     maxLagSeconds?: number;
     minLagSeconds?: number;
+    spinUpSeconds?: number;
   }): ScratchReleasePlan;
   export function scratchReleaseRate(
     t: number,
