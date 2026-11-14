@@ -5,11 +5,17 @@
  * bands, cuts and output level, each within range and as loud as Flat (pink noise, ±3 dB), and each
  * belongs to one of four families, in the spec's order; the 22 listening profiles use no cuts. The
  * 34 presets from spec 020 keep their keys and values, so saved selections still load and sound the same.
+ * @spec: 026-eq-listening-tools (functional §2.4, tech §2.4)
+ * Every one of the 81 presets plays within ±3 dB of Flat: the four loud profiles got an output level,
+ * their bands unchanged, and saved settings from them load exactly as saved (values, not the key).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { EQUALIZER_PRESETS, EQUALIZER_PRESET_FAMILIES } from '../presets';
 import { EQ_GAIN_LIMIT, HIGH_CUT_RANGE, LOW_CUT_RANGE, OUTPUT_GAIN_RANGE } from '../AudioEqualizer';
 import { pinkNoiseLoudnessDb } from '../response';
+import { getDefaultSettings, loadEqualizerSettings, saveEqualizerSettings } from '../persistence';
+// @ts-expect-error untyped .mjs test helper shared with @strudel/mixer
+import { createMemoryStorage } from '../../mixer/test/webAudioMock.mjs';
 
 /** The genre presets by family, in picker order (functional spec §2.1, tech §2.1 keys). */
 const FAMILIES: Record<string, string[]> = {
@@ -206,6 +212,13 @@ const SPEC_020_PRESETS: Record<string, Record<string, unknown>> = {
   },
 };
 
+/**
+ * Spec 026: the four listening profiles that were more than 3 dB louder than Flat (acoustic +3.24,
+ * bassBoost +3.71, piano +3.47, rnb +3.62) and the output level that brings each within ±3 dB: the
+ * smallest 0.5 dB step that does it. Their bands are the spec 020 ones (checked below).
+ */
+const LOUDNESS_MATCHED_026: Record<string, number> = { acoustic: -0.5, bassBoost: -1, piano: -0.5, rnb: -1 };
+
 const FREQUENCIES = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 const entries = Object.entries(EQUALIZER_PRESETS);
 const genres = entries.filter(([, p]) => p.group === 'genre');
@@ -228,13 +241,13 @@ describe('EQ presets (spec 020)', () => {
     expect(genres.map(([key]) => key)).toEqual(GENRES);
   });
 
-  it('keeps the 22 listening profiles, flat included, with no cuts or output level', () => {
+  it('keeps the 22 listening profiles, flat included, with no cuts; only the four loud ones have an output level', () => {
     expect(profiles).toHaveLength(22);
     expect(EQUALIZER_PRESETS.flat.group).toBe('profile');
-    profiles.forEach(([, p]) => {
+    profiles.forEach(([key, p]) => {
       expect(p.lowCut ?? null).toBeNull();
       expect(p.highCut ?? null).toBeNull();
-      expect(p.outputGain ?? 0).toBe(0);
+      if (!(key in LOUDNESS_MATCHED_026)) expect([key, p.outputGain ?? 0]).toEqual([key, 0]);
     });
   });
 
@@ -263,7 +276,8 @@ describe('EQ presets (spec 020)', () => {
     expect(p.outputGain!).toBeLessThanOrEqual(OUTPUT_GAIN_RANGE.max);
   });
 
-  it.each(GENRES)('%s plays as loud as Flat (pink noise, within ±3 dB)', (key) => {
+  // Spec 026 restores spec 021 AC 2.1.4 to its full scope: every preset, profiles included.
+  it.each(entries.map(([key]) => key))('%s plays as loud as Flat (pink noise, within ±3 dB)', (key) => {
     const loudness = pinkNoiseLoudnessDb(asSettings(key));
     expect(Math.abs(loudness)).toBeLessThanOrEqual(3);
   });
@@ -360,5 +374,38 @@ describe('EQ genre families (spec 021)', () => {
     // UK Garage: hats in the air band, warm sub.
     expect(P.ukGarage.gains[8] + P.ukGarage.gains[9]).toBeGreaterThanOrEqual(10);
     expect(P.ukGarage.gains[0]).toBeGreaterThanOrEqual(6);
+  });
+});
+
+describe('EQ profiles loudness-matched (spec 026)', () => {
+  it.each(Object.entries(LOUDNESS_MATCHED_026))(
+    '%s gets output %s dB, the smallest 0.5 dB step within ±3 dB of Flat',
+    (key, output) => {
+      expect(EQUALIZER_PRESETS[key].outputGain).toBe(output);
+      expect(Math.abs(pinkNoiseLoudnessDb(asSettings(key)))).toBeLessThanOrEqual(3);
+      // Half a dB less would not do: the change is the smallest one.
+      expect(pinkNoiseLoudnessDb({ ...asSettings(key), outputGain: output + 0.5 })).toBeGreaterThan(3);
+    },
+  );
+
+  it.each(Object.keys(LOUDNESS_MATCHED_026))('%s keeps its bands and has no cuts', (key) => {
+    expect(EQUALIZER_PRESETS[key].gains).toEqual(SPEC_020_PRESETS[key].gains);
+    expect([EQUALIZER_PRESETS[key].lowCut ?? null, EQUALIZER_PRESETS[key].highCut ?? null]).toEqual([null, null]);
+  });
+
+  it('saved settings that came from one of them load exactly as saved, never re-derived from the preset key', () => {
+    vi.stubGlobal('localStorage', createMemoryStorage());
+    const saved = {
+      ...getDefaultSettings(),
+      preset: 'bassBoost',
+      bands: getDefaultSettings().bands.map((b, i) => ({ ...b, gain: EQUALIZER_PRESETS.bassBoost.gains[i] })),
+      outputGain: 0, // saved before spec 026, when Bass Boost had no output level
+    };
+    saveEqualizerSettings(saved);
+    const loaded = loadEqualizerSettings()!;
+    expect(loaded.preset).toBe('bassBoost');
+    expect(loaded.outputGain).toBe(0);
+    expect(loaded.bands).toEqual(saved.bands);
+    vi.unstubAllGlobals();
   });
 });

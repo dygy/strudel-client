@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getAudioContext, getSuperdoughAudioController } from '@strudel/webaudio';
 import { ScreenRecorderEngine, type ScreenRecorderState } from './ScreenRecorderEngine';
+import { selectRecordingTap } from './recordingTap';
 import { generateScreenFilename } from './formatUtils';
 
 export interface UseScreenRecorderReturn {
@@ -97,17 +98,18 @@ export function useScreenRecorder(isAudioRecording: boolean): UseScreenRecorderR
         return;
       }
 
-      // Start recording — get destinationGain from superdough controller
+      // Start recording: from destinationGain (pre-EQ), or the main EQ's output when Record as heard
+      // is on and the EQ exists (spec 026). Chosen now; a change mid-recording applies next time.
       const controller = getSuperdoughAudioController();
-      const destinationGain = controller?.output?.destinationGain;
+      const source = selectRecordingTap(controller?.output?.destinationGain);
 
-      if (!destinationGain) {
+      if (!source) {
         setScreenRecordingError('Audio output not available. Press play first.');
         return;
       }
 
       setScreenRecordingError(null);
-      engine.start(destinationGain);
+      engine.start(source);
     } else {
       // Stop recording — get the blob and auto-download (Req 6.1, 6.2)
       engine

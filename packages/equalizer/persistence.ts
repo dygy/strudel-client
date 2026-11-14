@@ -71,56 +71,68 @@ export function loadEqualizerSettings(): EqualizerSettings | null {
   try {
     const serialized = localStorage.getItem(STORAGE_KEY);
     if (!serialized) return null;
-
-    const settings = JSON.parse(serialized) as EqualizerSettings;
-
-    // Validate settings structure
-    if (!settings || typeof settings !== 'object') {
-      console.warn('[Equalizer] Invalid settings format, using defaults');
-      return null;
-    }
-
-    // Validate bands array
-    if (!Array.isArray(settings.bands) || settings.bands.length !== 10) {
-      console.warn('[Equalizer] Invalid bands configuration, using defaults');
-      return null;
-    }
-
-    // Validate every band: the panel reads band.gain / band.Q and hands them to the
-    // audio graph, where a missing band throws and a non-finite value is rejected.
-    if (!settings.bands.every(isValidBand) || typeof settings.isEnabled !== 'boolean') {
-      console.warn('[Equalizer] Damaged band settings, using defaults');
-      return null;
-    }
-
-    // Spec 020 fields: absent is fine (an older save), present but invalid means damaged.
-    const defaults = defaultStripSettings();
-    const lowCut = settings.lowCut === undefined ? defaults.lowCut : settings.lowCut;
-    const highCut = settings.highCut === undefined ? defaults.highCut : settings.highCut;
-    const outputGain = settings.outputGain === undefined ? defaults.outputGain : settings.outputGain;
-    if (
-      !isValidCut(lowCut, LOW_CUT_RANGE) ||
-      !isValidCut(highCut, HIGH_CUT_RANGE) ||
-      !isNumberIn(outputGain, OUTPUT_GAIN_RANGE.min, OUTPUT_GAIN_RANGE.max)
-    ) {
-      console.warn('[Equalizer] Damaged cut or output settings, using defaults');
-      return null;
-    }
-
-    // An unknown preset name would leave the preset menu showing a preset that is not applied.
-    const preset =
-      typeof settings.preset === 'string' && settings.preset in EQUALIZER_PRESETS ? settings.preset : 'custom';
-    return {
-      ...settings,
-      preset,
-      lowCut: { enabled: lowCut.enabled, frequency: lowCut.frequency },
-      highCut: { enabled: highCut.enabled, frequency: highCut.frequency },
-      outputGain,
-    };
+    return validateEqualizerSettings(JSON.parse(serialized));
   } catch (err) {
     console.warn('[Equalizer] Failed to load settings:', err);
     return null;
   }
+}
+
+/**
+ * Validate settings read from storage (the rules loadEqualizerSettings applies; the A/B slots of
+ * spec 026 use them for each slot). Returns a clean copy, or null when they are damaged: 10 bands
+ * with a finite frequency (1–24000 Hz), gain (±24 dB) and Q (0.5–4), a boolean on/off, and the
+ * spec 020 fields either absent (an older save: both cuts off, output 0 dB) or in range. An unknown
+ * preset name becomes 'custom'.
+ * @param raw - Parsed JSON
+ * @returns The settings, or null
+ */
+export function validateEqualizerSettings(raw: unknown): EqualizerSettings | null {
+  const settings = raw as EqualizerSettings;
+
+  // Validate settings structure
+  if (!settings || typeof settings !== 'object') {
+    console.warn('[Equalizer] Invalid settings format, using defaults');
+    return null;
+  }
+
+  // Validate bands array
+  if (!Array.isArray(settings.bands) || settings.bands.length !== 10) {
+    console.warn('[Equalizer] Invalid bands configuration, using defaults');
+    return null;
+  }
+
+  // Validate every band: the panel reads band.gain / band.Q and hands them to the
+  // audio graph, where a missing band throws and a non-finite value is rejected.
+  if (!settings.bands.every(isValidBand) || typeof settings.isEnabled !== 'boolean') {
+    console.warn('[Equalizer] Damaged band settings, using defaults');
+    return null;
+  }
+
+  // Spec 020 fields: absent is fine (an older save), present but invalid means damaged.
+  const defaults = defaultStripSettings();
+  const lowCut = settings.lowCut === undefined ? defaults.lowCut : settings.lowCut;
+  const highCut = settings.highCut === undefined ? defaults.highCut : settings.highCut;
+  const outputGain = settings.outputGain === undefined ? defaults.outputGain : settings.outputGain;
+  if (
+    !isValidCut(lowCut, LOW_CUT_RANGE) ||
+    !isValidCut(highCut, HIGH_CUT_RANGE) ||
+    !isNumberIn(outputGain, OUTPUT_GAIN_RANGE.min, OUTPUT_GAIN_RANGE.max)
+  ) {
+    console.warn('[Equalizer] Damaged cut or output settings, using defaults');
+    return null;
+  }
+
+  // An unknown preset name would leave the preset menu showing a preset that is not applied.
+  const preset =
+    typeof settings.preset === 'string' && settings.preset in EQUALIZER_PRESETS ? settings.preset : 'custom';
+  return {
+    ...settings,
+    preset,
+    lowCut: { enabled: lowCut.enabled, frequency: lowCut.frequency },
+    highCut: { enabled: highCut.enabled, frequency: highCut.frequency },
+    outputGain,
+  };
 }
 
 const isNumberIn = (v: unknown, min: number, max: number) =>

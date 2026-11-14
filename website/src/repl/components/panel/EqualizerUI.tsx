@@ -5,14 +5,19 @@ import {
   type CutConfig,
   type CutUpdate,
   type EqualizerSettings,
+  type EqualizerSlotName,
+  type EqualizerSlots,
   applyEqualizerSettings,
   EQUALIZER_PRESETS,
   EQUALIZER_PRESET_FAMILIES,
   HIGH_CUT_RANGE,
   LOW_CUT_RANGE,
   OUTPUT_GAIN_RANGE,
-  saveEqualizerSettings,
-  loadEqualizerSettings,
+  loadEqualizerSlots,
+  saveEqualizerSlots,
+  switchEqualizerSlot,
+  updateActiveEqualizerSlot,
+  copyActiveEqualizerSlot,
   getDefaultSettings,
   generateLogFrequencies,
   equalizerResponseDb,
@@ -35,7 +40,14 @@ import {
 import { EqualizerStripControls } from './EqualizerStripControls';
 import { EqualizerPresetDescription } from './EqualizerPresetDescription';
 import { EqualizerRecommendation } from './EqualizerRecommendation';
-import { getPlayingEqProfile, subscribePlayingEqProfile } from '../../playingEqProfile';
+import {
+  getPlayingEqProfile,
+  getSpeakersPlaying,
+  subscribePlayingEqProfile,
+  subscribeSpeakersPlaying,
+} from '../../playingEqProfile';
+import { EqualizerListeningControls } from './EqualizerListeningControls';
+import { loadRecordPostEq, saveRecordPostEq } from '../../recording/recordingTap';
 
 interface EqualizerUIProps {
   /** The headphone PreviewEngine (its own EQ); null when it is not ready. */
@@ -59,6 +71,19 @@ const CHART_GRID_DB = [-24, -18, -12, -6, 0, 6, 12, 18, 24];
 export const LIMITING_THRESHOLD_DB = -1;
 /** …and stays lit this long after, so a pumping limiter does not flicker it (ms). */
 const LIMITING_HOLD_MS = 250;
+
+/** localStorage key of the Spectrum toggle (spec 026): 'true' / 'false', on when absent. */
+export const SPECTRUM_STORAGE_KEY = 'strudel-eq-spectrum';
+/** The spectrum's dB axis (dBFS): SPECTRUM_DB_FLOOR at the bottom of the chart, 0 dBFS at the top. */
+export const SPECTRUM_DB_FLOOR = -100;
+
+const loadSpectrumOn = () => {
+  try {
+    return localStorage.getItem(SPECTRUM_STORAGE_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+};
 
 /** Preset key → its label key, e.g. 'flat' → 'equalizerPresetFlat'. */
 const presetTranslationKey = (key: string) => `equalizerPreset${key.charAt(0).toUpperCase()}${key.slice(1)}`;
@@ -94,6 +119,37 @@ export const PICKER_GROUPS: { id: string; label: string; keys: string[] }[] = [
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 /**
+ * The spectrum as chart points (spec 026): each analyser bin from 20 Hz to 20 kHz on the curve's
+ * log-frequency axis (frequencyToX), its level mapped from SPECTRUM_DB_FLOOR…0 dBFS to the chart's
+ * height (silence and -Infinity at the bottom). Bins that fall in the same pixel column keep the
+ * loudest, so the high end is not drawn thousands of times.
+ * @param data - getFloatFrequencyData output (dBFS per bin)
+ * @param sampleRate - The context's sample rate (bin i is at i · sampleRate / (2 · data.length))
+ */
+export function spectrumPoints(
+  data: Float32Array,
+  sampleRate: number,
+  width: number,
+  height: number,
+): [number, number][] {
+  const points: [number, number][] = [];
+  const binHz = sampleRate / (2 * data.length);
+  for (let i = 1; i < data.length; i++) {
+    const frequency = i * binHz;
+    if (frequency < 20) continue;
+    if (frequency > 20000) break;
+    const db = Number.isFinite(data[i]) ? data[i] : SPECTRUM_DB_FLOOR;
+    const level = clamp((db - SPECTRUM_DB_FLOOR) / -SPECTRUM_DB_FLOOR, 0, 1);
+    const x = frequencyToX(frequency, width);
+    const y = height * (1 - level);
+    const last = points[points.length - 1];
+    if (last && Math.floor(last[0]) === Math.floor(x)) last[1] = Math.min(last[1], y);
+    else points.push([x, y]);
+  }
+  return points;
+}
+
+/**
  * Keeps a band update inside the range the audio graph accepts and the saved-settings loader
  * validates (an out-of-range save would make the EQ start flat). Non-finite values are dropped.
  */
@@ -122,6 +178,15 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   const [highCut, setHighCut] = useState<CutConfig>(defaults.highCut!);
   const [outputGain, setOutputGain] = useState(0);
   const [limiting, setLimiting] = useState(false);
+  // Spec 026: the A/B slots (the active one is what the controls show and edit), the spectrum, and
+  // Record as heard (read by the recorders when a recording starts).
+  const [activeSlot, setActiveSlot] = useState<EqualizerSlotName>('A');
+  const slotsRef = useRef<EqualizerSlots | null>(null);
+  const [spectrumOn, setSpectrumOn] = useState(loadSpectrumOn);
+  const [recordPostEq, setRecordPostEq] = useState(loadRecordPostEq);
+  /** The latest spectrum frame (null: none drawn) and the chart's draw function, for the rAF loop. */
+  const spectrumRef = useRef<{ data: Float32Array; sampleRate: number } | null>(null);
+  const drawChartRef = useRef<() => void>(() => {});
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { compact } = usePanelViewport();
   const [selectedBand, setSelectedBand] = useState(0);
@@ -145,22 +210,36 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     [equalizers],
   );
 
-  // Load saved settings on mount
-  useEffect(() => {
-    const saved = loadEqualizerSettings();
-    const settings = saved || getDefaultSettings();
+  /** Show settings in the controls (every field; the spec 020 ones default when absent). */
+  const showSettings = (settings: EqualizerSettings) => {
     const fallback = getDefaultSettings();
-
     setIsEnabled(settings.isEnabled);
     setBands(settings.bands);
     setActivePreset(settings.preset);
     setLowCut(settings.lowCut ?? fallback.lowCut!);
     setHighCut(settings.highCut ?? fallback.highCut!);
     setOutputGain(settings.outputGain ?? 0);
+  };
+
+  // Load saved settings on mount: the active A/B slot (spec 026; settings saved before it are slot A,
+  // and B starts as a copy).
+  useEffect(() => {
+    const slots = loadEqualizerSlots();
+    slotsRef.current = slots;
+    const settings = slots[slots.active];
+    setActiveSlot(slots.active);
+    showSettings(settings);
 
     // Apply to equalizers
     applySettingsToEqualizers(settings);
   }, [applySettingsToEqualizers]);
+
+  /** Save settings into the active slot only (and, through it, the legacy key the EQs load at start). */
+  const persist = (settings: EqualizerSettings) => {
+    const slots = slotsRef.current ?? loadEqualizerSlots();
+    slotsRef.current = updateActiveEqualizerSlot(slots, settings);
+    saveEqualizerSlots(slotsRef.current);
+  };
 
   // The limiting indicator: poll the main (speakers) EQ's limiter once per frame while the panel is
   // mounted (requestAnimationFrame also pauses in a hidden tab); stopped on unmount.
@@ -196,6 +275,49 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     updateFrequencyResponseChart();
   }, [bands, isEnabled, compact, selectedBand, lowCut, highCut, outputGain]);
 
+  // Spec 026 spectrum: what the speakers play, after the EQ, drawn behind the curve. The analyser is
+  // connected (a fan-out from the main EQ's output) and frames are requested only while the panel is
+  // mounted, the Spectrum toggle is on, the main EQ exists and the speakers play. Otherwise the tap
+  // is disposed and one frame without the spectrum is drawn: no animation frames while stopped.
+  const speakersPlaying = useSyncExternalStore(subscribeSpeakersPlaying, getSpeakersPlaying, () => false);
+  const spectrumEqualizer = mainEqualizer ?? appMainEqualizer;
+  const spectrumActive = spectrumOn && speakersPlaying && !!spectrumEqualizer;
+  useEffect(() => {
+    if (!spectrumActive || !spectrumEqualizer) {
+      spectrumRef.current = null;
+      drawChartRef.current();
+      return;
+    }
+    const tap = spectrumEqualizer.createAnalyserTap();
+    const data = new Float32Array(tap.analyser.frequencyBinCount);
+    const raf =
+      typeof requestAnimationFrame === 'function'
+        ? // Called as plain functions: as methods of this object they throw "Illegal invocation".
+          { request: (cb: () => void) => requestAnimationFrame(cb), cancel: (id: number) => cancelAnimationFrame(id) }
+        : { request: (cb: () => void) => window.setTimeout(cb, 50), cancel: (id: number) => window.clearTimeout(id) };
+    let frame = 0;
+    const tick = () => {
+      frame = 0;
+      if (!tap.isRunning()) {
+        // A suspended context gives no new data: draw silence and stop until the next play.
+        spectrumRef.current = null;
+        drawChartRef.current();
+        return;
+      }
+      tap.analyser.getFloatFrequencyData(data);
+      spectrumRef.current = { data, sampleRate: tap.sampleRate };
+      drawChartRef.current();
+      frame = raf.request(tick);
+    };
+    frame = raf.request(tick);
+    return () => {
+      if (frame) raf.cancel(frame);
+      tap.dispose();
+      spectrumRef.current = null;
+      drawChartRef.current();
+    };
+  }, [spectrumActive, spectrumEqualizer]);
+
   /** The full settings as saved, with `patch` applied (every control saves all of them). */
   const settingsWith = (patch: Partial<EqualizerSettings>): EqualizerSettings => ({
     isEnabled,
@@ -223,6 +345,9 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     // Draw grid
     drawGrid(ctx, width, height);
 
+    // The live spectrum, behind the curve (spec 026)
+    drawSpectrum(ctx, width, height);
+
     // Draw frequency response curve
     if (isEnabled) {
       drawFrequencyResponse(ctx, width, height);
@@ -231,6 +356,8 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     // Draw band markers
     drawBandMarkers(ctx, width, height);
   };
+
+  drawChartRef.current = updateFrequencyResponseChart;
 
   const drawGrid = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
@@ -268,6 +395,21 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
       ctx.textAlign = 'left';
       ctx.fillText(`${gain > 0 ? '+' : ''}${gain}dB`, 5, y - 5);
     });
+  };
+
+  const drawSpectrum = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const frame = spectrumRef.current;
+    if (!frame) return;
+    const points = spectrumPoints(frame.data, frame.sampleRate, width, height);
+    if (points.length === 0) return;
+    ctx.beginPath();
+    ctx.moveTo(points[0][0], height);
+    points.forEach(([x, y]) => ctx.lineTo(x, y));
+    ctx.lineTo(points[points.length - 1][0], height);
+    ctx.closePath();
+    // Quieter than the curve: a low-alpha fill, no glow.
+    ctx.fillStyle = 'rgba(96, 165, 250, 0.22)';
+    ctx.fill();
   };
 
   const drawFrequencyResponse = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
@@ -354,7 +496,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
 
     equalizers().forEach((eq) => eq.setEnabled(newEnabled));
 
-    saveEqualizerSettings(settingsWith({ isEnabled: newEnabled }));
+    persist(settingsWith({ isEnabled: newEnabled }));
   };
 
   // The one band setter, used by the desktop grid and the compact sliders. setBand keeps the
@@ -371,7 +513,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     equalizers().forEach((eq) => eq.setBand(index, next));
 
     setActivePreset('custom');
-    saveEqualizerSettings(settingsWith({ bands: newBands, preset: 'custom' }));
+    persist(settingsWith({ bands: newBands, preset: 'custom' }));
   };
 
   // The cuts and the output level: like a band, each change drives both EQs (stored always, heard
@@ -386,7 +528,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     equalizers().forEach((eq) => (which === 'low' ? eq.setLowCut(next) : eq.setHighCut(next)));
 
     setActivePreset('custom');
-    saveEqualizerSettings(settingsWith({ [which === 'low' ? 'lowCut' : 'highCut']: next, preset: 'custom' }));
+    persist(settingsWith({ [which === 'low' ? 'lowCut' : 'highCut']: next, preset: 'custom' }));
   };
 
   const handleOutputGainChange = (db: number) => {
@@ -398,7 +540,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     equalizers().forEach((eq) => eq.setOutputGain(next));
 
     setActivePreset('custom');
-    saveEqualizerSettings(settingsWith({ outputGain: next, preset: 'custom' }));
+    persist(settingsWith({ outputGain: next, preset: 'custom' }));
   };
 
   const handlePresetChange = (presetName: string) => {
@@ -410,7 +552,8 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
       gain: preset.gains[i],
     }));
     // A preset sets the cuts and the output too; one without cuts (a listening profile) turns them
-    // off (keeping their frequencies) at 0 dB output. Same rule as AudioEqualizer.applyPreset.
+    // off (keeping their frequencies); one without an output level gets 0 dB. Same rule as
+    // AudioEqualizer.applyPreset.
     const newLowCut =
       preset.lowCut != null ? { enabled: true, frequency: preset.lowCut } : { ...lowCut, enabled: false };
     const newHighCut =
@@ -425,7 +568,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
 
     equalizers().forEach((eq) => eq.applyPreset(presetName));
 
-    saveEqualizerSettings(
+    persist(
       settingsWith({
         bands: newBands,
         lowCut: newLowCut,
@@ -461,7 +604,52 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     setOutputGain(next.outputGain);
     setActivePreset(preset);
     setIsEnabled(true);
-    saveEqualizerSettings(settingsWith({ ...next, preset, isEnabled: true }));
+    // Spec 026: into the active slot only.
+    persist(settingsWith({ ...next, preset, isEnabled: true }));
+  };
+
+  // Spec 026 A/B: switching applies the other slot's whole settings (bands, cuts, output, on/off and
+  // preset name) to both EQs through the setters, which glide: no click. Switching on: the values
+  // first (stored silently while off), then on, so the switch-on crossfade brings the new curve in.
+  // Switching off: off first, then the values (stored, not heard).
+  const handleSwitchSlot = (slot: EqualizerSlotName) => {
+    const slots = slotsRef.current ?? loadEqualizerSlots();
+    if (slot === slots.active) return;
+    const next = switchEqualizerSlot(slots, slot);
+    const settings = next[slot];
+    const fallback = getDefaultSettings();
+    equalizers().forEach((eq) => {
+      if (!settings.isEnabled) eq.setEnabled(false);
+      settings.bands.forEach((band, index) => eq.setBand(index, { gain: band.gain, Q: band.Q }));
+      eq.setLowCut({ ...(settings.lowCut ?? fallback.lowCut!) });
+      eq.setHighCut({ ...(settings.highCut ?? fallback.highCut!) });
+      eq.setOutputGain(settings.outputGain ?? 0);
+      if (settings.isEnabled) eq.setEnabled(true);
+    });
+    slotsRef.current = next;
+    saveEqualizerSlots(next);
+    setActiveSlot(slot);
+    showSettings(settings);
+  };
+
+  const handleCopySlot = () => {
+    const slots = slotsRef.current ?? loadEqualizerSlots();
+    slotsRef.current = copyActiveEqualizerSlot(updateActiveEqualizerSlot(slots, settingsWith({})));
+    saveEqualizerSlots(slotsRef.current);
+  };
+
+  const handleSpectrumChange = (on: boolean) => {
+    setSpectrumOn(on);
+    try {
+      localStorage.setItem(SPECTRUM_STORAGE_KEY, on ? 'true' : 'false');
+    } catch {
+      /* storage unavailable: the toggle still works for this session */
+    }
+  };
+
+  const handleRecordPostEqChange = (on: boolean) => {
+    setRecordPostEq(on);
+    saveRecordPostEq(on);
   };
 
   const handleReset = () => {
@@ -514,6 +702,18 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
           onApply={handleApplyProfile}
         />
       )}
+
+      {/* A/B slots, Spectrum and Record as heard (spec 026; both layouts) */}
+      <EqualizerListeningControls
+        activeSlot={activeSlot}
+        onSwitchSlot={handleSwitchSlot}
+        onCopySlot={handleCopySlot}
+        spectrumOn={spectrumOn}
+        onSpectrumChange={handleSpectrumChange}
+        recordPostEq={recordPostEq}
+        onRecordPostEqChange={handleRecordPostEqChange}
+        compact={compact}
+      />
 
       {/* Preset selector */}
       <div>

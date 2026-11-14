@@ -9,8 +9,9 @@ export {
   DEFAULT_HIGH_CUT_FREQUENCY,
   LOW_CUT_OFF_FREQUENCY,
   LIMITER,
+  ANALYSER_TAP,
 } from './AudioEqualizer.js';
-export type { EqualizerState, BandUpdate, CutConfig, CutUpdate } from './AudioEqualizer.js';
+export type { EqualizerState, BandUpdate, CutConfig, CutUpdate, AnalyserTap } from './AudioEqualizer.js';
 export { EQUALIZER_PRESETS, EQUALIZER_PRESET_FAMILIES } from './presets.js';
 export type { EqualizerPreset, EqualizerPresetGroup, EqualizerPresetFamily } from './presets.js';
 export { describeSettings, EQUALIZER_REGIONS, DESCRIBE_REGION_THRESHOLD_DB } from './describe.js';
@@ -46,5 +47,17 @@ export {
   loadEqualizerSettings,
   getDefaultSettings,
   applyEqualizerSettings,
+  validateEqualizerSettings,
 } from './persistence.js';
 export type { EqualizerSettings, BandSettings } from './persistence.js';
+export {
+  EQ_SLOTS_STORAGE_KEY,
+  loadEqualizerSlots,
+  saveEqualizerSlots,
+  createEqualizerSlots,
+  switchEqualizerSlot,
+  updateActiveEqualizerSlot,
+  copyActiveEqualizerSlot,
+  otherEqualizerSlot,
+} from './slots.js';
+export type { EqualizerSlots, EqualizerSlotName } from './slots.js';

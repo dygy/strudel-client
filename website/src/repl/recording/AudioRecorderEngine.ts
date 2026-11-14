@@ -35,6 +35,8 @@ export class AudioRecorderEngine {
   private options: Required<Pick<RecorderOptions, 'memoryWarningThresholdMB'>> & RecorderOptions;
 
   private mediaStreamDestination: MediaStreamAudioDestinationNode | null = null;
+  /** The node the recording is connected to (its connection to mediaStreamDestination is removed on stop). */
+  private source: AudioNode | null = null;
   private mediaRecorder: MediaRecorder | null = null;
   private timerInterval: ReturnType<typeof setInterval> | null = null;
   private chunkStore: ChunkStore | null = null;
@@ -60,13 +62,14 @@ export class AudioRecorderEngine {
 
   /**
    * Start recording by connecting a MediaStreamDestination to the given
-   * GainNode and starting a MediaRecorder.
+   * node and starting a MediaRecorder: destinationGain (pre-EQ), or the main EQ's
+   * output for Record as heard (spec 026). Any AudioNode works; it is a fan-out.
    *
    * Validates that the AudioContext is in "running" state (Req 1.4).
    * Creates MediaStreamDestination and connects to destinationGain (Req 1.1).
    * Starts a timer that updates elapsedSeconds and estimatedSizeMB (Req 2.5).
    */
-  start(destinationGain: GainNode): void {
+  start(destinationGain: AudioNode): void {
     if (!this.audioContext) {
       this.updateState({ error: 'AudioRecorderEngine has been destroyed.' });
       return;
@@ -88,6 +91,7 @@ export class AudioRecorderEngine {
       // Req 1.1: Create MediaStreamDestination and connect to DestinationGain
       this.mediaStreamDestination = this.audioContext.createMediaStreamDestination();
       destinationGain.connect(this.mediaStreamDestination);
+      this.source = destinationGain;
 
       // Create MediaRecorder with webm/opus codec
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -259,6 +263,14 @@ export class AudioRecorderEngine {
 
   /** Disconnect MediaStreamDestination and release Web Audio nodes. */
   private cleanupNodes(): void {
+    // The source's connection to the stream destination: the source (destinationGain or the main EQ's
+    // output) lives on, so leaving it connected would leak one dead destination per recording.
+    try {
+      if (this.source && this.mediaStreamDestination) this.source.disconnect(this.mediaStreamDestination);
+    } catch {
+      // Already disconnected — safe to ignore
+    }
+    this.source = null;
     try {
       this.mediaStreamDestination?.disconnect();
     } catch {

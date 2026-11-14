@@ -36,7 +36,7 @@ export class ScreenRecorderEngine {
 
   private tabCaptureStream: MediaStream | null = null;
   private mediaStreamDestination: MediaStreamAudioDestinationNode | null = null;
-  private destinationGainRef: GainNode | null = null;
+  private destinationGainRef: AudioNode | null = null;
   private mediaRecorder: MediaRecorder | null = null;
   private timerInterval: ReturnType<typeof setInterval> | null = null;
   private chunkStore: ScreenChunkStore | null = null;
@@ -82,7 +82,7 @@ export class ScreenRecorderEngine {
    * Req 3.4: Incremental chunk collection
    * Req 4.6: Listen for video track "ended" (browser "Stop sharing")
    */
-  async start(destinationGain: GainNode): Promise<void> {
+  async start(destinationGain: AudioNode): Promise<void> {
     if (!this.audioContext) {
       this.updateState({ error: 'ScreenRecorderEngine has been destroyed.' });
       return;

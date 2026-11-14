@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getAudioContext, getSuperdoughAudioController } from '@strudel/webaudio';
 import { AudioRecorderEngine, type RecorderState } from './AudioRecorderEngine';
 import { encodeWAV } from './wavEncoder';
+import { selectRecordingTap } from './recordingTap';
 import { generateFilename } from './formatUtils';
 
 export interface UseAudioRecorderReturn {
@@ -67,17 +68,18 @@ export function useAudioRecorder(isScreenRecording = false): UseAudioRecorderRet
         return;
       }
 
-      // Start recording — get destinationGain from superdough controller
+      // Start recording: from destinationGain (pre-EQ), or the main EQ's output when Record as heard
+      // is on and the EQ exists (spec 026). Chosen now; a change mid-recording applies next time.
       const controller = getSuperdoughAudioController();
-      const destinationGain = controller?.output?.destinationGain;
+      const source = selectRecordingTap(controller?.output?.destinationGain);
 
-      if (!destinationGain) {
+      if (!source) {
         setError('Audio output not available. Press play first.');
         return;
       }
 
       setError(null);
-      engine.start(destinationGain);
+      engine.start(source);
     } else {
       // Stop recording — get the blob
       engine

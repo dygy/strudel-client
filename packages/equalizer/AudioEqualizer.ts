@@ -82,6 +82,20 @@ export const CLIP_INPUT_RANGE = 2;
  */
 export const LIMITER_MAKEUP_DB = 0.6 * -LIMITER.threshold * (1 - 1 / LIMITER.ratio);
 
+/** The spectrum tap's analysis (spec 026): 4096-point FFT (~11.7 Hz bins at 48 kHz), smoothed. */
+export const ANALYSER_TAP = { fftSize: 4096, smoothingTimeConstant: 0.8 } as const;
+
+/** A spectrum tap from AudioEqualizer.createAnalyserTap. */
+export interface AnalyserTap {
+  analyser: AnalyserNode;
+  /** The EQ's sample rate (Hz): bin i of the analyser is at i · sampleRate / fftSize. */
+  sampleRate: number;
+  /** Whether the EQ's AudioContext is running (a suspended or closed one gives no new data). */
+  isRunning(): boolean;
+  /** Disconnect the analyser from the EQ output (idempotent). */
+  dispose(): void;
+}
+
 /**
  * Band configuration interface
  */
@@ -202,6 +216,8 @@ export class AudioEqualizer {
   private lowCutTarget = LOW_CUT_OFF_FREQUENCY;
   /** The output gain (linear) last glided to (to pick the rise or fall glide). */
   private outputGainTarget = 1;
+  /** Connected spectrum taps (createAnalyserTap), disconnected by their dispose or destroy(). */
+  private analyserTaps = new Set<AnalyserNode>();
 
   constructor(audioContext: AudioContext) {
     this.audioContext = audioContext;
@@ -457,6 +473,41 @@ export class AudioEqualizer {
   }
 
   /**
+   * A spectrum tap (spec 026): an AnalyserNode fed from the EQ's final output (after the bands, cuts,
+   * output level and limiter, or the dry path while off; what the speakers get). It is a fan-out:
+   * the output's own connections and samples are unchanged. The EQ owns the connection: call
+   * `dispose()` to disconnect it (safe to call twice; destroy() disconnects it too).
+   * @param options - `fftSize` (default 4096) and `smoothingTimeConstant` (default 0.8)
+   * @returns The analyser and its dispose
+   */
+  createAnalyserTap(options: { fftSize?: number; smoothingTimeConstant?: number } = {}): AnalyserTap {
+    const output = this.getOutput();
+    const analyser = this.audioContext.createAnalyser();
+    analyser.fftSize = options.fftSize ?? ANALYSER_TAP.fftSize;
+    analyser.smoothingTimeConstant = options.smoothingTimeConstant ?? ANALYSER_TAP.smoothingTimeConstant;
+    output.connect(analyser);
+    this.analyserTaps.add(analyser);
+    return {
+      analyser,
+      sampleRate: this.audioContext.sampleRate || 44100,
+      isRunning: () => this.audioContext.state === 'running',
+      dispose: () => {
+        if (!this.analyserTaps.delete(analyser)) return;
+        try {
+          output.disconnect(analyser);
+        } catch {
+          // already disconnected
+        }
+      },
+    };
+  }
+
+  /** How many spectrum taps are connected now (tests, diagnostics). */
+  getAnalyserTapCount(): number {
+    return this.analyserTaps.size;
+  }
+
+  /**
    * Enable or disable the equalizer. Off crossfades to the dry path (a true bypass: no bands,
    * cuts, output level or limiter) and lets the wet chain rest at flat; on brings the stored
    * settings back and crossfades to the wet path. Settings are remembered either way.
@@ -619,7 +670,7 @@ export class AudioEqualizer {
 
   /**
    * Apply a preset: its bands, cuts and output level. A preset without cuts (every listening
-   * profile) turns both cuts off, keeping their frequencies, and sets the output to 0 dB.
+   * profile) turns both cuts off, keeping their frequencies; one without an output level sets 0 dB.
    */
   applyPreset(preset: string): void {
     const presetConfig = EQUALIZER_PRESETS[preset];
@@ -671,6 +722,8 @@ export class AudioEqualizer {
    * Clean up resources: disconnect every node this EQ created.
    */
   destroy(): void {
+    this.analyserTaps.forEach((analyser) => analyser.disconnect());
+    this.analyserTaps.clear();
     this.nodes.forEach((node) => node.disconnect());
     this.nodes = [];
     this.bands = [];

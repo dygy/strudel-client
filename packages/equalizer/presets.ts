@@ -10,7 +10,10 @@
  * Source inspiration: [Spotify equalizer presets](https://higherhz.com/best-spotify-equalizer-settings/)
  */
 
-/** `genre`: a sound designed for a music genre (bands, cuts and output level). `profile`: a listening profile (bands only). */
+/**
+ * `genre`: a sound designed for a music genre (bands, cuts and output level). `profile`: a listening
+ * profile (bands, no cuts; the four that were more than 3 dB louder than Flat carry an output level, spec 026).
+ */
 export type EqualizerPresetGroup = 'profile' | 'genre';
 
 /** The family a genre preset is listed under in the picker (spec 021). */
@@ -49,11 +52,15 @@ export const EQUALIZER_PRESETS: Record<string, EqualizerPreset> = {
     name: 'Acoustic',
     group: 'profile',
     gains: [4, 3, 2, 1, 1, 1, 2, 3, 4, 3],
+    // Spec 026: loudness-matched to Flat (pink noise, within ±3 dB); the bands are unchanged.
+    outputGain: -0.5,
   },
   bassBoost: {
     name: 'Bass Boost',
     group: 'profile',
     gains: [8, 6, 4, 2, 0, 0, 0, 0, 0, 0],
+    // Spec 026: loudness-matched to Flat (pink noise, within ±3 dB); the bands are unchanged.
+    outputGain: -1,
   },
   bassReducer: {
     name: 'Bass Reducer',
@@ -109,6 +116,8 @@ export const EQUALIZER_PRESETS: Record<string, EqualizerPreset> = {
     name: 'Piano',
     group: 'profile',
     gains: [2, 1, 0, 2, 3, 2, 3, 4, 3, 2],
+    // Spec 026: loudness-matched to Flat (pink noise, within ±3 dB); the bands are unchanged.
+    outputGain: -0.5,
   },
   pop: {
     name: 'Pop',
@@ -119,6 +128,8 @@ export const EQUALIZER_PRESETS: Record<string, EqualizerPreset> = {
     name: 'R&B',
     group: 'profile',
     gains: [7, 6, 3, 1, -1, -1, 1, 2, 3, 5],
+    // Spec 026: loudness-matched to Flat (pink noise, within ±3 dB); the bands are unchanged.
+    outputGain: -1,
   },
   rock: {
     name: 'Rock',

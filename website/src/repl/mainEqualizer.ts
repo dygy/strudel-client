@@ -5,7 +5,8 @@
  *
  * installed through superdough's output insert (SuperdoughAudioController.setOutputInsert), so it
  * survives resetGlobalEffects() rebuilding destinationGain. Recorders and track transitions tap
- * destinationGain, so recordings stay pre-EQ (the EQ is monitoring, like a player EQ).
+ * destinationGain, so recordings stay pre-EQ (the EQ is monitoring, like a player EQ), unless the
+ * user turns on Record as heard (spec 026): then the recorders tap getMainEqualizerOutputTap().
  *
  * When: only after superdough's `initAudio` has run (installMainEqualizerWhenReady(audioReady)).
  * Creating the global controller sizes its channel merger and destination.channelCount for the
@@ -118,6 +119,18 @@ export function installMainEqualizerWhenReady(
 /** The main (speakers) EQ, or null before it is installed / after the last release. */
 export function getMainEqualizer(): AudioEqualizer | null {
   return mainEqualizer;
+}
+
+/**
+ * Spec 026 Record as heard: the main EQ's final output node (after the bands, cuts, output level and
+ * limiter, or the dry path while the EQ is off: exactly what the speakers get), for a recorder to
+ * connect to as a fan-out; null before the EQ is installed (the recorder falls back to
+ * destinationGain). The node belongs to the EQ: connect to it and disconnect only that connection.
+ * The EQ instance is kept across superdough's output reset (the insert is re-attached to the new
+ * destinationGain), so a recording that started on this node keeps receiving the sound.
+ */
+export function getMainEqualizerOutputTap(): AudioNode | null {
+  return mainEqualizer ? mainEqualizer.getOutput() : null;
 }
 
 /** Call `listener` whenever the main EQ appears or goes away. Returns the unsubscribe. */

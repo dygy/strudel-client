@@ -4,7 +4,7 @@
  * Covers everything packages/mixer/*.mjs and @strudel/equalizer call on the
  * AudioContext: createGain, createBiquadFilter (10-band EQ and the cuts), createDynamicsCompressor
  * (the EQ limiter: `reduction` is settable), createDelay, createWaveShaper, createChannelSplitter,
- * createChannelMerger, createAnalyser (loudness tap),
+ * createChannelMerger, createAnalyser (loudness tap; spec 026 spectrum: getFloatFrequencyData),
  * createMediaStreamDestination, audioWorklet.addModule + AudioWorkletNode (spec 019 scratch),
  * currentTime/state/destination, resume/close, the node
  * constructors superdough's output uses (stubWebAudioNodeConstructors),
@@ -84,6 +84,15 @@ function createNode(extra = {}) {
 export class MockMediaStream {
   constructor() {
     this.id = Math.random().toString(36).slice(2);
+  }
+
+  /** No real tracks (spec 026: the screen recorder combines them into its stream). */
+  getAudioTracks() {
+    return [];
+  }
+
+  getTracks() {
+    return [];
   }
 }
 
@@ -224,14 +233,26 @@ export class MockAudioContext {
    */
   createAnalyser() {
     const ctx = this;
-    return createNode({
+    const analyser = createNode({
+      kind: 'Analyser',
       fftSize: 2048,
+      smoothingTimeConstant: 0.8,
+      minDecibels: -100,
+      maxDecibels: -30,
       level: 0,
+      /** Spec 026: every bin of getFloatFrequencyData reads `spectrumDb` (dBFS). */
+      spectrumDb: -100,
+      getFloatFrequencyData(array) {
+        array.fill(this.spectrumDb);
+      },
       getFloatTimeDomainData(array) {
         const level = typeof this.level === 'function' ? this.level(ctx.currentTime) : this.level;
         array.fill(level);
       },
     });
+    // A getter (createNode's spread would freeze it): it follows fftSize, as in Web Audio.
+    Object.defineProperty(analyser, 'frequencyBinCount', { get: () => analyser.fftSize / 2 });
+    return analyser;
   }
 
   createMediaStreamDestination() {
