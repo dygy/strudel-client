@@ -267,6 +267,9 @@ declare module '@strudel/mixer' {
     type?: string;
     length?: number;
     snap?: number;
+    /** Spec 027: 'jump' | 'glide' | 'match' | 'keep'. */
+    tempo?: 'jump' | 'glide' | 'match' | 'keep';
+    /** Legacy (pre-027); still accepted by normalizeTransitionSettings as tempo 'glide'. */
     glide?: boolean;
     matchLoudness?: boolean;
   }
@@ -278,6 +281,11 @@ declare module '@strudel/mixer' {
       destinationGain?: GainNode;
       getSettings?: () => TrackTransitionSettings;
       cleanupCanvases?: () => void;
+      /**
+       * Spec 027: the speakers deck's scratch shift, read when a switch begins: cycles, or the
+       * settled cycles plus a part that only applies from `atCycle` on.
+       */
+      getTrackShift?: () => number | { cycles: number; pending: { cycles: number; atCycle: number } | null };
       eventTarget?: EventTarget;
       targetVolume?: number;
     });
@@ -291,13 +299,22 @@ declare module '@strudel/mixer' {
     ): Promise<Record<string, unknown>>;
     setOutput(output: { audioContext?: AudioContext; destinationGain?: GainNode }): boolean;
     stopped(): void;
-    getState(): { phase: string; type?: string; T?: number; end?: number; origin: number; queued: boolean };
+    getState(): {
+      phase: string;
+      type?: string;
+      T?: number;
+      end?: number;
+      origin: number;
+      queued: boolean;
+      tempoHold?: 'glide' | 'keep' | null;
+    };
     destroy(): void;
   }
 
   export const TRANSITION_TYPES: readonly string[];
   export const TRANSITION_LENGTHS: readonly number[];
   export const TRANSITION_SNAPS: readonly number[];
+  export const TRANSITION_TEMPOS: readonly ('jump' | 'glide' | 'match' | 'keep')[];
 
   // Vinyl scratch control (spec 019); see packages/mixer/scratch/*.
   /** Which deck a scratch acts on: the speakers (main) or the headphone preview. */

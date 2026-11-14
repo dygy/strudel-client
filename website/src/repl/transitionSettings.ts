@@ -1,11 +1,12 @@
 /**
- * Transition settings for track switches (spec 017 §2.1–2.3): the type, the length in cycles
- * and the three modifiers. Stored per browser in `settingsMap` (website/src/settings.ts); this
+ * Transition settings for track switches (spec 017 §2.1–2.3, spec 027): the type, the length in
+ * cycles and the three modifiers (Snap to, Tempo, Match loudness). Stored per browser in `settingsMap` (website/src/settings.ts); this
  * module holds the pure parts: types, defaults, parsing of stored (string) values, the
- * greyed-out rules, and the one-time migration from the old smooth-transitions key.
+ * greyed-out rules, and the one-time migrations from the old smooth-transitions key and from the
+ * old Tempo glide checkbox.
  *
- * The lists mirror @strudel/mixer's TRANSITION_TYPES / TRANSITION_LENGTHS / TRANSITION_SNAPS;
- * a test keeps them equal.
+ * The lists mirror @strudel/mixer's TRANSITION_TYPES / TRANSITION_LENGTHS / TRANSITION_SNAPS /
+ * TRANSITION_TEMPOS; a test keeps them equal.
  */
 
 export const TRANSITION_TYPE_OPTIONS = [
@@ -23,14 +24,23 @@ export type TransitionType = (typeof TRANSITION_TYPE_OPTIONS)[number];
 export const TRANSITION_LENGTH_OPTIONS = [1, 2, 4, 8, 16] as const;
 export type TransitionLength = (typeof TRANSITION_LENGTH_OPTIONS)[number];
 
-export const TRANSITION_SNAP_OPTIONS = [0, 1, 4, 8] as const;
+/** Phrase boundaries, counted from the playing track's own cycle 0 (spec 027 §2.1). */
+export const TRANSITION_SNAP_OPTIONS = [0, 1, 4, 8, 16] as const;
 export type TransitionSnap = (typeof TRANSITION_SNAP_OPTIONS)[number];
+
+/**
+ * How the tempo moves (spec 027 §2.2): Jump (the new tempo at once), Glide during (old → new over
+ * the transition), Match then glide (old tempo during it, then a slide to the new one), Keep set
+ * tempo (the new track stays at the old tempo).
+ */
+export const TRANSITION_TEMPO_OPTIONS = ['jump', 'glide', 'match', 'keep'] as const;
+export type TransitionTempo = (typeof TRANSITION_TEMPO_OPTIONS)[number];
 
 export interface TransitionSettings {
   type: TransitionType;
   length: TransitionLength;
   snap: TransitionSnap;
-  glide: boolean;
+  tempo: TransitionTempo;
   matchLoudness: boolean;
 }
 
@@ -38,7 +48,7 @@ export const DEFAULT_TRANSITION: TransitionSettings = Object.freeze({
   type: 'off',
   length: 4,
   snap: 0,
-  glide: false,
+  tempo: 'jump',
   matchLoudness: false,
 });
 
@@ -47,6 +57,8 @@ export interface RawTransitionSettings {
   transitionType?: string;
   transitionLength?: number | string;
   transitionSnap?: number | string;
+  transitionTempo?: string;
+  /** Pre-027 Tempo glide checkbox: read (migrated to `transitionTempo`), never written. */
   transitionGlide?: boolean | string;
   transitionMatchLoudness?: boolean | string;
 }
@@ -55,7 +67,7 @@ export const TRANSITION_SETTING_KEYS = [
   'transitionType',
   'transitionLength',
   'transitionSnap',
-  'transitionGlide',
+  'transitionTempo',
   'transitionMatchLoudness',
 ] as const;
 
@@ -68,6 +80,24 @@ const asBoolean = (value: unknown): boolean => value === true || value === 'true
 
 export function isTransitionType(value: unknown): value is TransitionType {
   return typeof value === 'string' && (TRANSITION_TYPE_OPTIONS as readonly string[]).includes(value);
+}
+
+export function isTransitionTempo(value: unknown): value is TransitionTempo {
+  return typeof value === 'string' && (TRANSITION_TEMPO_OPTIONS as readonly string[]).includes(value);
+}
+
+/**
+ * The Tempo choice from stored values (spec 027 §2.2 migration): a valid `transitionTempo` wins;
+ * otherwise the old Tempo glide checkbox on (`true`, or `'true'` after a reload) is Glide during;
+ * anything else is Jump.
+ */
+export function parseTransitionTempo(
+  raw: Pick<RawTransitionSettings, 'transitionTempo' | 'transitionGlide'>,
+): TransitionTempo {
+  if (isTransitionTempo(raw.transitionTempo)) {
+    return raw.transitionTempo;
+  }
+  return asBoolean(raw.transitionGlide) ? 'glide' : DEFAULT_TRANSITION.tempo;
 }
 
 /** The offered length closest to `cycles`; ties go to the shorter one (3 s = 1.5 cycles → 1). */
@@ -88,7 +118,7 @@ export function parseTransitionSettings(raw: RawTransitionSettings = {}): Transi
       ? (length as TransitionLength)
       : DEFAULT_TRANSITION.length,
     snap: (TRANSITION_SNAP_OPTIONS as readonly number[]).includes(snap) ? (snap as TransitionSnap) : 0,
-    glide: asBoolean(raw.transitionGlide),
+    tempo: parseTransitionTempo(raw),
     matchLoudness: asBoolean(raw.transitionMatchLoudness),
   };
 }
@@ -97,8 +127,17 @@ export function parseTransitionSettings(raw: RawTransitionSettings = {}): Transi
 export const isLengthDisabled = (type: TransitionType): boolean => type === 'off' || type === 'cut';
 /** Modifiers apply to every type except Off (spec 2.3). */
 export const areModifiersDisabled = (type: TransitionType): boolean => type === 'off';
-/** Tempo glide has no audible effect for Dip and Cut (spec 2.3), nor for Off. */
-export const isGlideDisabled = (type: TransitionType): boolean => type === 'off' || type === 'dip' || type === 'cut';
+/** Types the tempo can't glide across (spec 027 §2.2): the controller plays Glide during as Jump. */
+const NO_GLIDE_TYPES: readonly TransitionType[] = ['dip', 'cut', 'echoOut'];
+
+/**
+ * Whether a Tempo option is greyed out (spec 027 §2.2): every option for Off (modifiers don't
+ * apply); Glide during for Dip, Cut and Echo-out, which the controller never glides (they aren't
+ * overlapping types). Match then glide and Keep set tempo do work for them. A stored Glide during
+ * with one of these types stays selected (greyed out) and the controller plays it as Jump.
+ */
+export const isTempoOptionDisabled = (type: TransitionType, tempo: TransitionTempo): boolean =>
+  type === 'off' || (tempo === 'glide' && NO_GLIDE_TYPES.includes(type));
 
 /**
  * What the old smooth-transitions value becomes (spec 2.1, 2.2; tech §2.5): `enabled` → Dip,
@@ -156,6 +195,23 @@ export function migrateLegacySmoothTransitions({ storage, settingsPrefix, setKey
   return Boolean(updates);
 }
 
+/**
+ * One-time migration of the old Tempo glide checkbox (spec 027 §2.2, tech §2.3). persistentMap
+ * writes every default into storage when the store mounts, so the default `transitionTempo`
+ * ('jump') would otherwise shadow a saved `transitionGlide` for good. It must run before the store
+ * mounts: when `transitionGlide` is stored and `transitionTempo` isn't, `transitionTempo` is
+ * written from it. `transitionGlide` itself is never written (nor removed).
+ * @returns whether `transitionTempo` was written
+ */
+export function migrateLegacyTempoGlide({ storage, settingsPrefix, setKey }: LegacyMigrationDeps): boolean {
+  const glide = storage.getItem(`${settingsPrefix}transitionGlide`);
+  if (glide === null || storage.getItem(`${settingsPrefix}transitionTempo`) !== null) {
+    return false;
+  }
+  setKey('transitionTempo', parseTransitionTempo({ transitionGlide: glide }));
+  return true;
+}
+
 const KEY_SUFFIX: Record<TransitionType, string> = {
   off: 'Off',
   dip: 'Dip',
@@ -173,6 +229,18 @@ export const transitionTypeDescriptionKey = (type: TransitionType): string => `t
 /** `settings:` key of a snap option's label. */
 export const transitionSnapLabelKey = (snap: TransitionSnap): string =>
   snap === 0 ? 'transitionSnapOff' : `transitionSnapNext${snap}`;
+
+const TEMPO_KEY_SUFFIX: Record<TransitionTempo, string> = {
+  jump: 'Jump',
+  glide: 'Glide',
+  match: 'Match',
+  keep: 'Keep',
+};
+/** `settings:` key of a Tempo option's name, e.g. `transitionTempoMatch`. */
+export const transitionTempoLabelKey = (tempo: TransitionTempo): string => `transitionTempo${TEMPO_KEY_SUFFIX[tempo]}`;
+/** `settings:` key of a Tempo option's one-line description, e.g. `transitionTempoMatchDescription`. */
+export const transitionTempoDescriptionKey = (tempo: TransitionTempo): string =>
+  `${transitionTempoLabelKey(tempo)}Description`;
 
 /**
  * How a track switch runs (spec 017 §2.1, §2.6; tech §2.1):
@@ -216,7 +284,7 @@ export interface TransitionOverride {
 }
 
 /**
- * The settings one switch uses: the global ones with `override`'s type and length (snap, glide and
+ * The settings one switch uses: the global ones with `override`'s type and length (snap, tempo and
  * match loudness always stay global). No override (a set item on Default, or any non-set switch):
  * the global settings unchanged.
  */

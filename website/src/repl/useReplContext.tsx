@@ -892,6 +892,9 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         destinationGain,
         getSettings: getTransitionSettings,
         cleanupCanvases: () => cleanupDrawCanvasesRef.current?.(),
+        // Spec 027: snap boundaries count from the playing track's cycle 0, which includes the
+        // speakers deck's scratch shift; the controller reads it when a switch begins.
+        getTrackShift: () => scratchRuntime.mainShift(),
       });
       transitionControllerRef.current = controller;
     } else {

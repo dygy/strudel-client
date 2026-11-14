@@ -20,7 +20,8 @@ vi.mock('../../../components/auth/AuthButton', () => ({ AuthButton: () => null }
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { s } from '../../../../../packages/core/index.mjs';
-import { getTransitionSettings, setTransitionSettings } from '@src/settings';
+import { getTransitionSettings, setTransitionSettings, settingsMap } from '@src/settings';
+import i18n from '@src/i18n/i18n';
 import { DEFAULT_TRANSITION, settingsForSwitch } from '@src/repl/transitionSettings';
 import { TRANSITION_EVENTS } from '@src/repl/transitionPhase';
 import en from '@src/i18n/locales/en/settings.json';
@@ -56,7 +57,14 @@ const emit = (name: keyof typeof TRANSITION_EVENTS) =>
     window.dispatchEvent(new CustomEvent(TRANSITION_EVENTS[name], { detail: { timestamp: 0 } }));
   });
 
-beforeEach(() => setTransitionSettings({ ...DEFAULT_TRANSITION }));
+// isolate:false: an earlier file can leave the settings store's language non-English (settings.ts
+// copies i18next's cached language into it once, 10 ms after it loads), and then any settings write
+// switches i18n to that language (the settings.ts subscription). Start each test in English.
+beforeEach(async () => {
+  await i18n.changeLanguage('en');
+  if (settingsMap.get().language !== 'en') settingsMap.setKey('language', 'en');
+  setTransitionSettings({ ...DEFAULT_TRANSITION });
+});
 afterEach(() => {
   act(() => root?.unmount());
   container?.remove();
@@ -118,6 +126,32 @@ describe('picker ↔ Mixer Settings', () => {
     expect(lengthSelect().disabled).toBe(true);
     choose(typeSelect(), 'dip');
     expect(lengthSelect().disabled).toBe(false);
+  });
+});
+
+describe('spec 027 §2.2: the quick picker is unchanged (type and length only)', () => {
+  it('it has the type and length selects and no Snap or Tempo control, whatever the stored Tempo', () => {
+    act(() => setTransitionSettings({ type: 'crossfade', snap: 16, tempo: 'match' }));
+    render(<TransitionPicker />);
+    const picker = container!.querySelector('[data-transition-picker]')!;
+    expect(picker.querySelectorAll('select')).toHaveLength(2);
+    expect(picker.querySelectorAll('input')).toHaveLength(0);
+    expect(picker.querySelector('[data-transition-tempo], [data-transition-snap]')).toBeNull();
+    expect(picker.textContent).not.toContain(en.transitionTempoMatch);
+    choose(typeSelect(), 'dip');
+    expect(getTransitionSettings()).toMatchObject({ type: 'dip', snap: 16, tempo: 'match' }); // left alone
+  });
+
+  it('negative: Mixer Settings, rendered beside it, does have the Tempo group (so the check can tell)', () => {
+    act(() => setTransitionSettings({ type: 'crossfade' }));
+    render(
+      <>
+        <TransitionPicker />
+        <TransitionSettingsSection />
+      </>,
+    );
+    expect(container!.querySelectorAll('input[name=transition-tempo]')).toHaveLength(4);
+    expect(container!.querySelector('[data-transition-picker] input[name=transition-tempo]')).toBeNull();
   });
 });
 

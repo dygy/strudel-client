@@ -1,7 +1,7 @@
 /**
  * @spec: 022-set-playlist (2.3 Go with the item's transition, 2.5 failed Go; tech §2.4)
  * evaluateNewTrack with a per-switch override: the item's type decides the path (Crossfade while the
- * global type is Off; Cut while it is Crossfade), snap/glide/loudness stay global, a queued Go keeps
+ * global type is Off; Cut while it is Crossfade), snap/tempo/loudness stay global, a queued Go keeps
  * its item's transition, and a failed evaluate is reported. Without an override: spec 017 unchanged.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -42,13 +42,13 @@ function setup({
 
 describe('evaluateNewTrack with a set item transition', () => {
   it('a Crossfade item goes through the controller even while the global type is Off', async () => {
-    const { deps, switchTo, repl } = setup({ global: { ...DEFAULT_TRANSITION, type: 'off', snap: 4, glide: true } });
+    const { deps, switchTo, repl } = setup({ global: { ...DEFAULT_TRANSITION, type: 'off', snap: 4, tempo: 'match' } });
     expect(await evaluateNewTrack(deps, 'code', { restart: true, transition: { type: 'crossfade', length: 8 } })).toBe(
       'ok',
     );
     expect(switchTo).toHaveBeenCalledWith(
       'code',
-      { ...DEFAULT_TRANSITION, type: 'crossfade', length: 8, snap: 4, glide: true },
+      { ...DEFAULT_TRANSITION, type: 'crossfade', length: 8, snap: 4, tempo: 'match' },
       {
         prepare: undefined,
       },
@@ -139,7 +139,7 @@ describe('a set Go (keepOldOnFailure) never silences the speakers for a broken t
   it.each([
     [
       'the global type Off (Default item)',
-      { ...DEFAULT_TRANSITION, type: 'off' as const, snap: 4 as const, glide: true },
+      { ...DEFAULT_TRANSITION, type: 'off' as const, snap: 4 as const, tempo: 'match' as const },
       null,
     ],
     [
@@ -158,7 +158,8 @@ describe('a set Go (keepOldOnFailure) never silences the speakers for a broken t
       expect(repl.stop).not.toHaveBeenCalled();
       expect(repl.evaluate).not.toHaveBeenCalled();
       // A Cut through the controller, with none of the modifiers: the same hard switch as Off.
-      expect(switchTo.mock.calls[0][1]).toMatchObject({ type: 'cut', snap: 0, glide: false, matchLoudness: false });
+      expect(switchTo.mock.calls[0][1]).toMatchObject({ type: 'cut', snap: 0, tempo: 'jump', matchLoudness: false });
+      expect(switchTo.mock.calls[0][1]).not.toHaveProperty('glide'); // spec 027: tempo replaces glide
       warn.mockRestore();
     },
   );

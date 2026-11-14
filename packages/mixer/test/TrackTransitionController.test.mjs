@@ -20,7 +20,11 @@ import {
   normalizeTransitionSettings,
   transitionStart,
   glideCps,
+  SAFETY_MARGIN,
+  TRANSITION_SNAPS,
+  TRANSITION_TEMPOS,
 } from '../TrackTransitionController.mjs';
+import * as mixer from '../index.mjs';
 import { MockAudioContext, stubWebAudio, unstubWebAudio } from './webAudioMock.mjs';
 
 const OLD = s(sequence('old', 'old', 'old', 'old'));
@@ -146,6 +150,7 @@ function setup({
   playing = true,
   neo = false,
   voices = createFakeVoices(),
+  getTrackShift,
 } = {}) {
   const sch = (neo ? createNeoScheduler : createFakeScheduler)({ cycle, cps, started: playing });
   const repl = createFakeRepl(sch, { A: { pattern: NEW }, ...programs });
@@ -167,6 +172,7 @@ function setup({
     cleanupCanvases,
     eventTarget: target,
     voices,
+    getTrackShift,
   });
   repl.editPattern = controller.editPattern;
   if (playing) {
@@ -775,7 +781,7 @@ describe('settings', () => {
       type: 'dip',
       length: 4,
       snap: 0,
-      glide: false,
+      tempo: 'jump',
       matchLoudness: false,
     });
     expect(normalizeTransitionSettings({ type: 'wobble', length: 'abc', snap: 3 })).toMatchObject({
@@ -1051,6 +1057,565 @@ describe('setOutput: following a replaced master output (superdough resetGlobalE
     expect(controller.busy).toBe(true);
     expect(controller.setOutput({ destinationGain: ctx.createGain() })).toBe(false);
     expect(controller.destinationGain).toBe(destinationGain);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 027 §2.1: Snap boundaries count from the playing track's own cycle 0.
+describe('spec 027: phrase origin', () => {
+  /** Spec 017's formula, for the "origin 0 is unchanged" check. */
+  const start017 = (now, { type, snap = 0 }) => {
+    const base = now + SAFETY_MARGIN;
+    const size = Math.max(snap || 0, type === 'cut' || type === 'echoOut' ? 1 : 0);
+    if (size > 0) return (Math.floor(base / size) + 1) * size;
+    const grid = type === 'off' ? 1 / 16 : 1 / 4;
+    return Math.ceil(base / grid - 1e-9) * grid;
+  };
+
+  it('Snap offers 16 cycles, and a saved 16 survives normalize', () => {
+    expect(TRANSITION_SNAPS).toEqual([0, 1, 4, 8, 16]);
+    expect(normalizeTransitionSettings({ snap: 16 }).snap).toBe(16);
+    expect(normalizeTransitionSettings({ snap: 2 }).snap).toBe(0);
+    expect(normalizeTransitionSettings({ snap: 'abc' }).snap).toBe(0);
+  });
+
+  it('origin 6, Snap 8, Update at 9: T is 14 (the track’s cycle 8), not 16', () => {
+    expect(transitionStart(9, { type: 'crossfade', snap: 8 }, 6)).toBe(14);
+    expect(transitionStart(9, { type: 'crossfade', snap: 8 })).toBe(16); // negative: from scheduler cycle 0
+  });
+
+  it('Snap 16 at the track’s cycle 20 (origin 0): T is 32', () => {
+    expect(transitionStart(20, { type: 'crossfade', snap: 16 }, 0)).toBe(32);
+  });
+
+  it('Cut with Snap off counts the track’s own cycles from a fractional origin', () => {
+    // The track's cycle 1.6 at scheduler 4.1: its next cycle (2) is scheduler 4.5.
+    expect(transitionStart(4.1, { type: 'cut', snap: 0 }, 2.5)).toBe(4.5);
+    expect(transitionStart(4.1, { type: 'cut', snap: 0 }, 0)).toBe(5); // negative: global cycles
+  });
+
+  it('a boundary inside the safety margin is skipped, counted from the origin', () => {
+    expect(transitionStart(14.6, { type: 'crossfade', snap: 4 }, 10.75)).toBe(18.75);
+  });
+
+  it('origin 0 gives exactly spec 017’s T for every type and snap', () => {
+    for (const type of ['crossfade', 'cut', 'echoOut', 'dip', 'off']) {
+      for (const snap of [0, 1, 4, 8]) {
+        for (let now = 0; now < 40; now += 0.0731) {
+          expect(transitionStart(now, { type, snap }, 0)).toBe(start017(now, { type, snap }));
+        }
+      }
+    }
+  });
+
+  it('without a snap the beat grid stays global (the origin is ignored)', () => {
+    expect(transitionStart(9.5, { type: 'crossfade', snap: 0 }, 6.3)).toBe(9.75);
+    expect(transitionStart(9.5, { type: 'off', snap: 0 }, 6.3)).toBe(transitionStart(9.5, { type: 'off', snap: 0 }));
+  });
+
+  it('after a Dip, the next Snap 4 switch counts from where the Dip’s new track began', async () => {
+    const { controller, sch, events } = setup({
+      programs: { B: { pattern: OLD } },
+      settings: { type: 'dip', length: 1 },
+    });
+    const first = controller.switchTo('A');
+    await untilCycle(sch, 11.8); // T 9.75, silent (the new track's cycle 0) at 10.75, end 11.75
+    await first;
+    expect(controller.origin).toBe(10.75);
+    controller.switchTo('B', { type: 'crossfade', length: 1, snap: 4 });
+    await vi.advanceTimersByTimeAsync(1);
+    const waiting = events.filter(([n]) => n === 'waiting').pop();
+    expect(waiting[1].T).toBe(14.75); // the track's cycle 4, not scheduler cycle 16
+  });
+
+  it('the speakers’ scratch shift (getTrackShift) moves the phrase origin, read before evaluate', async () => {
+    let shift = 1.5;
+    const { controller, sch, events } = setup({
+      // The scratch offset drops the shift once the switch is busy (PatternOffset.editPattern).
+      programs: { B: { pattern: OLD, during: () => (shift = 0) } },
+      settings: { type: 'cut' },
+      getTrackShift: () => shift,
+    });
+    shift = 0;
+    const first = controller.switchTo('A');
+    await untilCycle(sch, 10.1);
+    await first;
+    expect(controller.origin).toBe(10);
+    shift = 1.5; // scratched 1.5 cycles late: the track's cycle 0 is at 11.5
+    controller.switchTo('B', { type: 'crossfade', length: 1, snap: 4 });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(events.filter(([n]) => n === 'waiting').pop()[1].T).toBe(11.5);
+  });
+
+  it('negative pair: with no shift the same switch waits for the track’s cycle 4', async () => {
+    const { controller, sch, events } = setup({
+      programs: { B: { pattern: OLD } },
+      settings: { type: 'cut' },
+      getTrackShift: () => 0,
+    });
+    const first = controller.switchTo('A');
+    await untilCycle(sch, 10.1);
+    await first;
+    controller.switchTo('B', { type: 'crossfade', length: 1, snap: 4 });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(events.filter(([n]) => n === 'waiting').pop()[1].T).toBe(14);
+  });
+
+  describe('a pending scratch shift (an Update during a spin-up) moves the origin only from its atCycle', () => {
+    async function afterCut(shift) {
+      const ctx = setup({
+        programs: { B: { pattern: OLD } },
+        settings: { type: 'cut' },
+        getTrackShift: () => shift.value,
+      });
+      shift.value = 0;
+      const first = ctx.controller.switchTo('A');
+      await untilCycle(ctx.sch, 10.1);
+      await first; // origin 10, now ≈ 10.1
+      return ctx;
+    }
+    const waitingT = async ({ controller, events }) => {
+      controller.switchTo('B', { type: 'crossfade', length: 1, snap: 4 });
+      await vi.advanceTimersByTimeAsync(1);
+      return events.filter(([n]) => n === 'waiting').pop()[1].T;
+    };
+
+    it('T before atCycle counts from the settled shift', async () => {
+      const shift = {};
+      const ctx = await afterCut(shift);
+      shift.value = { cycles: 0, pending: { cycles: 1.5, atCycle: 20 } };
+      expect(await waitingT(ctx)).toBe(14); // the track's cycle 4; not 11.5 or 15.5
+    });
+
+    it('T after atCycle counts from the full shift', async () => {
+      const shift = {};
+      const ctx = await afterCut(shift);
+      shift.value = { cycles: 0, pending: { cycles: 1.5, atCycle: 10.2 } };
+      expect(await waitingT(ctx)).toBe(11.5);
+    });
+
+    it('a full-shift boundary before atCycle is skipped: the first one at or after it', async () => {
+      const shift = {};
+      const ctx = await afterCut(shift);
+      shift.value = { cycles: 0, pending: { cycles: 1.5, atCycle: 12 } };
+      expect(await waitingT(ctx)).toBe(15.5); // 11.5 is before the shift applies
+    });
+
+    it('settled and pending parts add up; a malformed pending part is ignored; a number still works', async () => {
+      for (const [value, T] of [
+        [{ cycles: 1.5, pending: { cycles: 1, atCycle: 10.2 } }, 12.5],
+        [{ cycles: 1.5, pending: { cycles: 'x', atCycle: 10.2 } }, 11.5],
+        [{ cycles: 1.5, pending: null }, 11.5],
+        [1.5, 11.5],
+      ]) {
+        const shift = {};
+        const ctx = await afterCut(shift);
+        shift.value = value;
+        expect(await waitingT(ctx)).toBe(T);
+      }
+    });
+  });
+
+  it.each([
+    [
+      'throws',
+      () => {
+        throw new Error('boom');
+      },
+    ],
+    ['returns NaN', () => NaN],
+    ['returns a string', () => 'x'],
+  ])('a getTrackShift that %s counts as 0 and warns', async (_label, getTrackShift) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { controller, events } = setup({ settings: { type: 'crossfade', snap: 4 }, getTrackShift });
+    controller.origin = 6;
+    controller.switchTo('A');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(events[0][1].T).toBe(10); // origin 6 + 4
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 027 §2.2: the Tempo choice.
+describe('spec 027: tempo settings', () => {
+  it('TRANSITION_TEMPOS and the default, exported from the package', () => {
+    expect(TRANSITION_TEMPOS).toEqual(['jump', 'glide', 'match', 'keep']);
+    expect(mixer.TRANSITION_TEMPOS).toBe(TRANSITION_TEMPOS);
+    expect(mixer.DEFAULT_TRANSITION_SETTINGS.tempo).toBe('jump');
+    expect(mixer.DEFAULT_TRANSITION_SETTINGS).not.toHaveProperty('glide');
+  });
+
+  it.each(TRANSITION_TEMPOS)('tempo %s is kept', (tempo) => {
+    expect(normalizeTransitionSettings({ tempo }).tempo).toBe(tempo);
+  });
+
+  it('legacy glide: true becomes glide; false, missing or garbage becomes jump; no glide field', () => {
+    expect(normalizeTransitionSettings({ glide: true }).tempo).toBe('glide');
+    expect(normalizeTransitionSettings({ glide: false }).tempo).toBe('jump');
+    expect(normalizeTransitionSettings({ glide: 'true' }).tempo).toBe('jump');
+    expect(normalizeTransitionSettings({ tempo: 'fast' }).tempo).toBe('jump');
+    expect(normalizeTransitionSettings({ tempo: 'fast', glide: true }).tempo).toBe('glide');
+    expect(normalizeTransitionSettings({}).tempo).toBe('jump');
+    expect(normalizeTransitionSettings({ glide: true })).not.toHaveProperty('glide');
+  });
+
+  it('a valid tempo wins over legacy glide', () => {
+    expect(normalizeTransitionSettings({ tempo: 'keep', glide: true }).tempo).toBe('keep');
+    expect(normalizeTransitionSettings({ tempo: 'jump', glide: true }).tempo).toBe('jump');
+  });
+});
+
+describe('spec 027: tempo plans', () => {
+  const CPS_90 = 90 / 60 / 4;
+  const CPS_150 = 150 / 60 / 4;
+  const programs = {
+    A: { pattern: NEW, cps: CPS_140 },
+    A150: { pattern: NEW, cps: CPS_150 },
+    B: { pattern: OLD, cps: CPS_90 },
+    C: { pattern: OLD, cps: 0.9 },
+    N: { pattern: NEW }, // no setcps
+  };
+  const values = (sch) => sch.cpsLog.map(([, v]) => v);
+
+  it('jump (tempo: jump): one change, straight to the new tempo at T (017 kept)', async () => {
+    const { controller, sch } = setup({ programs, settings: { type: 'crossfade', length: 4, tempo: 'jump' } });
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 14);
+    await done;
+    expect(values(sch)).toEqual([CPS_140]);
+    expect(sch.cpsLog[0][0]).toBeGreaterThanOrEqual(9.75);
+    expect(sch.cpsLog[0][0]).toBeLessThan(9.85);
+    expect(controller.getState().tempoHold).toBe(null);
+  });
+
+  it('glide during (tempo: glide): rises over the overlap and ends on the new tempo (017 kept)', async () => {
+    const { controller, sch } = setup({ programs, settings: { type: 'crossfade', length: 4, tempo: 'glide' } });
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 14);
+    await done;
+    const v = values(sch);
+    expect(v.length).toBeGreaterThanOrEqual(32);
+    v.slice(1).forEach((x, i) => expect(x).toBeGreaterThan(v[i]));
+    expect(v[v.length - 1]).toBe(CPS_140);
+    expect(sch.cpsLog[v.length - 1][0]).toBeLessThanOrEqual(13.85); // done by T+L
+    expect(controller.getState().tempoHold).toBe(null);
+  });
+
+  it('match, crossfade L4, 120 → 140: 120 until the end, then steps up to 140 over 4 cycles, and stays', async () => {
+    const { controller, sch } = setup({ programs, settings: { type: 'crossfade', length: 4, tempo: 'match' } });
+    const original = sch.setCps;
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 13.7); // T 9.75, end 13.75
+    expect(values(sch)).toEqual([]); // the old track never changes tempo
+    await untilCycle(sch, 13.8);
+    await done;
+    expect(controller.getState().tempoHold).toBe('glide');
+    await untilCycle(sch, 15.75);
+    expect(sch.cps).toBeGreaterThan(CPS_120);
+    expect(sch.cps).toBeLessThan(CPS_140);
+    await untilCycle(sch, 17.9);
+    const v = values(sch);
+    expect(sch.cpsLog[0][0]).toBeGreaterThanOrEqual(13.75);
+    expect(v.length).toBeGreaterThanOrEqual(32); // stepped, never one jump
+    v.slice(1).forEach((x, i) => expect(x).toBeGreaterThan(v[i]));
+    expect(v[v.length - 1]).toBe(CPS_140);
+    expect(sch.cpsLog[v.length - 1][0]).toBeLessThanOrEqual(17.85);
+    expect(controller.getState().tempoHold).toBe(null);
+    expect(sch.setCps).toBe(original); // after a glide hold ends
+    await untilCycle(sch, 20);
+    expect(values(sch).length).toBe(v.length); // and stays
+  });
+
+  it('match with Cut and Length 8: starts at 120, reaches 140 8 cycles later', async () => {
+    const { controller, sch } = setup({ programs, settings: { type: 'cut', length: 8, tempo: 'match' } });
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 10.5); // T = 10
+    await done;
+    // The new track starts at 120; the slide's first step (1/128 of the way: 16 per cycle) is not before T.
+    expect(sch.cpsLog[0][0]).toBeGreaterThanOrEqual(10);
+    expect(sch.cpsLog[0][1]).toBeCloseTo(CPS_120 + (CPS_140 - CPS_120) / 128, 10);
+    expect(names(sch.pattern, 10.5, 11)).toEqual(['new', 'new']);
+    await untilCycle(sch, 14);
+    expect(sch.cps).toBeGreaterThan(CPS_120);
+    expect(sch.cps).toBeLessThan(CPS_140);
+    await untilCycle(sch, 17.85);
+    expect(sch.cps).toBeLessThan(CPS_140);
+    await untilCycle(sch, 18.1);
+    expect(sch.cps).toBe(CPS_140);
+  });
+
+  it('match with Dip: the new tempo is not set at T+L; the fade-up runs at the old tempo; then the slide', async () => {
+    const { controller, sch, gain } = setup({ programs, settings: { type: 'dip', length: 1, tempo: 'match' } });
+    const done = controller.switchTo('A');
+    await vi.advanceTimersByTimeAsync(1);
+    const ramps = gain.calls.filter(([m]) => m === 'linearRampToValueAtTime');
+    expect(ramps[2][2] - ramps[1][2]).toBeCloseTo(1 / CPS_120, 6); // up over 1 cycle at 120
+    await untilCycle(sch, 11.7); // silent at 10.75, end 11.75
+    expect(values(sch)).toEqual([]);
+    await untilCycle(sch, 11.8);
+    await done;
+    await untilCycle(sch, 12.85);
+    expect(sch.cps).toBe(CPS_140);
+  });
+
+  it('negative pair: jump with Dip still sets the new tempo at T+L and fades up at it', async () => {
+    const { controller, sch, gain } = setup({ programs, settings: { type: 'dip', length: 1, tempo: 'jump' } });
+    controller.switchTo('A');
+    await vi.advanceTimersByTimeAsync(1);
+    const ramps = gain.calls.filter(([m]) => m === 'linearRampToValueAtTime');
+    expect(ramps[2][2] - ramps[1][2]).toBeCloseTo(1 / CPS_140, 6);
+    await untilCycle(sch, 10.85);
+    expect(sch.cps).toBe(CPS_140);
+  });
+
+  it('dip and cut play glide as jump: one change, no hold', async () => {
+    for (const type of ['dip', 'cut']) {
+      const { controller, sch } = setup({ programs, settings: { type, length: 1, tempo: 'glide' } });
+      const done = controller.switchTo('A');
+      await untilCycle(sch, 13);
+      await done;
+      expect(values(sch)).toEqual([CPS_140]);
+      expect(controller.getState().tempoHold).toBe(null);
+    }
+  });
+
+  it('Off has no tempo modifier: match jumps at once and leaves no hold', async () => {
+    const { controller, sch } = setup({ programs, settings: { type: 'off', tempo: 'match' } });
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 10.5);
+    await done;
+    expect(sch.cps).toBe(CPS_140);
+    expect(controller.getState().tempoHold).toBe(null);
+  });
+
+  it('keep: 120 → 140 → 90 is all heard at 120', async () => {
+    const { controller, sch } = setup({ programs, settings: { type: 'crossfade', length: 1, tempo: 'keep' } });
+    const original = sch.setCps;
+    const first = controller.switchTo('A');
+    await untilCycle(sch, 11);
+    await first;
+    expect(controller.getState().tempoHold).toBe('keep');
+    const second = controller.switchTo('B');
+    await untilCycle(sch, 12.5);
+    await second;
+    await untilCycle(sch, 15);
+    expect(values(sch)).toEqual([]);
+    expect(sch.cps).toBe(CPS_120);
+    expect(controller.getState().tempoHold).toBe('keep');
+    controller.stopped();
+    expect(sch.setCps).toBe(original); // after Stop
+  });
+
+  it('keep: a hot swap still setting the track’s own tempo is ignored; a new tempo applies at once', async () => {
+    const { controller, sch, repl } = setup({ programs, settings: { type: 'crossfade', length: 1, tempo: 'keep' } });
+    const original = sch.setCps;
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 11);
+    await done;
+    await settle(repl.evaluate('A')); // only a note changed: its code still says 140
+    expect(sch.cps).toBe(CPS_120);
+    expect(controller.getState().tempoHold).toBe('keep');
+    await settle(repl.evaluate('A150')); // the tempo changed on purpose
+    expect(sch.cps).toBe(CPS_150);
+    expect(controller.getState().tempoHold).toBe(null);
+    expect(sch.setCps).toBe(original);
+  });
+
+  it('keep: a track whose code sets no tempo keeps the set tempo on hot swaps', async () => {
+    const { controller, sch, repl } = setup({ cps: 0.6, programs, settings: { type: 'cut', tempo: 'keep' } });
+    const done = controller.switchTo('N');
+    await untilCycle(sch, 10.2);
+    await done;
+    await settle(repl.evaluate('N'));
+    expect(sch.cps).toBe(0.6);
+    expect(controller.getState().tempoHold).toBe('keep');
+  });
+
+  it('negative pair: under jump, a track whose code sets no tempo runs at the default', async () => {
+    const { controller, sch } = setup({ cps: 0.6, programs, settings: { type: 'cut', tempo: 'jump' } });
+    const done = controller.switchTo('N');
+    await untilCycle(sch, 10.2);
+    await done;
+    expect(sch.cps).toBe(0.5);
+  });
+
+  it('a slide after the transition: a hot swap’s setcps applies at once and the slide stops', async () => {
+    const { controller, sch, repl } = setup({ programs, settings: { type: 'cut', length: 8, tempo: 'match' } });
+    const original = sch.setCps;
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 12);
+    await done;
+    expect(controller.getState().tempoHold).toBe('glide');
+    await settle(repl.evaluate('C'));
+    expect(sch.cps).toBe(0.9);
+    expect(controller.getState().tempoHold).toBe(null);
+    expect(sch.setCps).toBe(original);
+    const count = sch.cpsLog.length;
+    await untilCycle(sch, 20);
+    expect(sch.cpsLog.length).toBe(count); // never fought over
+  });
+
+  it('a switch during a slide starts from the tempo the slide reached; setCps is the original afterwards', async () => {
+    const { controller, sch } = setup({ programs, settings: { type: 'cut', length: 8, tempo: 'match' } });
+    const original = sch.setCps;
+    const first = controller.switchTo('A');
+    await untilCycle(sch, 14);
+    await first;
+    const reached = sch.cps;
+    expect(reached).toBeGreaterThan(CPS_120);
+    expect(reached).toBeLessThan(CPS_140);
+    const second = controller.switchTo('C', { type: 'crossfade', length: 1, tempo: 'jump' });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(controller.getState().tempoHold).toBe(null);
+    expect(controller.active.oldCps).toBe(reached);
+    const cpsAtArm = sch.cps;
+    await untilCycle(sch, controller.active.T - 0.05);
+    expect(sch.cps).toBe(cpsAtArm); // the slide no longer moves the tempo
+    await untilCycle(sch, controller.active.end + 0.1);
+    await second;
+    expect(sch.cps).toBe(0.9);
+    expect(sch.setCps).toBe(original);
+  });
+
+  it('a switch during a keep hold starts from the held tempo; setCps is the original afterwards', async () => {
+    const { controller, sch } = setup({ programs, settings: { type: 'cut', tempo: 'keep' } });
+    const original = sch.setCps;
+    const first = controller.switchTo('A');
+    await untilCycle(sch, 10.2);
+    await first;
+    const second = controller.switchTo('B', { type: 'cut', tempo: 'jump' });
+    await untilCycle(sch, 11.2);
+    await second;
+    expect(sch.cps).toBe(CPS_90);
+    expect(sch.setCps).toBe(original);
+  });
+
+  it('Stop during a slide ends it: no more tempo changes, setCps is the original, Play is at the track’s own tempo', async () => {
+    const { controller, sch } = setup({ programs, settings: { type: 'cut', length: 8, tempo: 'match' } });
+    const original = sch.setCps;
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 12);
+    await done;
+    controller.stopped();
+    expect(controller.getState().tempoHold).toBe(null);
+    expect(sch.setCps).toBe(original);
+    sch.setCps(0.5); // onToggle(false)'s tempo reset reaches the clock
+    const count = sch.cpsLog.length;
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(sch.cpsLog.length).toBe(count);
+    expect(sch.cps).toBe(0.5);
+  });
+
+  it('destroy during a hold restores setCps', async () => {
+    for (const tempo of ['match', 'keep']) {
+      const { controller, sch } = setup({ programs, settings: { type: 'cut', length: 8, tempo } });
+      const original = sch.setCps;
+      const done = controller.switchTo('A');
+      await untilCycle(sch, 10.5);
+      await done;
+      expect(sch.setCps).not.toBe(original);
+      controller.destroy();
+      expect(sch.setCps).toBe(original);
+      expect(controller.tempoHold).toBe(null);
+    }
+  });
+
+  it('a failed switch during a keep hold keeps it (spec 027 §2.2): the same tempo is still ignored', async () => {
+    const { controller, sch, repl } = setup({ programs, settings: { type: 'cut', tempo: 'keep' } });
+    const original = sch.setCps;
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 10.2);
+    await done;
+    const err = await settle(controller.switchTo('broken(').catch((e) => e));
+    expect(err.evaluateFailed).toBe(true);
+    expect(controller.getState().tempoHold).toBe('keep');
+    expect(sch.cps).toBe(CPS_120);
+    await settle(repl.evaluate('A')); // the playing track's hot swap, its code still says 140
+    expect(sch.cps).toBe(CPS_120);
+    expect(sch.cpsLog).toEqual([]);
+    await settle(repl.evaluate('A150')); // a new tempo still ends it
+    expect(sch.cps).toBe(CPS_150);
+    expect(controller.getState().tempoHold).toBe(null);
+    expect(sch.setCps).toBe(original);
+  });
+
+  it('a failed switch mid-slide: the slide continues to 140, never a step bigger than a glide step', async () => {
+    const { controller, sch } = setup({ programs, settings: { type: 'cut', length: 8, tempo: 'match' } });
+    const original = sch.setCps;
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 14); // T 10: the slide runs over [10, 18]
+    await done;
+    await settle(controller.switchTo('broken(').catch(() => {}));
+    expect(controller.getState().tempoHold).toBe('glide');
+    await untilCycle(sch, 18.2);
+    const v = [CPS_120, ...values(sch)];
+    const step = (CPS_140 - CPS_120) / (8 * 16);
+    v.slice(1).forEach((x, i) => {
+      expect(x).toBeGreaterThan(v[i]);
+      expect(x - v[i]).toBeLessThanOrEqual(step * 1.05);
+    });
+    expect(v[v.length - 1]).toBe(CPS_140);
+    expect(sch.cpsLog[sch.cpsLog.length - 1][0]).toBeLessThanOrEqual(18.1);
+    expect(controller.getState().tempoHold).toBe(null);
+    expect(sch.setCps).toBe(original);
+  });
+
+  it('negative pair: a failed switch after the slide’s end lands on the target, with no hold left', async () => {
+    const { controller, sch, repl } = setup({ programs, settings: { type: 'cut', length: 1, tempo: 'match' } });
+    const original = sch.setCps;
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 10.5); // T 10: the slide runs over [10, 11]
+    await done;
+    repl.evaluate.mockImplementationOnce(async () => {
+      await new Promise((r) => setTimeout(r, 2000)); // 1+ cycles: the slide would have ended
+      throw new Error('broken');
+    });
+    const failed = controller.switchTo('slow').catch((e) => e);
+    await vi.advanceTimersByTimeAsync(2001);
+    expect((await failed).evaluateFailed).toBe(true);
+    expect(sch.cps).toBe(CPS_140);
+    expect(controller.getState().tempoHold).toBe(null);
+    expect(sch.setCps).toBe(original);
+  });
+
+  it('a failed switch with another switch queued: the queued one starts from the restored hold', async () => {
+    const { controller, sch } = setup({ programs, settings: { type: 'cut', tempo: 'keep' } });
+    const original = sch.setCps;
+    const first = controller.switchTo('A');
+    await untilCycle(sch, 10.2);
+    await first;
+    const failed = controller.switchTo('broken(').catch((e) => e);
+    const queued = controller.switchTo('B', { type: 'cut', tempo: 'jump' });
+    await vi.advanceTimersByTimeAsync(1);
+    expect((await failed).evaluateFailed).toBe(true);
+    expect(controller.getState().tempoHold).toBe(null); // ended again by the queued switch
+    expect(controller.active.oldCps).toBe(CPS_120);
+    await untilCycle(sch, 11.2);
+    await queued;
+    expect(sch.cps).toBe(CPS_90);
+    expect(sch.setCps).toBe(original);
+  });
+
+  it('negative pair: a Stop while the failing switch evaluates does not bring the hold back', async () => {
+    const { controller, sch, repl } = setup({ programs, settings: { type: 'cut', tempo: 'keep' } });
+    const original = sch.setCps;
+    const done = controller.switchTo('A');
+    await untilCycle(sch, 10.2);
+    await done;
+    repl.evaluate.mockImplementationOnce(async () => {
+      await new Promise((r) => setTimeout(r, 500));
+      throw new Error('broken');
+    });
+    const failed = controller.switchTo('slow').catch((e) => e);
+    await vi.advanceTimersByTimeAsync(100);
+    sch.stop();
+    controller.stopped();
+    await vi.advanceTimersByTimeAsync(500);
+    await failed;
+    expect(controller.getState().tempoHold).toBe(null);
+    expect(sch.setCps).toBe(original);
   });
 });
 

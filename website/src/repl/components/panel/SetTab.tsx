@@ -316,7 +316,7 @@ function OpenSet({ ctx, set, t }: { ctx: SetPlayerContextValue; set: SetList; t:
   );
 }
 
-/** Default, or a type with a length (spec 2.2). Snap, glide and match loudness stay global. */
+/** Default, or a type with a length (spec 2.2). Snap, tempo and match loudness stay global. */
 function TransitionChoice({
   t,
   value,

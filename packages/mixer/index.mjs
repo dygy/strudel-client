@@ -18,6 +18,7 @@ export {
   DEFAULT_TRANSITION_SETTINGS,
   TRANSITION_LENGTHS,
   TRANSITION_SNAPS,
+  TRANSITION_TEMPOS,
 } from './TrackTransitionController.mjs';
 export {
   buildTransition,

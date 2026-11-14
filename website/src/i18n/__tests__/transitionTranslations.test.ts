@@ -18,8 +18,11 @@ import { describe, expect, it } from 'vitest';
 const ROOT = process.cwd();
 const LOCALES_DIR = resolve(ROOT, 'website/src/i18n/locales');
 const LANGUAGES = ['ar', 'es', 'fr', 'he', 'ko', 'ru', 'sr', 'zh'];
-/** Strings that are legitimately spelled the same as in English. */
-const SAME_AS_ENGLISH: Record<string, string[]> = { fr: ['transition'] };
+/** Strings that are legitimately spelled the same as in English ("Tempo" is the word in es and fr). */
+const SAME_AS_ENGLISH: Record<string, string[]> = {
+  es: ['transitionTempo'],
+  fr: ['transition', 'transitionTempo'],
+};
 
 const settingsOf = (lang: string): Record<string, string> =>
   JSON.parse(readFileSync(resolve(LOCALES_DIR, lang, 'settings.json'), 'utf8'));
@@ -47,7 +50,7 @@ describe('spec 017: every transition string is translated in all 9 languages', (
   });
 
   it('negative: English copied into a locale is caught, key by key', () => {
-    const copied = { ...settingsOf('es'), transitionDescEchoOut: en.transitionDescEchoOut };
+    const copied = { ...settingsOf('ru'), transitionDescEchoOut: en.transitionDescEchoOut };
     expect(untranslated(copied)).toEqual(['transitionDescEchoOut']);
     expect(untranslated(en)).toEqual(TRANSITION_KEYS);
   });

@@ -7,10 +7,12 @@ import i18n from './i18n/i18n';
 import {
   DEFAULT_TRANSITION,
   migrateLegacySmoothTransitions,
+  migrateLegacyTempoGlide,
   parseTransitionSettings,
   type TransitionLength,
   type TransitionSettings,
   type TransitionSnap,
+  type TransitionTempo,
   type TransitionType,
 } from './repl/transitionSettings';
 
@@ -105,7 +107,7 @@ export interface Settings {
   transitionType: TransitionType;
   transitionLength: TransitionLength;
   transitionSnap: TransitionSnap;
-  transitionGlide: boolean;
+  transitionTempo: TransitionTempo;
   transitionMatchLoudness: boolean;
   // Vinyl scratch control (spec 019): the deck the platter, keys and MIDI jog act on
   scratchDeck: ScratchDeckSetting;
@@ -167,7 +169,9 @@ export interface RawSettings {
   transitionType: string;
   transitionLength: number | string;
   transitionSnap: number | string;
-  transitionGlide: boolean | string;
+  transitionTempo: string;
+  /** Pre-027 Tempo glide checkbox (spec 027): read for the migration, never written. */
+  transitionGlide?: boolean | string;
   transitionMatchLoudness: boolean | string;
   scratchDeck: string;
 }
@@ -243,7 +247,7 @@ export const defaultSettings: RawSettings = {
   transitionType: DEFAULT_TRANSITION.type,
   transitionLength: DEFAULT_TRANSITION.length,
   transitionSnap: DEFAULT_TRANSITION.snap,
-  transitionGlide: DEFAULT_TRANSITION.glide,
+  transitionTempo: DEFAULT_TRANSITION.tempo,
   transitionMatchLoudness: DEFAULT_TRANSITION.matchLoudness,
   scratchDeck: 'main',
 };
@@ -359,6 +363,18 @@ if (typeof window !== 'undefined') {
   // Run migration after a short delay to ensure everything is initialized
   setTimeout(runMigration, 0);
 
+  // Spec 027: the old Tempo glide checkbox becomes the Tempo choice. Before anything mounts the
+  // store, because mounting writes the default 'jump' into storage.
+  try {
+    migrateLegacyTempoGlide({
+      storage: localStorage,
+      settingsPrefix: settings_key,
+      setKey: (key, value) => settingsMap.setKey(key, value),
+    });
+  } catch (error: unknown) {
+    console.warn('[settings] tempo glide migration failed:', error);
+  }
+
   // Spec 017: the old smooth-transitions on/off + seconds become a transition type + cycles.
   // Synchronous, so the first render already shows the migrated choice.
   try {
@@ -472,7 +488,7 @@ const transitionFields = (t: TransitionSettings) => ({
   transitionType: t.type,
   transitionLength: t.length,
   transitionSnap: t.snap,
-  transitionGlide: t.glide,
+  transitionTempo: t.tempo,
   transitionMatchLoudness: t.matchLoudness,
 });
 
@@ -485,7 +501,7 @@ export function setTransitionSettings(update: Partial<TransitionSettings>): void
     type: 'transitionType',
     length: 'transitionLength',
     snap: 'transitionSnap',
-    glide: 'transitionGlide',
+    tempo: 'transitionTempo',
     matchLoudness: 'transitionMatchLoudness',
   };
   for (const field of Object.keys(update) as (keyof TransitionSettings)[]) {

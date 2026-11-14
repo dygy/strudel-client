@@ -131,6 +131,16 @@ export interface PatternOffsetLike {
   editPattern(pattern: unknown, inner?: (pattern: unknown) => unknown): unknown;
   reset(): void;
   readonly cycles: number;
+  /** The whole offset in cycles, a pending shift included (`PatternOffset.total`). */
+  readonly total?: number;
+  /** A shift that only applies from `atCycle` on (`PatternOffset.pending`). */
+  readonly pending?: { cycles: number; atCycle: number } | null;
+}
+
+/** Spec 027: the speakers' scratch shift, split into the settled part and a later-starting one. */
+export interface MainShift {
+  cycles: number;
+  pending: { cycles: number; atCycle: number } | null;
 }
 
 /** Spec 023: what applies a settled scratch to the speakers' repl. */
@@ -224,6 +234,18 @@ export interface ScratchRuntime extends ScratchActions {
    * the result by the speakers' scratch offset; with offset 0 it returns `inner`'s result as is.
    */
   editMainPattern<T>(pattern: T, inner?: (pattern: T) => T): T;
+  /**
+   * Spec 027: the speakers' scratch shift in cycles (a pending one included), 0 without one. The
+   * track transition controller reads it when a switch begins: the playing track's phrases start
+   * at the transition origin plus this shift.
+   */
+  mainShiftCycles(): number;
+  /**
+   * Spec 027 review: the same shift split for the phrase origin. A pending part (an Update during
+   * a spin-up) only moves the track from its `atCycle`, so the controller counts from the settled
+   * `cycles` for a transition start before it. This is what `getTrackShift` should return.
+   */
+  mainShift(): MainShift;
   /** Spec 023: the main repl (for the shift) and whether a track switch is busy (blocks grabs). */
   setMainRepl(repl: MainReplLike | null, options?: { isBusy?: () => boolean }): void;
   /** Spec 023: a deck stopped: its offset resets and a record spinning up goes back to live. */
@@ -701,6 +723,19 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
     editMainPattern(pattern, inner) {
       if (!mainOffset) return inner ? inner(pattern) : pattern;
       return mainOffset.editPattern(pattern, inner as ((p: unknown) => unknown) | undefined) as typeof pattern;
+    },
+
+    mainShiftCycles() {
+      const total = mainOffset?.total ?? 0;
+      return finite(total) ? total : 0;
+    },
+
+    mainShift() {
+      const cycles = mainOffset?.cycles ?? 0;
+      const p = mainOffset?.pending;
+      const pending =
+        p && finite(p.cycles) && finite(p.atCycle) && p.cycles !== 0 ? { cycles: p.cycles, atCycle: p.atCycle } : null;
+      return { cycles: finite(cycles) ? cycles : 0, pending };
     },
 
     setMainRepl(repl, options) {

@@ -229,8 +229,18 @@ export interface SettingsTranslations {
   transitionSnapNext1: string;
   transitionSnapNext4: string;
   transitionSnapNext8: string;
-  transitionGlide: string;
-  transitionGlideDescription: string;
+  // Tempo and phrase sync (spec 027)
+  transitionSnapNext16: string;
+  transitionSnapDescription: string;
+  transitionTempo: string;
+  transitionTempoJump: string;
+  transitionTempoGlide: string;
+  transitionTempoMatch: string;
+  transitionTempoKeep: string;
+  transitionTempoJumpDescription: string;
+  transitionTempoGlideDescription: string;
+  transitionTempoMatchDescription: string;
+  transitionTempoKeepDescription: string;
   transitionMatchLoudness: string;
   transitionMatchLoudnessDescription: string;
   transitionPicker: string;

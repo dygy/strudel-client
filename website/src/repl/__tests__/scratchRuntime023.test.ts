@@ -316,3 +316,61 @@ describe('Snap to beat storage: strudel-scratch-snap', () => {
     warn.mockRestore();
   });
 });
+
+describe('spec 027: the speakers’ shift for the phrase origin (mainShiftCycles)', () => {
+  it('reports the offset in cycles, a pending shift included, and 0 again after a stop', async () => {
+    const { runtime, handOvers } = setup();
+    const repl = mainRepl(runtime);
+    runtime.setMainRepl(repl);
+    await runtime.attachMain({} as AudioContext, {});
+    const offset = handOvers[0].options.offset as PatternOffset;
+    expect(runtime.mainShiftCycles()).toBe(0);
+    repl.setPattern(sequence('bd', 'sd'));
+    offset.shift(0.25);
+    expect(runtime.mainShiftCycles()).toBe(0.25);
+    offset.shift(0.5, { atCycle: 100 }); // starts later (an Update during a spin-up)
+    expect(offset.cycles).toBe(0.25);
+    expect(runtime.mainShiftCycles()).toBe(0.75);
+    runtime.deckStopped('main');
+    expect(runtime.mainShiftCycles()).toBe(0);
+  });
+
+  it('negative pair: 0 without a pattern offset, and a non-finite total counts as 0', () => {
+    expect(setup({ createPatternOffset: undefined }).runtime.mainShiftCycles()).toBe(0);
+    const broken = setup({
+      createPatternOffset: () => ({ editPattern: (p: unknown) => p, reset() {}, cycles: 0, total: NaN }),
+    });
+    expect(broken.runtime.mainShiftCycles()).toBe(0);
+  });
+});
+
+describe('spec 027 review: mainShift() splits the settled and the pending shift for the phrase origin', () => {
+  it('a pending shift is reported apart, with the cycle it applies from; a stop clears both', async () => {
+    const { runtime, handOvers } = setup();
+    const repl = mainRepl(runtime);
+    runtime.setMainRepl(repl);
+    await runtime.attachMain({} as AudioContext, {});
+    const offset = handOvers[0].options.offset as PatternOffset;
+    expect(runtime.mainShift()).toEqual({ cycles: 0, pending: null });
+    repl.setPattern(sequence('bd', 'sd'));
+    offset.shift(0.25);
+    expect(runtime.mainShift()).toEqual({ cycles: 0.25, pending: null });
+    offset.shift(0.5, { atCycle: 100 });
+    expect(runtime.mainShift()).toEqual({ cycles: 0.25, pending: { cycles: 0.5, atCycle: 100 } });
+    runtime.deckStopped('main');
+    expect(runtime.mainShift()).toEqual({ cycles: 0, pending: null });
+  });
+
+  it('negative pair: no offset gives 0; a non-finite or malformed offset counts as none', () => {
+    expect(setup({ createPatternOffset: undefined }).runtime.mainShift()).toEqual({ cycles: 0, pending: null });
+    const broken = setup({
+      createPatternOffset: () => ({
+        editPattern: (p: unknown) => p,
+        reset() {},
+        cycles: NaN,
+        pending: { cycles: NaN, atCycle: 4 },
+      }),
+    });
+    expect(broken.runtime.mainShift()).toEqual({ cycles: 0, pending: null });
+  });
+});

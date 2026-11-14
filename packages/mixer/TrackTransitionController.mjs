@@ -45,12 +45,20 @@ export const OLD_LOUDNESS_SECONDS = 2;
 export const NEW_LOUDNESS_CYCLES = 1;
 /** Allowed lengths and snaps (the UI offers these). */
 export const TRANSITION_LENGTHS = Object.freeze([1, 2, 4, 8, 16]);
-export const TRANSITION_SNAPS = Object.freeze([0, 1, 4, 8]);
+export const TRANSITION_SNAPS = Object.freeze([0, 1, 4, 8, 16]);
+/**
+ * Tempo choices (spec 027):
+ * - `jump`: the new tempo from T (both tracks);
+ * - `glide`: old → new over the overlap (overlapping types only; Dip and Cut play it as `jump`);
+ * - `match`: both tracks at the old tempo, then old → new over `length` cycles once the old one is gone;
+ * - `keep`: both tracks at the old tempo, and the new track stays there (the set keeps its tempo).
+ */
+export const TRANSITION_TEMPOS = Object.freeze(['jump', 'glide', 'match', 'keep']);
 export const DEFAULT_TRANSITION_SETTINGS = Object.freeze({
   type: 'dip',
   length: 4,
   snap: 0,
-  glide: false,
+  tempo: 'jump',
   matchLoudness: false,
 });
 
@@ -75,8 +83,10 @@ function nearestLength(cycles) {
 
 /**
  * Validate a settings object; anything missing or out of range takes its default.
+ * `tempo` is one of TRANSITION_TEMPOS; without a valid one, the legacy `glide: true` (spec 017)
+ * gives `'glide'` and anything else `'jump'`. The result has no `glide` field.
  * @param {Object} [settings]
- * @returns {{type: string, length: number, snap: number, glide: boolean, matchLoudness: boolean}}
+ * @returns {{type: string, length: number, snap: number, tempo: string, matchLoudness: boolean}}
  */
 export function normalizeTransitionSettings(settings = {}) {
   const s = settings ?? {};
@@ -86,21 +96,27 @@ export function normalizeTransitionSettings(settings = {}) {
     type: TRANSITION_TYPES.includes(s.type) ? s.type : DEFAULT_TRANSITION_SETTINGS.type,
     length: Number.isFinite(length) && length > 0 ? nearestLength(length) : DEFAULT_TRANSITION_SETTINGS.length,
     snap: TRANSITION_SNAPS.includes(snap) ? snap : 0,
-    glide: Boolean(s.glide),
+    tempo: TRANSITION_TEMPOS.includes(s.tempo) ? s.tempo : s.glide === true ? 'glide' : 'jump',
     matchLoudness: Boolean(s.matchLoudness),
   };
 }
 
 /**
  * The transition start T for a switch armed at cycle `now`: the next boundary of
- * max(snap, the type's minimum) cycles strictly after `now + SAFETY_MARGIN`; without a
- * boundary, `now + SAFETY_MARGIN` rounded up to the beat grid.
+ * max(snap, the type's minimum) cycles strictly after `now + SAFETY_MARGIN`, counted from
+ * `origin` (the playing track's cycle 0 on the scheduler grid, spec 027); without a boundary,
+ * `now + SAFETY_MARGIN` rounded up to the (global) beat grid. With origin 0 this is spec 017's T.
+ * @param {number} now the scheduler cycle
+ * @param {{type: string, snap?: number}} settings
+ * @param {number} [origin=0] where the playing track's phrases start
+ * @returns {number}
  */
-export function transitionStart(now, { type, snap = 0 }) {
+export function transitionStart(now, { type, snap = 0 }, origin = 0) {
   const base = now + SAFETY_MARGIN;
   const size = Math.max(snap || 0, TYPE_MIN_SNAP[type] || 0);
   if (size > 0) {
-    return (Math.floor(base / size) + 1) * size;
+    const from = Number.isFinite(origin) ? origin : 0;
+    return from + (Math.floor((base - from) / size + 1e-9) + 1) * size;
   }
   const grid = type === 'off' ? OFF_GRID : BEAT_GRID;
   return Math.ceil(base / grid - 1e-9) * grid;
@@ -137,6 +153,10 @@ export class TrackTransitionController {
    * @param {Function} [options.clearTimeout]
    * @param {{getActiveSoundIds: Function, releaseSounds: Function}} [options.voices] the main engine's
    *   sounding voices (default: superdough's, filtered to the main engine's controller)
+   * @param {Function} [options.getTrackShift] the speakers' scratch shift (spec 023), read when a
+   *   switch begins: the playing track's phrases start at `origin + shift` (spec 027). It returns
+   *   cycles, or `{ cycles, pending: { cycles, atCycle } | null }` when part of the shift only
+   *   applies from a later cycle (an Update during a spin-up)
    */
   constructor({
     repl,
@@ -149,6 +169,7 @@ export class TrackTransitionController {
     setTimeout: setTimeoutFn,
     clearTimeout: clearTimeoutFn,
     voices = SUPERDOUGH_VOICES,
+    getTrackShift = () => 0,
   } = {}) {
     this.repl = repl;
     this.audioContext = audioContext;
@@ -160,6 +181,7 @@ export class TrackTransitionController {
     this._setTimeout = setTimeoutFn;
     this._clearTimeout = clearTimeoutFn;
     this.voices = voices;
+    this.getTrackShift = getTrackShift;
 
     this.origin = 0; // cycle where the playing track's cycle 0 sits on the scheduler grid
     this.trimState = null; // the playing track's loudness trim ({ start, value }), if matched
@@ -173,6 +195,7 @@ export class TrackTransitionController {
     this.timer = null;
     this.gainAutomated = false; // a Dip has scheduled ramps on destinationGain
     this._capture = null; // the setcps capture of the switch being evaluated
+    this.tempoHold = null; // spec 027: the tempo after a Match or Keep transition ({ kind: 'glide' | 'keep', ... })
 
     this.editPattern = this.editPattern.bind(this);
     this._tick = this._tick.bind(this);
@@ -239,7 +262,7 @@ export class TrackTransitionController {
   _arm(sw, newPat) {
     const { type, length, snap } = sw.settings;
     const now = this._now();
-    const T = transitionStart(now, { type, snap });
+    const T = this._phraseStart(now, sw.settings, sw.trackShift);
     const buildType = type === 'off' ? 'cut' : type;
     const L = buildType === 'cut' ? 0 : length;
     const timing = transitionTiming(buildType, T, L);
@@ -266,6 +289,27 @@ export class TrackTransitionController {
     return this._build(active);
   }
 
+  /**
+   * T counted from the playing track's cycle 0. A pending part of the scratch shift only moves
+   * the track from its `atCycle`: a T before that counts from the settled shift; a T at or after
+   * it from the full shift, on its first boundary at or after `atCycle`.
+   */
+  _phraseStart(now, { type, snap }, shift = { cycles: 0, pending: null }) {
+    const settled = this.origin + shift.cycles;
+    const T = transitionStart(now, { type, snap }, settled);
+    const pending = shift.pending;
+    if (!pending || T < pending.atCycle) {
+      return T;
+    }
+    const full = settled + pending.cycles;
+    const T2 = transitionStart(now, { type, snap }, full);
+    if (T2 >= pending.atCycle) {
+      return T2;
+    }
+    const size = Math.max(snap || 0, TYPE_MIN_SNAP[type] || 0);
+    return size > 0 ? full + Math.ceil((pending.atCycle - full) / size - 1e-9) * size : T;
+  }
+
   _build(a) {
     return buildTransition({
       oldPat: a.oldPat,
@@ -290,7 +334,8 @@ export class TrackTransitionController {
    * keeps playing untouched (tempo, gain, pattern).
    *
    * @param {string} code
-   * @param {Object} [settings] overrides `getSettings()`: { type, length, snap, glide, matchLoudness }
+   * @param {Object} [settings] overrides `getSettings()`: { type, length, snap, tempo, matchLoudness }
+   *   (a legacy `glide: true` without `tempo` means `tempo: 'glide'`)
    * @param {Object} [options]
    * @param {Function} [options.prepare] async reset run just before evaluate (its `setCps` is captured too)
    * @returns {Promise<Object>}
@@ -341,9 +386,15 @@ export class TrackTransitionController {
     this.inflight = inflight;
     let sw;
     let capture;
+    let prevHold = null;
     try {
       await this._ensureAudioContextRunning();
       const settings = normalizeTransitionSettings(settingsArg ?? this.getSettings?.());
+      // A slide or held set tempo from the last transition ends here: this switch starts from
+      // the tempo it reached (spec 027 §2.2), and only one setCps wrapper is ever installed.
+      // If the new code fails, the hold comes back (catch below).
+      prevHold = this.tempoHold;
+      this._endTempoHold();
       const scheduler = this.scheduler;
       const oldPat = scheduler?.pattern ?? this.repl?.state?.pattern;
       const playing = Boolean(scheduler?.started && oldPat);
@@ -356,6 +407,8 @@ export class TrackTransitionController {
         immediate: !playing,
         oldPat,
         oldCps: scheduler?.cps ?? DEFAULT_CPS,
+        // Read now: once the switch is busy, the scratch offset drops it from the next pattern.
+        trackShift: playing ? this._readTrackShift() : { cycles: 0, pending: null },
         useLayers: !GLOBAL_TRANSFORM.test(code),
         trimState: playing && settings.matchLoudness ? { start: null, value: 1 } : null,
         consumed: false,
@@ -429,6 +482,11 @@ export class TrackTransitionController {
       }
       this.metering = false;
       this._restoreGain();
+      if (evaluateFailed) {
+        // The old track plays on untouched, so does its tempo hold (spec 027 §2.2). The capture
+        // was restored in the finally above: this is again the only wrapper.
+        this._resumeTempoHold(prevHold);
+      }
       this._emit('error', { error: error.message, evaluateFailed });
       error.evaluateFailed = evaluateFailed;
       throw error;
@@ -505,6 +563,48 @@ export class TrackTransitionController {
     a.newCps = cps;
   }
 
+  /**
+   * The speakers' scratch shift as `{ cycles, pending }`. A plain number is a settled shift; a
+   * throw or a non-finite value counts as 0 (with a warning), a malformed pending part as none.
+   */
+  _readTrackShift() {
+    const none = { cycles: 0, pending: null };
+    let shift;
+    try {
+      shift = this.getTrackShift?.() ?? 0;
+    } catch (error) {
+      console.warn('[TrackTransitionController] getTrackShift() failed:', error);
+      return none;
+    }
+    const cycles = typeof shift === 'object' && shift !== null ? shift.cycles : shift;
+    if (!Number.isFinite(cycles)) {
+      console.warn('[TrackTransitionController] getTrackShift() returned a non-finite value:', shift);
+      return none;
+    }
+    const p = typeof shift === 'object' ? shift.pending : null;
+    const pending =
+      p && Number.isFinite(p.cycles) && Number.isFinite(p.atCycle) && p.cycles !== 0
+        ? { cycles: p.cycles, atCycle: p.atCycle }
+        : null;
+    return { cycles, pending };
+  }
+
+  /** The tempo choice in force for this transition (Off has no modifiers: it jumps). */
+  _tempoMode(a) {
+    return a.type === 'off' ? 'jump' : a.settings.tempo;
+  }
+
+  /** Match and Keep play the whole transition at the old tempo. */
+  _holdsOldTempo(a) {
+    const mode = this._tempoMode(a);
+    return mode === 'match' || mode === 'keep';
+  }
+
+  /** The tempo the new track plays at during the transition. */
+  _incomingCps(a) {
+    return this._holdsOldTempo(a) ? a.oldCps : a.newCps;
+  }
+
   _snapshotVoices() {
     try {
       return this.voices?.getActiveSoundIds?.() ?? [];
@@ -536,7 +636,7 @@ export class TrackTransitionController {
     if (a.buildType === 'dip') {
       seconds = a.L / a.oldCps;
     } else if (isOverlapping(a.buildType)) {
-      seconds = a.L / Math.max(a.oldCps, a.newCps);
+      seconds = a.L / Math.max(a.oldCps, this._incomingCps(a));
     } else {
       seconds = SHORT_RELEASE;
     }
@@ -557,7 +657,7 @@ export class TrackTransitionController {
     const ctxNow = this.audioContext.currentTime;
     const down = this._ctxTimeOfT(a);
     const silent = down + a.L / a.oldCps;
-    const up = silent + a.L / a.newCps;
+    const up = silent + a.L / this._incomingCps(a);
     try {
       const current = gain.value;
       gain.cancelScheduledValues(ctxNow);
@@ -601,8 +701,14 @@ export class TrackTransitionController {
     }
   }
 
-  /** The tempo plan (tech §2.2 step 6) at cycle `now`. */
+  /** The tempo plan (spec 017 tech §2.2 step 6, spec 027 tech §2.1 step 5) at cycle `now`. */
   _applyTempo(a, now) {
+    const mode = this._tempoMode(a);
+    if (mode === 'match' || mode === 'keep') {
+      // Both tracks at the old tempo throughout (a no-op: it is already the clock's tempo).
+      this._setCps(a, a.oldCps);
+      return;
+    }
     if (a.buildType === 'dip') {
       // The old tempo holds until the output is silent; the new one is set at that moment.
       if (now >= a.T + a.L) {
@@ -610,7 +716,7 @@ export class TrackTransitionController {
       }
       return;
     }
-    if (a.settings.glide && isOverlapping(a.buildType)) {
+    if (mode === 'glide' && isOverlapping(a.buildType)) {
       const from = a.glideStart ?? a.T;
       this._setCps(a, glideCps(now, { T: from, L: a.end - from, oldCps: a.glideFrom ?? a.oldCps, newCps: a.newCps }));
       return;
@@ -642,19 +748,29 @@ export class TrackTransitionController {
         }
       }
     }
+    this._tickTempoHold(now);
     if (this.metering) {
       this._sampleLoudness();
       this._checkMeasure(now);
     }
-    if (this.active || this.metering) {
+    if (this.active || this.metering || this.tempoHold?.kind === 'glide') {
       this._startTicking();
     }
   }
 
   _finish(a) {
     this.active = null;
-    this._setCps(a, a.newCps);
+    const mode = this._tempoMode(a);
+    if (mode !== 'match' && mode !== 'keep') {
+      this._setCps(a, a.newCps);
+    }
+    // The transition's wrapper goes before the hold installs its own: never two at once.
     a.releaseTempo?.();
+    if (mode === 'match') {
+      this._startTempoHold({ kind: 'glide', from: a.lastCps, to: a.newCps, start: a.end, L: a.settings.length });
+    } else if (mode === 'keep') {
+      this._startTempoHold({ kind: 'keep', cps: a.lastCps, ownCps: a.newCps });
+    }
     if (this.gainAutomated && a.buildType === 'dip') {
       this.gainAutomated = false; // the ramps have run their course
     }
@@ -673,6 +789,89 @@ export class TrackTransitionController {
     }
     this._emit('end', { type: a.type, T: a.T, end: a.end });
     a.resolve({ type: a.type, T: a.T, end: a.end });
+  }
+
+  /**
+   * Spec 027: hold the tempo after a Match (`glide`: from → to over [start, start+L]) or Keep
+   * (`keep`: stay at `cps`; the track's own tempo is `ownCps`) transition. While it lasts, the
+   * scheduler's setCps comes here: a setcps that changes the tempo ends it and applies at once.
+   */
+  _startTempoHold(hold) {
+    this._endTempoHold();
+    const wrap = this._wrapSetCps((cps) => this._onTempoHoldRequest(hold, cps));
+    hold.apply = wrap.apply;
+    hold.restore = wrap.restore;
+    hold.lastCps = hold.kind === 'glide' ? hold.from : hold.cps;
+    this.tempoHold = hold;
+    if (hold.kind === 'glide') {
+      this._startTicking();
+    }
+  }
+
+  /** A setcps/setcpm (a hot swap of the playing track, or anything else) while a hold lasts. */
+  _onTempoHoldRequest(hold, cps) {
+    const value = cps ?? DEFAULT_CPS;
+    if (this.tempoHold !== hold) {
+      hold.apply(value); // a stale wrapper (another one was installed over it): pass through
+      return;
+    }
+    if (hold.kind === 'keep' && value === hold.ownCps) {
+      return; // the track's code still sets its own tempo: the set tempo stays
+    }
+    this._endTempoHold();
+    hold.apply(value);
+  }
+
+  _tickTempoHold(now) {
+    const hold = this.tempoHold;
+    if (hold?.kind !== 'glide') {
+      return;
+    }
+    const done = now >= hold.start + hold.L;
+    const cps = done ? hold.to : glideCps(now, { T: hold.start, L: hold.L, oldCps: hold.from, newCps: hold.to });
+    if (cps !== hold.lastCps) {
+      hold.lastCps = cps;
+      hold.apply(cps);
+    }
+    if (done) {
+      this._endTempoHold();
+    }
+  }
+
+  /**
+   * A switch failed to evaluate: put back the hold it ended. Keep holds the same tempo again; a
+   * slide continues from the tempo the clock is at now over what remains of it (no jump), or
+   * lands on its target when nothing remains. Not after a Stop or destroy, or over another hold.
+   */
+  _resumeTempoHold(prev) {
+    if (!prev || this.tempoHold || !this.scheduler?.started) {
+      return;
+    }
+    if (prev.kind === 'keep') {
+      this._startTempoHold({ kind: 'keep', cps: prev.cps, ownCps: prev.ownCps });
+      return;
+    }
+    const now = this._now();
+    const end = prev.start + prev.L;
+    const from = this.scheduler.cps ?? prev.lastCps;
+    if (now >= end) {
+      if (from !== prev.to) {
+        this.scheduler.setCps(prev.to);
+      }
+      return;
+    }
+    const start = Math.max(now, prev.start);
+    this._startTempoHold({ kind: 'glide', from, to: prev.to, start, L: end - start });
+  }
+
+  /** Restore the scheduler's own setCps and forget the hold (idempotent). */
+  _endTempoHold() {
+    const hold = this.tempoHold;
+    if (!hold) {
+      return;
+    }
+    this.tempoHold = null;
+    hold.restore();
   }
 
   _sampleLoudness() {
@@ -748,6 +947,7 @@ export class TrackTransitionController {
    * evaluating will start like a fresh track.
    */
   stopped() {
+    this._endTempoHold(); // Play starts the track at its own tempo
     this.origin = 0;
     this.trimState = null;
     if (this.armed) {
@@ -808,6 +1008,7 @@ export class TrackTransitionController {
       end: a?.end,
       origin: this.origin,
       queued: this.queued !== null,
+      tempoHold: this.tempoHold?.kind ?? null,
     };
   }
 
@@ -850,6 +1051,7 @@ export class TrackTransitionController {
   /** Stop timers, disconnect the loudness tap, cancel anything pending. */
   destroy() {
     this._clearTimer();
+    this._endTempoHold();
     const a = this.active;
     this.active = null;
     a?.releaseTempo?.();

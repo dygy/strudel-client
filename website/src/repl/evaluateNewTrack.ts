@@ -63,7 +63,7 @@ export interface EvaluateNewTrackOptions {
   /**
    * A set's Go (spec 022 §2.5): if the new code fails, the old track must keep playing. The instant
    * path stops the speakers before it evaluates, so an Off switch while playing runs through the
-   * controller as a Cut instead (no snap, glide or loudness match: the same hard switch as Off), and
+   * controller as a Cut instead (no snap, tempo change or loudness match: the same hard switch as Off), and
    * a broken track never replaces the playing one. Plain switches (Update, the library) keep spec
    * 017's instant path.
    */
@@ -73,7 +73,7 @@ export interface EvaluateNewTrackOptions {
 export type SwitchResult = 'ok' | 'failed';
 
 /** Off as a Cut through the controller: a hard switch that only happens once the new code evaluated. */
-export const OFF_AS_CUT = Object.freeze({ type: 'cut', snap: 0, glide: false, matchLoudness: false } as const);
+export const OFF_AS_CUT = Object.freeze({ type: 'cut', snap: 0, tempo: 'jump', matchLoudness: false } as const);
 
 export async function evaluateNewTrack(
   deps: EvaluateNewTrackDeps,
