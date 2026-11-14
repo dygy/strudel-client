@@ -138,6 +138,9 @@ export class SuperdoughOutput {
   // fork addition (strudel-client spec 019): a node between channelMerger and destinationGain
   // (the vinyl scratch node). Kept across reset() / initializeAudio().
   preGainInsert = null;
+  // fork addition (strudel-client fix: .dough() skipped the EQ): sources played straight into
+  // destinationGain (the dsp worklet). Re-attached to the new destinationGain on reset().
+  directInputs = new Set();
 
   constructor(audioContext) {
     this.audioContext = audioContext;
@@ -151,6 +154,7 @@ export class SuperdoughOutput {
     this.channelMerger = new ChannelMergerNode(audioContext, { numberOfInputs: audioContext.destination.channelCount });
     this.destinationGain = new GainNode(audioContext);
     this.connectPreGain(this.preGainInsert); // fork: channelMerger → [insert] → destinationGain (spec 019)
+    this.directInputs.forEach((node) => node.connect(this.destinationGain)); // fork: direct inputs
     this.outputSwitches = new Map();
     this.destinationGain.connect(this.outputInsert ?? audioContext.destination); // fork: insert (spec 008)
     // fork (spec 020): the insert sizes itself to the output's channels, which a reset can change.
@@ -336,6 +340,34 @@ export class SuperdoughOutput {
     return fade;
   }
 
+  /**
+   * Fork addition (strudel-client). Play `node` straight into `destinationGain`, so it is heard
+   * through everything after it (gain, recorders' pre-EQ tap, `setOutputInsert`: the main EQ) like
+   * superdough's own sounds, but not through the orbits or the pre-gain insert. Kept across
+   * `reset()`. Upstream connects such nodes (the `.dough()` worklet) to the destination directly.
+   * @param {AudioNode} node
+   * @noAutocomplete
+   */
+  connectDirectInput(node) {
+    if (!node || this.directInputs.has(node)) return;
+    this.directInputs.add(node);
+    if (this.destinationGain) node.connect(this.destinationGain);
+  }
+
+  /**
+   * Fork addition (strudel-client). Remove only the edge `connectDirectInput(node)` made.
+   * @param {AudioNode} node
+   * @noAutocomplete
+   */
+  disconnectDirectInput(node) {
+    if (!this.directInputs.delete(node)) return;
+    try {
+      if (this.destinationGain) node.disconnect(this.destinationGain);
+    } catch {
+      // was not connected
+    }
+  }
+
   reset() {
     this.disconnect();
     this.initializeAudio();
@@ -345,6 +377,14 @@ export class SuperdoughOutput {
     if (this.preGainInsert) {
       this.disconnectPreGain(this.preGainInsert);
     }
+    // fork: direct inputs outlive this gain too; drop only their edges into it.
+    this.directInputs.forEach((node) => {
+      try {
+        node.disconnect(this.destinationGain);
+      } catch {
+        // was not connected
+      }
+    });
     this.channelMerger.disconnect();
     this.destinationGain.disconnect();
     this.outputSwitches.forEach((sw) => sw.disconnect()); // fork (spec 020)
@@ -408,6 +448,25 @@ export class SuperdoughAudioController {
    */
   getPreGainInsert() {
     return this.output.getPreGainInsert();
+  }
+
+  /**
+   * Fork addition (strudel-client). See `SuperdoughOutput.connectDirectInput`: `node` plays into
+   * destinationGain (and so through the main EQ insert); kept across `reset()`.
+   * @param {AudioNode} node
+   * @noAutocomplete
+   */
+  connectDirectInput(node) {
+    this.output.connectDirectInput(node);
+  }
+
+  /**
+   * Fork addition (strudel-client). See `SuperdoughOutput.disconnectDirectInput`.
+   * @param {AudioNode} node
+   * @noAutocomplete
+   */
+  disconnectDirectInput(node) {
+    this.output.disconnectDirectInput(node);
   }
 
   reset() {
