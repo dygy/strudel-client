@@ -4,6 +4,8 @@ import { register } from '@strudel/core';
 import { isUdels } from './repl/util';
 import type { Language } from './i18n';
 import i18n from './i18n/i18n';
+import { supportedLanguages } from './i18n/languageConfig';
+import { bindLanguageSync } from './i18nSettingsSync';
 import {
   DEFAULT_TRANSITION,
   migrateLegacySmoothTransitions,
@@ -387,19 +389,9 @@ if (typeof window !== 'undefined') {
     console.warn('[settings] smooth-transitions migration failed:', error);
   }
 
-  // Sync language from i18next localStorage to settings store
-  const syncLanguageFromI18n = () => {
-    const i18nLanguage = localStorage.getItem('strudel-language');
-    const currentSettings = settingsMap.get();
-
-    if (i18nLanguage && i18nLanguage !== currentSettings.language) {
-      console.log('[settings] syncing language from i18next:', i18nLanguage);
-      settingsMap.setKey('language', i18nLanguage);
-    }
-  };
-
-  // Run language sync after migrations
-  setTimeout(syncLanguageFromI18n, 10);
+  // Language: the store and i18next stay in step (see i18nSettingsSync.ts). Bound synchronously,
+  // not from a timer, so a stale cached language can't land later and overwrite a newer choice.
+  bindLanguageSync(i18n, settingsMap, supportedLanguages, localStorage);
 
   // Listen for localStorage changes to keep settings in sync
   window.addEventListener('storage', (e) => {
@@ -409,18 +401,6 @@ if (typeof window !== 'undefined') {
         console.log('[settings] syncing language from storage event:', e.newValue);
         settingsMap.setKey('language', e.newValue);
       }
-    }
-  });
-
-  // Listen for settings store changes to sync back to i18next
-  settingsMap.subscribe((settings) => {
-    const i18nLanguage = localStorage.getItem('strudel-language');
-    if (settings.language && settings.language !== i18nLanguage) {
-      console.log('[settings] syncing language to i18next:', settings.language);
-      localStorage.setItem('strudel-language', settings.language);
-
-      // Also update i18next
-      i18n.changeLanguage(settings.language);
     }
   });
 }
