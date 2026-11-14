@@ -40,7 +40,7 @@ Spec 017 gave track switches two timing options:
   - [ ] Given the playing track's cycle 0 sits at scheduler cycle 6 (it came in through an earlier transition), and Snap is 8, when the user presses Update for another track at scheduler cycle 9, then the transition begins at scheduler cycle 14, the track's own cycle 8. It does not begin at cycle 16.
   - [ ] Given Snap is 16 and a track has played since Play was pressed, when the user presses Update at the track's cycle 20, then the transition begins at its cycle 32.
   - [ ] Given a track came in through a Dip, whose new track starts after the fade-down, when the next switch uses Snap 4, then the boundaries count from where that track's audio started.
-  - [ ] Given Cut, Snap off, and a playing track whose cycle 0 sits at scheduler cycle 2.5, when the user presses Update at scheduler cycle 4.1, then the new track starts at scheduler cycle 5.5.
+  - [ ] Given Cut, Snap off, and a playing track whose cycle 0 sits at scheduler cycle 2.5, when the user presses Update at scheduler cycle 4.1, then the new track starts at scheduler cycle 4.5 (the track's own cycle 2).
   - [ ] Given a saved Snap value that isn't offered (e.g. 2 or "abc"), when the settings load, then Snap is Off.
   - [ ] Snap to shows 5 choices including "16 cycles", in the settings panel on desktop and in the compact layout. The description mentions the track's start.
 
@@ -55,7 +55,7 @@ The **Tempo glide** checkbox becomes a **Tempo** choice with four options. Like 
 | **Match, then glide** | Both tracks at the **old** tempo; the old track never changes tempo. | Once the old track is gone, the tempo moves steadily from old to new over the selected Length (in cycles). |
 | **Keep set tempo** | Both tracks at the old tempo. | The new track stays at the old tempo. The set keeps its tempo across switches. |
 
-- **Dip and Cut.** They have no overlap, so Glide during is greyed out for them, as Tempo glide was. Match, then glide and Keep set tempo do work: the new track starts at the old tempo. With Match, then glide, the slide to the new tempo then runs over the selected Length (Cut has no length of its own).
+- **Dip, Cut and Echo-out.** The tempo can't glide across their switch point, so Glide during is greyed out for them (Dip and Cut as in 017; Echo-out added, see Change Log). Match, then glide and Keep set tempo do work: the new track starts at the old tempo. With Match, then glide, the slide to the new tempo then runs over the selected Length (Cut has no length of its own).
 - **Keep set tempo holds while the track plays unchanged.**
   - When the user updates the same track (a hot swap) and its code still sets the same tempo, the set tempo stays.
   - If the code now sets a different tempo, the user changed it on purpose: that tempo applies at once, and the hold ends.
@@ -80,8 +80,9 @@ The **Tempo glide** checkbox becomes a **Tempo** choice with four options. Like 
   - [ ] Given a slide after a transition is running, when the user updates the playing track and its code sets a tempo, then that tempo applies at once and the slide stops.
   - [ ] Given a slide after a transition is running, when the next switch begins, then its "old tempo" is the tempo the slide had reached.
   - [ ] Given a slide after a transition or a held set tempo, when the user presses Stop and then Play, then the track plays at its own tempo.
+  - [ ] Given a held set tempo (Keep) or a slide after a transition (Match), when the user switches to a track whose code fails to evaluate, then the playing track keeps that hold: Keep still holds on the next same-track update, and a slide continues to the track's own tempo without jumping.
   - [ ] Given Tempo glide was saved on before this change, when the user opens the settings, then Tempo shows Glide during. Saved off shows Jump.
-  - [ ] When the user selects Dip or Cut, then Glide during is greyed out, and the other three options can still be chosen.
+  - [ ] When the user selects Dip, Cut or Echo-out, then Glide during is greyed out, and the other three options can still be chosen.
   - [ ] Every tempo change during a slide happens in small steps (at least 16 per cycle, as 017's glide does), never as one jump.
 
 ### 2.3 What the user hears, and other rules
@@ -119,4 +120,6 @@ The **Tempo glide** checkbox becomes a **Tempo** choice with four options. Like 
 
 ## Change Log
 
-- (none yet)
+- 2026-11-14 — implementation (audio report) — AC 2.1 Cut example corrected from 5.5 to 4.5: at 4.1 the track is at its own cycle 1.6, and its next cycle starts at 4.5, which is after the 0.25 safety margin. The rule did not change; the number was miscalculated.
+- 2026-11-14 — review 027 (finding 3) — Glide during is also greyed out for Echo-out. The controller never glided it (it's not an overlapping type, which is inherited from 017), so offering the option promised a slide that never happened.
+- 2026-11-14 — review 027 (finding 1) — new AC: a failed switch keeps the tempo hold. This follows 017's rule that on a failed switch the old track keeps playing untouched, tempo included.

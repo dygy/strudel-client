@@ -47,7 +47,7 @@ Everything happens inside spec 017's `TrackTransitionController` (`packages/mixe
 5. **The tempo plan during a transition (`_applyTempo`).**
    - `jump`: unchanged (017 `glide: false`).
    - `glide`: unchanged (017 `glide: true`). Only overlapping types glide; Dip and Cut behave as `jump`.
-   - `match` and `keep`: `_setCps(a, a.oldCps)` throughout. For Dip, the new tempo is no longer set at `T + L`.
+   - `match` and `keep`: `_setCps(a, a.oldCps)` throughout. For Dip, the new tempo is no longer set at `T + L`. **Amended during implementation:** under match/keep, the Dip fade-up and the old-voice release are timed at the tempo that actually plays during the transition (the old one).
    - `_retarget` (a re-evaluate of the incoming track during the transition) still updates `a.newCps`. For `match`/`keep` that changes only the target after the transition.
 6. **`_finish(a)`.**
    - `jump`/`glide`: `_setCps(a, a.newCps)`, as today.
@@ -91,7 +91,7 @@ Everything happens inside spec 017's `TrackTransitionController` (`packages/mixe
   - else `transitionGlide === true` or `'true'` gives `'glide'`;
   - else `'jump'`.
   - An invalid stored `transitionTempo` (e.g. `'fast'`) falls back the same way.
-- The legacy `transitionGlide` key stays readable but is never written again. On the first save of a Tempo choice, `transitionTempo` is stored and wins from then on, so no explicit migration write is needed.
+- The legacy `transitionGlide` key stays readable but is never written again. **Amended during implementation:** `persistentMap` writes every default into storage when the store mounts, so a default `transitionTempo: 'jump'` would hide a saved Tempo glide for good. `migrateLegacyTempoGlide` therefore runs at load, before the store mounts (next to the 017 migration). It writes `transitionTempo` (`'glide'` or `'jump'`) only when `transitionGlide` is stored and `transitionTempo` isn't, and it never writes `transitionGlide`. On the first save of a Tempo choice, `transitionTempo` is stored and wins from then on, so no explicit migration write is needed.
 - Replace `isGlideDisabled(type)` with `isTempoOptionDisabled(type, tempo)`:
   - true for every option when `type === 'off'`;
   - true for `'glide'` when `type` is `dip` or `cut`.
