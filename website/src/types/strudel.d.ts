@@ -181,6 +181,8 @@ declare module '@strudel/codemirror' {
     success: boolean;
     formattedCode?: string;
     error?: string;
+    /** The formatter left the code as it was, because the result would not have been safe (formatEngine.ts). */
+    rejected?: boolean;
   }
 
   export interface PrettierSettings {
@@ -398,10 +400,21 @@ declare module '@strudel/mixer' {
     constructor(options?: { getRepl?: () => any; isBusy?: () => boolean });
     cycles: number;
     raw: any;
+    /** A shift that starts at a later cycle, or null. */
+    pending: { atCycle: number; cycles: number; endCycle?: number } | null;
+    /** The whole offset in cycles, a pending one included. */
+    readonly total: number;
     /** The repl's hook: runs `inner` (the spec 017 transition hook) and shifts the result late. */
     editPattern(pattern: any, inner?: (pattern: any) => any): any;
-    /** Adds `cycles` and re-sets the pattern; false while busy, stopped or without a pattern. */
-    shift(cycles: number, options?: { onFirstQuery?: (cycle: number) => void }): boolean;
+    /**
+     * Adds `cycles` and re-sets the pattern; false while busy, stopped or without a pattern.
+     * `atCycle` shifts from that cycle on instead of from the next query; `endCycle` (with `atCycle`)
+     * is where the unshifted track's notes end.
+     */
+    shift(
+      cycles: number,
+      options?: { onFirstQuery?: (cycle: number) => void; atCycle?: number; endCycle?: number },
+    ): boolean;
     reset(): void;
   }
 
@@ -551,6 +564,11 @@ declare module '@strudel/mixer' {
     learn(): Promise<MidiJogMapping | null>;
     forget(): void;
     readonly mapping: MidiJogMapping | null;
+    /** Spec 029 review: how the last Learn ended; null while one runs or before the first. */
+    readonly lastLearn?:
+      | { status: 'learned' | 'timeout' | 'cancelled' }
+      | { status: 'conflict'; controller: number; with: 'brake' | 'spinUp' }
+      | null;
     readonly state: MidiJogState;
     /** Set only while unavailable. */
     readonly reason?: 'unsupported' | 'denied' | 'failed';
@@ -571,6 +589,48 @@ declare module '@strudel/mixer' {
   export const MIDI_JOG_RELEASE_MS: number;
   export const MIDI_JOG_LEARN_TIMEOUT_MS: number;
   export const MIDI_JOG_ENCODINGS: readonly MidiJogEncoding[];
+
+  // Spec 029: MIDI Learn for the Brake and Spin-up sliders; see packages/mixer/scratch/midiFeel.mjs.
+  export type MidiFeelTarget = 'brake' | 'spinUp';
+  export interface MidiFeelMapping {
+    inputName: string;
+    channel: number;
+    controller: number;
+  }
+  export type MidiFeelMappings = Record<MidiFeelTarget, MidiFeelMapping | null>;
+  export type MidiFeelLearnResult =
+    | { status: 'learned'; mapping: MidiFeelMapping }
+    | { status: 'timeout' }
+    | { status: 'cancelled' }
+    | { status: 'unavailable' }
+    | { status: 'conflict'; controller: number; with: 'jog' | MidiFeelTarget };
+  export interface MidiFeel {
+    learn(target: MidiFeelTarget): Promise<MidiFeelLearnResult>;
+    cancel(): void;
+    forget(target: MidiFeelTarget): void;
+    readonly mappings: MidiFeelMappings;
+    readonly state: MidiJogState;
+    readonly learning: MidiFeelTarget | null;
+    readonly reason?: 'unsupported' | 'denied' | 'failed';
+    readonly detail?: string;
+    readonly ready: Promise<void>;
+    on(event: 'change', listener: (feel: MidiFeel) => void): () => void;
+    destroy(): void;
+  }
+  export function createMidiFeel(
+    target: { setFeel(feel: Partial<ScratchFeel>): unknown },
+    options?: { loadMidi?: () => Promise<unknown>; storage?: Storage; getJogMapping?: () => unknown },
+  ): MidiFeel;
+  export function ccToFeel(value: number, range: readonly [number, number]): number;
+  export function midiFeelConflict(
+    mapping: MidiFeelMapping,
+    used: { target: MidiFeelTarget; mappings: MidiFeelMappings; jog?: MidiFeelMapping | null },
+  ): 'jog' | MidiFeelTarget | null;
+  export function readMidiFeelMappings(storage: Storage | null | undefined): MidiFeelMappings;
+  export const MIDI_FEEL_STORAGE_KEY: string;
+  export const MIDI_FEEL_LEARN_TIMEOUT_MS: number;
+  export const MIDI_FEEL_TARGETS: readonly MidiFeelTarget[];
+  export const MIDI_FEEL_KEYS: Readonly<Record<MidiFeelTarget, keyof ScratchFeel>>;
   /** Adds the scratch processor to the context, once per context. */
   export function loadScratchWorklet(audioContext: BaseAudioContext): Promise<void>;
 }

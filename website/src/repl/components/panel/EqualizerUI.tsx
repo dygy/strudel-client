@@ -26,6 +26,11 @@ import {
   formatFrequency,
   resolveEqProfile,
   sameEqSettings,
+  isUserPresetValue,
+  loadUserPresets,
+  userPresetName,
+  userPresetValue,
+  type UserPreset,
 } from '@strudel/equalizer';
 import { usePanelViewport } from './panelViewport';
 import { getMainEqualizer, subscribeMainEqualizer } from '../../mainEqualizer';
@@ -48,6 +53,7 @@ import {
 } from '../../playingEqProfile';
 import { EqualizerListeningControls } from './EqualizerListeningControls';
 import { loadRecordPostEq, saveRecordPostEq } from '../../recording/recordingTap';
+import { EqualizerUserPresets, type UserPresetChange } from './EqualizerUserPresets';
 
 interface EqualizerUIProps {
   /** The headphone PreviewEngine (its own EQ); null when it is not ready. */
@@ -190,6 +196,10 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { compact } = usePanelViewport();
   const [selectedBand, setSelectedBand] = useState(0);
+  // Spec 028: the user's named presets, and the one Rename / Overwrite / Delete act on (the last one
+  // picked or saved; an edit afterwards keeps it, so Overwrite can store the edit).
+  const [userPresets, setUserPresets] = useState<UserPreset[]>(loadUserPresets);
+  const [userTarget, setUserTarget] = useState<string | null>(null);
 
   // Every EQ the panel drives: the speakers' (main) and the headphones' (preview engine).
   // The app's main EQ is installed after the first click (once initAudio has picked the output
@@ -229,6 +239,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     const settings = slots[slots.active];
     setActiveSlot(slots.active);
     showSettings(settings);
+    setUserTarget(userPresetName(settings.preset));
 
     // Apply to equalizers
     applySettingsToEqualizers(settings);
@@ -242,12 +253,15 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   };
 
   // The limiting indicator: poll the main (speakers) EQ's limiter once per frame while the panel is
-  // mounted (requestAnimationFrame also pauses in a hidden tab); stopped on unmount.
+  // mounted and the speakers play (requestAnimationFrame also pauses in a hidden tab); stopped on
+  // unmount and on stop, with the indicator cleared: no animation frames while nothing plays (as the
+  // spec 026 spectrum below).
+  const speakersPlaying = useSyncExternalStore(subscribeSpeakersPlaying, getSpeakersPlaying, () => false);
   const speakersEqualizer = mainEqualizer ?? appMainEqualizer;
   useEffect(() => {
-    // A new (or no) main EQ starts unlit: the poll's own `lit` starts false, so the state must too.
+    // A new (or no) main EQ, or a stop, starts unlit: the poll's own `lit` starts false, so the state must too.
     setLimiting(false);
-    if (!speakersEqualizer) return;
+    if (!speakersEqualizer || !speakersPlaying) return;
     const raf =
       typeof requestAnimationFrame === 'function'
         ? // Called as plain functions: as methods of this object they throw "Illegal invocation".
@@ -268,7 +282,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     };
     frame = raf.request(poll);
     return () => raf.cancel(frame);
-  }, [speakersEqualizer]);
+  }, [speakersEqualizer, speakersPlaying]);
 
   // Update frequency response chart when anything it shows changes
   useEffect(() => {
@@ -279,7 +293,6 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   // connected (a fan-out from the main EQ's output) and frames are requested only while the panel is
   // mounted, the Spectrum toggle is on, the main EQ exists and the speakers play. Otherwise the tap
   // is disposed and one frame without the spectrum is drawn: no animation frames while stopped.
-  const speakersPlaying = useSyncExternalStore(subscribeSpeakersPlaying, getSpeakersPlaying, () => false);
   const spectrumEqualizer = mainEqualizer ?? appMainEqualizer;
   const spectrumActive = spectrumOn && speakersPlaying && !!spectrumEqualizer;
   useEffect(() => {
@@ -544,8 +557,13 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   };
 
   const handlePresetChange = (presetName: string) => {
+    if (isUserPresetValue(presetName)) {
+      handleUserPresetPick(presetName);
+      return;
+    }
     const preset = EQUALIZER_PRESETS[presetName];
     if (!preset) return;
+    setUserTarget(null);
 
     const newBands = bands.map((band, i) => ({
       ...band,
@@ -612,11 +630,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   // preset name) to both EQs through the setters, which glide: no click. Switching on: the values
   // first (stored silently while off), then on, so the switch-on crossfade brings the new curve in.
   // Switching off: off first, then the values (stored, not heard).
-  const handleSwitchSlot = (slot: EqualizerSlotName) => {
-    const slots = slotsRef.current ?? loadEqualizerSlots();
-    if (slot === slots.active) return;
-    const next = switchEqualizerSlot(slots, slot);
-    const settings = next[slot];
+  const glideToSettings = (settings: EqualizerSettings) => {
     const fallback = getDefaultSettings();
     equalizers().forEach((eq) => {
       if (!settings.isEnabled) eq.setEnabled(false);
@@ -626,10 +640,66 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
       eq.setOutputGain(settings.outputGain ?? 0);
       if (settings.isEnabled) eq.setEnabled(true);
     });
+  };
+
+  const handleSwitchSlot = (slot: EqualizerSlotName) => {
+    const slots = slotsRef.current ?? loadEqualizerSlots();
+    if (slot === slots.active) return;
+    const next = switchEqualizerSlot(slots, slot);
+    const settings = next[slot];
+    glideToSettings(settings);
     slotsRef.current = next;
     saveEqualizerSlots(next);
     setActiveSlot(slot);
     showSettings(settings);
+    setUserTarget(userPresetName(settings.preset));
+  };
+
+  // Spec 028: a user preset is applied like an A/B switch (the gliding setters, the on/off order
+  // above), into the active slot only. Its bands keep the panel's frequencies.
+  const handleUserPresetPick = (value: string) => {
+    const preset = userPresets.find((p) => userPresetValue(p.name) === value);
+    if (!preset) return;
+    const settings: EqualizerSettings = { ...preset.settings, preset: value };
+    glideToSettings(settings);
+    showSettings(settings);
+    setUserTarget(preset.name);
+    persist(settings);
+  };
+
+  /** Spec 028 review: only the active slot's preset label changes; its settings are kept as stored. */
+  const relabelActiveSlot = (preset: string) => {
+    const slots = slotsRef.current ?? loadEqualizerSlots();
+    setActivePreset(preset);
+    persist({ ...slots[slots.active], preset });
+  };
+
+  const handleUserPresetsChange = (presets: UserPreset[], change?: UserPresetChange) => {
+    setUserPresets(presets);
+    if (change?.kind === 'saved') {
+      // Saved or overwritten from the active slot's settings: the slot now is that preset.
+      setUserTarget(change.name);
+      setActivePreset(userPresetValue(change.name));
+      persist(settingsWith({ preset: userPresetValue(change.name) }));
+      return;
+    }
+    let shown = activePreset;
+    if (change?.kind === 'renamed') {
+      // A rename only renames the stored preset. The slot follows only while it shows exactly that
+      // preset; an edited slot (Custom) stays Custom, and no settings are written.
+      setUserTarget(change.to);
+      if (activePreset === userPresetValue(change.from)) {
+        shown = userPresetValue(change.to);
+        relabelActiveSlot(shown);
+      }
+    } else if (userTarget && !presets.some((p) => p.name === userTarget)) {
+      // Deleted (here or in another tab): the target is gone.
+      setUserTarget(null);
+    }
+    // A slot showing a preset that no longer exists becomes Custom (its sound does not change).
+    if (isUserPresetValue(shown) && !presets.some((p) => userPresetValue(p.name) === shown)) {
+      relabelActiveSlot('custom');
+    }
   };
 
   const handleCopySlot = () => {
@@ -657,6 +727,12 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
       handlePresetChange('flat');
     }
   };
+
+  // A slot naming a user preset that no longer exists (deleted, renamed on another tab) shows Custom.
+  const shownPreset =
+    isUserPresetValue(activePreset) && !userPresets.some((p) => userPresetValue(p.name) === activePreset)
+      ? 'custom'
+      : activePreset;
 
   if (equalizers().length === 0) {
     return (
@@ -723,9 +799,18 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
             className={`w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 cursor-pointer hover:border-gray-600${
               compact ? ' min-h-11' : ''
             }`}
-            value={activePreset}
+            value={shownPreset}
             onChange={(e) => handlePresetChange(e.target.value)}
           >
+            {userPresets.length > 0 && (
+              <optgroup label={t('equalizerMyPresets')} data-eq-group="user" className="bg-gray-800">
+                {userPresets.map(({ name }) => (
+                  <option key={name} value={userPresetValue(name)} className="bg-gray-800">
+                    {name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
             {PICKER_GROUPS.map(({ id, label, keys }) => (
               <optgroup key={id} label={t(label)} data-eq-group={id} className="bg-gray-800">
                 {keys.map((key) => (
@@ -735,7 +820,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
                 ))}
               </optgroup>
             ))}
-            {activePreset === 'custom' && (
+            {shownPreset === 'custom' && (
               <option value="custom" className="bg-gray-800">
                 {t('equalizerCustom')}
               </option>
@@ -747,7 +832,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
             </svg>
           </div>
         </div>
-        {activePreset === 'custom' && (
+        {shownPreset === 'custom' && (
           <div className="mt-2 text-xs text-green-400 flex items-center gap-1">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -760,13 +845,21 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
             {t('equalizerCustomActive')}
           </div>
         )}
+        {/* Named user presets: Save as, Rename, Overwrite, Delete (spec 028; both layouts) */}
+        <EqualizerUserPresets
+          presets={userPresets}
+          target={userTarget}
+          currentSettings={settingsWith({})}
+          onChange={handleUserPresetsChange}
+          compact={compact}
+        />
         {/* What the settings do, and why for a genre preset (spec 021; both layouts) */}
         <EqualizerPresetDescription
           bands={bands}
           lowCut={lowCut}
           highCut={highCut}
           outputGain={outputGain}
-          activePreset={activePreset}
+          activePreset={shownPreset}
         />
       </div>
 

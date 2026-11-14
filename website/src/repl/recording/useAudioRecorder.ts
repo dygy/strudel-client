@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getAudioContext, getSuperdoughAudioController } from '@strudel/webaudio';
 import { AudioRecorderEngine, type RecorderState } from './AudioRecorderEngine';
 import { encodeWAV } from './wavEncoder';
-import { selectRecordingTap } from './recordingTap';
+import { openRecordingTap, type RecordingTap } from './recordingTap';
 import { generateFilename } from './formatUtils';
 
 export interface UseAudioRecorderReturn {
@@ -30,6 +30,12 @@ export function useAudioRecorder(isScreenRecording = false): UseAudioRecorderRet
   const [error, setError] = useState<string | null>(null);
 
   const engineRef = useRef<AudioRecorderEngine | null>(null);
+  // The open tap (spec 026 Record as heard owns a trim node): closed once the recording has stopped.
+  const tapRef = useRef<RecordingTap | null>(null);
+  const closeTap = useCallback(() => {
+    tapRef.current?.close();
+    tapRef.current = null;
+  }, []);
 
   /** Lazily create the engine on first record toggle (AudioContext may not exist at mount). */
   const getOrCreateEngine = useCallback((): AudioRecorderEngine | null => {
@@ -46,6 +52,7 @@ export function useAudioRecorder(isScreenRecording = false): UseAudioRecorderRet
         setIsRecording(state.isRecording);
         setElapsedSeconds(state.elapsedSeconds);
         if (state.error) setError(state.error);
+        if (!state.isRecording) closeTap(); // stopped, or the start failed: the engine let go of the tap
       },
       onMemoryWarning: (sizeMB: number) => {
         console.warn(`[AudioRecorder] Memory warning: ~${Math.round(sizeMB)} MB used. Consider stopping.`);
@@ -54,7 +61,7 @@ export function useAudioRecorder(isScreenRecording = false): UseAudioRecorderRet
 
     engineRef.current = engine;
     return engine;
-  }, []);
+  }, [closeTap]);
 
   /** Toggle recording on/off (Req 2.2, 2.3). */
   const handleRecordToggle = useCallback(() => {
@@ -70,16 +77,20 @@ export function useAudioRecorder(isScreenRecording = false): UseAudioRecorderRet
 
       // Start recording: from destinationGain (pre-EQ), or the main EQ's output when Record as heard
       // is on and the EQ exists (spec 026). Chosen now; a change mid-recording applies next time.
+      // Record as heard records through a −1 dB trim (no codec clipping); closed when the recording stops.
       const controller = getSuperdoughAudioController();
-      const source = selectRecordingTap(controller?.output?.destinationGain);
+      closeTap();
+      const tap = openRecordingTap(getAudioContext(), controller?.output?.destinationGain);
 
-      if (!source) {
+      if (!tap) {
         setError('Audio output not available. Press play first.');
         return;
       }
 
       setError(null);
-      engine.start(source);
+      tapRef.current = tap;
+      engine.start(tap.node);
+      if (!engine.getState().isRecording) closeTap();
     } else {
       // Stop recording — get the blob
       engine
@@ -95,7 +106,7 @@ export function useAudioRecorder(isScreenRecording = false): UseAudioRecorderRet
           setError(`Failed to stop recording: ${err instanceof Error ? err.message : String(err)}`);
         });
     }
-  }, [getOrCreateEngine, isScreenRecording]);
+  }, [getOrCreateEngine, isScreenRecording, closeTap]);
 
   /** Clear the export blob after the user has handled it (Req 7.3). */
   const clearExport = useCallback(() => {
@@ -165,11 +176,13 @@ export function useAudioRecorder(isScreenRecording = false): UseAudioRecorderRet
   useEffect(() => {
     return () => {
       if (engineRef.current) {
-        engineRef.current.destroy();
+        engineRef.current.destroy().then(closeTap, closeTap);
         engineRef.current = null;
+      } else {
+        closeTap();
       }
     };
-  }, []);
+  }, [closeTap]);
 
   return {
     isRecording,

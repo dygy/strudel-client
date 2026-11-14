@@ -8,6 +8,7 @@
  */
 import { map, type MapStore } from 'nanostores';
 import {
+  MIDI_FEEL_STORAGE_KEY,
   MIDI_JOG_STORAGE_KEY,
   PatternOffset,
   SCRATCH_FEEL_DEFAULTS,
@@ -18,6 +19,10 @@ import {
   sanitizeScratchSnapGrid,
 } from '@strudel/mixer';
 import type {
+  MidiFeel,
+  MidiFeelLearnResult,
+  MidiFeelMappings,
+  MidiFeelTarget,
   MidiJog,
   MidiJogMapping,
   MidiJogState,
@@ -28,7 +33,7 @@ import type {
   ScratchSource,
 } from '@strudel/mixer';
 
-export type { ScratchFeel, ScratchSnapGrid };
+export type { MidiFeelLearnResult, MidiFeelTarget, ScratchFeel, ScratchSnapGrid };
 import { getScratchDeckSetting, setScratchDeckSetting } from '../../settings';
 
 export interface ScratchMidiStatus {
@@ -36,6 +41,23 @@ export interface ScratchMidiStatus {
   /** Why MIDI is unavailable: 'unsupported' (no Web MIDI), 'denied', or 'failed'/'error'. */
   reason?: string;
   mapping: MidiJogMapping | null;
+  /** Spec 029 review: how the last jog Learn ended (a conflict names the feel knob using the control). */
+  lastLearn?: MidiJog['lastLearn'];
+}
+
+/** Spec 029: the Brake and Spin-up knobs (MIDI Learn), for the sliders' Learn / Forget buttons. */
+export interface ScratchFeelMidiStatus {
+  state: MidiJogState;
+  /** Why MIDI is unavailable, as for the jog. */
+  reason?: string;
+  /** The slider waiting for a knob, or null. */
+  learning: MidiFeelTarget | null;
+  mappings: MidiFeelMappings;
+  /** The last Learn's outcome worth a message: no knob in 10 s, or a control already in use. */
+  message:
+    | { target: MidiFeelTarget; kind: 'timeout' }
+    | { target: MidiFeelTarget; kind: 'conflict'; control: number }
+    | null;
 }
 
 export interface ScratchState {
@@ -67,6 +89,8 @@ export interface ScratchState {
   snap: boolean;
   /** Spec 025: the brake and spin-up, in seconds (stored on this device; both decks). */
   feel: ScratchFeel;
+  /** Spec 029: the knobs learned for the Brake and Spin-up sliders. */
+  feelMidi: ScratchFeelMidiStatus;
   /**
    * Spec 023 / tech §3: the deck can't be grabbed now. The speakers are blocked while a spec 017
    * track switch evaluates, waits or runs (the platter is dimmed), so a scratch never fights a
@@ -178,6 +202,9 @@ export interface ScratchRuntimeDeps {
   writeSelected: (deck: ScratchDeckName) => void;
   midiSupported: () => boolean;
   hasStoredMidiMapping: () => boolean;
+  /** Spec 029: the feel knobs call `target.setFeel` (lazy, like the jog). */
+  loadMidiFeel?: (target: Pick<ScratchRuntime, 'setFeel'>) => Promise<MidiFeel>;
+  hasStoredFeelMidiMapping?: () => boolean;
   /**
    * Spec 023: the stored Snap to beat setting (default on) and its writer.
    * @deprecated Since spec 025: used only when `readSnapGrid` / `writeSnapGrid` are not given.
@@ -276,7 +303,16 @@ export interface ScratchRuntime extends ScratchActions {
   detachPreview(): void;
   midiLearn(): Promise<MidiJogMapping | null>;
   midiForget(): void;
-  /** Reconnects a stored jog mapping (loads the MIDI code only when one exists). */
+  /**
+   * Spec 029: wait up to 10 s for a knob for the Brake or Spin-up slider. Pressed again while that
+   * slider waits, it cancels. A timeout, cancel or conflict keeps the previous knob.
+   */
+  learnFeel(target: MidiFeelTarget): Promise<MidiFeelLearnResult>;
+  /** Spec 029: stop a feel Learn (Esc). */
+  cancelFeelLearn(): void;
+  /** Spec 029: remove a slider's knob. */
+  forgetFeel(target: MidiFeelTarget): void;
+  /** Reconnects a stored jog mapping, and stored feel knobs (loads the MIDI code only when one exists). */
   restoreMidi(): Promise<void>;
   /** For browser checks: each attached deck's worklet state. */
   debugState(): Promise<Partial<Record<ScratchDeckName, ScratchDebugState | null>>>;
@@ -390,6 +426,14 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
     snapGrid: initialGrid,
     snap: initialGrid !== 'off',
     feel: sanitizeScratchFeel(deps.readFeel ? deps.readFeel() : null),
+    feelMidi: {
+      ...(midiSupported && deps.loadMidiFeel
+        ? { state: 'off' as const }
+        : { state: 'unavailable' as const, reason: 'unsupported' }),
+      learning: null,
+      mappings: { brake: null, spinUp: null },
+      message: null,
+    },
     blocked: { main: false, preview: false },
     spin: null,
   });
@@ -443,6 +487,8 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
   let previewEngine: PreviewEngineLike | null = null;
   let midi: MidiJog | null = null;
   let midiLoading: Promise<MidiJog | null> | null = null;
+  let feelMidi: MidiFeel | null = null;
+  let feelMidiLoading: Promise<MidiFeel | null> | null = null;
 
   /** Spec 025: give a deck the current snap grid and feel (on attach and on every change). */
   const applySettings = (deck: ScratchDeckLike | null) => {
@@ -496,7 +542,14 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
 
   const syncMidi = () => {
     if (!midi) return;
-    update({ midi: { state: midi.state, reason: midi.reason, mapping: midi.mapping ?? null } });
+    update({
+      midi: {
+        state: midi.state,
+        reason: midi.reason,
+        mapping: midi.mapping ?? null,
+        lastLearn: midi.lastLearn ?? null,
+      },
+    });
   };
 
   const ensureMidi = (): Promise<MidiJog | null> => {
@@ -517,6 +570,41 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
         return null;
       });
     return midiLoading;
+  };
+
+  const syncFeelMidi = (message?: ScratchFeelMidiStatus['message']) => {
+    if (!feelMidi) return;
+    const current = store.get().feelMidi;
+    update({
+      feelMidi: {
+        state: feelMidi.state,
+        reason: feelMidi.reason,
+        learning: feelMidi.learning,
+        mappings: { ...feelMidi.mappings },
+        // A new Learn clears the last message.
+        message: message !== undefined ? message : feelMidi.learning ? null : current.message,
+      },
+    });
+  };
+
+  const ensureFeelMidi = (): Promise<MidiFeel | null> => {
+    if (feelMidi) return Promise.resolve(feelMidi);
+    if (!midiSupported || !deps.loadMidiFeel) return Promise.resolve(null);
+    feelMidiLoading ??= deps
+      .loadMidiFeel(runtime)
+      .then((knobs) => {
+        feelMidi = knobs;
+        knobs.on('change', () => syncFeelMidi());
+        syncFeelMidi();
+        return knobs;
+      })
+      .catch((error: unknown) => {
+        console.warn('[scratch] MIDI feel knobs unavailable:', error);
+        feelMidiLoading = null;
+        update({ feelMidi: { ...store.get().feelMidi, state: 'unavailable', reason: 'error', learning: null } });
+        return null;
+      });
+    return feelMidiLoading;
   };
 
   const runtime: ScratchRuntime = {
@@ -791,9 +879,34 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
       syncMidi();
     },
 
+    async learnFeel(target) {
+      const knobs = await ensureFeelMidi();
+      if (!knobs) return { status: 'unavailable' };
+      const learning = knobs.learn(target);
+      syncFeelMidi(null);
+      const result = await learning;
+      if (result.status === 'timeout') syncFeelMidi({ target, kind: 'timeout' });
+      else if (result.status === 'conflict') syncFeelMidi({ target, kind: 'conflict', control: result.controller });
+      else syncFeelMidi();
+      return result;
+    },
+
+    cancelFeelLearn() {
+      feelMidi?.cancel();
+    },
+
+    forgetFeel(target) {
+      if (!feelMidi) return;
+      feelMidi.forget(target);
+      syncFeelMidi(null);
+    },
+
     async restoreMidi() {
-      if (!midiSupported || !deps.hasStoredMidiMapping()) return;
-      await ensureMidi();
+      if (!midiSupported) return;
+      // Spec 029: stored feel knobs reconnect too (independently of the jog).
+      const feel = deps.hasStoredFeelMidiMapping?.() ? ensureFeelMidi() : null;
+      if (deps.hasStoredMidiMapping()) await ensureMidi();
+      await feel;
     },
 
     async debugState() {
@@ -819,6 +932,14 @@ const storedMidiMapping = (): boolean => {
   }
 };
 
+const storedFeelMidiMapping = (): boolean => {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem(MIDI_FEEL_STORAGE_KEY) !== null;
+  } catch (error: unknown) {
+    return false;
+  }
+};
+
 /** The website's scratch runtime (a module singleton, tech §2.4). */
 export const scratchRuntime: ScratchRuntime = createScratchRuntime({
   createController: () => new ScratchController(),
@@ -833,6 +954,12 @@ export const scratchRuntime: ScratchRuntime = createScratchRuntime({
   writeSelected: setScratchDeckSetting,
   midiSupported: browserMidiSupported,
   hasStoredMidiMapping: storedMidiMapping,
+  // Spec 029: lazy like the jog; the knobs call the runtime's setFeel, like a slider move.
+  loadMidiFeel: async (target) => {
+    const { createMidiFeel } = await import('@strudel/mixer');
+    return createMidiFeel(target);
+  },
+  hasStoredFeelMidiMapping: storedFeelMidiMapping,
   readSnapGrid: readScratchSnapGrid,
   writeSnapGrid: writeScratchSnapGrid,
   readFeel: readScratchFeel,

@@ -19,6 +19,17 @@ import type { CutSettings } from './response.js';
 
 const STORAGE_KEY = 'strudel-equalizer-settings';
 
+/** The prefix of a user preset's picker value and saved preset name (spec 028): `user:<name>`. */
+export const USER_PRESET_PREFIX = 'user:';
+
+/**
+ * Whether a preset value names a user preset (spec 028): `user:` followed by a name.
+ * @param value - A preset value, e.g. 'phonk' or 'user:Phonk car'
+ */
+export function isUserPresetValue(value: unknown): value is string {
+  return typeof value === 'string' && value.startsWith(USER_PRESET_PREFIX) && value.length > USER_PRESET_PREFIX.length;
+}
+
 /**
  * Band settings interface
  */
@@ -123,9 +134,12 @@ export function validateEqualizerSettings(raw: unknown): EqualizerSettings | nul
     return null;
   }
 
-  // An unknown preset name would leave the preset menu showing a preset that is not applied.
+  // An unknown preset name would leave the preset menu showing a preset that is not applied. A user
+  // preset's name (spec 028, `user:<name>`) is kept: the panel shows Custom when no such preset exists.
   const preset =
-    typeof settings.preset === 'string' && settings.preset in EQUALIZER_PRESETS ? settings.preset : 'custom';
+    typeof settings.preset === 'string' && (settings.preset in EQUALIZER_PRESETS || isUserPresetValue(settings.preset))
+      ? settings.preset
+      : 'custom';
   return {
     ...settings,
     preset,

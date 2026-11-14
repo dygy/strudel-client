@@ -18,7 +18,6 @@ vi.hoisted(() => {
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { AudioEqualizer, EQUALIZER_PRESETS } from '@strudel/equalizer';
-// @ts-expect-error untyped .mjs test helper shared with @strudel/mixer
 import { MockAudioContext } from '../../../../../../packages/mixer/test/webAudioMock.mjs';
 import { destroyMainEqualizer, getMainEqualizer, initMainEqualizer } from '../../../mainEqualizer';
 import { EqualizerUI } from '../EqualizerUI';

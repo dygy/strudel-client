@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useStore } from '@nanostores/react';
 import cx from '@src/cx';
 import { useTranslation } from '@src/i18n';
@@ -16,6 +16,8 @@ import {
   isScratchActive,
   selectedSpin,
   scratchRuntime,
+  type MidiFeelTarget,
+  type ScratchFeelMidiStatus,
   type ScratchMidiStatus,
   type ScratchRuntime,
   type ScratchState,
@@ -92,9 +94,100 @@ export function formatFeelSeconds(seconds: number, language?: string): string {
   }
 }
 
+/** Spec 029: each feel slider's MIDI Learn target. */
+export const FEEL_MIDI_TARGETS: Record<keyof ScratchFeel, MidiFeelTarget> = {
+  brakeSeconds: 'brake',
+  spinUpSeconds: 'spinUp',
+};
+
+/**
+ * Spec 029: a slider's Learn / Forget buttons and its knob status. Hidden without Web MIDI (as the
+ * jog's Learn is unusable then); Esc or a second press cancels a Learn.
+ */
+function FeelMidiControls({
+  runtime,
+  feelMidi,
+  target,
+  touch,
+}: {
+  runtime: ScratchRuntime;
+  feelMidi: ScratchFeelMidiStatus | undefined;
+  target: MidiFeelTarget;
+  touch: boolean;
+}) {
+  const { t } = useTranslation('settings');
+  // Learn was pressed and MIDI is still starting (the browser may be asking for access).
+  const [pending, setPending] = useState(false);
+  if (!feelMidi || (feelMidi.state === 'unavailable' && feelMidi.reason === 'unsupported')) return null;
+  const unavailable = feelMidi.state === 'unavailable';
+  const learning = feelMidi.learning === target || (pending && !unavailable && !feelMidi.learning);
+  const mapping = feelMidi.mappings[target];
+  const message = feelMidi.message?.target === target && !learning ? feelMidi.message : null;
+
+  const learn = async () => {
+    setPending(true);
+    try {
+      await runtime.learnFeel(target);
+    } catch (error: unknown) {
+      console.warn('[scratch] MIDI feel learn failed:', error);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  let status = '';
+  if (learning) status = t('scratchFeelLearning');
+  else if (message?.kind === 'timeout') status = t('scratchFeelLearnTimeout');
+  else if (message?.kind === 'conflict') status = t('scratchFeelLearnConflict', { control: message.control });
+  else if (mapping)
+    status = t('scratchMidiAssigned', {
+      device: mapping.inputName,
+      control: mapping.controller,
+      channel: mapping.channel,
+    });
+
+  const buttonClass = cx(
+    'px-2 rounded-md text-xs border border-lineHighlight bg-background text-foreground',
+    'hover:border-foreground disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-lineHighlight',
+    touch ? 'min-h-11 min-w-11' : 'h-6',
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-2" data-scratch-feel-midi={target}>
+      <button
+        type="button"
+        data-scratch-feel-learn={target}
+        aria-pressed={learning}
+        disabled={unavailable}
+        onClick={learn}
+        className={cx(buttonClass, learning && 'animate-pulse')}
+      >
+        {t('scratchFeelLearn')}
+      </button>
+      {mapping && !learning && (
+        <button
+          type="button"
+          data-scratch-feel-forget={target}
+          onClick={() => runtime.forgetFeel(target)}
+          className={buttonClass}
+        >
+          {t('scratchFeelForget')}
+        </button>
+      )}
+      <span
+        data-scratch-feel-midi-status={message?.kind ?? (learning ? 'learning' : mapping ? 'assigned' : 'none')}
+        className="text-xs text-foreground opacity-70"
+        aria-live="polite"
+      >
+        {status}
+      </span>
+    </div>
+  );
+}
+
 /**
  * Spec 025: Snap (Off / ½ beat / Beat / Bar), the Brake and Spin-up sliders with readouts, and
- * Reset. Stored on this device; both decks, from the next grab or release.
+ * Reset. Stored on this device; both decks, from the next grab or release. Spec 029: each slider
+ * has a MIDI Learn / Forget when Web MIDI is there.
  */
 export function ScratchFeelControls({
   runtime,
@@ -107,6 +200,16 @@ export function ScratchFeelControls({
 }) {
   const { t, i18n } = useTranslation('settings');
   const language = i18n?.language;
+  // Spec 029: Esc cancels a feel Learn.
+  const feelLearning = state.feelMidi?.learning ?? null;
+  useEffect(() => {
+    if (!feelLearning) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') runtime.cancelFeelLearn();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [feelLearning, runtime]);
   const slider = (key: keyof ScratchFeel, label: string) => {
     const [min, max] = SCRATCH_FEEL_RANGES[key];
     const value = state.feel[key];
@@ -135,6 +238,7 @@ export function ScratchFeelControls({
             touch ? 'h-3 my-2' : 'h-2',
           )}
         />
+        <FeelMidiControls runtime={runtime} feelMidi={state.feelMidi} target={FEEL_MIDI_TARGETS[key]} touch={touch} />
       </div>
     );
   };
@@ -261,8 +365,12 @@ function MidiJogControls({
     setPending(true);
     try {
       const mapping = await runtime.midiLearn();
-      // Learn gave up (10 s without a turned control): the old mapping, if any, is kept.
-      if (mapping === null && runtime.store.get().midi.state !== 'unavailable') setTimedOut(true);
+      // Learn gave up (10 s without a turned control): the old mapping, if any, is kept. A Learn
+      // cancelled by another one or refused (spec 029 review) is not a timeout.
+      const { state: midiState, lastLearn } = runtime.store.get().midi;
+      if (mapping === null && midiState !== 'unavailable' && (!lastLearn || lastLearn.status === 'timeout')) {
+        setTimedOut(true);
+      }
     } catch (error: unknown) {
       console.warn('[scratch] MIDI learn failed:', error);
     } finally {
@@ -321,6 +429,11 @@ function MidiJogControls({
       {timedOut && !learning && (
         <p data-scratch-midi-timeout="" className="text-xs text-foreground opacity-70">
           {t('scratchMidiLearnTimeout')}
+        </p>
+      )}
+      {midi.lastLearn?.status === 'conflict' && !learning && (
+        <p data-scratch-midi-conflict="" className="text-xs text-foreground opacity-70" role="alert">
+          {t('scratchMidiLearnConflict', { control: midi.lastLearn.controller })}
         </p>
       )}
     </div>

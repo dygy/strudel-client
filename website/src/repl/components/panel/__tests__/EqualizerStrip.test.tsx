@@ -19,9 +19,9 @@ vi.hoisted(() => {
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { AudioEqualizer, EQUALIZER_PRESETS, LOW_CUT_RANGE, loadEqualizerSettings } from '@strudel/equalizer';
-// @ts-expect-error untyped .mjs test helper shared with @strudel/mixer
 import { MockAudioContext } from '../../../../../../packages/mixer/test/webAudioMock.mjs';
 import { destroyMainEqualizer, initMainEqualizer } from '../../../mainEqualizer';
+import { playingCodeEvaluated, playingStopped, resetPlayingEqProfile } from '../../../playingEqProfile';
 import { EqualizerUI } from '../EqualizerUI';
 import {
   cutFrequencyToPosition,
@@ -76,6 +76,7 @@ function tick() {
 
 beforeEach(() => {
   localStorage.clear();
+  localStorage.setItem('strudel-eq-spectrum', 'false'); // frames here are the limiter poll's only (spec 026 spectrum off)
   Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 1440 });
   Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: 900 });
   frames = new Map();
@@ -104,6 +105,7 @@ afterEach(() => {
   container?.remove();
   root = container = null;
   destroyMainEqualizer();
+  resetPlayingEqProfile();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   localStorage.clear();
@@ -254,6 +256,7 @@ describe('EQ panel: cuts, output level, limiting (spec 020)', () => {
   it('the limiting indicator lights while the main EQ limits by more than 1 dB, and polling stops on unmount', () => {
     let reduction = 0;
     vi.spyOn(main, 'getLimiterReduction').mockImplementation(() => reduction);
+    playingCodeEvaluated('s("bd")'); // the poll runs only while the speakers play
     render();
     tick();
     expect(q('[data-eq-limiting]')!.getAttribute('data-eq-limiting')).toBe('off');
@@ -275,6 +278,7 @@ describe('EQ panel: cuts, output level, limiting (spec 020)', () => {
   // started with its own `lit` false and never cleared the React state, so the indicator stayed lit.
   it('the limiting indicator goes out when the main EQ is swapped for one that is not limiting', () => {
     vi.spyOn(main, 'getLimiterReduction').mockReturnValue(-6);
+    playingCodeEvaluated('s("bd")');
     render();
     tick();
     expect(q('[data-eq-limiting]')!.getAttribute('data-eq-limiting')).toBe('on');
@@ -287,6 +291,31 @@ describe('EQ panel: cuts, output level, limiting (spec 020)', () => {
     tick();
     expect(main.getLimiterReduction()).toBe(0);
     expect(q('[data-eq-limiting]')!.getAttribute('data-eq-limiting')).toBe('off');
+  });
+
+  // Fix (2026-11-14): the poll requested a frame every frame while the panel was open, even with nothing
+  // playing. Gated like the spec 026 spectrum: no frames while stopped, and the indicator cleared.
+  it('the limiting indicator polls only while the speakers play: no frames while stopped, cleared on stop', () => {
+    const read = vi.spyOn(main, 'getLimiterReduction').mockReturnValue(-6);
+    render();
+    tick();
+    expect(frames.size).toBe(0);
+    expect(read).not.toHaveBeenCalled();
+    expect(q('[data-eq-limiting]')!.getAttribute('data-eq-limiting')).toBe('off');
+
+    act(() => playingCodeEvaluated('s("bd")'));
+    tick();
+    expect(frames.size).toBe(1);
+    expect(q('[data-eq-limiting]')!.getAttribute('data-eq-limiting')).toBe('on');
+
+    act(() => playingStopped());
+    expect(frames.size).toBe(0); // the pending frame was cancelled
+    expect(q('[data-eq-limiting]')!.getAttribute('data-eq-limiting')).toBe('off');
+    const calls = read.mock.calls.length;
+    tick();
+    tick();
+    expect(frames.size).toBe(0);
+    expect(read).toHaveBeenCalledTimes(calls);
   });
 
   it('the compact (phone) layout has the cuts and the output level with 44px targets', () => {

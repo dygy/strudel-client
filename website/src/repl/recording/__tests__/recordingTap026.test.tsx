@@ -16,7 +16,6 @@ vi.hoisted(() => {
   }
 });
 
-// @ts-expect-error untyped .mjs test helper shared with @strudel/mixer
 import { MockAudioContext } from '../../../../../packages/mixer/test/webAudioMock.mjs';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -59,6 +58,11 @@ async function load() {
 
 /** The stream destination a node was connected to by a recorder. */
 const streamTargets = (node: any) => node.connections.filter((n: any) => n.stream);
+/** After the EQ: the stream destinations on the EQ output's −1 dB recording trim (AC 2.3.2, amended). */
+const postEqStreams = (output: any) =>
+  output.connections.filter((n: any) => n.kind === 'Gain').flatMap((trim: any) => streamTargets(trim));
+/** The −1 dB recording trim the EQ output feeds (AC 2.3.2, amended), or undefined. */
+const trimOf = (output: any) => output.connections.find((n: any) => n.kind === 'Gain');
 
 beforeEach(() => {
   localStorage.clear();
@@ -176,7 +180,7 @@ describe('the hooks pick the tap when a recording starts (spec 026)', () => {
 
     react.act(() => result.current!.handleRecordToggle());
     expect(streamTargets(destinationGain)).toHaveLength(1);
-    expect(streamTargets(output)).toEqual([]);
+    expect(postEqStreams(output)).toEqual([]);
     await react.act(async () => {
       result.current!.handleRecordToggle();
       await Promise.resolve();
@@ -186,7 +190,7 @@ describe('the hooks pick the tap when a recording starts (spec 026)', () => {
 
     saveRecordPostEq(true);
     react.act(() => result.current!.handleRecordToggle());
-    expect(streamTargets(output)).toHaveLength(1);
+    expect(postEqStreams(output)).toHaveLength(1);
     expect(streamTargets(destinationGain)).toEqual([]);
     unmount();
   });
@@ -203,7 +207,8 @@ describe('the hooks pick the tap when a recording starts (spec 026)', () => {
     const { result, unmount } = await renderHook(() => useScreenRecorder(false), react, client);
 
     react.act(() => result.current!.handleScreenRecordToggle());
-    expect(start).toHaveBeenLastCalledWith(eq.getOutput());
+    expect(start).toHaveBeenLastCalledWith(trimOf(eq.getOutput()));
+    expect(trimOf(eq.getOutput()).gain.value).toBeCloseTo(0.891, 3);
 
     unmount();
     destroyMainEqualizer();

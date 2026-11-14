@@ -270,6 +270,24 @@ export interface SettingsTranslations {
   scratchMidiUnsupported: string;
   scratchMidiDenied: string;
   scratchMidiError: string;
+  // Snap grid and feel (spec 025)
+  scratchSnap: string;
+  scratchSnapHint: string;
+  scratchSnapOff: string;
+  scratchSnapHalf: string;
+  scratchSnapBeat: string;
+  scratchSnapBar: string;
+  scratchBrake: string;
+  scratchSpinUp: string;
+  scratchFeelReset: string;
+  scratchFeelHint: string;
+  // Spec 029: MIDI Learn for the Brake and Spin-up sliders
+  scratchFeelLearn: string;
+  scratchFeelLearning: string;
+  scratchFeelForget: string;
+  scratchFeelLearnTimeout: string;
+  scratchFeelLearnConflict: string;
+  scratchMidiLearnConflict: string;
 }
 
 export interface TabsTranslations {

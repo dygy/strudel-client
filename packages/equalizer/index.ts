@@ -61,3 +61,18 @@ export {
   otherEqualizerSlot,
 } from './slots.js';
 export type { EqualizerSlots, EqualizerSlotName } from './slots.js';
+export {
+  USER_PRESETS_STORAGE_KEY,
+  USER_PRESET_LIMIT,
+  USER_PRESET_NAME_MAX,
+  USER_PRESET_PREFIX,
+  isUserPresetValue,
+  loadUserPresets,
+  saveUserPreset,
+  renameUserPreset,
+  deleteUserPreset,
+  validateName,
+  userPresetValue,
+  userPresetName,
+} from './userPresets.js';
+export type { UserPreset, UserPresetError, UserPresetResult, UserPresetWriteOptions } from './userPresets.js';

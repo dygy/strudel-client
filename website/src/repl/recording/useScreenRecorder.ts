@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getAudioContext, getSuperdoughAudioController } from '@strudel/webaudio';
 import { ScreenRecorderEngine, type ScreenRecorderState } from './ScreenRecorderEngine';
-import { selectRecordingTap } from './recordingTap';
+import { openRecordingTap, type RecordingTap } from './recordingTap';
 import { generateScreenFilename } from './formatUtils';
 
 export interface UseScreenRecorderReturn {
@@ -37,6 +37,12 @@ export function useScreenRecorder(isAudioRecording: boolean): UseScreenRecorderR
   const [screenRecordingError, setScreenRecordingError] = useState<string | null>(null);
 
   const engineRef = useRef<ScreenRecorderEngine | null>(null);
+  // The open tap (spec 026 Record as heard owns a trim node): closed once the recording has stopped.
+  const tapRef = useRef<RecordingTap | null>(null);
+  const closeTap = useCallback(() => {
+    tapRef.current?.close();
+    tapRef.current = null;
+  }, []);
 
   const isScreenRecordingSupported = ScreenRecorderEngine.isSupported();
 
@@ -64,6 +70,7 @@ export function useScreenRecorder(isAudioRecording: boolean): UseScreenRecorderR
         setIsScreenRecording(state.isRecording);
         setScreenRecordingElapsedSeconds(state.elapsedSeconds);
         if (state.error) setScreenRecordingError(state.error);
+        if (!state.isRecording) closeTap(); // stopped, or the start failed: the engine let go of the tap
       },
       onExternalStop: () => {
         // Browser "Stop sharing" fired — auto-stop and download (Req 4.6)
@@ -84,7 +91,7 @@ export function useScreenRecorder(isAudioRecording: boolean): UseScreenRecorderR
 
     engineRef.current = engine;
     return engine;
-  }, [handleRecordingStopped]);
+  }, [handleRecordingStopped, closeTap]);
 
   /** Toggle screen recording on/off (Req 4.2, 4.3). */
   const handleScreenRecordToggle = useCallback(() => {
@@ -100,16 +107,22 @@ export function useScreenRecorder(isAudioRecording: boolean): UseScreenRecorderR
 
       // Start recording: from destinationGain (pre-EQ), or the main EQ's output when Record as heard
       // is on and the EQ exists (spec 026). Chosen now; a change mid-recording applies next time.
+      // Record as heard records through a −1 dB trim (no codec clipping); closed when the recording stops.
       const controller = getSuperdoughAudioController();
-      const source = selectRecordingTap(controller?.output?.destinationGain);
+      closeTap();
+      const tap = openRecordingTap(getAudioContext(), controller?.output?.destinationGain);
 
-      if (!source) {
+      if (!tap) {
         setScreenRecordingError('Audio output not available. Press play first.');
         return;
       }
 
       setScreenRecordingError(null);
-      engine.start(source);
+      tapRef.current = tap;
+      // A cancelled picker starts nothing and reports nothing: close the tap then too.
+      void Promise.resolve(engine.start(tap.node)).then(() => {
+        if (tapRef.current === tap && !engine.getState().isRecording) closeTap();
+      });
     } else {
       // Stop recording — get the blob and auto-download (Req 6.1, 6.2)
       engine
@@ -121,7 +134,7 @@ export function useScreenRecorder(isAudioRecording: boolean): UseScreenRecorderR
           setScreenRecordingError(`Failed to stop recording: ${err instanceof Error ? err.message : String(err)}`);
         });
     }
-  }, [getOrCreateEngine, isAudioRecording, handleRecordingStopped]);
+  }, [getOrCreateEngine, isAudioRecording, handleRecordingStopped, closeTap]);
 
   // beforeunload emergency download — best-effort WebM save
   useEffect(() => {
@@ -154,11 +167,13 @@ export function useScreenRecorder(isAudioRecording: boolean): UseScreenRecorderR
   useEffect(() => {
     return () => {
       if (engineRef.current) {
-        engineRef.current.destroy();
+        engineRef.current.destroy().then(closeTap, closeTap);
         engineRef.current = null;
+      } else {
+        closeTap();
       }
     };
-  }, []);
+  }, [closeTap]);
 
   return {
     isScreenRecording,

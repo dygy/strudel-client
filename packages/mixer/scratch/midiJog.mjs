@@ -8,6 +8,7 @@
  */
 
 import { SCRATCH_SECONDS_PER_TURN } from './ScratchDeck.mjs';
+import { claimMidiLearn, readMidiFeelMappings, sameMidiControl } from './midiLearnShared.mjs';
 
 /** localStorage key of the learned mapping. */
 export const MIDI_JOG_STORAGE_KEY = 'strudel:scratch:midi';
@@ -67,6 +68,16 @@ function isMapping(m) {
   );
 }
 
+/**
+ * The stored jog mapping, or null when there is none or it is damaged (spec 029 checks a learned
+ * feel knob against it).
+ * @param {Storage|null|undefined} storage
+ * @returns {MidiJogMapping|null}
+ */
+export function readMidiJogMapping(storage) {
+  return readMapping(storage);
+}
+
 function readMapping(storage) {
   try {
     const raw = storage?.getItem(MIDI_JOG_STORAGE_KEY);
@@ -94,12 +105,82 @@ function writeMapping(storage, mapping) {
   }
 }
 
-/** Extract `{ channel, controller, value }` from a webmidi `midimessage` event, or null if not a CC. */
-function parseControlChange(e) {
+/**
+ * Extract `{ channel, controller, value }` from a webmidi `midimessage` event, or null if not a CC.
+ * @param {any} e
+ * @returns {{channel: number, controller: number, value: number}|null}
+ */
+export function parseControlChange(e) {
   const status = e?.message?.statusByte ?? e?.statusByte ?? e?.data?.[0];
   const bytes = e?.message?.dataBytes ?? e?.dataBytes ?? (e?.data ? [e.data[1], e.data[2]] : null);
   if (!Number.isInteger(status) || (status & 0xf0) !== 0xb0 || !bytes) return null;
   return { channel: (status & 0x0f) + 1, controller: bytes[0], value: bytes[1] };
+}
+
+/**
+ * The Web MIDI set-up shared by the jog (spec 019) and the feel knobs (spec 029): enables WebMidi
+ * once (lazily, through `loadMidi`), listens on every input (and on inputs connected later), and
+ * hands each control change to `onControlChange(inputName, cc)`.
+ * @param {object} options
+ * @param {() => Promise<{enableWebMidi: Function, WebMidi: any}>} options.loadMidi
+ * @param {(inputName: string, cc: {channel: number, controller: number, value: number}) => void} options.onControlChange
+ * @returns {{ensure: () => Promise<void>, destroy: () => void}} `ensure` rejects when MIDI can't
+ *   start (see {@link midiErrorReason}); `destroy` removes every listener.
+ */
+export function createMidiInputs({ loadMidi, onControlChange }) {
+  const bound = new Map(); // input → midimessage listener
+  let WebMidi = null;
+  let midiPromise = null;
+  let destroyed = false;
+
+  function ensure() {
+    if (!midiPromise) {
+      midiPromise = (async () => {
+        if (typeof navigator === 'undefined' || typeof navigator.requestMIDIAccess !== 'function') {
+          throw new MidiUnsupportedError('This browser does not support Web MIDI.');
+        }
+        const midi = await loadMidi();
+        await midi.enableWebMidi();
+        WebMidi = midi.WebMidi;
+        if (destroyed) return;
+        bindInputs();
+        WebMidi.addListener?.('connected', bindInputs);
+      })().catch((err) => {
+        midiPromise = null;
+        throw err;
+      });
+    }
+    return midiPromise;
+  }
+
+  function bindInputs() {
+    if (!WebMidi || destroyed) return;
+    for (const input of WebMidi.inputs ?? []) {
+      if (bound.has(input)) continue;
+      const fn = (e) => {
+        const cc = parseControlChange(e);
+        if (cc) onControlChange(input.name, cc);
+      };
+      input.addListener('midimessage', fn);
+      bound.set(input, fn);
+    }
+  }
+
+  function destroy() {
+    if (destroyed) return;
+    destroyed = true;
+    for (const [input, fn] of bound) {
+      try {
+        input.removeListener('midimessage', fn);
+      } catch {
+        /* port gone */
+      }
+    }
+    bound.clear();
+    WebMidi?.removeListener?.('connected', bindInputs);
+  }
+
+  return { ensure, destroy };
 }
 
 /**
@@ -116,6 +197,9 @@ function parseControlChange(e) {
  *   new mapping, or null on timeout (previous mapping kept) or when MIDI is unavailable.
  * @property {() => void} forget - Remove the mapping (and its stored copy).
  * @property {MidiJogMapping|null} mapping
+ * @property {{status: 'learned'|'timeout'|'cancelled'}|{status: 'conflict', controller: number, with: 'brake'|'spinUp'}|null} lastLearn -
+ *   How the last Learn ended (null while one runs or before the first): a timeout, a cancel (another
+ *   Learn started, Forget), or a control a feel knob already uses (spec 029 review).
  * @property {'off'|'ready'|'learning'|'unavailable'} state
  * @property {'unsupported'|'denied'|'failed'|undefined} reason - Why MIDI is unavailable (a code
  *   for the UI to translate); set only in state `'unavailable'`.
@@ -140,15 +224,14 @@ export function createMidiJog(controller, options = {}) {
   const storage = options.storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
   const now = options.now ?? (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
   const listeners = new Set();
-  const bound = new Map(); // input → midimessage listener
-  let WebMidi = null;
-  let midiPromise = null;
+  const inputs = createMidiInputs({ loadMidi, onControlChange: onMessage });
   let learning = null; // { resolve, timer, seen: Map }
   let learnPromise = null;
   let destroyed = false;
 
   const jog = {
     mapping: readMapping(storage),
+    lastLearn: null,
     state: 'off',
     reason: undefined,
     detail: undefined,
@@ -181,45 +264,17 @@ export function createMidiJog(controller, options = {}) {
   }
 
   function ensureMidi() {
-    if (!midiPromise) {
-      midiPromise = (async () => {
-        if (typeof navigator === 'undefined' || typeof navigator.requestMIDIAccess !== 'function') {
-          throw new MidiUnsupportedError('This browser does not support Web MIDI.');
-        }
-        const midi = await loadMidi();
-        await midi.enableWebMidi();
-        WebMidi = midi.WebMidi;
-        if (destroyed) return;
-        bindInputs();
-        WebMidi.addListener?.('connected', bindInputs);
-      })().catch((err) => {
-        midiPromise = null;
-        throw err;
-      });
-    }
-    return midiPromise;
+    return inputs.ensure();
   }
 
-  function bindInputs() {
-    if (!WebMidi || destroyed) return;
-    for (const input of WebMidi.inputs ?? []) {
-      if (bound.has(input)) continue;
-      const fn = (e) => onMessage(input, e);
-      input.addListener('midimessage', fn);
-      bound.set(input, fn);
-    }
-  }
-
-  function onMessage(input, e) {
-    const cc = parseControlChange(e);
-    if (!cc) return;
+  function onMessage(inputName, cc) {
     if (learning) {
-      learnMessage(input.name, cc);
+      learnMessage(inputName, cc);
       return;
     }
     const m = jog.mapping;
     if (!m || jog.state !== 'ready') return;
-    if (input.name !== m.inputName || cc.channel !== m.channel || cc.controller !== m.controller) return;
+    if (inputName !== m.inputName || cc.channel !== m.channel || cc.controller !== m.controller) return;
     const ticks = decodeRelativeCC(cc.value, m.encoding);
     if (ticks === 0) return;
     // The jog holds the record as its own source: its idle release never drops a pointer or key hold.
@@ -242,6 +297,15 @@ export function createMidiJog(controller, options = {}) {
       entry.times.shift();
     }
     if (entry.times.length >= MIDI_JOG_LEARN_MESSAGES) {
+      // Spec 029 review: a control a feel knob already uses is refused, keeping the old mapping.
+      const knobs = readMidiFeelMappings(storage);
+      const taken = ['brake', 'spinUp'].find((name) =>
+        sameMidiControl({ inputName, channel: cc.channel, controller: cc.controller }, knobs[name]),
+      );
+      if (taken) {
+        finishLearn(null, { status: 'conflict', controller: cc.controller, with: taken });
+        return;
+      }
       finishLearn({
         inputName,
         channel: cc.channel,
@@ -251,11 +315,13 @@ export function createMidiJog(controller, options = {}) {
     }
   }
 
-  function finishLearn(mapping) {
+  function finishLearn(mapping, outcome) {
     const pending = learning;
     learning = null;
     learnPromise = null;
     clearTimeout(pending.timer);
+    pending.release();
+    jog.lastLearn = mapping ? { status: 'learned' } : (outcome ?? { status: 'timeout' });
     if (mapping) {
       jog.mapping = mapping;
       writeMapping(storage, mapping);
@@ -280,8 +346,14 @@ export function createMidiJog(controller, options = {}) {
         return null;
       }
       return new Promise((resolve) => {
+        // One Learn at a time on the page: a feel knob Learn in progress is cancelled (spec 029 review).
+        const release = claimMidiLearn(() => {
+          if (learning) finishLearn(null, { status: 'cancelled' });
+        }, storage);
+        jog.lastLearn = null;
         learning = {
           resolve,
+          release,
           seen: new Map(),
           timer: setTimeout(() => finishLearn(null), MIDI_JOG_LEARN_TIMEOUT_MS),
         };
@@ -292,7 +364,7 @@ export function createMidiJog(controller, options = {}) {
   }
 
   function forget() {
-    if (learning) finishLearn(null);
+    if (learning) finishLearn(null, { status: 'cancelled' });
     jog.mapping = null;
     writeMapping(storage, null);
     if (jog.state !== 'unavailable') setState('off');
@@ -300,17 +372,9 @@ export function createMidiJog(controller, options = {}) {
 
   function destroy() {
     if (destroyed) return;
-    if (learning) finishLearn(null);
+    if (learning) finishLearn(null, { status: 'cancelled' });
     destroyed = true;
-    for (const [input, fn] of bound) {
-      try {
-        input.removeListener('midimessage', fn);
-      } catch {
-        /* port gone */
-      }
-    }
-    bound.clear();
-    WebMidi?.removeListener?.('connected', bindInputs);
+    inputs.destroy();
     listeners.clear();
   }
 
@@ -330,8 +394,12 @@ export function createMidiJog(controller, options = {}) {
 
 class MidiUnsupportedError extends Error {}
 
-/** Map a MIDI start-up failure to a reason code the UI translates. */
-function midiErrorReason(err) {
+/**
+ * Map a MIDI start-up failure to a reason code the UI translates.
+ * @param {any} err
+ * @returns {'unsupported'|'denied'|'failed'}
+ */
+export function midiErrorReason(err) {
   if (err instanceof MidiUnsupportedError) return 'unsupported';
   const name = err?.name ?? '';
   if (name === 'SecurityError' || name === 'NotAllowedError') return 'denied';

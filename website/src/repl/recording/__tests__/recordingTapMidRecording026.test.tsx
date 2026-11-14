@@ -15,7 +15,6 @@ vi.hoisted(() => {
   }
 });
 
-// @ts-expect-error untyped .mjs test helper shared with @strudel/mixer
 import { MockAudioContext } from '../../../../../packages/mixer/test/webAudioMock.mjs';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -61,6 +60,9 @@ async function load() {
 
 /** The stream destinations a node is connected to by a recorder. */
 const streamTargets = (node: any) => node.connections.filter((n: any) => n.stream);
+/** After the EQ: the stream destinations on the EQ output's −1 dB recording trim (AC 2.3.2, amended). */
+const postEqStreams = (output: any) =>
+  output.connections.filter((n: any) => n.kind === 'Gain').flatMap((trim: any) => streamTargets(trim));
 
 /** A mounted useAudioRecorder with start/stop helpers. */
 async function recorder() {
@@ -109,7 +111,7 @@ describe('Record as heard changed during a recording (spec 026 §2.3)', () => {
     expect(streamTargets(destinationGain)).toEqual([]);
 
     r.start();
-    expect(streamTargets(r.output)).toHaveLength(1);
+    expect(postEqStreams(r.output)).toHaveLength(1);
     expect(streamTargets(destinationGain)).toEqual([]);
     await r.stop();
     r.unmount();
@@ -124,7 +126,7 @@ describe('Record as heard changed during a recording (spec 026 §2.3)', () => {
 
     r.start();
     expect(streamTargets(destinationGain)).toHaveLength(1);
-    expect(streamTargets(r.output)).toEqual([]);
+    expect(postEqStreams(r.output)).toEqual([]);
     await r.stop();
     r.unmount();
   });
@@ -134,12 +136,12 @@ describe('Record as heard changed during a recording (spec 026 §2.3)', () => {
     r.start();
     r.saveRecordPostEq(true);
     expect(streamTargets(destinationGain)).toHaveLength(1);
-    expect(streamTargets(r.output)).toEqual([]);
+    expect(postEqStreams(r.output)).toEqual([]);
     await r.stop();
 
     r.start();
     r.saveRecordPostEq(false);
-    expect(streamTargets(r.output)).toHaveLength(1);
+    expect(postEqStreams(r.output)).toHaveLength(1);
     expect(streamTargets(destinationGain)).toEqual([]);
     await r.stop();
     r.unmount();

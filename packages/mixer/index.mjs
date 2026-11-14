@@ -48,6 +48,17 @@ export {
   MIDI_JOG_LEARN_TIMEOUT_MS,
   MIDI_JOG_ENCODINGS,
 } from './scratch/midiJog.mjs';
+// Spec 029: MIDI Learn for the Brake and Spin-up sliders.
+export {
+  createMidiFeel,
+  ccToFeel,
+  midiFeelConflict,
+  readMidiFeelMappings,
+  MIDI_FEEL_STORAGE_KEY,
+  MIDI_FEEL_LEARN_TIMEOUT_MS,
+  MIDI_FEEL_TARGETS,
+  MIDI_FEEL_KEYS,
+} from './scratch/midiFeel.mjs';
 export { loadScratchWorklet } from './scratch/scratchWorklet.mjs';
 // Spec 023: the record's physics (shared by the worklet and the platter) and the track shift.
 export {

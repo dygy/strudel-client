@@ -28,7 +28,6 @@ import {
   loadEqualizerSettings,
   saveEqualizerSettings,
 } from '@strudel/equalizer';
-// @ts-expect-error untyped .mjs test helper shared with @strudel/mixer
 import { MockAudioContext } from '../../../../../../packages/mixer/test/webAudioMock.mjs';
 import { destroyMainEqualizer, getMainEqualizer, initMainEqualizer } from '../../../mainEqualizer';
 import { playingCodeEvaluated, playingStopped, resetPlayingEqProfile } from '../../../playingEqProfile';
@@ -278,9 +277,9 @@ describe('§2.2 spectrum', () => {
   it('taps the main EQ and draws frames only while the speakers play; stopping stops the frames', () => {
     render();
     flush();
-    // Before play: no tap, and only the limiter poll (spec 020) has a frame pending.
+    // Before play: no tap and no frame pending (the limiter poll is gated on play too, fix 2026-11-14).
     expect(analyserTaps()).toBe(0);
-    expect(frames.size).toBe(1);
+    expect(frames.size).toBe(0);
 
     act(() => playingCodeEvaluated('s("bd")'));
     expect(analyserTaps()).toBe(1);
@@ -294,10 +293,10 @@ describe('§2.2 spectrum', () => {
 
     act(() => playingStopped());
     expect(analyserTaps()).toBe(0);
-    expect(frames.size).toBe(1); // the spectrum's pending frame was cancelled
+    expect(frames.size).toBe(0); // the spectrum's and the limiter poll's pending frames were cancelled
     flush();
     flush();
-    expect(frames.size).toBe(1);
+    expect(frames.size).toBe(0);
     expect(read).toHaveBeenCalledTimes(2); // no spectrum frame while stopped
   });
 

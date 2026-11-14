@@ -32,9 +32,9 @@ import {
   getDefaultSettings,
   loadEqualizerSettings,
 } from '@strudel/equalizer';
-// @ts-expect-error untyped .mjs test helper shared with @strudel/mixer
 import { MockAudioContext } from '../../../../../../packages/mixer/test/webAudioMock.mjs';
 import { destroyMainEqualizer, initMainEqualizer } from '../../../mainEqualizer';
+import { playingCodeEvaluated, resetPlayingEqProfile } from '../../../playingEqProfile';
 import { EqualizerUI } from '../EqualizerUI';
 import { cutFrequencyToPosition } from '../EqualizerStripControls';
 
@@ -162,6 +162,7 @@ afterEach(() => {
   container?.remove();
   root = container = null;
   destroyMainEqualizer();
+  resetPlayingEqProfile();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   localStorage.clear();
@@ -313,6 +314,9 @@ describe('§2.2 low cut and high cut', () => {
 });
 
 describe('§2.3 output level and the limiting indicator', () => {
+  // The indicator polls only while the speakers play (fix 2026-11-14: no frames while stopped).
+  beforeEach(() => playingCodeEvaluated('s("bd")'));
+
   it('AC 2.3.1/2.3.2: the indicator lights past −1 dB of reduction and goes out after the hold once under the limit', () => {
     render();
     tick();

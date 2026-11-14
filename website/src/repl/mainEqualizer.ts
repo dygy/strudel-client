@@ -6,7 +6,8 @@
  * installed through superdough's output insert (SuperdoughAudioController.setOutputInsert), so it
  * survives resetGlobalEffects() rebuilding destinationGain. Recorders and track transitions tap
  * destinationGain, so recordings stay pre-EQ (the EQ is monitoring, like a player EQ), unless the
- * user turns on Record as heard (spec 026): then the recorders tap getMainEqualizerOutputTap().
+ * user turns on Record as heard (spec 026): then the recorders tap getMainEqualizerOutputTap() through a
+ * −1 dB trim of their own (recordingTap.ts openRecordingTap), so the encoded file does not clip.
  *
  * When: only after superdough's `initAudio` has run (installMainEqualizerWhenReady(audioReady)).
  * Creating the global controller sizes its channel merger and destination.channelCount for the
@@ -26,8 +27,9 @@
  *
  * Latency (spec 020): the EQ delays the speakers by its limiter look-ahead (LIMITER.lookahead, 6 ms),
  * on and off alike. The MIDI default latency includes it. Sound written by `.dough()` / the dsp
- * worklet goes straight to the destination, skips the EQ, and so plays 6 ms early relative to
- * superdough's sounds.
+ * worklet plays into destinationGain too (superdough fork addition `connectDirectInput`, kept across
+ * resetGlobalEffects()), so it is EQ'd, limited, recorded and delayed by the same 6 ms as superdough's
+ * sounds. `.supradough()` goes through superdough's merger, so it was always EQ'd.
  */
 import { AudioEqualizer, applyEqualizerSettings, loadEqualizerSettings } from '@strudel/equalizer';
 import { getAudioContext, getSuperdoughAudioController } from '@strudel/webaudio';
@@ -126,6 +128,8 @@ export function getMainEqualizer(): AudioEqualizer | null {
  * limiter, or the dry path while the EQ is off: exactly what the speakers get), for a recorder to
  * connect to as a fan-out; null before the EQ is installed (the recorder falls back to
  * destinationGain). The node belongs to the EQ: connect to it and disconnect only that connection.
+ * Recorders do not connect here directly: openRecordingTap puts a −1 dB trim GainNode between (made per
+ * recording, disconnected when it stops); the speakers' edge from this node is never touched.
  * The EQ instance is kept across superdough's output reset (the insert is re-attached to the new
  * destinationGain), so a recording that started on this node keeps receiving the sound.
  */
