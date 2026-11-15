@@ -210,15 +210,27 @@ export class MockAudioContext {
     return this._track(createNode({ kind: 'WaveShaper', curve: null, oversample: 'none' }));
   }
 
+  /**
+   * A ChannelSplitterNode. As in Web Audio (and Chrome), its channelCount (= numberOfOutputs),
+   * channelCountMode ('explicit') and channelInterpretation ('discrete') are locked: assigning any
+   * other value throws an InvalidStateError.
+   */
   createChannelSplitter(numberOfOutputs = 6) {
-    return this._track(
-      createNode({
-        kind: 'ChannelSplitter',
-        numberOfOutputs,
-        channelCount: numberOfOutputs,
-        channelCountMode: 'explicit',
-      }),
-    );
+    const splitter = createNode({ kind: 'ChannelSplitter', numberOfOutputs });
+    const locked = { channelCount: numberOfOutputs, channelCountMode: 'explicit', channelInterpretation: 'discrete' };
+    for (const [key, fixed] of Object.entries(locked)) {
+      Object.defineProperty(splitter, key, {
+        enumerable: true,
+        get: () => fixed,
+        set: (value) => {
+          if (value === fixed) return;
+          const error = new Error(`ChannelSplitter: ${key} cannot be changed from '${fixed}'`);
+          error.name = 'InvalidStateError';
+          throw error;
+        },
+      });
+    }
+    return this._track(splitter);
   }
 
   createChannelMerger(numberOfInputs = 6) {

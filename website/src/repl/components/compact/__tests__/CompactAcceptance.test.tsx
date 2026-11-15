@@ -421,6 +421,8 @@ describe('the admin read-only view on a phone (spec 016 2.5)', () => {
       'moreRecordAudio',
       'moreRecordScreen',
       'morePreview',
+      // Spec 030: the performance view works in the read-only view (the editor stays read-only).
+      'morePerform',
       'moreShare',
     ]);
     expect(items.filter((i) => EDIT_ACTION.test(i.textContent ?? ''))).toEqual([]);
