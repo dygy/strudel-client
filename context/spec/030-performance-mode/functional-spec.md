@@ -93,11 +93,15 @@ Worse, one stray Cmd+W or a click on a bookmark kills the music in the middle of
 - While stopped, nothing asks. The headphone preview alone doesn't count as playing.
 - Switching tracks, opening folders and other moves inside the app don't trigger it (they don't unload the page).
 - The existing unload work (emergency save of unsaved edits) is unchanged and still runs if the user leaves anyway.
+- **Answering "Stay" changes nothing.** The visuals keep drawing and a recording keeps recording. Work that tears things down (clearing the canvases, the recorders' emergency save) runs only when the page really goes (`pagehide`).
+- **While recording,** closing also asks, even with the music stopped. If the user leaves anyway, the recording so far is downloaded as the recorder's raw WebM (best effort: the browser may drop a download started during unload). The previous emergency save waited for an asynchronous stop and a WAV conversion that a closing page never finishes, and its fallback already saved WebM data under a `.wav` name.
 - **Acceptance Criteria:**
   - [ ] Given the main output playing, when the page is about to unload, then the `beforeunload` event is cancelled (the browser asks).
   - [ ] Given the main output stopped, when the page is about to unload, then the event is not cancelled.
   - [ ] Given only the preview playing, then the event is not cancelled.
   - [ ] Given unsaved edits and the user leaves anyway, then the emergency save still runs as before.
+  - [ ] Given music playing with a scope drawing and a recording running, when `beforeunload` is cancelled ("Stay"), then the draw loop keeps running, the canvases are not cleared, and the recorder is not stopped and downloads nothing.
+  - [ ] Given a recording running and the music stopped, when the page is about to unload, then the event is cancelled; on `pagehide` the chunks so far are downloaded as `.webm`.
 
 ### 2.6 Strings
 
@@ -132,3 +136,5 @@ New strings go into all 9 locales: Perform, Exit, Set time, Track time, Reset, L
 ## Change Log
 
 - 2026-11-15 — Draft from the owner's choices.
+- 2026-11-15 — Clip light at −0.3 dBFS (the EQ limiter's ceiling), not 0 dBFS.
+- 2026-11-15 — Review #1 (accepted): "Stay" must not stop recordings or clear visuals; canvas cleanup and the recorders' emergency save moved to `pagehide`; recording also asks on close; emergency recording file is WebM. Review #3: the track-conflict notice stays visible in the view (§2.2 hidden list unchanged: it was never listed).

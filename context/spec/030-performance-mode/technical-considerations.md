@@ -36,7 +36,7 @@ Two areas: **web** (store, strip, layout, shortcut, clocks, guard, font size, i1
 ### 2.2 Layout: `website/src/repl/components/ReplEditor.tsx` (web)
 
 - `const perf = useStore(performanceOpen)`. On the root: `data-performance={perf ? 'true' : undefined}`.
-- Wrap or class the Header, `TrackConflictNotice`, sidebar slot, drawer, vertical/horizontal panel and `CompactControlBar` so that `perf` adds `hidden`. **No conditional rendering on `perf`.**
+- Wrap or class the Header, sidebar slot, drawer, vertical/horizontal panel and `CompactControlBar` so that `perf` adds `hidden`. **No conditional rendering on `perf`.**
 - `{perf && <PerformanceStrip context={context} trackName={currentTrackName(fileManagerHook)} />}` goes right after the Header (the strip mounts and unmounts; it owns only the meter, the clock display and buttons).
 - `UserFacingErrorMessage` stays visible.
 - Font size: in `website/src/styles` (or a co-located CSS module imported by the strip), `[data-performance='true'] .cm-editor { font-size: var(--perf-font-size) !important; }`, with `--perf-font-size` set on the root from the store. If the inline `root.style.fontSize` from codemirror.mjs wins anyway, set it through `editorRef.current.setFontSize()` on open and restore `settings.fontSize` on close; the test in §4 fixes whichever is used.
@@ -93,7 +93,8 @@ Two areas: **web** (store, strip, layout, shortcut, clocks, guard, font size, i1
 
 - `installCloseGuard(isPlaying: () => boolean, win = window)`: a `beforeunload` listener that, when `isPlaying()`, calls `event.preventDefault()` and sets `event.returnValue = ''` (the legacy requirement). Returns the uninstaller.
 - Installed once from `ReplEditor` with `() => Boolean(context.editorRef.current?.repl?.scheduler?.started)`. That is the main scheduler only; the preview engine is a separate scheduler and isn't consulted.
-- It is a separate listener from the canvas cleanup and the emergency save (useReplContext.tsx:706, useEmergencySave), which keep running as before. `beforeunload` listeners all run; cancelling it doesn't stop the others.
+- It is a separate listener from the emergency save (`globalSaveManager`), which keeps running as before. `beforeunload` listeners all run; cancelling it doesn't stop the others.
+- Review #1: anything destructive on unload moved to `pagehide`, so "Stay" changes nothing: the canvas cleanup (`website/src/repl/canvasUnloadCleanup.ts`, used by `useReplContext.tsx`) and the recorders (`website/src/repl/recording/recordingUnload.ts`: `beforeunload` only asks while recording; `pagehide` downloads `engine.snapshot()` synchronously, without stopping the engine).
 
 ### 2.8 i18n (web)
 
@@ -114,7 +115,7 @@ Ten keys in `website/src/i18n/locales/*/settings.json` (or the namespace the Hea
   - All are disconnected on close.
   - It has no gain node and no ramp, because it never feeds the speakers.
   - The preview engine (its own `AudioContext`) is untouched, so preview audio never reaches the meter.
-- **Upstream impact:** none. Nothing in `@strudel/*` changes. `superdough`'s `destinationGain` and `getSuperdoughAudioController` are read, not modified.
+- **Upstream impact:** none. (Test-only: `packages/mixer/test/webAudioMock.mjs` locks a splitter's channel fields like Chrome; `packages/codemirror/test/editorFixture.mjs` is a test helper and uses plain JSDoc types, because jsdoc-json parses every `packages/*.mjs`.) Nothing in `@strudel/*` changes. `superdough`'s `destinationGain` and `getSuperdoughAudioController` are read, not modified.
 - **Risks:**
   - **Hiding vs. unmounting.** Zen mode unmounts; this must not. A test asserts that the panel and sidebar stay mounted (in the DOM, `hidden`) while the view is open.
   - **Fullscreen and Esc.** In browser full screen, Esc is consumed by the browser, which fires `fullscreenchange`; the view closes then. Outside full screen, Esc is left to the editor (autocomplete close); the spec does not make Esc a leave key there.
