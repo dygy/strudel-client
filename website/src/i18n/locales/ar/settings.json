@@ -478,5 +478,15 @@
   "setListCueNoLibrary": "لا يمكن الاستماع المسبق — افتح المكتبة",
   "setListCueNoPreview": "الاستماع المسبق عبر السماعات غير متاح",
   "setListCueFailed": "تعذّر الاستماع المسبق للمسار التالي — اضغط مرة أخرى لإعادة المحاولة",
-  "setListGoIgnored": "لا يزال الانتقال جاريًا — اضغط مرة أخرى بعد قليل"
+  "setListGoIgnored": "لا يزال الانتقال جاريًا — اضغط مرة أخرى بعد قليل",
+  "performMode": "أداء",
+  "performModeDescription": "عرض المسرح بملء الشاشة: كود كبير، الآن/التالي، مؤقتات ومستويات",
+  "performExit": "خروج",
+  "performSetTime": "مدة المجموعة",
+  "performTrackTime": "مدة المقطع",
+  "performResetClock": "إعادة الضبط",
+  "performLevel": "المستوى",
+  "performClip": "تشبّع",
+  "performBiggerCode": "تكبير الكود",
+  "performSmallerCode": "تصغير الكود"
 }

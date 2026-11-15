@@ -478,5 +478,15 @@
   "setListCueNoLibrary": "Преслушавање није могуће — отворите библиотеку",
   "setListCueNoPreview": "Преслушавање на слушалицама није доступно",
   "setListCueFailed": "Следећа нумера није преслушана — притисните поново",
-  "setListGoIgnored": "Прелаз је још у току — притисните „Миксуј“ мало касније"
+  "setListGoIgnored": "Прелаз је још у току — притисните „Миксуј“ мало касније",
+  "performMode": "Наступ",
+  "performModeDescription": "Приказ за бину преко целог екрана: велики код, Сада/Следеће, сатови и нивои",
+  "performExit": "Изађи",
+  "performSetTime": "Време сета",
+  "performTrackTime": "Време нумере",
+  "performResetClock": "Ресетуј",
+  "performLevel": "Ниво",
+  "performClip": "Пресек",
+  "performBiggerCode": "Већи код",
+  "performSmallerCode": "Мањи код"
 }

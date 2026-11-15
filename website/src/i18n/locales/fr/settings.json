@@ -478,5 +478,15 @@
   "setListCueNoLibrary": "Pré-écoute impossible : ouvrez la bibliothèque",
   "setListCueNoPreview": "La pré-écoute au casque n'est pas disponible",
   "setListCueFailed": "Impossible de pré-écouter la piste suivante — appuyez à nouveau pour réessayer",
-  "setListGoIgnored": "Enchaînement en cours — réessayez dans un instant"
+  "setListGoIgnored": "Enchaînement en cours — réessayez dans un instant",
+  "performMode": "Scène",
+  "performModeDescription": "Vue scène en plein écran : code en grand, Maintenant/Suivant, chronos et niveaux",
+  "performExit": "Quitter",
+  "performSetTime": "Durée du set",
+  "performTrackTime": "Durée du morceau",
+  "performResetClock": "Remettre à zéro",
+  "performLevel": "Niveau",
+  "performClip": "Saturation",
+  "performBiggerCode": "Code plus grand",
+  "performSmallerCode": "Code plus petit"
 }

@@ -29,6 +29,18 @@ import { useAuth } from '@src/hooks/useAuth';
 import { SetPlayerContext, useSetPlayer } from '../sets/useSetPlayer';
 import type { SetBridge } from '../sets/setBridge';
 import { AddToSetChooser } from './set/AddToSetChooser';
+import { useStore } from '@nanostores/react';
+import {
+  clampPerformanceFontSize,
+  performanceFontSize,
+  performanceOpen,
+  togglePerformance,
+} from '../performance/performanceStore';
+import { installPerformanceShortcut } from '../performance/performanceShortcut';
+import { installPerformanceFullscreen } from '../performance/performanceFullscreen';
+import { installPerformanceClock } from '../performance/performanceClock';
+import { installCloseGuard } from '../performance/closeGuard';
+import { PerformanceStrip } from './performance/PerformanceStrip';
 
 interface ReplContext {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -49,6 +61,8 @@ interface ReplContext {
   handleScreenRecordToggle?: () => void;
   isScreenRecordingSupported?: boolean;
   setBridge?: SetBridge;
+  /** The main REPL's track ids (useReplContext): `playing` feeds the track clock (spec 030). */
+  trackIds?: () => { editor: string | null; playing: string | null };
 }
 
 interface ReplEditorProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -80,6 +94,14 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
   // control bar's Settings button opens the sheet instead).
   const showPanel = !compact || panelOpen;
   const closeDrawer = () => closeFileManagerAfterSelect(true);
+
+  // Spec 030: the performance view is a layout state. Everything it hides stays MOUNTED (class
+  // `hidden`, never conditional rendering, unlike zen mode): panels own audio state (the EQ tap, the
+  // scratch deck, the mixer UI) and the #code slot must never move, so CodeMirror keeps its text,
+  // cursor and undo history.
+  const perf = useStore(performanceOpen);
+  const perfFontSize = clampPerformanceFontSize(useStore(performanceFontSize));
+  const hideInPerf = perf ? 'hidden' : 'contents';
 
   // Use the tracks store instead of complex state management
   const tracks = useTracks();
@@ -320,6 +342,21 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
   fileManagerRef.current = fileManagerHook;
   contextRef.current = context;
 
+  // Spec 030: the key, the browser's full screen, the clocks and the close-tab guard, installed once.
+  // The clocks and the guard read the main REPL only (the headphone preview is another scheduler).
+  useEffect(() => {
+    const uninstall = [
+      installPerformanceShortcut(togglePerformance),
+      installPerformanceFullscreen(),
+      installPerformanceClock({
+        isStarted: () => Boolean(contextRef.current?.started),
+        playingTrackId: () => contextRef.current?.trackIds?.().playing ?? null,
+      }),
+      installCloseGuard(() => Boolean(contextRef.current?.editorRef?.current?.repl?.scheduler?.started)),
+    ];
+    return () => uninstall.forEach((stop) => stop());
+  }, []);
+
   useEffect(() => {
     if (fileManagerRef.current && contextRef.current) {
       console.log('ReplEditor: Registering with global save manager');
@@ -428,9 +465,18 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
           compact && 'pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]',
         )}
         {...editorProps}
+        data-performance={perf ? 'true' : undefined}
+        style={{ ...editorProps.style, ['--perf-font-size' as string]: `${perfFontSize}px` }}
       >
         <Loader active={pending} />
-        <Header context={context} trackName={currentTrackName(fileManagerHook)} />
+        <Header
+          context={context}
+          trackName={currentTrackName(fileManagerHook)}
+          className={perf ? 'hidden' : undefined}
+        />
+        {perf && <PerformanceStrip context={context} trackName={currentTrackName(fileManagerHook)} />}
+        {/* Stays visible in the performance view: it is the only sign that saving is paused
+            (spec 030 review #3). */}
         {!readOnly && <TrackConflictNotice controller={fileManagerHook?.trackConflict ?? null} />}
 
         <div className="grow flex relative overflow-hidden">
@@ -438,18 +484,21 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
             position whether it renders or not, so a layout switch (rotation, resize) never
             remounts the editor (#code); only the library moves between drawer and sidebar. */}
           {!isZen && compact && (
-            <LibraryDrawer open={isFileManagerOpen} onClose={closeDrawer}>
-              <FileManager
-                context={context}
-                fileManagerHook={fileManagerHook}
-                readOnly={readOnly}
-                onAfterTrackSelect={closeDrawer}
-              />
-            </LibraryDrawer>
+            <div className={hideInPerf} data-perf-hide="drawer">
+              <LibraryDrawer open={isFileManagerOpen} onClose={closeDrawer}>
+                <FileManager
+                  context={context}
+                  fileManagerHook={fileManagerHook}
+                  readOnly={readOnly}
+                  onAfterTrackSelect={closeDrawer}
+                />
+              </LibraryDrawer>
+            </div>
           )}
           {!isZen && !compact && (
             <div
-              className="flex-shrink-0 overflow-hidden"
+              data-perf-hide="sidebar"
+              className={cx('flex-shrink-0 overflow-hidden', perf && 'hidden')}
               style={{
                 maxWidth: isFileManagerOpen ? 500 : 0,
                 transition: 'max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -467,11 +516,23 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
               <Code key={codeComponentKey} containerRef={containerRef} editorRef={editorRef} init={init} />
             </div>
           )}
-          {!isZen && panelPosition === 'right' && showPanel && <VerticalPanel context={context} />}
+          {!isZen && panelPosition === 'right' && showPanel && (
+            <div className={hideInPerf} data-perf-hide="panel">
+              <VerticalPanel context={context} />
+            </div>
+          )}
         </div>
         <UserFacingErrorMessage error={error} />
-        {!isZen && panelPosition === 'bottom' && showPanel && <HorizontalPanel context={context} />}
-        {!isZen && compact && <CompactControlBar context={context} />}
+        {!isZen && panelPosition === 'bottom' && showPanel && (
+          <div className={hideInPerf} data-perf-hide="panel">
+            <HorizontalPanel context={context} />
+          </div>
+        )}
+        {!isZen && compact && (
+          <div className={hideInPerf} data-perf-hide="control-bar">
+            <CompactControlBar context={context} />
+          </div>
+        )}
 
         {/* Global Toast Container */}
         <GlobalToastContainer />

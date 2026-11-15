@@ -288,6 +288,17 @@ export interface SettingsTranslations {
   scratchFeelLearnTimeout: string;
   scratchFeelLearnConflict: string;
   scratchMidiLearnConflict: string;
+  // Spec 030: the performance view
+  performMode: string;
+  performModeDescription: string;
+  performExit: string;
+  performSetTime: string;
+  performTrackTime: string;
+  performResetClock: string;
+  performLevel: string;
+  performClip: string;
+  performBiggerCode: string;
+  performSmallerCode: string;
 }
 
 export interface TabsTranslations {

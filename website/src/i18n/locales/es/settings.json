@@ -478,5 +478,15 @@
   "setListCueNoLibrary": "No se puede preescuchar: abre la biblioteca",
   "setListCueNoPreview": "La preescucha en auriculares no está disponible",
   "setListCueFailed": "No se pudo preescuchar la siguiente pista: pulsa de nuevo para reintentar",
-  "setListGoIgnored": "Aún se está cambiando: pulsa Mezclar de nuevo en un momento"
+  "setListGoIgnored": "Aún se está cambiando: pulsa Mezclar de nuevo en un momento",
+  "performMode": "Actuar",
+  "performModeDescription": "Vista de escenario a pantalla completa: código grande, Ahora/Siguiente, relojes y niveles",
+  "performExit": "Salir",
+  "performSetTime": "Tiempo de sesión",
+  "performTrackTime": "Tiempo de pista",
+  "performResetClock": "Reiniciar",
+  "performLevel": "Nivel",
+  "performClip": "Saturación",
+  "performBiggerCode": "Código más grande",
+  "performSmallerCode": "Código más pequeño"
 }

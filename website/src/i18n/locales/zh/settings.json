@@ -478,5 +478,15 @@
   "setListCueNoLibrary": "无法预听——请打开曲库",
   "setListCueNoPreview": "耳机预听不可用",
   "setListCueFailed": "无法预听下一条音轨——再按一次重试",
-  "setListGoIgnored": "仍在切换中——请稍后再按一次"
+  "setListGoIgnored": "仍在切换中——请稍后再按一次",
+  "performMode": "演出",
+  "performModeDescription": "全屏舞台视图：大号代码、当前/下一首、计时器和电平",
+  "performExit": "退出",
+  "performSetTime": "演出时长",
+  "performTrackTime": "曲目时长",
+  "performResetClock": "重置",
+  "performLevel": "电平",
+  "performClip": "削波",
+  "performBiggerCode": "放大代码",
+  "performSmallerCode": "缩小代码"
 }

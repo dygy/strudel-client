@@ -478,5 +478,15 @@
   "setListCueNoLibrary": "미리 들을 수 없습니다 — 라이브러리를 여세요",
   "setListCueNoPreview": "헤드폰 미리 듣기를 사용할 수 없습니다",
   "setListCueFailed": "다음 트랙을 미리 듣지 못했습니다 — 다시 눌러 재시도하세요",
-  "setListGoIgnored": "아직 전환 중입니다 — 잠시 후 다시 누르세요"
+  "setListGoIgnored": "아직 전환 중입니다 — 잠시 후 다시 누르세요",
+  "performMode": "공연",
+  "performModeDescription": "전체 화면 무대 보기: 큰 코드, 현재/다음, 시계와 레벨",
+  "performExit": "나가기",
+  "performSetTime": "세트 시간",
+  "performTrackTime": "트랙 시간",
+  "performResetClock": "초기화",
+  "performLevel": "레벨",
+  "performClip": "클리핑",
+  "performBiggerCode": "코드 크게",
+  "performSmallerCode": "코드 작게"
 }

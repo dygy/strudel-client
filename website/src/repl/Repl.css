@@ -40,6 +40,13 @@
   z-index: 11;
 }
 
+/* Spec 030: the code's size in the performance view. StrudelMirror.setFontSize writes the normal
+   view's size inline on #code; this sets it on the editor inside, so the setting itself is untouched
+   and the normal size comes back on exit. --perf-font-size is set on ReplEditor's root. */
+[data-performance='true'] #code .cm-editor {
+  font-size: var(--perf-font-size, 28px) !important;
+}
+
 #code .cm-theme {
   width: 100%;
   height: 100%;

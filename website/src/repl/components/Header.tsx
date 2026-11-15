@@ -2,7 +2,14 @@ import { AssistantControlIndicator } from '../assistantControl/AllowAssistantSwi
 import { useState, useRef, useEffect } from 'react';
 import PlayCircleIcon from '@heroicons/react/20/solid/PlayCircleIcon';
 import StopCircleIcon from '@heroicons/react/20/solid/StopCircleIcon';
-import { Bars3Icon, ArrowPathIcon, EyeIcon, MicrophoneIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
+import {
+  Bars3Icon,
+  ArrowPathIcon,
+  EyeIcon,
+  MicrophoneIcon,
+  PresentationChartBarIcon,
+  VideoCameraIcon,
+} from '@heroicons/react/24/outline';
 import cx from '@src/cx';
 import { useTranslation } from '@src/i18n';
 import { useTransitionPhase } from '../transitionPhase';
@@ -22,6 +29,7 @@ import {
   toggleScreenRecording,
 } from './recordActions';
 import { CompactTitleBar } from './compact/CompactTitleBar';
+import { openPerformance } from '../performance/performanceStore';
 import '../Repl.css';
 
 const { BASE_URL } = import.meta.env;
@@ -53,6 +61,8 @@ interface HeaderProps {
   embedded?: boolean;
   /** The open track's name, shown by the compact title bar (spec 016). */
   trackName?: string;
+  /** Spec 030: `hidden` while the performance view is open (the header stays mounted). */
+  className?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -196,9 +206,30 @@ function RecordPopover({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Play / Stop (also in the performance strip, spec 030)             */
+/* ------------------------------------------------------------------ */
+export function PlayButton({ context, className }: { context: ReplContext; className?: string }) {
+  return (
+    <IconBtn
+      onClick={() => context.handleTogglePlay()}
+      title={context.started ? 'Stop (Ctrl+P)' : 'Play (Ctrl+P)'}
+      active={context.started}
+      glow={context.started ? 'green' : undefined}
+      className={className}
+    >
+      {context.started ? (
+        <StopCircleIcon className="w-4 h-4 text-foreground" data-play-state="stop" />
+      ) : (
+        <PlayCircleIcon className="w-4 h-4 text-foreground" data-play-state="play" />
+      )}
+    </IconBtn>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Update, with the waiting state of a snapped switch (spec 017)     */
 /* ------------------------------------------------------------------ */
-export function UpdateButton({ context }: { context: ReplContext }) {
+export function UpdateButton({ context, className }: { context: ReplContext; className?: string }) {
   const { t } = useTranslation('settings');
   const waiting = useTransitionPhase() === 'waiting';
   return (
@@ -208,6 +239,7 @@ export function UpdateButton({ context }: { context: ReplContext }) {
       active={context.isDirty || waiting}
       glow={waiting ? 'blue' : context.isDirty ? 'orange' : undefined}
       pulse={waiting}
+      className={className}
     >
       <ArrowPathIcon className="w-4 h-4 text-foreground opacity-70" />
     </IconBtn>
@@ -215,9 +247,21 @@ export function UpdateButton({ context }: { context: ReplContext }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Perform: opens the performance view (spec 030)                    */
+/* ------------------------------------------------------------------ */
+function PerformButton() {
+  const { t } = useTranslation('settings');
+  return (
+    <IconBtn onClick={openPerformance} title={`${t('performMode')} (Alt+Shift+P)`}>
+      <PresentationChartBarIcon className="w-4 h-4 text-foreground opacity-70" data-perform-button="" />
+    </IconBtn>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main Header                                                       */
 /* ------------------------------------------------------------------ */
-export function Header({ context, embedded, trackName }: HeaderProps) {
+export function Header({ context, embedded, trackName, className }: HeaderProps) {
   const { isZen } = useSettings();
   // On phones the file sidebar and the panel sheet are mutually exclusive (session-only hides).
   const { filesOpen: isFileManagerOpen, toggleFileManager, compact } = usePanelLayout();
@@ -235,7 +279,7 @@ export function Header({ context, embedded, trackName }: HeaderProps) {
 
   // Phones and upright tablets: a thin title bar; the main controls live in the bottom bar.
   // The /embed REPL keeps the desktop header (out of scope for spec 016).
-  if (compact && !embedded) return <CompactTitleBar context={context} trackName={trackName} />;
+  if (compact && !embedded) return <CompactTitleBar context={context} trackName={trackName} className={className} />;
 
   return (
     <header
@@ -243,6 +287,7 @@ export function Header({ context, embedded, trackName }: HeaderProps) {
         'relative z-20 flex items-center h-10 px-3 select-none',
         'bg-background border-b border-lineHighlight',
         'transition-all duration-300',
+        className,
       )}
     >
       {/* ---- LEFT SIDE ---- */}
@@ -286,18 +331,7 @@ export function Header({ context, embedded, trackName }: HeaderProps) {
       <div className="flex items-center gap-1">
         {!embedded && <AssistantControlIndicator />}
         {/* Play / Stop */}
-        <IconBtn
-          onClick={() => context.handleTogglePlay()}
-          title={context.started ? 'Stop (Ctrl+P)' : 'Play (Ctrl+P)'}
-          active={context.started}
-          glow={context.started ? 'green' : undefined}
-        >
-          {context.started ? (
-            <StopCircleIcon className="w-4 h-4 text-foreground" />
-          ) : (
-            <PlayCircleIcon className="w-4 h-4 text-foreground" />
-          )}
-        </IconBtn>
+        <PlayButton context={context} />
 
         {/* Update / Evaluate, and the transition the next track switch uses */}
         <UpdateButton context={context} />
@@ -310,6 +344,8 @@ export function Header({ context, embedded, trackName }: HeaderProps) {
         <ScratchButton />
         {/* While a set plays: Now · Up next and the Cue/Go button (spec 022 2.3) */}
         {!embedded && <SetBar />}
+        {/* The stage view: big code, Now/Next, clocks, levels (spec 030 2.1) */}
+        {!embedded && <PerformButton />}
 
         {/* Preview (headphones) — only when mixer is available */}
         {context.mixer && (

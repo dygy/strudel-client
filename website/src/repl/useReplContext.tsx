@@ -57,6 +57,7 @@ import { useScreenRecorder } from './recording/useScreenRecorder';
 import { listenForSmoothTransitionErrors } from './smoothTransitionNotifier';
 import { createEvaluationWatch, isMusicChanging } from './evaluationWatch';
 import { createTrackSwitchController, type UpdateOutcome } from './trackSwitch';
+import { installCanvasUnloadCleanup } from './canvasUnloadCleanup';
 import type { TransitionOverride } from './transitionSettings';
 import {
   evaluateNewTrack as runEvaluateNewTrack,
@@ -695,21 +696,20 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     }
   }, [_settings, allSettings]);
 
-  // Canvas cleanup on component unmount and window unload
+  // Canvas cleanup on component unmount and when the page really goes. Not on beforeunload: that
+  // also fires when the user answers "Stay" to the close-tab guard, and the visuals would be
+  // cleared while the music plays on (spec 030 review #1).
   useEffect(() => {
-    const handleBeforeUnload = async () => {
-      console.log('[canvas-cleanup] Cleaning up on page unload');
-      await cleanupCanvasElements();
-    };
-
-    // Add event listener for page unload
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    const uninstall = installCanvasUnloadCleanup(() => {
+      console.log('[canvas-cleanup] Cleaning up on page exit');
+      return cleanupCanvasElements();
+    });
 
     // Cleanup function for component unmount
     return () => {
       console.log('[canvas-cleanup] Cleaning up on component unmount');
       cleanupCanvasElements(); // Don't await in cleanup function
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      uninstall();
     };
   }, []);
 

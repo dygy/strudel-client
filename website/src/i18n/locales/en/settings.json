@@ -478,5 +478,15 @@
   "setListCueNoLibrary": "Can't cue — open the library",
   "setListCueNoPreview": "Headphone preview isn't available",
   "setListCueFailed": "Couldn't cue the next track — press again to retry",
-  "setListGoIgnored": "Still switching — press Go again in a moment"
+  "setListGoIgnored": "Still switching — press Go again in a moment",
+  "performMode": "Perform",
+  "performModeDescription": "Full-screen stage view: big code, Now/Next, clocks and levels",
+  "performExit": "Exit",
+  "performSetTime": "Set time",
+  "performTrackTime": "Track time",
+  "performResetClock": "Reset",
+  "performLevel": "Level",
+  "performClip": "Clip",
+  "performBiggerCode": "Bigger code",
+  "performSmallerCode": "Smaller code"
 }

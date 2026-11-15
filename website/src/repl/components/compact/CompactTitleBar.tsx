@@ -18,7 +18,16 @@ export interface TitleBarContext extends MoreMenuContext {
  * Compact screens (spec 016 2.1): a thin 44px bar with the logo, the open track's name and the
  * "More" menu. Logical (start/end) classes, so Hebrew and Arabic mirror it.
  */
-export function CompactTitleBar({ context, trackName }: { context: TitleBarContext; trackName?: string }) {
+export function CompactTitleBar({
+  context,
+  trackName,
+  className,
+}: {
+  context: TitleBarContext;
+  trackName?: string;
+  /** Spec 030: `hidden` while the performance view is open (the bar stays mounted). */
+  className?: string;
+}) {
   const { t } = useTranslation(['common', 'files']);
   const [menuOpen, setMenuOpen] = useState(false);
   const moreRef = useRef<HTMLButtonElement>(null);
@@ -35,7 +44,10 @@ export function CompactTitleBar({ context, trackName }: { context: TitleBarConte
       data-compact-title-bar=""
       // Safe area (spec 016 review #5): below the notch / status bar; the REPL column pads left and
       // right. The divider is an inset shadow, not a border, so the 44px More button fits the bar.
-      className="relative z-20 shrink-0 pt-[env(safe-area-inset-top)] select-none bg-background shadow-[inset_0_-1px_0_0_var(--lineHighlight)]"
+      className={cx(
+        'relative z-20 shrink-0 pt-[env(safe-area-inset-top)] select-none bg-background shadow-[inset_0_-1px_0_0_var(--lineHighlight)]',
+        className,
+      )}
     >
       <div className="flex items-center h-11 ps-3 pe-0 gap-2" data-compact-title-row="">
         <a

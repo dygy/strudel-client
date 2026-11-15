@@ -210,6 +210,16 @@ export class AudioRecorderEngine {
     });
   }
 
+  /**
+   * The recording so far, assembled synchronously from the chunks collected until now (the MediaRecorder
+   * delivers one per second), without stopping anything; null while not recording. For the page-leave
+   * save (recordingUnload.ts), where nothing asynchronous can finish.
+   */
+  snapshot(): Blob | null {
+    if (!this.mediaRecorder || !this.state.isRecording || !this.chunkStore) return null;
+    return new Blob(this.chunkStore.chunks, { type: this.mediaRecorder.mimeType || 'audio/webm' });
+  }
+
   /** Returns the current RecorderState. */
   getState(): RecorderState {
     return { ...this.state };

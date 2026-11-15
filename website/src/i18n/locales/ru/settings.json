@@ -478,5 +478,15 @@
   "setListCueNoLibrary": "Нельзя прослушать — откройте библиотеку",
   "setListCueNoPreview": "Прослушивание в наушниках недоступно",
   "setListCueFailed": "Не удалось прослушать следующий трек — нажмите ещё раз",
-  "setListGoIgnored": "Переход ещё идёт — нажмите «Свести» чуть позже"
+  "setListGoIgnored": "Переход ещё идёт — нажмите «Свести» чуть позже",
+  "performMode": "Выступление",
+  "performModeDescription": "Полноэкранный режим сцены: крупный код, «Сейчас/Далее», таймеры и уровни",
+  "performExit": "Выйти",
+  "performSetTime": "Время сета",
+  "performTrackTime": "Время трека",
+  "performResetClock": "Сбросить",
+  "performLevel": "Уровень",
+  "performClip": "Перегруз",
+  "performBiggerCode": "Крупнее код",
+  "performSmallerCode": "Мельче код"
 }

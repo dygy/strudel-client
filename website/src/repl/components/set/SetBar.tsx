@@ -7,8 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import cx from '@src/cx';
 import { useTranslation } from '@src/i18n';
 import ForwardIcon from '@heroicons/react/24/outline/ForwardIcon';
-import { useSetPlayerContext } from '../../sets/useSetPlayer';
-import { itemTextById } from './setLabels';
+import { useSetBarModel } from './useSetBarModel';
 
 /**
  * Touch (compact control bar): built like its siblings (Play, Update, Library, Settings), an icon
@@ -43,7 +42,7 @@ function HeadphonesIcon({ className }: { className?: string }) {
 }
 
 export function SetBar({ touch = false, className }: { touch?: boolean; className?: string }) {
-  const ctx = useSetPlayerContext();
+  const model = useSetBarModel();
   const { t } = useTranslation('settings');
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -57,13 +56,8 @@ export function SetBar({ touch = false, className }: { touch?: boolean; classNam
     return () => document.removeEventListener('pointerdown', close);
   }, [menuOpen]);
 
-  if (!ctx || !ctx.enabled || !ctx.player.setId) return null;
-  const set = ctx.sets.find((candidate) => candidate.id === ctx.player.setId);
-  const now = itemTextById(t, set?.items, ctx.player.nowItemId, ctx.tracks);
-  const next = ctx.endOfSet ? t('setListEndOfSet') : itemTextById(t, set?.items, ctx.player.nextItemId, ctx.tracks);
-  const mode = ctx.buttonMode;
-  const busy = ctx.player.phase === 'cueing' || ctx.player.phase === 'going';
-  const label = mode === 'go' ? t('setListGo') : t('setListCue');
+  if (!model) return null;
+  const { ctx, now, next, mode, busy, label } = model;
 
   return (
     <div
@@ -90,8 +84,8 @@ export function SetBar({ touch = false, className }: { touch?: boolean; classNam
       <button
         type="button"
         data-set-bar-button={mode}
-        onClick={() => ctx.press()}
-        disabled={busy || (mode === 'cue' && ctx.endOfSet)}
+        onClick={model.press}
+        disabled={model.disabled}
         title={`${label}: ${next} (Alt+Shift+N)`}
         aria-label={`${label}: ${next}`}
         className={cx(

@@ -17,7 +17,7 @@ export function formatElapsedTime(seconds: number): string {
  * Generates a filename matching pattern `strudel-recording-YYYY-MM-DD-HHmmss.{ext}`
  * with zero-padded date components.
  */
-export function generateFilename(date: Date, format: 'wav' | 'mp3'): string {
+export function generateFilename(date: Date, format: 'wav' | 'mp3' | 'webm'): string {
   const y = date.getFullYear();
   const mo = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');

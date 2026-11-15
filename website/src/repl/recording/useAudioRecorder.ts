@@ -2,7 +2,7 @@
  * useAudioRecorder — React hook managing the AudioRecorderEngine lifecycle.
  *
  * Exposes recording state, toggle handler, export blob, and cleanup.
- * Registers a beforeunload handler for emergency WAV save.
+ * While recording, asks before the page goes and saves the recording so far when it does (recordingUnload.ts).
  *
  * Requirements: 2.2, 2.3, 6.3, 7.3
  */
@@ -10,9 +10,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getAudioContext, getSuperdoughAudioController } from '@strudel/webaudio';
 import { AudioRecorderEngine, type RecorderState } from './AudioRecorderEngine';
-import { encodeWAV } from './wavEncoder';
 import { openRecordingTap, type RecordingTap } from './recordingTap';
 import { generateFilename } from './formatUtils';
+import { installRecordingUnload } from './recordingUnload';
 
 export interface UseAudioRecorderReturn {
   isRecording: boolean;
@@ -113,64 +113,17 @@ export function useAudioRecorder(isScreenRecording = false): UseAudioRecorderRet
     setExportBlob(null);
   }, []);
 
-  // Req 6.3: beforeunload emergency save — best-effort WAV download
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      const engine = engineRef.current;
-      if (!engine || !engine.getState().isRecording) return;
-
-      // Best-effort: stop and encode synchronously-ish
-      // MediaRecorder.stop() is async, so we attempt to salvage what we can
-      try {
-        // We can't truly await here, but we try to trigger a download
-        engine
-          .stop()
-          .then((blob) => {
-            if (blob.size === 0) return;
-
-            const audioContext = getAudioContext();
-            if (!audioContext) return;
-
-            // Attempt to decode and encode as WAV for emergency save
-            const reader = new FileReader();
-            reader.onload = () => {
-              const arrayBuffer = reader.result as ArrayBuffer;
-              audioContext
-                .decodeAudioData(arrayBuffer)
-                .then((audioBuffer) => {
-                  const wavBlob = encodeWAV(audioBuffer);
-                  const url = URL.createObjectURL(wavBlob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = generateFilename(new Date(), 'wav');
-                  a.click();
-                  URL.revokeObjectURL(url);
-                })
-                .catch(() => {
-                  // Last resort: download the raw webm blob
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = generateFilename(new Date(), 'wav');
-                  a.click();
-                  URL.revokeObjectURL(url);
-                });
-            };
-            reader.readAsArrayBuffer(blob);
-          })
-          .catch(() => {
-            // Nothing we can do
-          });
-      } catch {
-        // Best-effort — swallow errors on unload
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, []);
+  // Req 6.3, spec 030 review #1: beforeunload only asks while recording ("Stay" leaves the recording
+  // untouched); pagehide downloads the recording so far, synchronously, as raw WebM. Why: recordingUnload.ts.
+  useEffect(
+    () =>
+      installRecordingUnload({
+        isRecording: () => Boolean(engineRef.current?.getState().isRecording),
+        snapshot: () => engineRef.current?.snapshot() ?? null,
+        filename: () => generateFilename(new Date(), 'webm'),
+      }),
+    [],
+  );
 
   // Cleanup engine on unmount (Req 7.3)
   useEffect(() => {

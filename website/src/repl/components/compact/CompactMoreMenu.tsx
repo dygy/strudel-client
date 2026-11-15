@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import {
   EyeIcon,
   MicrophoneIcon,
+  PresentationChartBarIcon,
   ShareIcon,
   SparklesIcon,
   StopIcon,
@@ -15,6 +16,7 @@ import { AuthButton } from '../../../components/auth/AuthButton';
 import { turnOn } from '../../assistantControl/AllowAssistantSwitch';
 import { assistantControlAvailable, assistantControlOn, setAssistantControl } from '../../assistantControl/store';
 import { formatElapsedTime } from '../../recording/formatUtils';
+import { openPerformance } from '../../performance/performanceStore';
 import {
   isAudioRecordDisabled,
   isScreenRecordDisabled,
@@ -161,6 +163,17 @@ export function CompactMoreMenu({
           label={context.isPreviewing ? t('stopPreview') : t('preview')}
         />
       )}
+      {/* Spec 030: the performance view (the desktop header's Perform button). */}
+      <MenuItem
+        data-more-perform=""
+        onClick={() => {
+          onClose();
+          openPerformance();
+        }}
+        icon={<PresentationChartBarIcon className="w-5 h-5 opacity-70" />}
+        label={tSettings('performMode')}
+        trailing={<span className="sr-only">{tSettings('performModeDescription')}</span>}
+      />
       {/* Spec 022: End set for the compact layout (the touch set bar is only its Cue/Go button). */}
       {setPlayer?.enabled && setPlayer.player.setId && (
         <MenuItem

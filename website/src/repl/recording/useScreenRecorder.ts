@@ -2,7 +2,7 @@
  * useScreenRecorder — React hook managing the ScreenRecorderEngine lifecycle.
  *
  * Exposes recording state, toggle handler, and auto-download on stop.
- * Registers a beforeunload handler for emergency WebM download.
+ * While recording, asks before the page goes and saves the recording so far when it does (recordingUnload.ts).
  *
  * Requirements: 4.2, 4.3, 4.6, 6.1, 6.2, 8.1, 8.2, 9.4
  */
@@ -12,6 +12,7 @@ import { getAudioContext, getSuperdoughAudioController } from '@strudel/webaudio
 import { ScreenRecorderEngine, type ScreenRecorderState } from './ScreenRecorderEngine';
 import { openRecordingTap, type RecordingTap } from './recordingTap';
 import { generateScreenFilename } from './formatUtils';
+import { downloadBlob, installRecordingUnload } from './recordingUnload';
 
 export interface UseScreenRecorderReturn {
   isScreenRecording: boolean;
@@ -22,14 +23,7 @@ export interface UseScreenRecorderReturn {
 }
 
 /** Create a temporary <a> element, trigger download, and revoke the blob URL. */
-function autoDownloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+const autoDownloadBlob = downloadBlob;
 
 export function useScreenRecorder(isAudioRecording: boolean): UseScreenRecorderReturn {
   const [isScreenRecording, setIsScreenRecording] = useState(false);
@@ -136,32 +130,17 @@ export function useScreenRecorder(isAudioRecording: boolean): UseScreenRecorderR
     }
   }, [getOrCreateEngine, isAudioRecording, handleRecordingStopped, closeTap]);
 
-  // beforeunload emergency download — best-effort WebM save
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      const engine = engineRef.current;
-      if (!engine || !engine.getState().isRecording) return;
-
-      try {
-        engine
-          .stop()
-          .then((blob) => {
-            if (blob.size === 0) return;
-            autoDownloadBlob(blob, generateScreenFilename(new Date()));
-          })
-          .catch(() => {
-            // Best-effort — swallow errors on unload
-          });
-      } catch {
-        // Best-effort — swallow errors on unload
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, []);
+  // Spec 030 review #1: beforeunload only asks while recording ("Stay" leaves the recording untouched);
+  // pagehide downloads the recording so far, synchronously. Why: recordingUnload.ts.
+  useEffect(
+    () =>
+      installRecordingUnload({
+        isRecording: () => Boolean(engineRef.current?.getState().isRecording),
+        snapshot: () => engineRef.current?.snapshot() ?? null,
+        filename: () => generateScreenFilename(new Date()),
+      }),
+    [],
+  );
 
   // Cleanup engine on unmount (Req 9.4)
   useEffect(() => {

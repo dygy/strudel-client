@@ -478,5 +478,15 @@
   "setListCueNoLibrary": "אי אפשר להאזין מראש — פתחו את הספרייה",
   "setListCueNoPreview": "האזנה מקדימה באוזניות אינה זמינה",
   "setListCueFailed": "לא ניתן להאזין מראש לרצועה הבאה — לחצו שוב כדי לנסות שוב",
-  "setListGoIgnored": "המעבר עדיין מתבצע — לחצו שוב בעוד רגע"
+  "setListGoIgnored": "המעבר עדיין מתבצע — לחצו שוב בעוד רגע",
+  "performMode": "הופעה",
+  "performModeDescription": "תצוגת במה במסך מלא: קוד גדול, עכשיו/הבא, שעונים ורמות",
+  "performExit": "יציאה",
+  "performSetTime": "זמן הסט",
+  "performTrackTime": "זמן הטראק",
+  "performResetClock": "איפוס",
+  "performLevel": "רמה",
+  "performClip": "קיטוע",
+  "performBiggerCode": "הגדלת הקוד",
+  "performSmallerCode": "הקטנת הקוד"
 }
