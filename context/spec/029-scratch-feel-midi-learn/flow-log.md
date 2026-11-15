@@ -16,3 +16,4 @@
     - The bundle has `strudel-eq-user-presets`, `strudel-scratch-feel-midi`, `connectDirectInput` and `languageChanging`, and the old "syncing language from i18next" timer code is gone.
     - The UI shows Save as… and three Learn buttons (jog, Brake, Spin-up; real Chrome exposes Web MIDI).
     - No console errors.
+- **2026-11-15 — manual check:** the owner tested MIDI Learn with a real controller and it works. That closes AC 1–4 on hardware.
