@@ -1,7 +1,7 @@
 # Functional Specification: Named EQ Presets
 
 - **Roadmap Item:** Not on the roadmap. The owner asked for this on 2026-11-14 ("go do all please") from the list of improvements after 026. No GitHub issue.
-- **Status:** Approved
+- **Status:** Completed
 - **Author:** Claude (for the owner)
 
 ## 1. Why

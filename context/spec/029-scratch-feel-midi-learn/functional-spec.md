@@ -1,7 +1,7 @@
 # Functional Specification: MIDI Learn for the Brake and Spin-up Sliders
 
 - **Roadmap Item:** Not on the roadmap. It follows spec [025](../025-scratch-feel-controls/). The owner asked for this on 2026-11-14 ("go do all please"). No GitHub issue.
-- **Status:** Approved
+- **Status:** Completed
 - **Author:** Claude (for the owner)
 
 ## 1. Why
