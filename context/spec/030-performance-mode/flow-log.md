@@ -41,3 +41,9 @@
 - `pnpm build:cloudflare` first FAILED in jsdoc-json: the new test helper `packages/codemirror/test/editorFixture.mjs` used a TS-style `@param` type (`doc?:`). CI's `pnpm run test` runs the same jsdoc step. Fixed to plain JSDoc; build OK, worker 2.7M.
 - Flow defect: the specialists' runs never exercised jsdoc (they ran vitest directly), so the docs-build breakage only surfaced at build:cloudflare.
 - Next: commit, push gate.
+
+## 2026-11-15 — Step 9–11: push, prod, bookkeeping
+- Owner approved the push. Pushed 1783034..ce2ccf3 (2c8ac20 spec, f15abf9 feat, 9c6cd68 test, ce2ccf3 docs). Deploy run 43766244378 = ce2ccf3 success.
+- Prod (strudel.dygy.app, signed-in Playwright session, track `molten`, nothing played): Alt+Shift+P opens the view (strip "Now: molten · Set time · Track time · meter · Clip · A− 28 A+ · Exit", code 28px), again closes it (18px); beforeunload not cancelled while stopped; 0 console errors. Screenshot docs/screenshots/030-prod-open.png.
+- Bookkeeping: feature-map row, roadmap tick, spec/tech Status Completed, memory note.
+- Agents dispatched: 4 (audio, web, test, reviewer) + follow-ups via SendMessage.

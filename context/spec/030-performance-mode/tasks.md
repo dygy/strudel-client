@@ -28,7 +28,7 @@ Spec: [functional-spec.md](./functional-spec.md) · Tech: [technical-considerati
   - [x] 5.1 Full suite on Node 24.12 `--maxWorkers=2`, lint, format-check, `pnpm run typecheck` = 0, `pnpm build:cloudflare` with the worker size.
   - [x] 5.2 Browser: enter/leave ×10 while playing (scheduler started, node count), meter on a playing track vs preview only, beforeunload cancelled/not, 375 px and RTL screenshots in `docs/screenshots/030-*.png`.
 
-- [ ] **Slice 6: Bookkeeping**
-  - [ ] 6.1 `context/product/feature-map.md`: a Performance mode row (paths, spec 030, tests, owner web + audio).
-  - [ ] 6.2 Roadmap tick and spec Status Completed after prod verification; memory note.
-  - [ ] 6.3 No migration (no schema change); i18n covered by 3.4.
+- [x] **Slice 6: Bookkeeping**
+  - [x] 6.1 `context/product/feature-map.md`: a Performance mode row (paths, spec 030, tests, owner web + audio).
+  - [x] 6.2 Roadmap tick and spec Status Completed after prod verification; memory note.
+  - [x] 6.3 No migration (no schema change); i18n covered by 3.4.

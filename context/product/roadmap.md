@@ -59,7 +59,7 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
 
 - [x] **Set playlist:** a prepared, ordered set of tracks and multitrack steps, each with its own transition type and length. Alt+Shift+N (or the set bar's button) Cues the next item on the headphones, then Goes: mixes it onto the speakers. Sets live in the account (Supabase `set_lists`) ([022](../spec/022-set-playlist/), bd99cdb, 2026-11-13).
 - [x] **Tempo and phrase sync:** Snap to 1/4/8/16 cycles counted from the playing track's own start; a Tempo choice (Jump, Glide during, Match then glide, Keep set tempo) replaces Tempo glide ([027](../spec/027-tempo-phrase-sync/), f598e3f, 2026-11-14).
-- [ ] **Performance mode:** full-screen view with large code, now and next, set timer, levels; guard against closing the tab.
+- [x] **Performance mode:** full-screen view with large code, now and next, set timer, levels; guard against closing the tab ([030](../spec/030-performance-mode/), f15abf9, 2026-11-15).
 - [ ] **MIDI mapping for everything:** EQ, volume, crossfader, Cue/Go and transition, not just the scratch jog.
 - [ ] **Master FX:** filter, delay/reverb throw, beat-repeat and brake on the master bus.
 - [ ] **Loudness meter and analyser:** LUFS/RMS, spectrum before and after the EQ, clipping warning.

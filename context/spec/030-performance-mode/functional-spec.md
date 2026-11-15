@@ -1,7 +1,7 @@
 # Functional Specification: Performance Mode
 
 - **Roadmap Item:** Phase 6 — Live sets: "Performance mode: full-screen view with large code, now and next, set timer, levels; guard against closing the tab." No GitHub issue.
-- **Status:** Draft
+- **Status:** Completed
 - **Author:** Claude (for the owner). The owner chose these on 2026-11-15: enter with a header button **and** a key; the code stays **editable** in the view, which also shows Now/Next, a set timer and levels; the close-tab guard is on **whenever music plays**, in any view.
 
 ---
