@@ -135,6 +135,7 @@ describe('callLibrary', () => {
             },
           );
         }
+        if (req.method !== 'POST') return void res.writeHead(405).end(); // the SDK's GET stream / DELETE on close
         const msg = JSON.parse(raw);
         if (msg.id === undefined) return void res.writeHead(202).end();
         if (msg.method === 'initialize') {
