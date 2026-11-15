@@ -182,7 +182,12 @@ export async function login(o = {}) {
  */
 export async function callLibrary(name, args, o = {}) {
   const serverUrl = o.serverUrl ?? libraryUrl();
-  const provider = fileAuthProvider({ serverUrl, file: o.file });
+  // The redirect URI the client was registered with. Without one the SDK takes the flow for a non-interactive one
+  // (client_credentials) and asks the token endpoint for a token outright, skipping the refresh grant: every call
+  // after the first access token expired (1 h) failed with "Either provider.prepareTokenRequest() or authorizationCode
+  // is required". With it, an expired token is refreshed, and a refused refresh ends in NotSignedIn.
+  const stored = (await readStore(o.file ?? authFile()))[serverUrl] ?? {};
+  const provider = fileAuthProvider({ serverUrl, file: o.file, redirectUrl: stored.client?.redirect_uris?.[0] });
   if (!(await provider.tokens())) throw new NotSignedIn();
   const client = new Client({ name: 'strudel-mcp-local', version: '1' });
   await client.connect(

@@ -84,3 +84,98 @@ describe('the sign-in store', () => {
     expect(() => p.redirectToAuthorization(new URL('https://as/authorize'))).toThrow(/strudel-mcp login/);
   });
 });
+
+describe('callLibrary', () => {
+  it('refreshes an expired access token with the stored refresh token instead of failing', async () => {
+    // Before the fix the provider had no redirect URL, so the SDK took the flow for a non-interactive one and never
+    // tried the refresh grant: every call failed an hour after sign-in ("Either provider.prepareTokenRequest() or
+    // authorizationCode is required").
+    const { createServer } = await import('node:http');
+    const { callLibrary } = await import('../src/library.mjs');
+    const seen = { refresh: 0, calls: 0 };
+    const srv = createServer(async (req, res) => {
+      const base = `http://127.0.0.1:${srv.address().port}`;
+      const json = (code, body, headers = {}) => {
+        res.writeHead(code, { 'content-type': 'application/json', ...headers });
+        res.end(JSON.stringify(body));
+      };
+      let raw = '';
+      for await (const c of req) raw += c;
+      if (req.url.startsWith('/.well-known/oauth-protected-resource')) {
+        return json(200, { resource: `${base}/mcp`, authorization_servers: [base] });
+      }
+      if (
+        req.url.startsWith('/.well-known/oauth-authorization-server') ||
+        req.url.startsWith('/.well-known/openid-configuration')
+      ) {
+        return json(200, {
+          issuer: base,
+          authorization_endpoint: `${base}/authorize`,
+          token_endpoint: `${base}/token`,
+          response_types_supported: ['code'],
+          code_challenge_methods_supported: ['S256'],
+          grant_types_supported: ['authorization_code', 'refresh_token'],
+          token_endpoint_auth_methods_supported: ['none'],
+        });
+      }
+      if (req.url === '/token') {
+        const p = new URLSearchParams(raw);
+        if (p.get('grant_type') !== 'refresh_token' || p.get('refresh_token') !== 'OLD')
+          return json(400, { error: 'invalid_grant' });
+        seen.refresh++;
+        return json(200, { access_token: 'NEW', token_type: 'bearer', expires_in: 3600, refresh_token: 'R2' });
+      }
+      if (req.url === '/mcp') {
+        if (req.headers.authorization !== 'Bearer NEW') {
+          return json(
+            401,
+            { error: 'invalid_token' },
+            {
+              'www-authenticate': `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource/mcp"`,
+            },
+          );
+        }
+        if (req.method !== 'POST') return void res.writeHead(405).end(); // the SDK's GET stream / DELETE on close
+        const msg = JSON.parse(raw);
+        if (msg.id === undefined) return void res.writeHead(202).end();
+        if (msg.method === 'initialize') {
+          return json(200, {
+            jsonrpc: '2.0',
+            id: msg.id,
+            result: {
+              protocolVersion: msg.params.protocolVersion,
+              capabilities: { tools: {} },
+              serverInfo: { name: 'fake', version: '1' },
+            },
+          });
+        }
+        seen.calls++;
+        return json(200, {
+          jsonrpc: '2.0',
+          id: msg.id,
+          result: { content: [{ type: 'text', text: '{"ok":true}' }], structuredContent: { ok: true } },
+        });
+      }
+      res.writeHead(404).end();
+    });
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+    try {
+      const base = `http://127.0.0.1:${srv.address().port}`;
+      const file = join(await dir(), 'auth.json');
+      await writeFile(
+        file,
+        JSON.stringify({
+          [`${base}/mcp`]: {
+            client: { client_id: 'c1', redirect_uris: ['http://127.0.0.1:9/callback'], issuer: base },
+            tokens: { access_token: 'EXPIRED', token_type: 'bearer', refresh_token: 'OLD', issuer: base },
+          },
+        }),
+      );
+      expect(await callLibrary('list_folders', {}, { serverUrl: `${base}/mcp`, file })).toEqual({ ok: true });
+      expect(seen).toEqual({ refresh: 1, calls: 1 });
+      expect(JSON.parse(await readFile(file, 'utf8'))[`${base}/mcp`].tokens.refresh_token).toBe('R2'); // rotated, kept
+    } finally {
+      srv.close();
+    }
+  });
+});
