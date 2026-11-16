@@ -13,7 +13,8 @@ function initDoughWorklet() {
       outputChannelCount: [2],
     },
   );
-  connectToDestination(doughWorklet); // channels?
+  // fork (strudel-client spec 032): kept, so resetGlobalEffects() doesn't leave it on the old merger.
+  connectToDestination(doughWorklet, undefined, { keep: true }); // channels?
 }
 
 const soundMap = new Map();

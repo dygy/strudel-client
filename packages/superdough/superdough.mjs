@@ -285,9 +285,19 @@ export function getSuperdoughAudioController() {
   }
   return controller;
 }
-export function connectToDestination(input, channels) {
+/**
+ * Play `input` into superdough's main output (through the scratch and master inserts, the gain and
+ * the output insert), on `channels` (default `[0, 1]`).
+ * Fork addition (strudel-client spec 032): `{ keep: true }` keeps the source routed across
+ * `resetGlobalEffects()` (for long-lived sources such as the `.supradough()` worklet).
+ * @param {AudioNode} input
+ * @param {number[]} [channels]
+ * @param {{ keep?: boolean }} [options]
+ * @noAutocomplete
+ */
+export function connectToDestination(input, channels, options) {
   const controller = getSuperdoughAudioController();
-  controller.output.connectToDestination(input, channels);
+  controller.output.connectToDestination(input, channels, options);
 }
 
 function getPhaser(time, end, frequency = 1, depth = 0.5, centerFrequency = 1000, sweep = 2000) {

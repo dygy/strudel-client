@@ -10,6 +10,7 @@
  * - Soft takeover: any change to an EQ band that didn't come from that band's own control (the panel
  *   slider, a preset, A/B, the other band's pad) makes its control pick up again. The volume and
  *   crossfader sliders call `notifyExternalChange` themselves.
+ *   Spec 032: the Master FX filter likewise, for any change not from its own control (watchFilterPickup).
  * - Works signed out and in the admin's read-only view (nothing here writes to a track).
  */
 import { useEffect, useRef, useState } from 'react';
@@ -26,7 +27,8 @@ import type { HeadphonesVolumeEngine } from '../headphonesVolume';
 import type { SetPlayerContextValue } from '../sets/useSetPlayer';
 import type { ManualMixControls } from '../useReplContext';
 import { createCrossfader, type ManualOutcome } from './crossfader';
-import { buildMidiTargets, EQ_BAND_COUNT, eqBandTargetId, midiEqBandSource } from './midiTargets';
+import { buildMidiTargets, EQ_BAND_COUNT, eqBandTargetId, midiEqBandSource, watchFilterPickup } from './midiTargets';
+import { masterFxRuntime } from '../masterFx/masterFxRuntime';
 import type { MidiMapContextValue } from './midiMapContext';
 
 export { MidiMapContext, useMidiMapContext, type MidiMapContextValue } from './midiMapContext';
@@ -169,6 +171,13 @@ export function useMidiMap({
         if (now[index]?.gain !== before[index]?.gain) map.notifyExternalChange(eqBandTargetId(index));
       }
     });
+  }, [map]);
+
+  // Spec 032 (review #2): the Master FX filter changed by anything but its own control (the knob, All
+  // FX off) picks up again.
+  useEffect(() => {
+    if (!map) return;
+    return watchFilterPickup(masterFxRuntime, map);
   }, [map]);
 
   const value: MidiMapContextValue = {

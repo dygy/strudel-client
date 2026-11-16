@@ -67,8 +67,13 @@ export interface ScratchFeelMidiStatus {
 }
 
 export interface ScratchState {
-  /** A deck's platter is held. */
+  /**
+   * The platter of the selected deck is held. Spec 032: a Master FX brake holding the speakers deck
+   * while the headphones are selected does not count (that platter is not held).
+   */
   grabbed: boolean;
+  /** Spec 032: the Master FX Brake holds the speakers deck. */
+  braking: boolean;
   /**
    * The deck inputs act on now: the headphones only while their preview runs, else the speakers.
    * Derived from `preferred`, which is what the user picked (and what is stored).
@@ -126,6 +131,10 @@ export interface ScratchControllerLike {
   setDeck(name: ScratchDeckName, deck: ScratchDeckLike | null): void;
   selected: ScratchDeckName;
   readonly state?: ScratchControllerState;
+  /** The sources holding the selected deck. */
+  readonly holders?: readonly string[];
+  /** The deck registered under `name`. */
+  getDeck?(name: ScratchDeckName): ScratchDeckLike | null;
   grab(source?: ScratchSource): boolean | void;
   moveBy(seconds: number, source?: ScratchSource): void;
   setMotor(rate: number, source?: ScratchSource): void;
@@ -138,6 +147,9 @@ export interface ScratchControllerLike {
 /** The part of ScratchDeck the runtime uses. */
 export interface ScratchDeckLike {
   attach(): Promise<unknown>;
+  /** Spec 032: the brake grabs the speakers deck directly when the headphones are selected. */
+  grab?(): boolean;
+  readonly isGrabbed?: boolean;
   release(): void;
   destroy(): void;
   getDebugState?(): Promise<ScratchDebugState | null>;
@@ -262,6 +274,14 @@ export interface ScratchRuntime extends ScratchActions {
   setFeel(feel: Partial<ScratchFeel>): void;
   /** Spec 025: back to the default brake (0.1 s) and spin-up (0.4 s). */
   resetFeel(): void;
+  /**
+   * Spec 032 (tech §2.4): the Master FX Brake. `down` grabs the speakers deck with the source
+   * `'brake'`, whichever deck is selected, so it brakes over the feel's brake time; the release
+   * spins it up over the spin-up time and hands over to live with Snap, as after a scratch. Refused
+   * (false) when the speakers deck isn't attached and playing, a track switch blocks it, or another
+   * source (platter, keys, jog) already holds it. `up` lets go only if the brake holds it.
+   */
+  brake(down: boolean): boolean;
   /**
    * Spec 023: the main repl's editPattern. Runs `inner` (spec 017's transition hook) and shifts
    * the result by the speakers' scratch offset; with offset 0 it returns `inner`'s result as is.
@@ -421,6 +441,7 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
       : 'beat';
   const store = map<ScratchState>({
     grabbed: false,
+    braking: false,
     selected: effectiveDeck(preferred, false),
     preferred,
     available: { main: false, preview: false },
@@ -519,14 +540,38 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
     if (controller && controller.selected !== next.selected) controller.selected = next.selected;
   };
 
+  // Spec 032: the brake's own hold on the speakers deck: through the controller (speakers selected,
+  // source 'brake') or on the deck directly (headphones selected), or none.
+  let brakeVia: 'controller' | 'direct' | null = null;
+
+  /**
+   * Whether the selected deck's platter is held. A controller that names its decks tells the
+   * selected one apart (a brake on the speakers while the headphones are selected is not the
+   * headphones' platter); otherwise the controller's "any deck held".
+   */
+  const grabbedOf = (state: ScratchControllerState | undefined, fallback: boolean): boolean => {
+    if (!state) return fallback;
+    const deck = controller?.getDeck?.(state.selected);
+    if (deck && typeof deck.isGrabbed === 'boolean') return deck.isGrabbed;
+    return Boolean(state.grabbed);
+  };
+
+  /** Spec 032: the brake's hold ended by itself (a stop, a deck switch, a release by another path). */
+  const syncBraking = () => {
+    if (brakeVia && !mainDeck?.isGrabbed) brakeVia = null;
+    if (store.get().braking !== (brakeVia !== null)) update({ braking: brakeVia !== null });
+  };
+
   const getController = (): ScratchControllerLike => {
     if (controller) return controller;
     controller = deps.createController();
     controller.selected = store.get().selected;
     controller.on('change', (state) => {
       if (!state) return;
+      if (brakeVia && !mainDeck?.isGrabbed) brakeVia = null;
       update({
-        grabbed: Boolean(state.grabbed),
+        grabbed: grabbedOf(state, Boolean(state.grabbed)),
+        braking: brakeVia !== null,
         available: {
           main: Boolean(state.available?.main),
           preview: Boolean(state.available?.preview),
@@ -540,7 +585,7 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
     const state = controller?.state;
     if (state) {
       update({
-        grabbed: Boolean(state.grabbed),
+        grabbed: grabbedOf(state, Boolean(state.grabbed)),
         available: { main: Boolean(state.available?.main), preview: Boolean(state.available?.preview) },
       });
     }
@@ -624,8 +669,7 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
       // ScratchDeck.grab() is idempotent: the wheel and the jog call this on every move.
       const scratch = getController();
       const held = scratch.grab(source) !== false;
-      const state = scratch.state;
-      update({ grabbed: state ? Boolean(state.grabbed) : held });
+      update({ grabbed: grabbedOf(scratch.state, held) });
       return held;
     },
 
@@ -643,8 +687,8 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
       if (!controller) return;
       // The record stays held while another source (a held key, the platter) still holds it.
       controller.release(source);
-      const state = controller.state;
-      update({ grabbed: state ? Boolean(state.grabbed) : false });
+      update({ grabbed: grabbedOf(controller.state, false) });
+      syncBraking();
     },
 
     releaseAll(options) {
@@ -652,7 +696,43 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
       if (!controller) return;
       if (options) controller.releaseAll(options);
       else controller.releaseAll();
-      update({ grabbed: false });
+      brakeVia = null;
+      update({ grabbed: false, braking: false });
+    },
+
+    brake(down) {
+      if (!down) {
+        const via = brakeVia;
+        brakeVia = null;
+        if (via === 'controller') {
+          // Only the brake's hold goes: a platter grabbed meanwhile keeps the record held.
+          controller?.release('brake');
+        } else if (via === 'direct' && mainDeck?.isGrabbed) {
+          // The speakers became the selected deck meanwhile and another source holds it: keep it.
+          const othersHold =
+            controller?.selected === 'main' && (controller.holders ?? []).some((holder) => holder !== 'brake');
+          if (!othersHold) mainDeck.release();
+        }
+        if (controller) update({ grabbed: grabbedOf(controller.state, false) });
+        syncBraking();
+        return false;
+      }
+      if (brakeVia) return true;
+      if (isMainBusy() !== store.get().blocked.main) runtime.refreshBlocked();
+      const state = store.get();
+      if (!mainDeck || !state.available.main || !state.playing.main || state.blocked.main) return false;
+      // Held by the platter, the keys, the wheel or the jog: the Brake does nothing until let go.
+      if (mainDeck.isGrabbed) return false;
+      const scratch = getController();
+      if (scratch.selected === 'main') {
+        if (scratch.grab('brake') === false) return false;
+        brakeVia = 'controller';
+      } else {
+        if (!mainDeck.grab || mainDeck.grab() === false) return false;
+        brakeVia = 'direct';
+      }
+      update({ grabbed: grabbedOf(scratch.state, state.grabbed), braking: true });
+      return true;
     },
 
     autoRelease(ms, source) {

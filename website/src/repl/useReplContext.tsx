@@ -65,6 +65,7 @@ import {
   type SwitchResult,
 } from './evaluateNewTrack';
 import { installMainEqualizerWhenReady } from './mainEqualizer';
+import { masterFxRuntime } from './masterFx/masterFxRuntime';
 import { runRestoringAbandon } from './abandonedMix';
 import { playingCodeEvaluated, playingStopped } from './playingEqProfile';
 import { scratchRuntime } from './scratch/scratchRuntime';
@@ -498,6 +499,10 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   useEffect(() => {
     scratchRuntime.setPlaying('main', Boolean(started));
   }, [started]);
+  // Spec 032: Stop releases every Master FX hold and fades the delay / reverb tails.
+  useEffect(() => {
+    masterFxRuntime.setPlaying(Boolean(started));
+  }, [started]);
   useEffect(() => {
     scratchRuntime.setPlaying('preview', isPreviewing);
   }, [isPreviewing]);
@@ -516,6 +521,9 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     // creates superdough's controller, which sizes the channels for that device); registered
     // now, so it runs before beforeEval's await of the same promise, i.e. before the first note.
     const releaseMainEqualizer = installMainEqualizerWhenReady(audioReady);
+    // Spec 032: the Master FX stage goes into superdough's master insert slot (before the EQ) at the
+    // same point, so it is in place before the first note.
+    const releaseMasterFx = masterFxRuntime.installWhenReady(audioReady);
 
     const initPreview = async () => {
       try {
@@ -559,6 +567,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
 
     return () => {
       releaseMainEqualizer();
+      releaseMasterFx();
       if (mixerRef.current) {
         scratchRuntime.detachPreview();
         mixerRef.current.destroy();
@@ -586,6 +595,30 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
 
   // The scratch keys (Alt+Shift+←/→), installed once so a held key survives re-renders.
   useEffect(() => installScratchShortcut(scratchRuntime), []);
+
+  // Spec 032: Master FX reads the main repl's tempo and the playing track's grid (Snap's: the transition
+  // origin plus the speakers' scratch shift), and brakes through the scratch runtime.
+  useEffect(() => {
+    const disconnectRepl = masterFxRuntime.setReplSource({
+      scheduler: () => editorRef.current?.repl?.scheduler ?? null,
+      origin: () => {
+        const origin = transitionControllerRef.current?.getState().origin ?? 0;
+        const shift = scratchRuntime.mainShift();
+        // A pending shift (an Update during a spin-up) moves the track only from its atCycle on.
+        const now = Number(editorRef.current?.repl?.scheduler?.now?.() ?? 0);
+        const pending = shift.pending && now >= shift.pending.atCycle ? shift.pending.cycles : 0;
+        return origin + shift.cycles + pending;
+      },
+    });
+    const disconnectBrake = masterFxRuntime.setBrakeTarget({
+      brake: (down) => scratchRuntime.brake(down),
+      watchBraking: (listener) => scratchRuntime.store.listen((state) => listener(state.braking)),
+    });
+    return () => {
+      disconnectRepl();
+      disconnectBrake();
+    };
+  }, []);
 
   // Track transitions (spec 017). The controller itself is created on the first switch
   // (getTransitionController); here: its visuals cleanup and the error toasts.

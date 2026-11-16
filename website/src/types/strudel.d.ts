@@ -85,6 +85,16 @@ declare module '@strudel/webaudio' {
      * Spec 020: click-free swap; returns seconds until the previous target is silent.
      */
     setOutputInsert(node: AudioNode | null, options?: { onChannelCount?: (channelCount: number) => void }): number;
+    /**
+     * Fork addition (spec 032): put `node` (… `output`) between the scratch slot and destinationGain;
+     * kept across reset(); null restores the spec 019 graph.
+     */
+    setMasterInsert(
+      node: AudioNode | null,
+      options?: { output?: AudioNode; onChannelCount?: (channelCount: number) => void },
+    ): void;
+    /** Spec 032: the master insert's input node, or null. */
+    getMasterInsert(): AudioNode | null;
     [key: string]: any;
   }
 
@@ -364,8 +374,11 @@ declare module '@strudel/mixer' {
   // Vinyl scratch control (spec 019); see packages/mixer/scratch/*.
   /** Which deck a scratch acts on: the speakers (main) or the headphone preview. */
   export type ScratchDeckName = 'main' | 'preview';
-  /** Who holds the record: the deck lets go only when no source holds it. No argument = 'default'. */
-  export type ScratchSource = 'pointer' | 'key' | 'wheel' | 'midi' | 'default';
+  /**
+   * Who holds the record: the deck lets go only when no source holds it. No argument = 'default'.
+   * Spec 032: 'brake' is the Master FX Brake (any non-empty string works as a source).
+   */
+  export type ScratchSource = 'pointer' | 'key' | 'wheel' | 'midi' | 'brake' | 'default';
 
   /** One deck's scratch node, inserted before the deck's destinationGain (pre-gain slot). */
   export class ScratchDeck {
@@ -702,14 +715,19 @@ declare module '@strudel/mixer' {
     channel: number;
     number: number;
   }
-  export type MidiMapTargetKind = 'continuous' | 'button';
-  /** An app target the map drives. Continuous: read/write 0..1 (soft takeover). Button: press once. */
+  export type MidiMapTargetKind = 'continuous' | 'button' | 'hold';
+  /**
+   * An app target the map drives. Continuous: read/write 0..1 (soft takeover). Button: press once.
+   * Hold (spec 032): down on press, up on release (and on clear, import, dispose or disconnect).
+   */
   export interface MidiMapTarget {
     id: string;
     kind: MidiMapTargetKind;
     read?: () => number;
     write?: (v01: number) => void;
     press?: () => void;
+    down?: () => void;
+    up?: () => void;
     /** Named when another Learn is refused because this target holds the control. */
     label?: string;
   }
@@ -811,6 +829,102 @@ declare module '@strudel/mixer' {
   export const MIDI_MAP_PICKUP_TOLERANCE: number;
   export const MIDI_MAP_TARGET_KINDS: readonly MidiMapTargetKind[];
   export const MIDI_MAP_EXPORT_FILENAME: string;
+
+  // Spec 032: the Master FX stage on the speakers; see packages/mixer/masterfx/*.
+  export interface MasterFxSettings {
+    /** 0..1. */
+    resonance: number;
+    delay: { fraction: number; feedback: number; level: number };
+    /** decay in seconds. */
+    reverb: { decay: number; level: number };
+    /** Cycles, one of MASTER_FX_REPEAT_LENGTHS. */
+    repeatLength: number;
+  }
+  export class MasterFx {
+    constructor(
+      audioContext: BaseAudioContext,
+      options?: {
+        channelCount?: number;
+        /** Resolves once the beat-repeat module is on the context; false: no beat-repeat. */
+        workletReady?: Promise<unknown> | false;
+        settings?: Partial<MasterFxSettings>;
+        cps?: number;
+        random?: () => number;
+      },
+    );
+    readonly input: AudioNode;
+    readonly output: AudioNode;
+    /** Settles once the beat-repeat worklet is in the path (true) or could not load (false). */
+    readonly ready: Promise<boolean>;
+    /** True once the beat-repeat worklet is in the path. */
+    readonly workletLoaded: boolean;
+    setFilter(position: number): void;
+    setResonance(r01: number): void;
+    setDelay(settings: { fraction?: number; feedback?: number; level?: number }): void;
+    setReverb(settings: { decay?: number; level?: number }): void;
+    setCps(cps: number): void;
+    throwDelay(on: boolean): void;
+    throwReverb(on: boolean): void;
+    /** Start (or stop: null) a roll; false until the worklet has loaded, or for a bad start / length. */
+    roll(options: { startTime: number; length: number } | null): boolean;
+    /** The held roll's slice length (s), from the next repeat; false before the worklet or for a bad length. */
+    setRollLength(seconds: number): boolean;
+    stopTails(): void;
+    setChannelCount(channelCount: number): void;
+    destroy(): void;
+  }
+  export function makeReverbImpulse(ctx: BaseAudioContext, decay: number, random?: () => number): AudioBuffer;
+  export const MASTER_FX_SEND_RAMP_SECONDS: number;
+  export const MASTER_FX_FILTER_FADE_SECONDS: number;
+  export const MASTER_FX_CUTOFF_TAU: number;
+  export const MASTER_FX_DELAY_TIME_TAU: number;
+  export const MASTER_FX_LEVEL_RAMP_SECONDS: number;
+  export const MASTER_FX_REVERB_SWAP_SECONDS: number;
+  export const MASTER_FX_REVERB_DEBOUNCE_MS: number;
+  export const MASTER_FX_STOP_FADE_SECONDS: number;
+  export const MASTER_FX_STOP_RESTORE_MS: number;
+  export const MASTER_FX_MAX_DELAY_SECONDS: number;
+  export const MASTER_FX_WORKLET_SWAP_SECONDS: number;
+  export const MASTER_FX_DEFAULT_CPS: number;
+  /** The knob mapping: wet 0 (dry, in the dead zone) or 1, both cutoffs, and the Qs. */
+  export function filterParams(
+    position: number,
+    r01: number,
+  ): { wet: number; side: 'off' | 'lp' | 'hp'; lpHz: number; hpHz: number; q: number; lpQ: number; hpQ: number };
+  /** −100..100 (not rounded); junk is 0. */
+  export function clampFilterPosition(position: unknown): number;
+  export const MASTER_FX_FILTER_MIN: number;
+  export const MASTER_FX_FILTER_MAX: number;
+  export const MASTER_FX_FILTER_DEAD_ZONE: number;
+  export const MASTER_FX_LP_OPEN_HZ: number;
+  export const MASTER_FX_LP_CLOSED_HZ: number;
+  export const MASTER_FX_HP_OPEN_HZ: number;
+  export const MASTER_FX_HP_CLOSED_HZ: number;
+  export const MASTER_FX_Q_FLAT: number;
+  export const MASTER_FX_Q_RANGE: number;
+  /** Delay times as fractions of a cycle: 1/8, 3/16, 1/4, 3/8. */
+  export const MASTER_FX_DELAY_FRACTIONS: readonly number[];
+  /** Beat-repeat lengths in cycles, in the Repeat length button's order: 1/2, 1/4, 1/8, 1/16. */
+  export const MASTER_FX_REPEAT_LENGTHS: readonly number[];
+  /** Inclusive ranges; resonance, feedback and levels are 0..1. */
+  export const MASTER_FX_RANGES: Readonly<{
+    filter: Readonly<{ min: number; max: number; deadZone: number }>;
+    resonance: Readonly<{ min: number; max: number }>;
+    delayFeedback: Readonly<{ min: number; max: number }>;
+    delayLevel: Readonly<{ min: number; max: number }>;
+    reverbDecay: Readonly<{ min: number; max: number }>;
+    reverbLevel: Readonly<{ min: number; max: number }>;
+  }>;
+  export const MASTER_FX_DEFAULTS: Readonly<MasterFxSettings>;
+  /** localStorage key the app keeps the settings under ('strudel-master-fx'). */
+  export const MASTER_FX_STORAGE_KEY: string;
+  /** Clean settings from anything: each damaged or missing field falls back to its default. */
+  export function sanitizeMasterFxSettings(raw: unknown): MasterFxSettings;
+  /** 1/2 → 1/4 → 1/8 → 1/16 → 1/2; an unknown one gives the first. */
+  export function nextRepeatLength(current: number): number;
+  /** Adds the beat-repeat processor to the context, once per context. */
+  export function loadBeatRepeatWorklet(audioContext: BaseAudioContext): Promise<void>;
+  export const BEAT_REPEAT_PROCESSOR: string;
 
   // Spec 031: speakers and headphones volume; see packages/mixer/volume.mjs.
   /** The squared taper: volumeGain(1) === 1, volumeGain(0.7) ≈ 0.49 (−6.2 dB). */

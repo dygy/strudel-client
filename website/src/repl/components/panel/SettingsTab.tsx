@@ -8,6 +8,7 @@ import { AudioEngineTargetSelector } from './AudioEngineTargetSelector';
 import { LanguageSelector } from './LanguageSelector';
 import { SampleCacheSettings } from './SampleCacheSettings';
 import { MixerSettings } from './MixerSettings';
+import { MasterFxPanel } from '../masterfx/MasterFxPanel';
 import { MidiSettings } from './MidiSettings';
 import { ConnectedAssistants } from './ConnectedAssistants';
 import { AllowAssistantSwitch } from '../../assistantControl/AllowAssistantSwitch';
@@ -294,6 +295,9 @@ export function SettingsTab({ started, mixer, readOnly = false }: SettingsTabPro
         <FormItem label={t('audioMixer')}>
           <MixerSettings mixer={mixer} isDisabled={started} />
         </FormItem>
+
+        {/* Spec 032: Master FX on the speakers (usable while playing, never disabled) */}
+        <MasterFxPanel />
 
         {/* Spec 031: MIDI mapping for every live control (nothing outside the REPL) */}
         <MidiSettings />

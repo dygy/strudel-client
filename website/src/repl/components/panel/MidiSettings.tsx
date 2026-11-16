@@ -34,6 +34,7 @@ type T = (key: string, options?: Record<string, unknown>) => string;
 const GROUPS: { id: MidiTargetGroup | 'scratch'; label: SettingsKey }[] = [
   { id: 'eq', label: 'midiGroupEq' },
   { id: 'mixer', label: 'midiGroupMixer' },
+  { id: 'masterFx', label: 'midiGroupMasterFx' },
   { id: 'set', label: 'midiGroupSet' },
   { id: 'transport', label: 'midiGroupTransport' },
   { id: 'transition', label: 'midiGroupTransition' },

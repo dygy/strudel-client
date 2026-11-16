@@ -330,6 +330,43 @@ export interface SettingsTranslations {
   midiTargetJog: string;
   midiTargetBrake: string;
   midiTargetSpinUp: string;
+  // Spec 032: Master FX (MIDI rows)
+  midiGroupMasterFx: string;
+  midiTargetMasterFilter: string;
+  midiTargetMasterDelay: string;
+  midiTargetMasterReverb: string;
+  midiTargetMasterRepeat: string;
+  midiTargetMasterBrake: string;
+  midiTargetMasterRepeatLength: string;
+  // Spec 032: the Master FX panel and the performance row
+  masterFx: {
+    title: string;
+    description: string;
+    filter: string;
+    filterOff: string;
+    filterLowPass: string;
+    filterHighPass: string;
+    filterLp: string;
+    filterHp: string;
+    filterHint: string;
+    resonance: string;
+    delay: string;
+    delayTime: string;
+    delayFeedback: string;
+    level: string;
+    reverb: string;
+    reverbDecay: string;
+    repeat: string;
+    repeatLength: string;
+    brake: string;
+    brakeNote: string;
+    brakeLink: string;
+    holdHint: string;
+    holdLabel: string;
+    allOff: string;
+    cycle: string;
+    seconds: string;
+  };
   midiBindingCc: string;
   midiBindingNote: string;
   midiLearn: string;

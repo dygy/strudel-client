@@ -141,6 +141,16 @@ export class SuperdoughOutput {
   // fork addition (strudel-client fix: .dough() skipped the EQ): sources played straight into
   // destinationGain (the dsp worklet). Re-attached to the new destinationGain on reset().
   directInputs = new Set();
+  // fork addition (strudel-client spec 032): a sub-graph (input node, output node) between the
+  // pre-gain insert (or channelMerger) and destinationGain (the master FX). The direct inputs play
+  // into it too. Kept across reset() / initializeAudio().
+  masterInsert = null;
+  // fork addition (spec 032): `{ output, onChannelCount }` given with the master insert.
+  masterInsertOptions = null;
+  // fork addition (spec 032 fix: supradough fell silent after resetGlobalEffects()): sources given
+  // to connectToDestination with `{ keep: true }`, input → { stereoMix, splitter, channels }. Their
+  // splitter is re-routed into the new channelMerger on reset().
+  keptSources = new Map();
 
   constructor(audioContext) {
     this.audioContext = audioContext;
@@ -153,8 +163,11 @@ export class SuperdoughOutput {
     this.audioContext.destination.channelCount = maxChannelCount;
     this.channelMerger = new ChannelMergerNode(audioContext, { numberOfInputs: audioContext.destination.channelCount });
     this.destinationGain = new GainNode(audioContext);
-    this.connectPreGain(this.preGainInsert); // fork: channelMerger → [insert] → destinationGain (spec 019)
-    this.directInputs.forEach((node) => node.connect(this.destinationGain)); // fork: direct inputs
+    // fork (spec 032): the master insert's output plays into the new destinationGain.
+    if (this.masterInsert) this.masterInsertOutput().connect(this.destinationGain);
+    this.connectPreGain(this.preGainInsert); // fork: channelMerger → [insert] → [master] → destinationGain (spec 019, 032)
+    this.directInputs.forEach((node) => node.connect(this.preGainTarget())); // fork: direct inputs
+    this.keptSources.forEach((kept) => this.routeIntoMerger(kept)); // fork (spec 032): kept sources
     this.outputSwitches = new Map();
     this.destinationGain.connect(this.outputInsert ?? audioContext.destination); // fork: insert (spec 008)
     // fork (spec 020): the insert sizes itself to the output's channels, which a reset can change.
@@ -165,6 +178,28 @@ export class SuperdoughOutput {
         console.warn('[superdough] output insert onChannelCount failed:', err);
       }
     }
+    // fork (spec 032): so does the master insert.
+    if (this.masterInsert && this.masterInsertOptions?.onChannelCount) {
+      try {
+        this.masterInsertOptions.onChannelCount(audioContext.destination.channelCount);
+      } catch (err) {
+        console.warn('[superdough] master insert onChannelCount failed:', err);
+      }
+    }
+  }
+
+  /**
+   * @private Fork addition (spec 032): where the merger (or the pre-gain insert) and the direct
+   * inputs play into: the master insert's input when one is set, else destinationGain.
+   * @returns {AudioNode}
+   */
+  preGainTarget() {
+    return this.masterInsert ?? this.destinationGain;
+  }
+
+  /** @private Fork addition (spec 032): the node that carries the master insert into destinationGain. */
+  masterInsertOutput() {
+    return this.masterInsertOptions?.output ?? this.masterInsert;
   }
 
   /** @private Fork addition (spec 020): destinationGain → new switch gain (at `gain`) → target. */
@@ -204,24 +239,27 @@ export class SuperdoughOutput {
     return sw;
   }
 
-  /** @private Fork addition (spec 019): wire channelMerger → node → destinationGain, or the direct edge. */
-  connectPreGain(node) {
+  /**
+   * @private Fork addition (spec 019): wire channelMerger → node → destinationGain, or the direct
+   * edge. Spec 032: the far end is `target` (default `preGainTarget()`: the master insert if set).
+   */
+  connectPreGain(node, target = this.preGainTarget()) {
     if (node) {
       this.channelMerger.connect(node);
-      node.connect(this.destinationGain);
+      node.connect(target);
     } else {
-      this.channelMerger.connect(this.destinationGain);
+      this.channelMerger.connect(target);
     }
   }
 
-  /** @private Fork addition (spec 019): remove only the edges connectPreGain(node) made. */
-  disconnectPreGain(node) {
+  /** @private Fork addition (spec 019): remove only the edges connectPreGain(node, target) made. */
+  disconnectPreGain(node, target = this.preGainTarget()) {
     const edges = node
       ? [
           [this.channelMerger, node],
-          [node, this.destinationGain],
+          [node, target],
         ]
-      : [[this.channelMerger, this.destinationGain]];
+      : [[this.channelMerger, target]];
     for (const [from, to] of edges) {
       try {
         from.disconnect(to);
@@ -262,6 +300,71 @@ export class SuperdoughOutput {
    */
   getPreGainInsert() {
     return this.preGainInsert;
+  }
+
+  /**
+   * Fork addition (strudel-client spec 032). Put a sub-graph between the pre-gain insert (the
+   * scratch node; or `channelMerger` without one) and `destinationGain`:
+   * `channelMerger → [pre-gain insert] → node … output → destinationGain`. Sources given to
+   * `connectDirectInput` (the `.dough()` worklet) play into `node` too, so everything heard on this
+   * output goes through it. Everything on `destinationGain` (gain ramps, recorders, the output
+   * insert) is after it. `null` restores the spec 019 graph exactly.
+   *
+   * The slot is kept across `reset()`, which rebuilds the merger and the gain: the edges into `node`
+   * and `output → destinationGain` are re-made, then `onChannelCount(destination.channelCount)` is
+   * called, so the sub-graph can size itself to the output. Only the slot's own edges are ever
+   * touched; the sub-graph's inner wiring is the caller's.
+   *
+   * The new path is wired before the old one is dropped, but a swap while sound plays is not
+   * faded and may click: install the slot once before the first note and remove it on teardown.
+   * @param {AudioNode|null} node - the sub-graph's input
+   * @param {{ output?: AudioNode, onChannelCount?: (channelCount: number) => void }} [options] -
+   *   `output`: the sub-graph's output (default `node`); `onChannelCount`: called on every `reset()`
+   * @noAutocomplete
+   */
+  setMasterInsert(node, { output, onChannelCount } = {}) {
+    const next = node ?? null;
+    const nextOutput = next ? (output ?? next) : null;
+    const previous = this.masterInsert;
+    const previousOutput = previous ? this.masterInsertOutput() : null;
+    this.masterInsertOptions = next ? { output: nextOutput, onChannelCount } : null;
+    if (next === previous && nextOutput === previousOutput) {
+      return;
+    }
+    this.masterInsert = next;
+    if (!this.channelMerger || !this.destinationGain) {
+      return;
+    }
+    const gain = this.destinationGain;
+    const nextTarget = next ?? gain;
+    const previousTarget = previous ?? gain;
+    const cut = (from, to) => {
+      try {
+        from.disconnect(to);
+      } catch {
+        // was not connected
+      }
+    };
+    // New path first (downstream, then upstream), then drop the old one.
+    if (nextOutput && nextOutput !== previousOutput) nextOutput.connect(gain);
+    if (nextTarget !== previousTarget) {
+      // Only the far-end edges move: the merger → pre-gain insert edge is shared by both paths.
+      const upstream = this.preGainInsert ?? this.channelMerger;
+      upstream.connect(nextTarget);
+      this.directInputs.forEach((n) => n.connect(nextTarget));
+      cut(upstream, previousTarget);
+      this.directInputs.forEach((n) => cut(n, previousTarget));
+    }
+    if (previousOutput && previousOutput !== nextOutput) cut(previousOutput, gain);
+  }
+
+  /**
+   * Fork addition (strudel-client spec 032). The input node set by `setMasterInsert`, or null.
+   * @returns {AudioNode|null}
+   * @noAutocomplete
+   */
+  getMasterInsert() {
+    return this.masterInsert;
   }
 
   /**
@@ -351,7 +454,7 @@ export class SuperdoughOutput {
   connectDirectInput(node) {
     if (!node || this.directInputs.has(node)) return;
     this.directInputs.add(node);
-    if (this.destinationGain) node.connect(this.destinationGain);
+    if (this.destinationGain) node.connect(this.preGainTarget()); // spec 032: into the master insert if set
   }
 
   /**
@@ -362,7 +465,7 @@ export class SuperdoughOutput {
   disconnectDirectInput(node) {
     if (!this.directInputs.delete(node)) return;
     try {
-      if (this.destinationGain) node.disconnect(this.destinationGain);
+      if (this.destinationGain) node.disconnect(this.preGainTarget());
     } catch {
       // was not connected
     }
@@ -377,14 +480,26 @@ export class SuperdoughOutput {
     if (this.preGainInsert) {
       this.disconnectPreGain(this.preGainInsert);
     }
-    // fork: direct inputs outlive this gain too; drop only their edges into it.
+    // fork: direct inputs outlive this gain too; drop only their edges into it (spec 032: or into
+    // the master insert, re-made by initializeAudio).
+    const target = this.preGainTarget();
     this.directInputs.forEach((node) => {
       try {
-        node.disconnect(this.destinationGain);
+        node.disconnect(target);
       } catch {
         // was not connected
       }
     });
+    // fork (spec 032): the master insert outlives this gain; drop only its output's edge into it.
+    if (this.masterInsert) {
+      try {
+        this.masterInsertOutput().disconnect(this.destinationGain);
+      } catch {
+        // was not connected
+      }
+    }
+    // fork (spec 032): kept sources outlive this merger; their splitter only feeds it.
+    this.keptSources.forEach(({ splitter }) => splitter.disconnect());
     this.channelMerger.disconnect();
     this.destinationGain.disconnect();
     this.outputSwitches.forEach((sw) => sw.disconnect()); // fork (spec 020)
@@ -392,7 +507,17 @@ export class SuperdoughOutput {
     this.destinationGain = null;
     this.channelMerger = null;
   }
-  connectToDestination = (input, channels = [0, 1]) => {
+  /**
+   * Play `input` into the output's channel merger, on `channels`.
+   * Fork addition (strudel-client spec 032): with `{ keep: true }` the source is kept across
+   * `reset()` (re-routed into the rebuilt merger), for long-lived sources such as the
+   * `.supradough()` worklet; keeping the same input twice routes it once. Without it, upstream behaviour.
+   * @param {AudioNode} input
+   * @param {number[]} [channels]
+   * @param {{ keep?: boolean }} [options]
+   */
+  connectToDestination = (input, channels = [0, 1], { keep = false } = {}) => {
+    if (keep && this.keptSources.has(input)) return;
     //This upmix can be removed if correct channel counts are set throughout the app,
     // and then strudel could theoretically support surround sound audio files
     const stereoMix = new StereoPannerNode(this.audioContext);
@@ -402,10 +527,17 @@ export class SuperdoughOutput {
       numberOfOutputs: stereoMix.channelCount,
     });
     stereoMix.connect(splitter);
+    const route = { stereoMix, splitter, channels };
+    if (keep) this.keptSources.set(input, route);
+    this.routeIntoMerger(route);
+  };
+
+  /** @private Fork (spec 032): connect a source's splitter to the current merger on its channels. */
+  routeIntoMerger({ stereoMix, splitter, channels }) {
     channels.forEach((ch, i) => {
       splitter.connect(this.channelMerger, i % stereoMix.channelCount, ch % this.audioContext.destination.channelCount);
     });
-  };
+  }
 }
 
 export class SuperdoughAudioController {
@@ -448,6 +580,27 @@ export class SuperdoughAudioController {
    */
   getPreGainInsert() {
     return this.output.getPreGainInsert();
+  }
+
+  /**
+   * Fork addition (strudel-client spec 032). See `SuperdoughOutput.setMasterInsert`: a sub-graph
+   * (`node` in, `options.output` out) between the scratch insert and the destination gain, which the
+   * direct inputs play into too (the master FX); `null` removes it. Kept across `reset()`.
+   * @param {AudioNode|null} node
+   * @param {{ output?: AudioNode, onChannelCount?: (channelCount: number) => void }} [options]
+   * @noAutocomplete
+   */
+  setMasterInsert(node, options) {
+    this.output.setMasterInsert(node, options);
+  }
+
+  /**
+   * Fork addition (strudel-client spec 032). The current master insert's input node, or null.
+   * @returns {AudioNode|null}
+   * @noAutocomplete
+   */
+  getMasterInsert() {
+    return this.output.getMasterInsert();
   }
 
   /**

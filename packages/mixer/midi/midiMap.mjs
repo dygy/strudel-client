@@ -8,6 +8,11 @@
  *   (`read()`), so a fader sitting elsewhere never jumps the sound;
  * - a **button** target takes a note-on (velocity > 0) or a CC press (≥ 64 after < 64, or as the
  *   first message), once per press: a held button doesn't repeat.
+ * - a **hold** target (spec 032) `{ id, kind: 'hold', down(), up() }` gets `down()` on the same press
+ *   and `up()` on the release (note-off / note-on velocity 0, or a CC < 64 after ≥ 64). Repeated
+ *   presses while down are ignored. It is learned like a button. A hold that is down is let go
+ *   (`up()`) when its binding is cleared, replaced or imported over, when its target is
+ *   unregistered, when the map is destroyed, and when its input disconnects, so nothing sticks.
  *
  * Bindings live in localStorage `strudel-midi-map` (`{ version: 1, bindings: { [targetId]: control } }`,
  * a control being `{ inputName, kind: 'cc'|'note', channel, number }`). A control is never bound
@@ -40,7 +45,7 @@ export const MIDI_MAP_LEARN_WINDOW_MS = 300;
 /** Soft takeover: a control within this distance (of the 0..1 range) of the value picks it up. */
 export const MIDI_MAP_PICKUP_TOLERANCE = 0.02;
 /** The kinds of target. */
-export const MIDI_MAP_TARGET_KINDS = Object.freeze(['continuous', 'button']);
+export const MIDI_MAP_TARGET_KINDS = Object.freeze(['continuous', 'button', 'hold']);
 /** The file name Export suggests. */
 export const MIDI_MAP_EXPORT_FILENAME = 'strudel-midi-map.json';
 
@@ -99,10 +104,12 @@ export function buttonEdge(state, msg) {
 /**
  * @typedef {object} MidiMapTarget
  * @property {string} id - Stable id (stored in the bindings).
- * @property {string} kind - `'continuous'` or `'button'`.
+ * @property {string} kind - `'continuous'`, `'button'` or (spec 032) `'hold'`.
  * @property {function(): number} [read] - Continuous: the current value, 0..1 (soft takeover).
  * @property {function(number): void} [write] - Continuous: set the value, 0..1.
  * @property {function(): void} [press] - Button: act once.
+ * @property {function(): void} [down] - Hold: the control was pressed.
+ * @property {function(): void} [up] - Hold: the control was released (or its binding went away).
  * @property {string} [label] - Shown when another Learn is refused because this target holds the control.
  */
 
@@ -175,7 +182,8 @@ export function createMidiMap(options = {}) {
   const listeners = new Set();
   const targets = new Map();
   const pickState = new Map(); // targetId → { picked, last }
-  const buttonState = new Map(); // targetId → { held }
+  const buttonState = new Map(); // targetId → { held }  (button and hold edges)
+  const holdsDown = new Set(); // spec 032: hold target ids that got down() and not up() yet
   let bindings = readBindings();
   let status = midiSupported() ? 'idle' : 'unsupported';
   let detail;
@@ -269,6 +277,8 @@ export function createMidiMap(options = {}) {
 
   function onInputsChange(names) {
     inputNames = [...names];
+    // Spec 032: a hold whose input went away can never get its release: let it go now.
+    releaseHolds((id) => !inputNames.includes(bindings[id]?.inputName));
     if (status === 'ready') emit();
   }
 
@@ -295,6 +305,7 @@ export function createMidiMap(options = {}) {
       if (!target) continue; // a target this build doesn't know (kept for a newer one)
       if (target.kind === 'continuous') driveContinuous(id, target, msg);
       else if (target.kind === 'button') driveButton(id, target, msg);
+      else if (target.kind === 'hold') driveHold(id, target, msg);
     }
   }
 
@@ -332,6 +343,45 @@ export function createMidiMap(options = {}) {
     }
   }
 
+  /** Spec 032: a hold target follows the control: down on the press, up on the release. */
+  function driveHold(id, target, msg) {
+    const { press, state } = buttonEdge(buttonState.get(id), msg);
+    buttonState.set(id, state);
+    if (press) holdDown(id, target);
+    else if (!state.held) holdUp(id);
+  }
+
+  function holdDown(id, target) {
+    if (holdsDown.has(id)) return;
+    holdsDown.add(id);
+    try {
+      target.down?.();
+    } catch (err) {
+      console.warn('[midiMap] down failed:', err);
+    }
+  }
+
+  /** Let a hold target go if it is down; `fallback` is used when the target is no longer registered. */
+  function holdUp(id, fallback) {
+    if (!holdsDown.delete(id)) return;
+    const target = targets.get(id) ?? fallback;
+    try {
+      target?.up?.();
+    } catch (err) {
+      console.warn('[midiMap] up failed:', err);
+    }
+  }
+
+  /** Let every hold target go (or only those `which` accepts). */
+  function releaseHolds(which = () => true) {
+    for (const id of [...holdsDown]) {
+      if (which(id)) {
+        holdUp(id);
+        buttonState.delete(id);
+      }
+    }
+  }
+
   function learnMessage(control, msg) {
     const p = pending;
     let candidate = null;
@@ -358,11 +408,13 @@ export function createMidiMap(options = {}) {
     }
     const clean = cleanMidiControl(candidate);
     if (!clean) return;
+    holdUp(p.id); // spec 032: a hold that was down on its old control is let go
     bindings = { ...bindings, [p.id]: clean };
     writeBindings();
     pickState.delete(p.id);
     // The press that bound a button is not a press of the target; its release is still to come.
-    if (p.kind === 'button') buttonState.set(p.id, { held: true });
+    // Spec 032: the same for a hold (no down for the binding press, so no up for its release).
+    if (p.kind === 'button' || p.kind === 'hold') buttonState.set(p.id, { held: true });
     else buttonState.delete(p.id);
     finishLearn({ ok: true, control: { ...clean } });
   }
@@ -437,6 +489,7 @@ export function createMidiMap(options = {}) {
   function clear(targetId) {
     if (pending?.id === targetId) finishLearn({ ok: false, reason: 'cancelled' });
     if (!(targetId in bindings)) return;
+    holdUp(targetId); // spec 032
     const next = { ...bindings };
     delete next[targetId];
     bindings = next;
@@ -448,6 +501,7 @@ export function createMidiMap(options = {}) {
 
   function clearAll() {
     if (pending) finishLearn({ ok: false, reason: 'cancelled' });
+    releaseHolds(); // spec 032
     bindings = {};
     pickState.clear();
     buttonState.clear();
@@ -489,6 +543,7 @@ export function createMidiMap(options = {}) {
       next[id] = clean;
     }
     if (pending) finishLearn({ ok: false, reason: 'cancelled' });
+    releaseHolds(); // spec 032: the controls are being replaced
     bindings = next;
     pickState.clear();
     buttonState.clear();
@@ -499,9 +554,17 @@ export function createMidiMap(options = {}) {
   }
 
   function setTargets(list) {
+    const previous = new Map(targets);
     targets.clear();
     for (const target of list ?? []) {
       if (target && typeof target.id === 'string' && target.id) targets.set(target.id, target);
+    }
+    // Spec 032: a hold that is down and no longer registered (or no longer a hold) is let go.
+    for (const id of [...holdsDown]) {
+      if (targets.get(id)?.kind !== 'hold') {
+        holdUp(id, previous.get(id));
+        buttonState.delete(id);
+      }
     }
   }
 
@@ -524,6 +587,7 @@ export function createMidiMap(options = {}) {
   function destroy() {
     if (destroyed) return;
     if (pending) finishLearn({ ok: false, reason: 'cancelled' });
+    releaseHolds(); // spec 032
     destroyed = true;
     inputs.destroy();
     listeners.clear();

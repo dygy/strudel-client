@@ -139,3 +139,55 @@ export {
   scratchMidNoteValue,
   scratchSoundingNotes,
 } from './scratch/ScratchShift.mjs';
+// Spec 032: Master FX (filter, delay/reverb throws, beat-repeat) for superdough's master insert.
+export {
+  MasterFx,
+  makeReverbImpulse,
+  MASTER_FX_SEND_RAMP_SECONDS,
+  MASTER_FX_FILTER_FADE_SECONDS,
+  MASTER_FX_CUTOFF_TAU,
+  MASTER_FX_DELAY_TIME_TAU,
+  MASTER_FX_LEVEL_RAMP_SECONDS,
+  MASTER_FX_REVERB_SWAP_SECONDS,
+  MASTER_FX_REVERB_DEBOUNCE_MS,
+  MASTER_FX_STOP_FADE_SECONDS,
+  MASTER_FX_STOP_RESTORE_MS,
+  MASTER_FX_MAX_DELAY_SECONDS,
+  MASTER_FX_WORKLET_SWAP_SECONDS,
+  MASTER_FX_WORKLET_SETTLE_SECONDS,
+  MASTER_FX_DEFAULT_CPS,
+} from './masterfx/MasterFx.mjs';
+export {
+  filterParams,
+  clampFilterPosition,
+  MASTER_FX_FILTER_MIN,
+  MASTER_FX_FILTER_MAX,
+  MASTER_FX_FILTER_DEAD_ZONE,
+  MASTER_FX_LP_OPEN_HZ,
+  MASTER_FX_LP_CLOSED_HZ,
+  MASTER_FX_HP_OPEN_HZ,
+  MASTER_FX_HP_CLOSED_HZ,
+  MASTER_FX_Q_FLAT,
+  MASTER_FX_Q_RANGE,
+} from './masterfx/filterCurve.mjs';
+export {
+  MASTER_FX_DELAY_FRACTIONS,
+  MASTER_FX_REPEAT_LENGTHS,
+  MASTER_FX_RANGES,
+  MASTER_FX_DEFAULTS,
+  MASTER_FX_STORAGE_KEY,
+  sanitizeMasterFxSettings,
+  nextRepeatLength,
+} from './masterfx/masterFxSettings.mjs';
+export { loadBeatRepeatWorklet, BEAT_REPEAT_PROCESSOR } from './masterfx/beatRepeatLoader.mjs';
+export {
+  createRollState,
+  processBlock as processRollBlock,
+  rollStart,
+  rollLength,
+  rollStop,
+  rollActive,
+  BEAT_REPEAT_RING_SECONDS,
+  BEAT_REPEAT_FADE_SECONDS,
+  BEAT_REPEAT_MIN_LENGTH_FRAMES,
+} from './masterfx/beatRepeatCore.mjs';

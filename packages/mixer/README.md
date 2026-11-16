@@ -15,6 +15,7 @@ Audio mixing for the strudel-client fork. The package exists only in this fork a
 
 - **MIDI mapping** (spec 031) in `midi/midiMap.mjs`: `createMidiMap` binds any knob, fader or pad to an app target, with Learn, soft takeover and JSON export/import. `scratch/midiLearnShared.mjs` keeps one control from being bound twice across the jog, the feel knobs and the map. See [MIDI map](#midi-map).
 - **Volume** (spec 031) in `volume.mjs`: the speakers and headphones volume nodes, their taper and their ramped setter. See [Volumes](#volumes).
+- **Master FX** (spec 032) in `masterfx/`: `MasterFx`, the speakers' filter, delay and reverb throws and beat-repeat, for superdough's master insert slot. See [Master FX](#master-fx).
 
 The speakers' EQ is not in this package. It is `@strudel/equalizer`, installed on superdough's output insert by `website/src/repl/mainEqualizer.ts`.
 
@@ -84,6 +85,7 @@ When the hold ends, the scheduler's own `setCps` is restored. At most one contro
   - One Learn runs at a time on the page, across the jog, the feel knobs and the map (`claimMidiLearn`).
 - **Soft takeover.** A continuous control drives its target only after it crosses `read()` or comes within 2 % of it. `notifyExternalChange(id)` (an on-screen change) resets that. `getState().awaitingPickup` lists the targets still waiting ("Move to pick up").
 - **Buttons** fire once per press: on a note-on with velocity > 0, or on a CC ≥ 64 that follows a value < 64 (or is the first value seen). They don't repeat while held.
+- **Holds** (spec 032), `{ id, kind: 'hold', down(), up() }`, get `down()` on the same press and `up()` on the release (note-off, or a CC < 64 after ≥ 64). They are learned like buttons; the press that binds is not a `down()`. A hold that is down gets `up()` when its binding is cleared, replaced or imported over, when `setTargets` drops it, on `destroy()`, and when its input disconnects.
 - **Export and import.** `exportJson()` writes the file. `importJson(text)` is strict: one bad entry rejects the whole file and nothing changes. It returns one of these error codes:
   - `'not-json'`;
   - `'not-a-map'`;
@@ -108,6 +110,25 @@ Each output has one permanent volume node at its very end, separate from superdo
 - **Speakers.** The node is in the website, `website/src/repl/speakersVolume.ts`: `getSpeakersVolumeNode()`, `setSpeakersVolume(v)`, `getSpeakersVolume()`, `subscribeSpeakersVolume(fn)`.
   - `mainEqualizer.ts` connects the main EQ's output into it.
   - When the EQ goes away, it becomes superdough's output insert. It survives `reset()` and the EQ's click-free swap, and superdough is unchanged.
+
+## Master FX
+
+`masterfx/MasterFx.mjs` is one stage with an `input` and an `output`, built on the main (speakers) context and put into superdough's master insert slot, between the scratch node and `destinationGain`:
+
+```js
+const fx = new MasterFx(ctx, { channelCount: ctx.destination.channelCount });
+controller.setMasterInsert(fx.input, { output: fx.output, onChannelCount: (n) => fx.setChannelCount(n) });
+await fx.ready; // true once the beat-repeat worklet is in the path (rolls are refused before)
+```
+
+The graph is `input → beat-repeat worklet → filter (dry/wet) → split`, then `split → output` (the dry signal, never turned down), `split → delay send → delay ↺ feedback → level → output` and `split → reverb send → convolver → level → output`. At rest (filter in its ±3 dead zone, nothing thrown, no roll) the output equals the input: the idle worklet copies sample for sample and the wet and send gains are exactly 0.
+
+- **Filter.** `setFilter(pos)` takes −100 … +100: left is a low-pass from 20 kHz down to 150 Hz, right a high-pass from 20 Hz up to 6 kHz, both exponential (`filterCurve.mjs`, `filterParams`). Leaving the dead zone opens both filters, crossfades dry → wet over 10 ms and glides the cutoff (τ 15 ms). Crossing the centre stays wet. `setResonance(r01)` sets Q = 0.707 + r × 7.3 on the side in use.
+- **Throws.** `throwDelay(on)` and `throwReverb(on)` ramp the send over 10 ms; tails ring out. The delay time is `fraction / cps`, at most 4 s, glided (τ 50 ms) by `setCps(cps)` and `setDelay({ fraction, feedback, level })`. `setReverb({ decay, level })` rebuilds the generated impulse response after 150 ms of rest and crossfades the convolvers over 50 ms.
+- **Stop.** `stopTails()` closes both sends and fades the levels to 0 within 0.1 s. After 0.25 s it swaps in an empty delay line and convolver and restores the levels, with the sends still closed.
+- **Beat-repeat.** `roll({ startTime, length })` (AudioContext seconds) repeats that slice once the track has played it, phase-locked to `startTime`; `roll(null)` goes back to live where the track is now; `setRollLength(seconds)` applies at the next repeat. The `beat-repeat-processor` worklet (`beatRepeatWorklet.mjs`, loaded by `beatRepeatLoader.mjs` like the scratch worklet) keeps an 8 s ring and uses 3 ms equal-power crossfades. Its DSP is the pure `beatRepeatCore.mjs`. A different channel count rebuilds the worklet node.
+- **Settings.** `masterFxSettings.mjs` has the choices, ranges and defaults (`MASTER_FX_DELAY_FRACTIONS`, `MASTER_FX_REPEAT_LENGTHS`, `MASTER_FX_RANGES`, `MASTER_FX_DEFAULTS`), `sanitizeMasterFxSettings` and `nextRepeatLength`.
+- `destroy()` disconnects every node the stage made and cancels its timers.
 
 ## History
 

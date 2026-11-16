@@ -10,17 +10,28 @@
  *   header's handlers; Performance mode is Alt+Shift+P's toggle.
  * - Next / Previous type steps the selected transition type through the list, wrapping.
  *
+ * - Spec 032: the Master FX filter (CC 62–66 is the centre: off), Delay / Reverb / Beat-repeat / Brake
+ *   (the hold kind: held while the pad or note is down, holder `midi:<targetId>`), Repeat length.
+ *
  * The scratch jog and feel knobs keep their own Learn (specs 019, 029); they are not map targets.
  */
 import type { AudioEqualizer } from '@strudel/equalizer';
 import { EQ_GAIN_LIMIT } from '@strudel/equalizer';
-import type { MidiMapTarget } from '@strudel/mixer';
+import type { MidiMap, MidiMapTarget } from '@strudel/mixer';
 import { activeEqSettings, setEqBand, toggleEq, toggleEqSlot } from '../eqStore';
 import { getSpeakersVolume, setSpeakersVolume } from '../speakersVolume';
 import { getHeadphonesVolume, setHeadphonesVolume, type HeadphonesVolumeEngine } from '../headphonesVolume';
 import { TRANSITION_TYPE_OPTIONS, type TransitionType } from '../transitionSettings';
 import type { Crossfader } from './crossfader';
-import { MIDI_EQ_SOURCE, MIDI_TARGETS, MIDI_TARGET_IDS, midiEqBandSource, type MidiTargetMeta } from './midiTargetMeta';
+import { masterFxRuntime, type MasterFxEffect, type MasterFxRuntime } from '../masterFx/masterFxRuntime';
+import {
+  MIDI_EQ_SOURCE,
+  MIDI_TARGETS,
+  MIDI_TARGET_IDS,
+  midiEqBandSource,
+  midiHolder,
+  type MidiTargetMeta,
+} from './midiTargetMeta';
 
 export {
   EQ_BAND_COUNT,
@@ -29,6 +40,7 @@ export {
   MIDI_TARGET_IDS,
   eqBandTargetId,
   midiEqBandSource,
+  midiHolder,
   type MidiTargetGroup,
   type MidiTargetMeta,
 } from './midiTargetMeta';
@@ -40,6 +52,19 @@ export const bandGainToUnit = (db: number): number => (db + EQ_GAIN_LIMIT) / (2 
 export const unitToBandGain = (v01: number): number => {
   const db = -EQ_GAIN_LIMIT + Math.min(1, Math.max(0, v01)) * 2 * EQ_GAIN_LIMIT;
   return Math.round(db * 2) / 2;
+};
+
+/** CC 62..66 (as 0..1) is the filter's centre detent: off. */
+export const FILTER_DETENT: readonly [number, number] = [62 / 127, 66 / 127];
+
+/** The filter knob (−100..100) as 0..1. */
+export const filterToUnit = (position: number): number => (Math.max(-100, Math.min(100, position)) + 100) / 200;
+
+/** 0..1 as the filter knob: CC 0 → −100, 127 → +100, 62–66 → 0 (off), whole steps. */
+export const unitToFilter = (v01: number): number => {
+  const v = Math.min(1, Math.max(0, Number.isFinite(v01) ? v01 : 0.5));
+  if (v >= FILTER_DETENT[0] - 1e-9 && v <= FILTER_DETENT[1] + 1e-9) return 0;
+  return Math.round(v * 200 - 100);
 };
 
 /** The type `direction` steps away from `current` in the list, wrapping at both ends. */
@@ -66,11 +91,36 @@ export interface MidiTargetDeps {
   setTransitionType: (type: TransitionType) => void;
   /** The target's name, shown when another Learn is refused because it holds the control. */
   label: (meta: MidiTargetMeta) => string;
+  /** Spec 032: the Master FX runtime (default: the app's). */
+  masterFx?: Pick<MasterFxRuntime, 'filter' | 'setFilter' | 'hold' | 'release' | 'stepRepeatLength'>;
 }
+
+/**
+ * Spec 032 soft takeover for the Master FX filter (review 032 #2): every filter change that didn't come
+ * from the filter's own MIDI control (the knob, All FX off from any path) makes that control pick up
+ * again, so a CC near the old position can't jump the knob back. Returns the unsubscribe.
+ */
+export function watchFilterPickup(
+  fx: Pick<MasterFxRuntime, 'subscribeFilter'>,
+  map: Pick<MidiMap, 'notifyExternalChange'>,
+): () => void {
+  const own = midiHolder(MIDI_TARGET_IDS.masterFilter);
+  return fx.subscribeFilter((_position, source) => {
+    if (source !== own) map.notifyExternalChange(MIDI_TARGET_IDS.masterFilter);
+  });
+}
+
+const HOLD_EFFECTS: Readonly<Record<string, MasterFxEffect>> = Object.freeze({
+  [MIDI_TARGET_IDS.masterDelay]: 'delay',
+  [MIDI_TARGET_IDS.masterReverb]: 'reverb',
+  [MIDI_TARGET_IDS.masterRepeat]: 'repeat',
+  [MIDI_TARGET_IDS.masterBrake]: 'brake',
+});
 
 /** The map's targets with their actions (fresh closures over `deps`). */
 export function buildMidiTargets(deps: MidiTargetDeps): MidiMapTarget[] {
-  const action = (meta: MidiTargetMeta): Pick<MidiMapTarget, 'read' | 'write' | 'press'> => {
+  const fx = deps.masterFx ?? masterFxRuntime;
+  const action = (meta: MidiTargetMeta): Pick<MidiMapTarget, 'read' | 'write' | 'press' | 'down' | 'up'> => {
     if (meta.group === 'eq' && meta.labelParams) {
       const index = meta.labelParams.n - 1;
       return {
@@ -80,7 +130,19 @@ export function buildMidiTargets(deps: MidiTargetDeps): MidiMapTarget[] {
         },
       };
     }
+    const effect = HOLD_EFFECTS[meta.id];
+    if (effect) {
+      const holder = midiHolder(meta.id);
+      return { down: () => void fx.hold(effect, holder), up: () => fx.release(effect, holder) };
+    }
     switch (meta.id) {
+      case MIDI_TARGET_IDS.masterFilter:
+        return {
+          read: () => filterToUnit(fx.filter.get()),
+          write: (v) => fx.setFilter(unitToFilter(v), midiHolder(MIDI_TARGET_IDS.masterFilter)),
+        };
+      case MIDI_TARGET_IDS.masterRepeatLength:
+        return { press: () => fx.stepRepeatLength() };
       case MIDI_TARGET_IDS.eqToggle:
         return { press: () => void toggleEq(deps.equalizers(), MIDI_EQ_SOURCE) };
       case MIDI_TARGET_IDS.eqAb:
