@@ -36,6 +36,13 @@ import {
   truncateHap,
 } from './envelopes.mjs';
 
+/**
+ * Spec 031: the control a progress-driven (manual or handed-over) transition stamps on every event:
+ * 'old' or 'new'. superdough records it per voice (fork addition `getActiveSoundIds(owner, side)`),
+ * so the controller releases exactly one track's voices; no sound reads it.
+ */
+export const MIX_SIDE_CONTROL = '_mixSide';
+
 /** Every transition type, in the order the UI lists them. */
 export const TRANSITION_TYPES = Object.freeze([
   'off',
@@ -108,8 +115,17 @@ export function endAt(pat, oldEnd) {
 export const fromOrigin = (pat, origin) => pat.filterHaps((hap) => onsetOf(hap) >= origin);
 
 /** Old-track envelope per type, for one hap. */
-function shapeOld(type, hap, { T, L, oldEnd, echoFrom, cps }) {
-  const p = progress(samplePoint(hap, oldEnd), T, L);
+function shapeOld(type, hap, { T, L, oldEnd, echoFrom, cps, progressAt }) {
+  const at = samplePoint(hap, oldEnd);
+  const p = progressAt ? progressAt(at) : progress(at, T, L);
+  if (progressAt && type === 'echoOut') {
+    // Spec 031 manual mix: once the fader has moved, the old track (playing on past T) fades with the
+    // progress and its notes go to the echo.
+    if (p <= 0 || onsetOf(hap) < echoFrom) {
+      return hap;
+    }
+    return mapControls(hap, (v) => ({ ...echoControls(v, L, cps), ...scaleVelocity(v, equalPowerOut(p)) }));
+  }
   if (p <= 0 && type !== 'echoOut') {
     return hap; // before the window the old track plays exactly as it was
   }
@@ -135,31 +151,35 @@ function shapeOld(type, hap, { T, L, oldEnd, echoFrom, cps }) {
       if (onset < echoFrom || onset >= T) {
         return hap;
       }
-      return mapControls(hap, (v) => {
-        const hasTime = typeof v.delaytime === 'number';
-        const sync = typeof v.delaysync === 'number' ? v.delaysync : ECHO_SYNC;
-        const repeatCycles = hasTime ? v.delaytime * cps : sync;
-        return {
-          ...v,
-          orbit: ECHO_ORBIT,
-          delay: ECHO_SEND,
-          delayfeedback: echoFeedback(L, repeatCycles),
-          ...(hasTime ? {} : { delaysync: sync }),
-        };
-      });
+      return mapControls(hap, (v) => echoControls(v, L, cps));
     }
     default:
       return hap;
   }
 }
 
-/** New-track envelope per type, for one hap inside [T, T+L]. */
-function shapeNew(type, hap, { T, L }) {
-  const windowEnd = T + L;
+/** Echo-out: a hap's controls sent to the echo orbit, with feedback decaying over L cycles. */
+function echoControls(v, L, cps) {
+  const hasTime = typeof v.delaytime === 'number';
+  const sync = typeof v.delaysync === 'number' ? v.delaysync : ECHO_SYNC;
+  const repeatCycles = hasTime ? v.delaytime * cps : sync;
+  return {
+    ...v,
+    orbit: ECHO_ORBIT,
+    delay: ECHO_SEND,
+    delayfeedback: echoFeedback(L, repeatCycles),
+    ...(hasTime ? {} : { delaysync: sync }),
+  };
+}
+
+/** New-track envelope per type, for one hap inside [T, T+L] (with `progressAt`: until `newEnd`). */
+function shapeNew(type, hap, { T, L, progressAt, newEnd }) {
+  const windowEnd = progressAt ? newEnd : T + L;
   if (onsetOf(hap) >= windowEnd) {
     return hap;
   }
-  const p = progress(samplePoint(hap, windowEnd), T, L);
+  const at = samplePoint(hap, windowEnd);
+  const p = progressAt ? progressAt(at) : progress(at, T, L);
   switch (type) {
     case 'crossfade':
       return mapControls(hap, (v) => scaleVelocity(v, equalPowerIn(p)));
@@ -185,16 +205,20 @@ function shapeNew(type, hap, { T, L }) {
 }
 
 /**
- * Layered intro: layer k of n (in `$:` order) is silent until T + L·k/n.
+ * Layered intro: layer k of n (in `$:` order) is silent until T + L·k/n; with `progressAt`
+ * (spec 031), until the progress at its onset reaches k/n.
  * Returns undefined when the layers can't stand in for the new pattern (fewer than 2).
  */
-function layeredNew(layers, T, L) {
+function layeredNew(layers, T, L, progressAt) {
   if (!Array.isArray(layers) || layers.length < 2) {
     return undefined;
   }
   const n = layers.length;
   return stack(
     ...layers.map(({ pattern }, k) => {
+      if (progressAt) {
+        return pattern.late(T).filterHaps((hap) => onsetOf(hap) >= T && progressAt(onsetOf(hap)) >= k / n);
+      }
       const entry = T + (L * k) / n;
       return pattern.late(T).filterHaps((hap) => onsetOf(hap) >= entry);
     }),
@@ -215,17 +239,28 @@ function layeredNew(layers, T, L) {
  * @param {string} options.type one of TRANSITION_TYPES except 'off'
  * @param {number} [options.cps=0.5] the old track's tempo (Echo-out converts `delaytime` with it)
  * @param {number} [options.echoFrom=T-1] Echo-out: old onsets from here to T are sent to the echo
+ * @param {Function} [options.progressAt] spec 031 manual mix: `(cycle) => p` in [0, 1], used by every
+ *   envelope instead of the progress through [T, T+L]. The new track still starts at T; the old one
+ *   plays on (shaped by `p`) until `oldEnd`. Cut and Dip have no in-between, so they play as Crossfade;
+ *   Echo-out fades the old track with `p` and sends its notes to the echo, while the
+ *   new track comes in as in a Crossfade (both only while `p > 0`). Every event carries
+ *   `_mixSide: 'old'|'new'` ({@link MIX_SIDE_CONTROL}). Without it, everything is as before.
+ * @param {number} [options.oldEnd=Infinity] with `progressAt` only: the old track ends here (the
+ *   controller sets it when a manual mix is handed to the timed path)
  * @returns {Pattern}
  */
-export function buildTransition({ oldPat, newPat, layers, T, length, type, cps = 0.5, echoFrom }) {
+export function buildTransition({ oldPat, newPat, layers, T, length, type, cps = 0.5, echoFrom, progressAt, oldEnd }) {
   if (!TRANSITION_TYPES.includes(type) || type === 'off') {
     throw new Error(`buildTransition: unsupported transition type "${type}"`);
   }
+  if (typeof progressAt === 'function') {
+    return buildProgressTransition({ oldPat, newPat, layers, T, length, type, cps, echoFrom, progressAt, oldEnd });
+  }
   const L = type === 'cut' ? 0 : length;
-  const { origin, oldEnd } = transitionTiming(type, T, L);
-  const ctx = { T, L, oldEnd, echoFrom: echoFrom ?? T - 1, cps };
+  const { origin, oldEnd: end } = transitionTiming(type, T, L);
+  const ctx = { T, L, oldEnd: end, echoFrom: echoFrom ?? T - 1, cps };
 
-  const oldPart = endAt(stripLocations(oldPat), oldEnd).withHap((hap) => shapeOld(type, hap, ctx));
+  const oldPart = endAt(stripLocations(oldPat), end).withHap((hap) => shapeOld(type, hap, ctx));
 
   let newShifted = type === 'layeredIntro' ? layeredNew(layers, T, L) : undefined;
   const shapeType = type === 'layeredIntro' && newShifted === undefined ? 'crossfade' : type;
@@ -234,3 +269,29 @@ export function buildTransition({ oldPat, newPat, layers, T, length, type, cps =
 
   return stack(oldPart, newPart);
 }
+
+/**
+ * Spec 031: a transition whose envelopes follow `progressAt` (the crossfader) instead of the clock.
+ * The new track's cycle 0 is at T; both tracks overlap from T until `oldEnd` (default: no end).
+ */
+function buildProgressTransition({ oldPat, newPat, layers, T, length, type, cps, echoFrom, progressAt, oldEnd }) {
+  const kind = type === 'cut' || type === 'dip' ? 'crossfade' : type;
+  const L = length;
+  const end = Number.isFinite(oldEnd) ? oldEnd : Infinity;
+  const ctx = { T, L, oldEnd: end, newEnd: end, echoFrom: echoFrom ?? T - 1, cps, progressAt };
+
+  const oldSource = stripLocations(oldPat);
+  const oldPart = (Number.isFinite(end) ? endAt(oldSource, end) : oldSource).withHap((hap) =>
+    stampSide(shapeOld(kind, hap, ctx), 'old'),
+  );
+
+  let newShifted = kind === 'layeredIntro' ? layeredNew(layers, T, L, progressAt) : undefined;
+  const shapeType = (kind === 'layeredIntro' && newShifted === undefined) || kind === 'echoOut' ? 'crossfade' : kind;
+  newShifted = fromOrigin(newShifted ?? newPat.late(T), T);
+  const newPart = newShifted.withHap((hap) => stampSide(shapeNew(shapeType, hap, ctx), 'new'));
+
+  return stack(oldPart, newPart);
+}
+
+/** Spec 031: mark which track a hap belongs to (control haps only; others reach no superdough voice). */
+const stampSide = (hap, side) => mapControls(hap, (v) => ({ ...v, [MIX_SIDE_CONTROL]: side }));

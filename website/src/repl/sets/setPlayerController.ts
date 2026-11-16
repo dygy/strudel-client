@@ -8,11 +8,15 @@
  * - Go: the bridge stops the headphones and switches the speakers with the item's transition. A
  *   failed Go leaves the set where it was, still cued.
  * - Stopping the preview with its own button cancels the cue. Update while cued is Go.
+ * - Manual Go (spec 031, the crossfader): `go`'s path as a manual mix. The set stays `going` while the
+ *   fader mixes, moves on when it completes, and stays cued when the fader comes back: the cue then
+ *   restarts on the headphones as a fresh Cue does. A press (Cue/Go, Alt+Shift+N) during the mix
+ *   hands it to the timed transition.
  *
  * No React here (useSetPlayer wraps it).
  */
 import type { SetItem } from '../../lib/setLists';
-import type { SetBridge } from './setBridge';
+import type { ManualGoResult, SetBridge } from './setBridge';
 import { resolveItem, type LibraryTrack } from './resolveItem';
 import * as machine from './setPlayer';
 import type { PlayerSet, SetPlayerState } from './setPlayer';
@@ -32,7 +36,9 @@ export interface SetPlayerControllerDeps {
     | 'removeRedirect'
     | 'onPreviewStopped'
     | 'setGoHandler'
-  >;
+  > &
+    // Spec 031 (the crossfader); optional so a bridge without them keeps 022's behaviour.
+    Partial<Pick<SetBridge, 'manualGo' | 'handOverManual'>>;
   /** The set with this id as it is now (local edits included), or null. */
   getSet: (id: string) => PlayerSet | null;
   /** The library's loaded tracks, keyed by id. */
@@ -105,11 +111,40 @@ export function createSetPlayerController(deps: SetPlayerControllerDeps) {
     savePosition();
   }
 
-  async function go(set: PlayerSet | null, itemId: string): Promise<void> {
+  async function go(set: PlayerSet | null, itemId: string, manual = false): Promise<ManualGoResult> {
     const item = set?.items.find((candidate) => candidate.id === itemId);
     dropRedirect();
-    const result = await bridge.go(item?.transition ?? null);
-    if (state.phase !== 'going' || state.cuedItemId !== itemId) return;
+    const transition = item?.transition ?? null;
+    let result: ManualGoResult;
+    let cuedCode: string | undefined;
+    if (manual && bridge.manualGo) ({ result, code: cuedCode } = await bridge.manualGo(transition));
+    else result = await bridge.go(transition);
+    if (state.phase !== 'going' || state.cuedItemId !== itemId) return result;
+    if (result === 'cancelled') {
+      // Spec 031 review #5: Stop ended the mix. Still cued; nothing to retry, so no toast, and the
+      // headphones stay off (the user stopped).
+      setState(machine.goFailed(state));
+      removeRedirect = bridge.redirectEditorToPreview();
+      return result;
+    }
+    if (result === 'abandoned') {
+      // Spec 031: the fader went back. Still cued, and the cued code (captured as the Go began, review
+      // #4) plays on the headphones again, as a fresh Cue does (the manual Go had stopped them).
+      setState(machine.goFailed(state));
+      const cued = await bridge.cue(cuedCode);
+      const after: SetPlayerState = state; // changed while the headphones started?
+      if (after.phase !== 'cued' || after.cuedItemId !== itemId) {
+        if (cued === 'playing') bridge.stopPreview();
+        return result;
+      }
+      if (cued !== 'playing') {
+        setState(machine.cancelCue(state));
+        deps.onCueFailed?.(cued);
+        return result;
+      }
+      removeRedirect = bridge.redirectEditorToPreview();
+      return result;
+    }
     if (result === 'switched') {
       setState(machine.goLanded(state, currentSet()));
       savePosition();
@@ -123,6 +158,7 @@ export function createSetPlayerController(deps: SetPlayerControllerDeps) {
       setState(machine.goFailed(state));
       removeRedirect = bridge.redirectEditorToPreview();
     }
+    return result;
   }
 
   const controller = {
@@ -150,6 +186,9 @@ export function createSetPlayerController(deps: SetPlayerControllerDeps) {
 
     /** The next key / the Cue-Go button. */
     async press(): Promise<void> {
+      // Spec 031: Go during a crossfader mix continues it as the timed transition from where it is,
+      // whatever the set does (review #6: also the editor-path mix with no set playing).
+      if (bridge.handOverManual?.()) return;
       const set = currentSet();
       const { state: next, action } = machine.press(state, set, isPlayable);
       setState(next);
@@ -163,6 +202,20 @@ export function createSetPlayerController(deps: SetPlayerControllerDeps) {
       } else {
         await go(set, action.itemId);
       }
+    },
+
+    /**
+     * Spec 031, the crossfader: Go the cued item as a manual mix. `'none'` when nothing is cued (or a
+     * Cue/Go is already in flight). Resolves when the mix ends; the set has then moved on
+     * (`'switched'`), or is still cued (`'abandoned'`, `'failed'`, `'ignored'`).
+     */
+    async manualGo(): Promise<ManualGoResult | 'none'> {
+      const set = currentSet();
+      if (state.phase !== 'cued' || !set || !bridge.manualGo) return 'none';
+      const { state: next, action } = machine.press(state, set, isPlayable);
+      if (action.kind !== 'go') return 'none';
+      setState(next);
+      return go(set, action.itemId, true);
     },
 
     /** An item clicked while the set plays: it becomes Up next (a cue is cancelled first). */

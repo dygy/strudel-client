@@ -11,6 +11,9 @@
  * - While an item is cued, the editor's own evaluate (Ctrl+Enter, Alt+Enter) goes to the preview,
  *   so an edit while cued is heard on the headphones and never replaces the speakers' track.
  * - Update while cued is the set's Go (`routeUpdate`).
+ * - `manualGo` (spec 031): the crossfader's Go. The same preview stop and forced switch as `go`, but
+ *   as a manual mix: it resolves when the fader completes it (`'switched'`) or brings it back
+ *   (`'abandoned'`), not when the new code starts playing.
  * - Stopping the preview with its own button fires `onPreviewStopped` (the player cancels the cue).
  */
 import type { TransitionOverride } from '../transitionSettings';
@@ -35,10 +38,14 @@ export interface SetBridgeDeps {
   /** Whether the speakers' scheduler runs. */
   isPlaying: () => boolean;
   editor: () => BridgeEditor | null;
-  /** runUpdate with `force: true` and the item's transition; reports the outcome and the result. */
+  /**
+   * runUpdate with `force: true` and the item's transition; reports the outcome and the result.
+   * `manual` (spec 031): a crossfader mix (TrackTransitionController.beginManual).
+   */
   runSwitch: (options: {
     force: true;
     transition: TransitionOverride | null;
+    manual?: boolean;
   }) => Promise<{ outcome: UpdateOutcome; result: SwitchResult }>;
   scratch: { beforeEvaluate: () => void; previewStopping: (engine: BridgePreviewEngine) => void };
   /** The library's own open (assistantControl/openTrack.ts); false while the library isn't mounted. */
@@ -50,6 +57,10 @@ export interface SetBridgeDeps {
    * in flight). Then the Go leaves the headphones and the cue alone.
    */
   goWouldBeIgnored?: () => boolean;
+  /** Spec 031: Go during a manual mix hands it to the timed transition (handManualToTimed). */
+  handOverManual?: () => boolean;
+  /** Spec 031 review #6: a manual mix is in flight (Alt+Shift+N hands it over even with no set). */
+  isManualMixing?: () => boolean;
 }
 
 /** What Update asks of the set player while an item may be cued. */
@@ -60,6 +71,13 @@ export interface SetGoHandler {
 
 /** `ignored`: the same switch is already running; the cue is kept (headphones still on). */
 export type GoResult = 'switched' | 'failed' | 'ignored';
+/** Spec 031: a crossfader Go. `abandoned`: the fader went back; the old track plays on. */
+export type ManualGoResult = GoResult | 'abandoned' | 'cancelled';
+/** What a manual Go resolves: how the mix ended, and the cued code it mixed (re-cued on abandon). */
+export interface ManualGoOutcome {
+  result: ManualGoResult;
+  code?: string;
+}
 /** `no-library`: the library isn't mounted (zen mode); the set can't open a track. */
 export type OpenResult = 'opened' | 'no-library' | 'failed';
 /** `no-preview`: the headphone preview engine isn't ready. */
@@ -97,6 +115,20 @@ export function createSetBridge(deps: SetBridgeDeps) {
     }
   };
 
+  /**
+   * What `go` and `manualGo` both do first: refuse a Go that would be ignored, let go of the redirect
+   * and the platter, and stop the headphones. Null when ignored.
+   */
+  const startGo = (): { code: string | undefined; wasPreviewing: boolean } | null => {
+    const code = deps.editor()?.code;
+    if (deps.goWouldBeIgnored?.()) return null;
+    bridge.removeRedirect();
+    deps.scratch.beforeEvaluate();
+    const wasPreviewing = deps.isPreviewing();
+    stopPreview();
+    return { code, wasPreviewing };
+  };
+
   const bridge = {
     /** Open `track` (or its step `stepIndex`) as a library click does. */
     async openItem(track: { id: string }, stepIndex?: number): Promise<OpenResult> {
@@ -129,12 +161,9 @@ export function createSetBridge(deps: SetBridgeDeps) {
      * switch is already in flight it is `'ignored'` and the headphones and the cue are left as they are.
      */
     go(transition: TransitionOverride | null): Promise<GoResult> {
-      const code = deps.editor()?.code;
-      if (deps.goWouldBeIgnored?.()) return Promise.resolve('ignored');
-      bridge.removeRedirect();
-      deps.scratch.beforeEvaluate();
-      const wasPreviewing = deps.isPreviewing();
-      stopPreview();
+      const start = startGo();
+      if (!start) return Promise.resolve('ignored');
+      const { code, wasPreviewing } = start;
       return new Promise<GoResult>((resolve) => {
         let done = false;
         const finish = (result: GoResult) => {
@@ -165,6 +194,44 @@ export function createSetBridge(deps: SetBridgeDeps) {
             finish('failed');
           });
       });
+    },
+
+    /**
+     * Spec 031: the crossfader's Go of the editor's (cued) code: `go`'s preview stop and forced switch,
+     * as a manual mix. Resolves once the mix ends: `'switched'` (completed, also after a hand-over to
+     * the timed path), `'abandoned'` (the fader went back), `'cancelled'` (Stop ended it), `'failed'`,
+     * or `'ignored'` (another switch in flight; the cue goes back on the headphones as for `go`).
+     * `code` is the cued code captured as the Go began (review #4: an abandon re-cues exactly it).
+     */
+    async manualGo(transition: TransitionOverride | null): Promise<ManualGoOutcome> {
+      const start = startGo();
+      if (!start) return { result: 'ignored' };
+      const { code, wasPreviewing } = start;
+      const ended = (result: ManualGoResult): ManualGoOutcome => ({ result, code });
+      try {
+        const { outcome, result } = await deps.runSwitch({ force: true, transition, manual: true });
+        if (outcome === 'ignored' || (outcome === 'switch' && result === 'ignored')) {
+          if (wasPreviewing && code) await previewCode(code).catch(() => 'failed');
+          return ended('ignored');
+        }
+        if (outcome !== 'switch') return ended('failed');
+        if (result === 'ok') return ended('switched');
+        if (result === 'abandoned' || result === 'cancelled') return ended(result);
+        return ended('failed');
+      } catch (error: unknown) {
+        console.error('[sets] manual Go failed:', error);
+        return ended('failed');
+      }
+    },
+
+    /** Spec 031: Go during a manual mix: hand it to the timed transition. False when none runs. */
+    handOverManual(): boolean {
+      return deps.handOverManual?.() ?? false;
+    },
+
+    /** Spec 031: whether a manual mix is in flight right now. */
+    isManualMixing(): boolean {
+      return deps.isManualMixing?.() ?? false;
     },
 
     isPreviewing: () => deps.isPreviewing(),

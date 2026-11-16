@@ -146,6 +146,14 @@ export function createTrackSwitchController() {
       }
     },
 
+    /**
+     * Spec 031: an abandoned manual mix put the old track's pattern back without an evaluate, after
+     * the new code's afterEval had already stamped the new track as playing: `id` plays again.
+     */
+    restorePlaying(id: string | null) {
+      playingTrackId = id;
+    },
+
     /** onToggle(false): nothing is playing on the speakers any more. */
     stopped() {
       playingTrackId = null;

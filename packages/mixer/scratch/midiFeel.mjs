@@ -18,6 +18,7 @@ import {
   MIDI_FEEL_STORAGE_KEY,
   claimMidiLearn,
   readMidiFeelMappings,
+  readMidiMapBindings,
   sameMidiControl as sameControl,
 } from './midiLearnShared.mjs';
 
@@ -56,19 +57,23 @@ function writeMappings(storage, mappings) {
 }
 
 /**
- * Who already uses a control: the jog wheel, or the other slider. Learning the same slider's own
- * control again is not a conflict.
+ * Who already uses a control: the jog wheel, the other slider, or (spec 031) a MIDI map target,
+ * given as `'map:<targetId>'`. Learning the same slider's own control again is not a conflict.
  * @param {MidiFeelMapping} mapping - The control just turned.
  * @param {object} used
  * @param {'brake'|'spinUp'} used.target - The slider being learned.
  * @param {{brake: MidiFeelMapping|null, spinUp: MidiFeelMapping|null}} used.mappings
  * @param {{inputName: string, channel: number, controller: number}|null} [used.jog]
- * @returns {'jog'|'brake'|'spinUp'|null}
+ * @param {Object<string, object>} [used.map] - The MIDI map's bindings (spec 031), by target id.
+ * @returns {string|null} `'jog'`, `'brake'`, `'spinUp'`, `'map:<targetId>'` or null.
  */
-export function midiFeelConflict(mapping, { target, mappings, jog }) {
+export function midiFeelConflict(mapping, { target, mappings, jog, map }) {
   if (sameControl(mapping, jog)) return 'jog';
   const other = target === 'brake' ? 'spinUp' : 'brake';
   if (sameControl(mapping, mappings?.[other])) return other;
+  for (const [id, bound] of Object.entries(map ?? {})) {
+    if (sameControl(mapping, bound)) return `map:${id}`;
+  }
   return null;
 }
 
@@ -82,7 +87,8 @@ export function midiFeelConflict(mapping, { target, mappings, jog }) {
 /**
  * @typedef {{status: 'learned', mapping: MidiFeelMapping}
  *   | {status: 'timeout'} | {status: 'cancelled'} | {status: 'unavailable'}
- *   | {status: 'conflict', controller: number, with: 'jog'|'brake'|'spinUp'}} MidiFeelLearnResult
+ *   | {status: 'conflict', controller: number, with: 'jog'|'brake'|'spinUp'}
+ *   | {status: 'conflict', controller: number, with: 'map', target: string, label: string}} MidiFeelLearnResult
  */
 
 /**
@@ -111,12 +117,22 @@ export function midiFeelConflict(mapping, { target, mappings, jog }) {
  * @param {() => Promise<{enableWebMidi: Function, WebMidi: any}>} [options.loadMidi] - Defaults to `import('@strudel/midi')`.
  * @param {Storage} [options.storage] - Defaults to `localStorage`.
  * @param {() => object|null} [options.getJogMapping] - The jog's mapping; defaults to the stored one.
+ * @param {(owner: string) => (string|undefined)} [options.labelOf] - Spec 031: the name of a MIDI map
+ *   target (`owner` is `'map:<targetId>'`) for a refused Learn's `label`; defaults to the target id.
  * @returns {MidiFeel}
  */
 export function createMidiFeel(target, options = {}) {
   const loadMidi = options.loadMidi ?? (() => import('@strudel/midi'));
   const storage = options.storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
   const getJogMapping = options.getJogMapping ?? (() => readMidiJogMapping(storage));
+  const labelOf = (owner, fallback) => {
+    try {
+      const named = options.labelOf?.(owner);
+      return typeof named === 'string' && named ? named : fallback;
+    } catch {
+      return fallback;
+    }
+  };
   const listeners = new Set();
   const inputs = createMidiInputs({ loadMidi, onControlChange: onMessage });
   let pending = null; // { target, resolve, timer, release }
@@ -184,7 +200,24 @@ export function createMidiFeel(target, options = {}) {
 
   function learnMessage(control, value) {
     const name = pending.target;
-    const conflict = midiFeelConflict(control, { target: name, mappings: feel.mappings, jog: getJogMapping() });
+    const conflict = midiFeelConflict(control, {
+      target: name,
+      mappings: feel.mappings,
+      jog: getJogMapping(),
+      map: readMidiMapBindings(storage),
+    });
+    if (conflict?.startsWith('map:')) {
+      // Spec 031: a control bound in the MIDI map.
+      const id = conflict.slice(4);
+      finish({
+        status: 'conflict',
+        controller: control.controller,
+        with: 'map',
+        target: id,
+        label: labelOf(conflict, id),
+      });
+      return;
+    }
     if (conflict) {
       finish({ status: 'conflict', controller: control.controller, with: conflict });
       return;

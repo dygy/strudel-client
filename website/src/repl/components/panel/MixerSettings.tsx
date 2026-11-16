@@ -5,6 +5,7 @@ import { EqualizerUI } from './EqualizerUI';
 import { usePanelViewport } from './panelViewport';
 import { TransitionSettingsSection } from './TransitionSettingsSection';
 import { ScratchSection } from '../scratch/ScratchSection';
+import { MixerLevels } from './MixerLevels';
 
 const PREVIEW_DEVICE_KEY = 'strudel-preview-device';
 
@@ -95,6 +96,8 @@ export function MixerSettings({ mixer, isDisabled = false }: MixerSettingsProps)
   if (!mixer) {
     return (
       <div className="space-y-4">
+        {/* Spec 031: speakers volume and the crossfader (no headphones without the preview mixer) */}
+        <MixerLevels mixer={null} compact={compact} />
         <TransitionSettingsSection />
         {/* Vinyl scratch (spec 019): the speakers only, without the preview mixer */}
         <ScratchSection withPreview={false} />
@@ -131,6 +134,9 @@ export function MixerSettings({ mixer, isDisabled = false }: MixerSettingsProps)
           </div>
         </div>
       )}
+
+      {/* Spec 031: speakers and headphones volume, the crossfader; usable while playing */}
+      <MixerLevels mixer={mixer} compact={compact} />
 
       {/* Track transitions (spec 017): usable while playing, so never isDisabled */}
       <TransitionSettingsSection />

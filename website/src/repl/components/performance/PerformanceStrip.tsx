@@ -5,7 +5,8 @@
  *
  * One row that wraps on a narrow screen (flex-wrap, nothing wider than the window), with logical
  * spacing only so an RTL language mirrors it. Mounted by ReplEditor only while the view is open: it
- * owns the meter's tap, the clock display and its buttons, nothing else.
+ * owns the meter's tap, the clock display and its buttons, nothing else. Spec 031 adds a compact
+ * crossfader (the Mixer settings' one, same state).
  */
 import { useStore } from '@nanostores/react';
 import cx from '@src/cx';
@@ -14,6 +15,7 @@ import { PlayButton, UpdateButton, type ReplContext } from '../Header';
 import { useSetBarModel } from '../set/useSetBarModel';
 import { PerformanceClocks } from './PerformanceClocks';
 import { LevelMeter } from './LevelMeter';
+import { CrossfaderControl } from '../panel/MixerLevels';
 import {
   closePerformance,
   clampPerformanceFontSize,
@@ -87,6 +89,7 @@ export function PerformanceStrip({ context, trackName }: { context: ReplContext;
         <UpdateButton context={context} className="!w-8 !h-8" />
       </div>
       <NowNext trackName={trackName} />
+      <CrossfaderControl strip />
       <PerformanceClocks />
       <LevelMeter />
       <div className="flex items-center gap-1 shrink-0" data-perf-font="">

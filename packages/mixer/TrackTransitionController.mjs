@@ -17,13 +17,17 @@
  * - `track-transition-start`   { type, T, end };
  * - `track-transition-end`     { type, T, end, cancelled? };
  * - `track-transition-error`   { error, evaluateFailed }: `evaluateFailed` means the new code
- *   is broken and the old track keeps playing.
+ *   is broken and the old track keeps playing;
+ * - `track-transition-manual`  { p }: spec 031, the manual mix's progress changed (the crossfader).
+ *   A manual mix's `start` has `end: null`; its `end` has `manual: true`, or `abandoned: true` when
+ *   the fader went back to the playing end.
  *
  * @class TrackTransitionController
  * @license AGPL-3.0-or-later
  */
 
 import { buildTransition, isOverlapping, transitionTiming, TRANSITION_TYPES } from './transitions/buildTransition.mjs';
+import { progress } from './transitions/envelopes.mjs';
 import { applyTrim, computeTrim, LoudnessMeter } from './transitions/loudness.mjs';
 import { getActiveSoundIds, releaseSounds } from 'superdough';
 
@@ -65,9 +69,34 @@ export const DEFAULT_TRANSITION_SETTINGS = Object.freeze({
 /** Cut, Off and Echo-out end the old track's held voices with a ramp this long (seconds) at T. */
 export const SHORT_RELEASE = 0.03;
 
-/** The main engine's voices in superdough (fork additions, spec 017). */
+/** Spec 031: a manual mix completes once its progress reaches this (the fader's last 2 %)… */
+export const MANUAL_COMPLETE_AT = 0.98;
+/** …and is abandoned when it comes back to this (the first 2 %) after having left it. */
+export const MANUAL_ABANDON_AT = 0.02;
+/** Spec 031: voices a manual mix leaves behind (complete or abandon) fade over this many seconds. */
+export const MANUAL_RELEASE = 0.1;
+/** Spec 031: a manual Glide steps the tempo at this resolution of the progress. */
+const MANUAL_TEMPO_STEPS = 64;
+
+/**
+ * Spec 031: the type a manual mix is built as. Off, Cut and Dip have no in-between, so they mix as
+ * Crossfade; the others keep their shape (Echo-out its echo on the old track).
+ */
+const manualBuildType = (type) => (type === 'off' || type === 'cut' || type === 'dip' ? 'crossfade' : type);
+
+/**
+ * Spec 031: at a hand-over, the old track's voices start fading this long after "now" (at most half
+ * the remaining time), so the ones already handed to superdough for the scheduler's lookahead have
+ * started by then: a fade that begins before a voice starts would hold it silent.
+ */
+export const HANDOVER_RELEASE_DELAY = 0.3;
+
+/**
+ * The main engine's voices in superdough (fork additions, spec 017). Spec 031: `side` ('old' or
+ * 'new') lists only the voices a manual mix stamped with `_mixSide: side`.
+ */
 const SUPERDOUGH_VOICES = Object.freeze({
-  getActiveSoundIds: () => getActiveSoundIds(),
+  getActiveSoundIds: (side) => getActiveSoundIds(undefined, side),
   releaseSounds,
 });
 
@@ -152,7 +181,8 @@ export class TrackTransitionController {
    * @param {Function} [options.setTimeout] timer functions (default: the global ones, looked up per call)
    * @param {Function} [options.clearTimeout]
    * @param {{getActiveSoundIds: Function, releaseSounds: Function}} [options.voices] the main engine's
-   *   sounding voices (default: superdough's, filtered to the main engine's controller)
+   *   sounding voices (default: superdough's, filtered to the main engine's controller). Spec 031:
+   *   `getActiveSoundIds(side)` with `side` 'old' or 'new' lists only that side of a manual mix
    * @param {Function} [options.getTrackShift] the speakers' scratch shift (spec 023), read when a
    *   switch begins: the playing track's phrases start at `origin + shift` (spec 027). It returns
    *   cycles, or `{ cycles, pending: { cycles, atCycle } | null }` when part of the shift only
@@ -196,6 +226,7 @@ export class TrackTransitionController {
     this.gainAutomated = false; // a Dip has scheduled ramps on destinationGain
     this._capture = null; // the setcps capture of the switch being evaluated
     this.tempoHold = null; // spec 027: the tempo after a Match or Keep transition ({ kind: 'glide' | 'keep', ... })
+    this._restorePattern = null; // spec 031: the old pattern an abandoned manual mix puts back as it is
 
     this.editPattern = this.editPattern.bind(this);
     this._tick = this._tick.bind(this);
@@ -220,6 +251,12 @@ export class TrackTransitionController {
    * @returns {import('@strudel/core').Pattern}
    */
   editPattern(pattern) {
+    if (this._restorePattern !== null && pattern === this._restorePattern) {
+      // Spec 031: an abandoned manual mix puts the old pattern back exactly as it was playing (it
+      // already carries its origin shift and trim).
+      this._restorePattern = null;
+      return pattern;
+    }
     const sw = this.armed;
     if (sw) {
       this.armed = null;
@@ -260,16 +297,25 @@ export class TrackTransitionController {
   }
 
   _arm(sw, newPat) {
-    const { type, length, snap } = sw.settings;
+    const { type, length } = sw.settings;
     const now = this._now();
     const T = this._phraseStart(now, sw.settings, sw.trackShift);
-    const buildType = type === 'off' ? 'cut' : type;
+    const manual = sw.manual ?? null;
+    const buildType = manual ? manualBuildType(type) : type === 'off' ? 'cut' : type;
     const L = buildType === 'cut' ? 0 : length;
-    const timing = transitionTiming(buildType, T, L);
+    // Spec 031: a manual mix overlaps from T until the fader completes it (no end on the clock).
+    const timing = manual ? { origin: T, oldEnd: Infinity, end: Infinity } : transitionTiming(buildType, T, L);
+    const oldVoiceIds = this._snapshotVoices();
     const active = {
       ...sw,
-      type,
+      type: manual ? buildType : type,
+      selectedType: type,
       buildType,
+      manual,
+      wasManual: Boolean(manual),
+      // What an abandoned manual mix puts back (spec 031).
+      prevOrigin: this.origin,
+      prevTrim: this.trimState,
       T,
       L,
       ...timing,
@@ -279,7 +325,7 @@ export class TrackTransitionController {
       // Every voice sounding now belongs to the old track (the new pattern isn't scheduled yet).
       // Notes queried from here on are cut by the pattern; these were handed out before and
       // keep their full length unless released (spec 2.5: nothing old after the end).
-      oldVoiceIds: this._snapshotVoices(),
+      oldVoiceIds,
       phase: 'armed',
       lastCps: sw.oldCps,
     };
@@ -311,6 +357,7 @@ export class TrackTransitionController {
   }
 
   _build(a) {
+    const progressDriven = a.manual || a.handedOver;
     return buildTransition({
       oldPat: a.oldPat,
       newPat: a.newPat,
@@ -320,7 +367,20 @@ export class TrackTransitionController {
       type: a.buildType,
       cps: a.oldCps,
       echoFrom: a.echoFrom,
+      // Spec 031: the fader's progress (heard from T on), or after a hand-over the clock from T'.
+      ...(progressDriven ? { progressAt: (t) => this._progressAt(a, t), oldEnd: a.handedOver ? a.end : Infinity } : {}),
     });
+  }
+
+  /** Spec 031: the envelope progress of a manual (or handed-over) mix at cycle `t`. */
+  _progressAt(a, t) {
+    if (t < a.T) {
+      return 0;
+    }
+    if (a.manual) {
+      return a.manual.p;
+    }
+    return progress(t, a.windowStart, a.L);
   }
 
   /**
@@ -349,6 +409,188 @@ export class TrackTransitionController {
       return this._enqueue(code, settings, prepare);
     }
     return this._run(code, settings, prepare);
+  }
+
+  /**
+   * Spec 031: start a **manual** mix to another track: the same evaluate path as `switchTo` (a
+   * failed evaluate rejects with `evaluateFailed` and the old track plays on untouched), but the
+   * transition's progress comes from {@link setManualProgress} (the crossfader) instead of the clock.
+   * - The new track starts at the phrase start T, as a timed switch would (Snap, phrase origin).
+   * - Off, Cut and Dip mix as Crossfade; the other types keep their shape.
+   * - Tempo: `glide` follows the progress, `jump` sets the new tempo at T, `match`/`keep` hold the
+   *   old tempo (Match glides to the new one after completion).
+   *
+   * Resolves `{ type, T, end, manual: true }` once complete (progress ≥ MANUAL_COMPLETE_AT),
+   * `{ abandoned: true, type, T }` when abandoned (back to ≤ MANUAL_ABANDON_AT after having left
+   * it), the timed transition's result after {@link handManualToTimed}, `{ immediate: true }` when
+   * nothing was playing (the track just starts), or `{ ignored: true, busy: true }` when another
+   * switch is in flight (a manual mix is never queued).
+   * @param {string} code
+   * @param {Object} [settings] overrides `getSettings()`, as for `switchTo`
+   * @param {Object} [options]
+   * @param {Function} [options.prepare] async reset run just before evaluate
+   * @returns {Promise<Object>}
+   */
+  beginManual(code, settings, { prepare } = {}) {
+    if (this.busy) {
+      return Promise.resolve({ ignored: true, busy: true });
+    }
+    return this._run(code, settings, prepare, { p: 0, left: false });
+  }
+
+  /**
+   * Spec 031: set the manual mix's progress (the crossfader position from the playing end), clamped
+   * to [0, 1]. The next queried events hear it (from T on). At ≥ MANUAL_COMPLETE_AT the mix completes
+   * (once T is reached); at ≤ MANUAL_ABANDON_AT after having been above it, it is abandoned: the old
+   * pattern is back as it was (origin, trim), the new track's voices fade out, the tempo is restored.
+   * May be called while the new code still evaluates. Does nothing without a manual mix.
+   * @param {number} p
+   * @returns {boolean} whether a manual mix took it
+   */
+  setManualProgress(p) {
+    const m = this.inflight?.manual;
+    if (!m || typeof p !== 'number' || Number.isNaN(p)) {
+      return false;
+    }
+    const value = Math.min(1, Math.max(0, p));
+    if (value === m.p) {
+      return true;
+    }
+    m.p = value;
+    if (value > MANUAL_ABANDON_AT) {
+      m.left = true;
+    }
+    this._emit('manual', { p: value });
+    const a = this.active;
+    if (a?.manual === m && a.newCps !== undefined) {
+      this._checkManual(a);
+    }
+    return true;
+  }
+
+  /**
+   * Spec 031: Go during a manual mix. It continues as a timed transition from the current progress:
+   * the envelope window starts at T' = now − p·L, so the level heard now is unchanged, and the old
+   * track ends at T' + L. Tempo: a Glide continues from the tempo it reached. The promise
+   * `beginManual` returned resolves when that transition ends.
+   * @returns {boolean} whether a manual mix was handed over
+   */
+  handManualToTimed() {
+    const a = this.active;
+    if (!a?.manual || a.newCps === undefined) {
+      return false;
+    }
+    const now = this._now();
+    const heard = now >= a.T ? a.manual.p : 0;
+    const L = a.settings.length;
+    a.L = L;
+    a.windowStart = Math.max(now, a.T) - heard * L;
+    a.end = a.windowStart + L;
+    a.oldEnd = a.end;
+    a.manual = null;
+    a.handedOver = true;
+    if (this.inflight) {
+      this.inflight.manual = null;
+    }
+    // A Glide continues from the tempo it reached, over what remains.
+    a.glideFrom = a.lastCps;
+    a.glideStart = Math.max(now, a.T);
+    // The old track's sounding voices (started during the mix, or before it) fade out by the end, as
+    // in a timed overlapping transition; its events from here on are cut at the end by the pattern.
+    const seconds = Math.max(0, a.end - now) / Math.max(a.oldCps, this._incomingCps(a));
+    this._releaseVoices(this._oldSideVoices(), seconds, Math.min(HANDOVER_RELEASE_DELAY, seconds / 2));
+    try {
+      Promise.resolve(this.repl.setPattern(a.newPat, false)).catch((error) =>
+        console.warn('[TrackTransitionController] setPattern at the hand-over failed:', error),
+      );
+    } catch (error) {
+      console.warn('[TrackTransitionController] setPattern at the hand-over failed:', error);
+    }
+    this._tick();
+    return true;
+  }
+
+  /** Spec 031: complete or abandon a manual mix whose progress reached an end. */
+  _checkManual(a) {
+    const m = a.manual;
+    if (!m || this.active !== a) {
+      return;
+    }
+    if (m.left && m.p <= MANUAL_ABANDON_AT) {
+      this._abandonManual(a);
+    } else if (m.p >= MANUAL_COMPLETE_AT && this._now() >= a.T) {
+      this._completeManual(a);
+    }
+  }
+
+  _completeManual(a) {
+    const now = this._now();
+    a.end = Math.max(now, a.T);
+    a.oldEnd = a.end;
+    a.manual = null;
+    if (this.inflight) {
+      this.inflight.manual = null;
+    }
+    // The old track's voices still sounding (long notes started during the mix, or before it, which
+    // the fader shaped only at their start) fade out now: the new track plays alone.
+    this._releaseVoices(this._oldSideVoices(), MANUAL_RELEASE);
+    this._finish(a);
+  }
+
+  /**
+   * Spec 031: the fader went back to the playing end. The old pattern is put back exactly as it was
+   * playing (its origin shift and trim), the voices the new track may have started fade out, the
+   * tempo and the old track's tempo hold come back, and nothing is re-evaluated (nothing heard twice).
+   */
+  _abandonManual(a) {
+    this.active = null;
+    if (this.inflight) {
+      this.inflight.manual = null;
+    }
+    a.manual = null;
+    a.releaseTempo?.();
+    const scheduler = this.scheduler;
+    if (scheduler && scheduler.cps !== a.oldCps) {
+      scheduler.setCps(a.oldCps);
+    }
+    this.origin = a.prevOrigin;
+    this.trimState = a.prevTrim;
+    // Only the new track's voices (stamped `_mixSide: 'new'`) fade out; the old track's, started
+    // during the mix or already scheduled for the lookahead, play on.
+    this._releaseVoices(this._snapshotVoices('new'), MANUAL_RELEASE);
+    this._restorePattern = a.oldPat;
+    try {
+      Promise.resolve(this.repl.setPattern(a.oldPat, false)).catch((error) =>
+        console.warn('[TrackTransitionController] restoring the old pattern failed:', error),
+      );
+    } catch (error) {
+      console.warn('[TrackTransitionController] restoring the old pattern failed:', error);
+    }
+    this._restorePattern = null;
+    this._cancelMeasure();
+    this._resumeTempoHold(a.prevHold);
+    this._emit('end', { type: a.type, T: a.T, end: null, abandoned: true });
+    a.resolve({ abandoned: true, type: a.type, T: a.T });
+  }
+
+  /** Spec 031: the main engine's voices that are not the new track's (old-stamped, or from before the mix). */
+  _oldSideVoices() {
+    const fresh = new Set(this._snapshotVoices('new'));
+    return this._snapshotVoices().filter((id) => !fresh.has(id));
+  }
+
+  /** Fade `ids` out so they are silent `seconds` from now, the fade beginning `delay` seconds from now. */
+  _releaseVoices(ids, seconds, delay = 0) {
+    if (!ids?.length || !this.audioContext || !this.voices?.releaseSounds) {
+      return;
+    }
+    const now = this.audioContext.currentTime;
+    const start = now + Math.max(0, delay);
+    try {
+      this.voices.releaseSounds(ids, Math.max(start + SHORT_RELEASE, now + seconds), start);
+    } catch (error) {
+      console.warn('[TrackTransitionController] releasing voices failed:', error);
+    }
   }
 
   _enqueue(code, settings, prepare) {
@@ -381,8 +623,8 @@ export class TrackTransitionController {
     this._run(q.code, q.settings, q.prepare).then(q.resolve, q.reject);
   }
 
-  async _run(code, settingsArg, prepare) {
-    const inflight = { code };
+  async _run(code, settingsArg, prepare, manual = null) {
+    const inflight = { code, manual };
     this.inflight = inflight;
     let sw;
     let capture;
@@ -412,6 +654,8 @@ export class TrackTransitionController {
         useLayers: !GLOBAL_TRANSFORM.test(code),
         trimState: playing && settings.matchLoudness ? { start: null, value: 1 } : null,
         consumed: false,
+        manual, // spec 031: { p, left } while a manual mix (the same object as inflight.manual)
+        prevHold, // spec 031: an abandoned manual mix puts the old track's tempo hold back
       };
       sw.done = new Promise((resolve) => (sw.resolve = resolve));
       if (sw.trimState && this.destinationGain && this.audioContext) {
@@ -465,13 +709,18 @@ export class TrackTransitionController {
       if (a.buildType === 'dip') {
         this._scheduleDip(a);
       }
-      this._releaseOldVoices(a);
+      if (!a.manual) {
+        this._releaseOldVoices(a); // a manual mix: the old track plays on until the fader decides
+      }
       const now = this._now();
       if (now < a.T) {
         a.phase = 'waiting';
         this._emit('waiting', { type: a.type, T: a.T, now });
       }
       this._tick();
+      if (a.manual) {
+        this._checkManual(a); // the fader may have moved (or come back) while the code evaluated
+      }
       return await a.done;
     } catch (error) {
       // Only evaluate (or resuming the context) can fail: nothing after the hook throws, and
@@ -605,9 +854,9 @@ export class TrackTransitionController {
     return this._holdsOldTempo(a) ? a.oldCps : a.newCps;
   }
 
-  _snapshotVoices() {
+  _snapshotVoices(side) {
     try {
-      return this.voices?.getActiveSoundIds?.() ?? [];
+      return (side === undefined ? this.voices?.getActiveSoundIds?.() : this.voices?.getActiveSoundIds?.(side)) ?? [];
     } catch (error) {
       console.warn('[TrackTransitionController] could not list active voices:', error);
       return [];
@@ -704,6 +953,17 @@ export class TrackTransitionController {
   /** The tempo plan (spec 017 tech §2.2 step 6, spec 027 tech §2.1 step 5) at cycle `now`. */
   _applyTempo(a, now) {
     const mode = this._tempoMode(a);
+    if (a.manual) {
+      // Spec 031: Match/Keep hold the old tempo; Glide follows the fader; Jump sets the new one at T.
+      if (mode === 'match' || mode === 'keep') {
+        this._setCps(a, a.oldCps);
+      } else if (now >= a.T) {
+        const q = Math.round(a.manual.p * MANUAL_TEMPO_STEPS) / MANUAL_TEMPO_STEPS;
+        const glides = mode === 'glide' && isOverlapping(a.buildType);
+        this._setCps(a, glides ? a.oldCps + (a.newCps - a.oldCps) * q : a.newCps);
+      }
+      return;
+    }
     if (mode === 'match' || mode === 'keep') {
       // Both tracks at the old tempo throughout (a no-op: it is already the clock's tempo).
       this._setCps(a, a.oldCps);
@@ -739,11 +999,13 @@ export class TrackTransitionController {
           const from = a.T - OLD_LOUDNESS_SECONDS * a.oldCps;
           a.oldRms = this.meter.rmsOver(from, a.T);
         }
-        this._emit('start', { type: a.type, T: a.T, end: a.end });
+        this._emit('start', { type: a.type, T: a.T, end: Number.isFinite(a.end) ? a.end : null });
       }
       if (a.phase === 'running') {
         this._applyTempo(a, now);
-        if (now >= a.end) {
+        if (a.manual) {
+          this._checkManual(a);
+        } else if (now >= a.end) {
           this._finish(a);
         }
       }
@@ -787,8 +1049,9 @@ export class TrackTransitionController {
     } else {
       this.metering = false;
     }
-    this._emit('end', { type: a.type, T: a.T, end: a.end });
-    a.resolve({ type: a.type, T: a.T, end: a.end });
+    const manual = a.wasManual ? { manual: true } : {};
+    this._emit('end', { type: a.type, T: a.T, end: a.end, ...manual });
+    a.resolve({ type: a.type, T: a.T, end: a.end, ...manual });
   }
 
   /**
@@ -998,17 +1261,22 @@ export class TrackTransitionController {
     return true;
   }
 
-  /** What the controller is doing, for the UI. */
+  /**
+   * What the controller is doing, for the UI. `manual` (spec 031) is `{ p, left }` while a manual
+   * mix is in flight (evaluating, waiting or running), else null; a manual mix's `end` is null.
+   */
   getState() {
     const a = this.active;
+    const m = this.inflight?.manual ?? null;
     return {
       phase: a ? a.phase : this.armed ? 'evaluating' : 'idle',
       type: a?.type,
       T: a?.T,
-      end: a?.end,
+      end: a && !Number.isFinite(a.end) ? null : a?.end,
       origin: this.origin,
       queued: this.queued !== null,
       tempoHold: this.tempoHold?.kind ?? null,
+      manual: m ? { p: m.p, left: m.left } : null,
     };
   }
 

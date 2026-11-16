@@ -19,6 +19,10 @@ export {
   TRANSITION_LENGTHS,
   TRANSITION_SNAPS,
   TRANSITION_TEMPOS,
+  MANUAL_COMPLETE_AT,
+  MANUAL_ABANDON_AT,
+  MANUAL_RELEASE,
+  HANDOVER_RELEASE_DELAY,
 } from './TrackTransitionController.mjs';
 export {
   buildTransition,
@@ -27,6 +31,7 @@ export {
   isOverlapping,
   TRANSITION_TYPES,
   OVERLAPPING_TYPES,
+  MIX_SIDE_CONTROL,
 } from './transitions/buildTransition.mjs';
 export { LoudnessMeter, computeTrim, applyTrim, trimFactorAt } from './transitions/loudness.mjs';
 // Vinyl scratch control (spec 019): the DSP runs in the `scratch-processor` AudioWorklet.
@@ -60,6 +65,43 @@ export {
   MIDI_FEEL_KEYS,
 } from './scratch/midiFeel.mjs';
 export { loadScratchWorklet } from './scratch/scratchWorklet.mjs';
+// Spec 031: MIDI mapping for everything (note input, the shared control registry, the map engine).
+export { createSharedMidiInputs, parseNote, parseControlChange } from './scratch/midiJog.mjs';
+export {
+  claimMidiLearn,
+  sameMidiControl,
+  cleanMidiControl,
+  midiControlHolder,
+  readMidiMapBindings,
+  MIDI_CONTROL_KINDS,
+} from './scratch/midiLearnShared.mjs';
+export {
+  createMidiMap,
+  ccToUnit,
+  pickup,
+  buttonEdge,
+  parseMidiMap,
+  MIDI_MAP_STORAGE_KEY,
+  MIDI_MAP_VERSION,
+  MIDI_MAP_LEARN_TIMEOUT_MS,
+  MIDI_MAP_LEARN_MESSAGES,
+  MIDI_MAP_LEARN_WINDOW_MS,
+  MIDI_MAP_PICKUP_TOLERANCE,
+  MIDI_MAP_TARGET_KINDS,
+  MIDI_MAP_EXPORT_FILENAME,
+} from './midi/midiMap.mjs';
+// Spec 031: speakers and headphones volume.
+export {
+  volumeGain,
+  clampVolume,
+  setVolume,
+  createVolumeNode,
+  readVolume,
+  writeVolume,
+  VOLUME_RAMP_SECONDS,
+  SPEAKERS_VOLUME_STORAGE_KEY,
+  HEADPHONES_VOLUME_STORAGE_KEY,
+} from './volume.mjs';
 // Spec 023: the record's physics (shared by the worklet and the platter) and the track shift.
 export {
   SCRATCH_BRAKE_SECONDS,

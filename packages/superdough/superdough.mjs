@@ -364,21 +364,28 @@ let activeSoundSources = new Map();
 // active voice plays through (the main engine's, or e.g. the headphone preview's, which shares the
 // AudioContext), so a track transition on the main engine releases only its own voices.
 const activeSoundOwners = new WeakMap();
+// fork addition (strudel-client spec 031, used by the @strudel/mixer manual mix): the side of a track
+// transition each active voice was started for, taken from the hap's `_mixSide` control ('old' or
+// 'new'). Only voices whose value carries the control are recorded; without it nothing changes.
+const activeSoundSides = new WeakMap();
 
 /**
  * Fork addition (strudel-client spec 017). Ids of the voices that are sounding (or scheduled)
  * through `owner`, by default the main engine's controller. Pass them to `releaseSounds` later.
+ * Fork addition (strudel-client spec 031): with `side`, only the voices whose hap carried the
+ * control `_mixSide: side` (a manual mix's 'old' or 'new' track); without it, every voice as before.
  * @param {Object} [owner] a SuperdoughAudioController
+ * @param {string} [side] 'old' or 'new'
  * @returns {number[]}
  * @noAutocomplete
  */
-export function getActiveSoundIds(owner = controller) {
+export function getActiveSoundIds(owner = controller, side) {
   const ids = [];
   if (owner == null) {
     return ids;
   }
   for (const [id, handle] of activeSoundSources) {
-    if (activeSoundOwners.get(handle) === owner) {
+    if (activeSoundOwners.get(handle) === owner && (side === undefined || activeSoundSides.get(handle) === side)) {
       ids.push(id);
     }
   }
@@ -629,6 +636,7 @@ export const superdough = async (value, t, hapDuration, cps = 0.5, cycle = 0.5, 
       sourceNode = soundHandle.node;
       activeSoundSources.set(chainID, soundHandle);
       activeSoundOwners.set(soundHandle, audioController); // fork addition (spec 017)
+      if (value._mixSide !== undefined) activeSoundSides.set(soundHandle, value._mixSide); // fork addition (spec 031)
     }
   } else {
     throw new Error(`sound ${s} not found! Is it loaded?`);

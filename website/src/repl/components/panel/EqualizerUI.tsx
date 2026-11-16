@@ -6,16 +6,12 @@ import {
   type CutUpdate,
   type EqualizerSettings,
   type EqualizerSlotName,
-  type EqualizerSlots,
   applyEqualizerSettings,
   EQUALIZER_PRESETS,
   EQUALIZER_PRESET_FAMILIES,
   HIGH_CUT_RANGE,
   LOW_CUT_RANGE,
   OUTPUT_GAIN_RANGE,
-  loadEqualizerSlots,
-  saveEqualizerSlots,
-  switchEqualizerSlot,
   updateActiveEqualizerSlot,
   copyActiveEqualizerSlot,
   getDefaultSettings,
@@ -34,14 +30,19 @@ import {
 } from '@strudel/equalizer';
 import { usePanelViewport } from './panelViewport';
 import { getMainEqualizer, subscribeMainEqualizer } from '../../mainEqualizer';
+import { EqualizerCompact, EQ_GAIN_MAX, EQ_GAIN_MIN, type CompactBandUpdate } from './EqualizerCompact';
 import {
-  EqualizerCompact,
-  EQ_GAIN_MAX,
-  EQ_GAIN_MIN,
-  EQ_Q_MAX,
-  EQ_Q_MIN,
-  type CompactBandUpdate,
-} from './EqualizerCompact';
+  clampBandUpdate as clampEqBandUpdate,
+  getEqSlots,
+  glideEqualizersTo,
+  persistActiveEqSettings,
+  reloadEqSlots,
+  replaceEqSlots,
+  setEqBand,
+  setEqEnabled,
+  subscribeEqSlots,
+  switchEqSlot,
+} from '../../eqStore';
 import { EqualizerStripControls } from './EqualizerStripControls';
 import { EqualizerPresetDescription } from './EqualizerPresetDescription';
 import { EqualizerRecommendation } from './EqualizerRecommendation';
@@ -158,13 +159,13 @@ export function spectrumPoints(
 /**
  * Keeps a band update inside the range the audio graph accepts and the saved-settings loader
  * validates (an out-of-range save would make the EQ start flat). Non-finite values are dropped.
+ * (Spec 031: lives in eqStore.ts, the panel's state path, which MIDI shares.)
  */
-export function clampBandUpdate({ gain, Q }: CompactBandUpdate): CompactBandUpdate {
-  const next: CompactBandUpdate = {};
-  if (gain !== undefined && Number.isFinite(gain)) next.gain = clamp(gain, EQ_GAIN_MIN, EQ_GAIN_MAX);
-  if (Q !== undefined && Number.isFinite(Q)) next.Q = clamp(Q, EQ_Q_MIN, EQ_Q_MAX);
-  return next;
+export function clampBandUpdate(update: CompactBandUpdate): CompactBandUpdate {
+  return clampEqBandUpdate(update);
 }
+
+let panelInstances = 0;
 
 const clampCut = (cut: CutConfig, update: CutUpdate, range: { min: number; max: number }): CutConfig => ({
   enabled: typeof update.enabled === 'boolean' ? update.enabled : cut.enabled,
@@ -187,7 +188,9 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   // Spec 026: the A/B slots (the active one is what the controls show and edit), the spectrum, and
   // Record as heard (read by the recorders when a recording starts).
   const [activeSlot, setActiveSlot] = useState<EqualizerSlotName>('A');
-  const slotsRef = useRef<EqualizerSlots | null>(null);
+  // Spec 031: this panel's changes go through eqStore (the state path MIDI shares) with this token,
+  // so the panel ignores its own echo and shows every other change (a MIDI knob, the A/B pad).
+  const [storeSource] = useState(() => `panel:${++panelInstances}`);
   const [spectrumOn, setSpectrumOn] = useState(loadSpectrumOn);
   const [recordPostEq, setRecordPostEq] = useState(loadRecordPostEq);
   /** The latest spectrum frame (null: none drawn) and the chart's draw function, for the rAF loop. */
@@ -234,8 +237,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   // Load saved settings on mount: the active A/B slot (spec 026; settings saved before it are slot A,
   // and B starts as a copy).
   useEffect(() => {
-    const slots = loadEqualizerSlots();
-    slotsRef.current = slots;
+    const slots = reloadEqSlots();
     const settings = slots[slots.active];
     setActiveSlot(slots.active);
     showSettings(settings);
@@ -245,11 +247,22 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     applySettingsToEqualizers(settings);
   }, [applySettingsToEqualizers]);
 
+  // Spec 031: a change made elsewhere (a MIDI knob or pad) shows here: the slider moves.
+  useEffect(
+    () =>
+      subscribeEqSlots((slots, source, previous) => {
+        if (source === storeSource) return;
+        const settings = slots[slots.active];
+        if (slots.active !== previous.active) setUserTarget(userPresetName(settings.preset));
+        setActiveSlot(slots.active);
+        showSettings(settings);
+      }),
+    [storeSource],
+  );
+
   /** Save settings into the active slot only (and, through it, the legacy key the EQs load at start). */
   const persist = (settings: EqualizerSettings) => {
-    const slots = slotsRef.current ?? loadEqualizerSlots();
-    slotsRef.current = updateActiveEqualizerSlot(slots, settings);
-    saveEqualizerSlots(slotsRef.current);
+    persistActiveEqSettings(settings, storeSource);
   };
 
   // The limiting indicator: poll the main (speakers) EQ's limiter once per frame while the panel is
@@ -503,30 +516,21 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     });
   };
 
+  // Through eqStore, the state path MIDI's EQ on/off pad shares (spec 031).
   const handleEnableToggle = () => {
-    const newEnabled = !isEnabled;
-    setIsEnabled(newEnabled);
-
-    equalizers().forEach((eq) => eq.setEnabled(newEnabled));
-
-    persist(settingsWith({ isEnabled: newEnabled }));
+    const settings = setEqEnabled(!isEnabled, equalizers(), storeSource);
+    setIsEnabled(settings.isEnabled);
   };
 
-  // The one band setter, used by the desktop grid and the compact sliders. setBand keeps the
-  // "EQ off stays silent" rule: it stores the value and only applies it while the EQ is on.
+  // The one band setter, used by the desktop grid and the compact sliders, and (spec 031) by MIDI
+  // through eqStore.setEqBand. setBand keeps the "EQ off stays silent" rule: it stores the value
+  // and only applies it while the EQ is on.
   const handleBandChange = (index: number, update: CompactBandUpdate) => {
     if (index < 0 || index >= bands.length) return;
-    const next = clampBandUpdate(update);
-    if (next.gain === undefined && next.Q === undefined) return;
-
-    const newBands = [...bands];
-    newBands[index] = { ...newBands[index], ...next };
-    setBands(newBands);
-
-    equalizers().forEach((eq) => eq.setBand(index, next));
-
+    const settings = setEqBand(index, update, equalizers(), storeSource);
+    if (!settings) return;
+    setBands(settings.bands);
     setActivePreset('custom');
-    persist(settingsWith({ bands: newBands, preset: 'custom' }));
   };
 
   // The cuts and the output level: like a band, each change drives both EQs (stored always, heard
@@ -629,27 +633,13 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   // Spec 026 A/B: switching applies the other slot's whole settings (bands, cuts, output, on/off and
   // preset name) to both EQs through the setters, which glide: no click. Switching on: the values
   // first (stored silently while off), then on, so the switch-on crossfade brings the new curve in.
-  // Switching off: off first, then the values (stored, not heard).
-  const glideToSettings = (settings: EqualizerSettings) => {
-    const fallback = getDefaultSettings();
-    equalizers().forEach((eq) => {
-      if (!settings.isEnabled) eq.setEnabled(false);
-      settings.bands.forEach((band, index) => eq.setBand(index, { gain: band.gain, Q: band.Q }));
-      eq.setLowCut({ ...(settings.lowCut ?? fallback.lowCut!) });
-      eq.setHighCut({ ...(settings.highCut ?? fallback.highCut!) });
-      eq.setOutputGain(settings.outputGain ?? 0);
-      if (settings.isEnabled) eq.setEnabled(true);
-    });
-  };
+  // Switching off: off first, then the values (stored, not heard). (eqStore.glideEqualizersTo.)
+  const glideToSettings = (settings: EqualizerSettings) => glideEqualizersTo(settings, equalizers());
 
+  // Through eqStore, the state path MIDI's A/B pad shares (spec 031).
   const handleSwitchSlot = (slot: EqualizerSlotName) => {
-    const slots = slotsRef.current ?? loadEqualizerSlots();
-    if (slot === slots.active) return;
-    const next = switchEqualizerSlot(slots, slot);
-    const settings = next[slot];
-    glideToSettings(settings);
-    slotsRef.current = next;
-    saveEqualizerSlots(next);
+    const settings = switchEqSlot(slot, equalizers(), storeSource);
+    if (!settings) return;
     setActiveSlot(slot);
     showSettings(settings);
     setUserTarget(userPresetName(settings.preset));
@@ -669,7 +659,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
 
   /** Spec 028 review: only the active slot's preset label changes; its settings are kept as stored. */
   const relabelActiveSlot = (preset: string) => {
-    const slots = slotsRef.current ?? loadEqualizerSlots();
+    const slots = getEqSlots();
     setActivePreset(preset);
     persist({ ...slots[slots.active], preset });
   };
@@ -703,9 +693,7 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   };
 
   const handleCopySlot = () => {
-    const slots = slotsRef.current ?? loadEqualizerSlots();
-    slotsRef.current = copyActiveEqualizerSlot(updateActiveEqualizerSlot(slots, settingsWith({})));
-    saveEqualizerSlots(slotsRef.current);
+    replaceEqSlots(copyActiveEqualizerSlot(updateActiveEqualizerSlot(getEqSlots(), settingsWith({}))), storeSource);
   };
 
   const handleSpectrumChange = (on: boolean) => {

@@ -65,6 +65,7 @@ import {
   type SwitchResult,
 } from './evaluateNewTrack';
 import { installMainEqualizerWhenReady } from './mainEqualizer';
+import { runRestoringAbandon } from './abandonedMix';
 import { playingCodeEvaluated, playingStopped } from './playingEqProfile';
 import { scratchRuntime } from './scratch/scratchRuntime';
 import { createScratchReplHooks } from './scratch/scratchReplHooks';
@@ -78,6 +79,23 @@ export interface UpdateOptions {
   reset?: boolean;
   force?: boolean;
   transition?: TransitionOverride | null;
+  /** Spec 031: a crossfader mix (TrackTransitionController.beginManual) instead of a timed switch. */
+  manual?: boolean;
+}
+
+/** Spec 031: how a crossfader mix of the editor's track ended. */
+export type ManualMixOutcome = 'complete' | 'abandoned' | 'failed' | 'ignored';
+
+/** Spec 031: what the crossfader may do to the main repl. */
+export interface ManualMixControls {
+  /** Whether the speakers play. */
+  isPlaying: () => boolean;
+  /** Mix the editor's track in by hand, through the Update path (stops a plain headphone preview as Update does). */
+  beginEditor: () => Promise<ManualMixOutcome>;
+  /** The fader's progress (TrackTransitionController.setManualProgress); false without a manual mix. */
+  setProgress: (p: number) => boolean;
+  /** Go during a manual mix (handManualToTimed); false without one. */
+  handOver: () => boolean;
 }
 
 // Type definitions
@@ -131,6 +149,8 @@ interface ReplContext {
   runUpdate?: (options?: UpdateOptions) => Promise<UpdateOutcome>;
   /** What a playing set may do to the REPL (spec 022): open, cue on the headphones, Go. */
   setBridge?: SetBridge;
+  /** Spec 031: the crossfader's access to the main repl's manual mix. */
+  manualMix?: ManualMixControls;
   /** The editor now holds track `id` without going through handleUpdate (e.g. same code already loaded). */
   setEditorTrackId?: (id: string | null | undefined) => void;
   replaceTrackId?: (oldId: string, newId: string) => void;
@@ -827,8 +847,9 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   // - a set's Go (spec 022): `force` makes it a switch even on the same track id, and `transition`
   //   is the item's type and length for this switch only.
   //   `onSwitchResult` hears whether a switch's new code evaluated (the set player's Go needs it).
+  //   `manual` (spec 031): the crossfader's mix; an abandoned one leaves the old track playing.
   const runUpdate = async (
-    { reset = false, force = false, transition = null }: UpdateOptions = {},
+    { reset = false, force = false, transition = null, manual = false }: UpdateOptions = {},
     onSwitchResult?: (result: SwitchResult) => void,
   ): Promise<UpdateOutcome> => {
     // Spec 019: an Update or a track switch never starts from a held platter.
@@ -843,13 +864,34 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
       },
       switchTrack: async (code, { reset: resetOldTrack }) => {
         console.log('[repl] Update: track switch', { from: trackSwitch.playingTrackId, to: trackSwitch.editorTrackId });
-        const result = await evaluateNewTrack(code, {
-          restart: true,
-          prepare: resetOldTrack ? resetEditor : undefined,
-          transition,
-          // A set's Go never silences the speakers for a broken track (spec 022 §2.5).
-          keepOldOnFailure: force,
-        });
+        // Spec 031: an abandoned manual mix puts the old pattern back without an evaluate; what the
+        // new code's afterEval stamped (track id, EQ recommendation, title, activeCode) goes back too.
+        const result = await runRestoringAbandon(
+          () =>
+            evaluateNewTrack(code, {
+              restart: true,
+              prepare: resetOldTrack ? resetEditor : undefined,
+              transition,
+              // A set's Go never silences the speakers for a broken track (spec 022 §2.5).
+              keepOldOnFailure: force,
+              manual,
+            }),
+          {
+            playingTrackId: () => trackSwitch.playingTrackId,
+            playingCode: () => editorRef.current?.repl?.state?.activeCode,
+            restorePlayingTrack: (id) => trackSwitch.restorePlaying(id),
+            restorePlayingCode: (playing) => {
+              playingCodeEvaluated(playing);
+              setDocumentTitle(playing);
+              setLatestCode(playing);
+              const repl = editorRef.current?.repl;
+              if (repl?.state) {
+                repl.state.activeCode = playing;
+                repl.setCode?.(repl.state.code); // recomputes isDirty and reports the state
+              }
+            },
+          },
+        );
         onSwitchResult?.(result);
       },
     });
@@ -860,6 +902,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
   };
 
   const handleEvaluate = async (): Promise<void> => {
+    // Spec 031: Update during a crossfader mix is Go: it completes as the timed transition from here.
+    if (transitionControllerRef.current?.handManualToTimed()) return;
     // Spec 022: Update while a set item is cued is the set's Go (its transition, and the set moves on).
     if (setBridgeRef.current?.routeUpdate()) return;
     // Spec 019: let go of the platter before the preview stops and the code evaluates.
@@ -1031,9 +1075,40 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
           true,
           editorRef.current?.code,
         ) === 'ignored',
+      handOverManual: () => transitionControllerRef.current?.handManualToTimed() ?? false,
+      isManualMixing: () => Boolean(transitionControllerRef.current?.getState().manual),
     });
   }
   const setBridge = setBridgeRef.current;
+
+  // Spec 031: the crossfader's way to the main repl, built once (it reads refs only).
+  const manualMixRef = useRef<ManualMixControls | null>(null);
+  if (!manualMixRef.current) {
+    manualMixRef.current = {
+      isPlaying: () => Boolean(editorRef.current?.repl?.scheduler?.started),
+      beginEditor: async () => {
+        // As Update: let go of the platter, and a plain headphone preview stops (the code goes live).
+        scratchHooks.beforeEvaluate();
+        if (isPreviewingRef.current && mixerRef.current) {
+          mixerRef.current.stop();
+          setIsPreviewing(false);
+        }
+        let result: SwitchResult | null = null;
+        const outcome = await runUpdateRef.current({ force: true, manual: true }, (switched) => {
+          result = switched;
+        });
+        if (outcome !== 'switch' || result === null) return 'ignored';
+        const ended: SwitchResult = result;
+        if (ended === 'ok') return 'complete';
+        if (ended === 'abandoned' || ended === 'ignored') return ended;
+        if (ended === 'cancelled') return 'ignored';
+        return 'failed';
+      },
+      setProgress: (p) => transitionControllerRef.current?.setManualProgress(p) ?? false,
+      handOver: () => transitionControllerRef.current?.handManualToTimed() ?? false,
+    };
+  }
+  const manualMix = manualMixRef.current;
   // A recreated track is the same music: sets follow it too (useSets listens).
   const replaceTrackId = useCallback(
     (oldId: string, newId: string) => {
@@ -1115,6 +1190,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     evaluationsSettled: () => evaluationWatch.settled(),
     runUpdate,
     setBridge,
+    manualMix,
     replaceTrackId,
     isRecording: audioRecorder.isRecording,
     recordingElapsedSeconds: audioRecorder.elapsedSeconds,

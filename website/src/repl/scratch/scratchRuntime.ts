@@ -35,6 +35,8 @@ import type {
 
 export type { MidiFeelLearnResult, MidiFeelTarget, ScratchFeel, ScratchSnapGrid };
 import { getScratchDeckSetting, setScratchDeckSetting } from '../../settings';
+import i18n from '../../i18n/i18n';
+import { conflictOwner, holderName } from '../midi/holderName';
 
 export interface ScratchMidiStatus {
   state: MidiJogState;
@@ -56,7 +58,11 @@ export interface ScratchFeelMidiStatus {
   /** The last Learn's outcome worth a message: no knob in 10 s, or a control already in use. */
   message:
     | { target: MidiFeelTarget; kind: 'timeout' }
-    | { target: MidiFeelTarget; kind: 'conflict'; control: number }
+    /**
+     * `holder` (spec 031 review #7): set when a MIDI map target holds the control, `'map:<targetId>'`
+     * (midi/holderName.ts names it); the 029 message covers the jog and the other knob.
+     */
+    | { target: MidiFeelTarget; kind: 'conflict'; control: number; holder?: string }
     | null;
 }
 
@@ -886,7 +892,14 @@ export function createScratchRuntime(deps: ScratchRuntimeDeps): ScratchRuntime {
       syncFeelMidi(null);
       const result = await learning;
       if (result.status === 'timeout') syncFeelMidi({ target, kind: 'timeout' });
-      else if (result.status === 'conflict') syncFeelMidi({ target, kind: 'conflict', control: result.controller });
+      else if (result.status === 'conflict')
+        syncFeelMidi({
+          target,
+          kind: 'conflict',
+          control: result.controller,
+          // Spec 031 review #7: a MIDI map target is named (the 029 message covers the jog and knobs).
+          ...(result.with === 'map' ? { holder: conflictOwner(result) } : {}),
+        });
       else syncFeelMidi();
       return result;
     },
@@ -957,7 +970,9 @@ export const scratchRuntime: ScratchRuntime = createScratchRuntime({
   // Spec 029: lazy like the jog; the knobs call the runtime's setFeel, like a slider move.
   loadMidiFeel: async (target) => {
     const { createMidiFeel } = await import('@strudel/mixer');
-    return createMidiFeel(target);
+    // Spec 031 review #7: a map target holding the control is named, not given as its raw id.
+    const en = i18n.getFixedT('en', 'settings') as (key: string, options?: Record<string, unknown>) => string;
+    return createMidiFeel(target, { labelOf: (owner: string) => holderName(en, { owner }) });
   },
   hasStoredFeelMidiMapping: storedFeelMidiMapping,
   readSnapGrid: readScratchSnapGrid,

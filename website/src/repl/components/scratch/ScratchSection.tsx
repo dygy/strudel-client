@@ -12,6 +12,7 @@ import {
 } from '@strudel/mixer';
 import { Platter } from './Platter';
 import { usePanelViewport } from '../panel/panelViewport';
+import { conflictOwner, holderName } from '../../midi/holderName';
 import {
   isScratchActive,
   selectedSpin,
@@ -138,7 +139,11 @@ function FeelMidiControls({
   let status = '';
   if (learning) status = t('scratchFeelLearning');
   else if (message?.kind === 'timeout') status = t('scratchFeelLearnTimeout');
-  else if (message?.kind === 'conflict') status = t('scratchFeelLearnConflict', { control: message.control });
+  else if (message?.kind === 'conflict')
+    // Spec 031 review #7: name who holds the control (the jog, the other knob, a MIDI map target).
+    status = message.holder
+      ? t('scratchMidiConflictHolder', { control: message.control, holder: holderName(t, { owner: message.holder }) })
+      : t('scratchFeelLearnConflict', { control: message.control });
   else if (mapping)
     status = t('scratchMidiAssigned', {
       device: mapping.inputName,
@@ -433,7 +438,13 @@ function MidiJogControls({
       )}
       {midi.lastLearn?.status === 'conflict' && !learning && (
         <p data-scratch-midi-conflict="" className="text-xs text-foreground opacity-70" role="alert">
-          {t('scratchMidiLearnConflict', { control: midi.lastLearn.controller })}
+          {midi.lastLearn.with === 'map'
+            ? // Spec 031 review #7: a MIDI map target holds it: name the target.
+              t('scratchMidiConflictHolder', {
+                control: midi.lastLearn.controller,
+                holder: holderName(t, { owner: conflictOwner(midi.lastLearn) }),
+              })
+            : t('scratchMidiLearnConflict', { control: midi.lastLearn.controller })}
         </p>
       )}
     </div>

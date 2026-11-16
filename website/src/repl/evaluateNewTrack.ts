@@ -14,6 +14,12 @@
  * controller is busy it is passed explicitly, so a queued Go keeps its item's transition.
  *
  * Resolves `'failed'` when the new code doesn't evaluate (the old track keeps playing), else `'ok'`.
+ *
+ * Spec 031 `manual`: the crossfader's mix. While the speakers play it always goes to the controller's
+ * beginManual (Off, Cut and Dip mix as Crossfade there), never queued and never the instant path, and
+ * it resolves when the fader completes it (`'ok'`), brings it back (`'abandoned'`), when another
+ * switch was in flight (`'ignored'`), or when Stop ended it (`'cancelled'`). A manual mix that fails is `'failed'`: no instant fallback, the
+ * old track keeps playing.
  */
 import {
   settingsForSwitch,
@@ -37,6 +43,12 @@ export interface SwitchingController {
     settings: TransitionSettings | undefined,
     options: { prepare?: () => Promise<void> },
   ) => Promise<unknown>;
+  /** Spec 031: the crossfader's manual mix (TrackTransitionController.beginManual). */
+  beginManual?: (
+    code: string,
+    settings: TransitionSettings | undefined,
+    options: { prepare?: () => Promise<void> },
+  ) => Promise<{ abandoned?: boolean; ignored?: boolean; cancelled?: boolean; superseded?: boolean } | undefined>;
 }
 
 export interface EvaluateNewTrackDeps {
@@ -68,9 +80,16 @@ export interface EvaluateNewTrackOptions {
    * 017's instant path.
    */
   keepOldOnFailure?: boolean;
+  /** Spec 031: a manual mix driven by the crossfader (TrackTransitionController.beginManual). */
+  manual?: boolean;
 }
 
-export type SwitchResult = 'ok' | 'failed';
+/**
+ * `'abandoned'` (spec 031): a manual mix went back to the playing end; the old track plays on.
+ * `'ignored'` (spec 031): a manual mix couldn't start because another switch was in flight.
+ * `'cancelled'` (spec 031 review #5): a manual mix ended by Stop (or replaced); nothing to retry.
+ */
+export type SwitchResult = 'ok' | 'failed' | 'abandoned' | 'ignored' | 'cancelled';
 
 /** Off as a Cut through the controller: a hard switch that only happens once the new code evaluated. */
 export const OFF_AS_CUT = Object.freeze({ type: 'cut', snap: 0, tempo: 'jump', matchLoudness: false } as const);
@@ -78,13 +97,37 @@ export const OFF_AS_CUT = Object.freeze({ type: 'cut', snap: 0, tempo: 'jump', m
 export async function evaluateNewTrack(
   deps: EvaluateNewTrackDeps,
   code: string,
-  { restart = false, prepare, transition, keepOldOnFailure = false }: EvaluateNewTrackOptions = {},
+  { restart = false, prepare, transition, keepOldOnFailure = false, manual = false }: EvaluateNewTrackOptions = {},
 ): Promise<SwitchResult> {
   const { repl } = deps;
   if (!repl) return 'failed';
   let settings = withTransitionOverride(deps.globalSettings(), transition);
   const playing = Boolean(repl.scheduler?.started);
   const busy = deps.controllerBusy();
+
+  if (manual && playing) {
+    const controller = deps.getController();
+    if (!controller?.beginManual) return 'failed';
+    if (busy || controller.busy) return 'ignored';
+    deps.flash();
+    try {
+      const result = await controller.beginManual(code, settings, {
+        prepare: prepare ? deps.resetBeforeTransition : undefined,
+      });
+      if (result?.abandoned) return 'abandoned';
+      if (result?.ignored) return 'ignored';
+      if (result?.cancelled || result?.superseded) return 'cancelled';
+      return 'ok';
+    } catch (error: unknown) {
+      if ((error as { evaluateFailed?: boolean } | null)?.evaluateFailed) {
+        console.warn('[TrackTransition] New track failed to evaluate; the old track keeps playing');
+      } else {
+        console.error('[TrackTransition] The manual mix failed; the old track keeps playing:', error);
+      }
+      return 'failed';
+    }
+  }
+
   const offAsCut = keepOldOnFailure && playing && settings.type === 'off';
   if (offAsCut) settings = { ...settings, ...OFF_AS_CUT };
   // The set's own settings are passed explicitly, so a queued Go keeps them.

@@ -259,6 +259,14 @@ declare module '@strudel/mixer' {
     initialize(): Promise<void>;
     ensurePlaying(): Promise<void>;
     setDevice(deviceId: string | null): Promise<void>;
+    /** Spec 031: the headphones volume node (last before the device sink); null before initialize(). */
+    volumeNode: GainNode | null;
+    /** Spec 031: the headphones volume level, 0..1 (1 = unity). */
+    volume: number;
+    /** Spec 031: ramps over 20 ms and remembers the level; returns whether a ramp was scheduled. */
+    setVolume(v01: number): boolean;
+    getVolume(): number;
+    getVolumeNode(): GainNode | null;
     evaluate(code: string): Promise<any>;
     stop(): void;
     destroy(): void;
@@ -301,17 +309,52 @@ declare module '@strudel/mixer' {
     ): Promise<Record<string, unknown>>;
     setOutput(output: { audioContext?: AudioContext; destinationGain?: GainNode }): boolean;
     stopped(): void;
+    /**
+     * Spec 031: a manual mix (the crossfader drives the progress). Resolves on complete
+     * (`manual: true`), abandon (`abandoned: true`), after a hand-over, `{ immediate: true }` when
+     * nothing played, or `{ ignored: true, busy: true }` while another switch is in flight.
+     */
+    beginManual(
+      code: string,
+      settings?: TrackTransitionSettings,
+      options?: { prepare?: () => Promise<void> },
+    ): Promise<TrackTransitionManualResult>;
+    /** Spec 031: the progress from the playing end, 0..1; false when no manual mix took it. */
+    setManualProgress(p: number): boolean;
+    /** Spec 031: Go during a manual mix: continue as the timed transition from the current progress. */
+    handManualToTimed(): boolean;
     getState(): {
       phase: string;
       type?: string;
       T?: number;
-      end?: number;
+      /** null while a manual mix runs (no end on the clock). */
+      end?: number | null;
       origin: number;
       queued: boolean;
       tempoHold?: 'glide' | 'keep' | null;
+      /** Spec 031: while a manual mix is in flight. */
+      manual: { p: number; left: boolean } | null;
     };
     destroy(): void;
   }
+
+  /** Spec 031: what TrackTransitionController.beginManual resolves. */
+  export interface TrackTransitionManualResult {
+    type?: string;
+    T?: number;
+    end?: number;
+    manual?: true;
+    abandoned?: true;
+    immediate?: true;
+    ignored?: true;
+    busy?: true;
+    cancelled?: true;
+    superseded?: true;
+  }
+  /** Spec 031: a manual mix completes at progress ≥ this (0.98) … */
+  export const MANUAL_COMPLETE_AT: number;
+  /** … and is abandoned at ≤ this (0.02) after having left it. */
+  export const MANUAL_ABANDON_AT: number;
 
   export const TRANSITION_TYPES: readonly string[];
   export const TRANSITION_LENGTHS: readonly number[];
@@ -568,6 +611,8 @@ declare module '@strudel/mixer' {
     readonly lastLearn?:
       | { status: 'learned' | 'timeout' | 'cancelled' }
       | { status: 'conflict'; controller: number; with: 'brake' | 'spinUp' }
+      /** Spec 031: a control bound in the MIDI map. */
+      | { status: 'conflict'; controller: number; with: 'map'; target: string; label: string }
       | null;
     readonly state: MidiJogState;
     /** Set only while unavailable. */
@@ -603,7 +648,9 @@ declare module '@strudel/mixer' {
     | { status: 'timeout' }
     | { status: 'cancelled' }
     | { status: 'unavailable' }
-    | { status: 'conflict'; controller: number; with: 'jog' | MidiFeelTarget };
+    | { status: 'conflict'; controller: number; with: 'jog' | MidiFeelTarget }
+    /** Spec 031: a control bound in the MIDI map. */
+    | { status: 'conflict'; controller: number; with: 'map'; target: string; label: string };
   export interface MidiFeel {
     learn(target: MidiFeelTarget): Promise<MidiFeelLearnResult>;
     cancel(): void;
@@ -619,13 +666,25 @@ declare module '@strudel/mixer' {
   }
   export function createMidiFeel(
     target: { setFeel(feel: Partial<ScratchFeel>): unknown },
-    options?: { loadMidi?: () => Promise<unknown>; storage?: Storage; getJogMapping?: () => unknown },
+    options?: {
+      loadMidi?: () => Promise<unknown>;
+      storage?: Storage;
+      getJogMapping?: () => unknown;
+      /** Spec 031: the name of a MIDI map target (`'map:<id>'`) for a refused Learn's label. */
+      labelOf?: (owner: string) => string | undefined;
+    },
   ): MidiFeel;
   export function ccToFeel(value: number, range: readonly [number, number]): number;
   export function midiFeelConflict(
     mapping: MidiFeelMapping,
-    used: { target: MidiFeelTarget; mappings: MidiFeelMappings; jog?: MidiFeelMapping | null },
-  ): 'jog' | MidiFeelTarget | null;
+    used: {
+      target: MidiFeelTarget;
+      mappings: MidiFeelMappings;
+      jog?: MidiFeelMapping | null;
+      /** Spec 031: the MIDI map's bindings; a hit returns `map:<targetId>`. */
+      map?: Record<string, MidiControl>;
+    },
+  ): 'jog' | MidiFeelTarget | `map:${string}` | null;
   export function readMidiFeelMappings(storage: Storage | null | undefined): MidiFeelMappings;
   export const MIDI_FEEL_STORAGE_KEY: string;
   export const MIDI_FEEL_LEARN_TIMEOUT_MS: number;
@@ -633,4 +692,136 @@ declare module '@strudel/mixer' {
   export const MIDI_FEEL_KEYS: Readonly<Record<MidiFeelTarget, keyof ScratchFeel>>;
   /** Adds the scratch processor to the context, once per context. */
   export function loadScratchWorklet(audioContext: BaseAudioContext): Promise<void>;
+
+  // Spec 031: MIDI mapping for everything; see packages/mixer/midi/midiMap.mjs.
+  export type MidiControlKind = 'cc' | 'note';
+  /** One physical control: a CC or a note on one channel of one input port. */
+  export interface MidiControl {
+    inputName: string;
+    kind: MidiControlKind;
+    channel: number;
+    number: number;
+  }
+  export type MidiMapTargetKind = 'continuous' | 'button';
+  /** An app target the map drives. Continuous: read/write 0..1 (soft takeover). Button: press once. */
+  export interface MidiMapTarget {
+    id: string;
+    kind: MidiMapTargetKind;
+    read?: () => number;
+    write?: (v01: number) => void;
+    press?: () => void;
+    /** Named when another Learn is refused because this target holds the control. */
+    label?: string;
+  }
+  /** `'jog'`, `'feel:brake'`, `'feel:spinUp'` or `'map:<targetId>'`. */
+  export interface MidiControlHolder {
+    owner: string;
+    label: string;
+  }
+  export type MidiMapLearnResult =
+    | { ok: true; control: MidiControl }
+    | {
+        ok: false;
+        reason: 'timeout' | 'cancelled' | 'conflict' | 'unsupported' | 'denied' | 'failed';
+        holder?: MidiControlHolder;
+      };
+  export type MidiMapStatus = 'unsupported' | 'idle' | 'denied' | 'failed' | 'ready';
+  export interface MidiMapState {
+    status: MidiMapStatus;
+    /** Connected input names while ready. */
+    inputs: string[];
+    learning: string | null;
+    bindings: Record<string, MidiControl>;
+    /** Bound continuous targets whose control hasn't picked up yet ("Move to pick up"). */
+    awaitingPickup: string[];
+    lastLearn: ({ targetId: string } & MidiMapLearnResult) | null;
+    detail?: string;
+  }
+  export type MidiMapImportError =
+    | 'not-json'
+    | 'not-a-map'
+    | 'unsupported-version'
+    | 'invalid-binding'
+    | 'duplicate-control'
+    | 'conflict';
+  export interface MidiMap {
+    learn(targetId: string): Promise<MidiMapLearnResult>;
+    cancelLearn(): void;
+    clear(targetId: string): void;
+    clearAll(): void;
+    bindings(): Record<string, MidiControl>;
+    exportJson(): string;
+    importJson(
+      text: string,
+    ): { ok: true } | { ok: false; error: MidiMapImportError; detail?: string; holder?: MidiControlHolder };
+    status(): { status: MidiMapStatus; inputs: string[] };
+    getState(): MidiMapState;
+    setTargets(targets: MidiMapTarget[]): void;
+    notifyExternalChange(targetId: string): void;
+    isPickedUp(targetId: string): boolean;
+    subscribe(listener: (state: MidiMapState) => void): () => void;
+    readonly ready: Promise<void>;
+    destroy(): void;
+  }
+  export interface SharedMidiInputs {
+    subscribe(handlers: {
+      onControlChange?: (inputName: string, cc: { channel: number; controller: number; value: number }) => void;
+      onNote?: (inputName: string, note: { channel: number; note: number; velocity: number; on: boolean }) => void;
+      onInputsChange?: (names: string[]) => void;
+    }): { ensure(): Promise<void>; destroy(): void; inputNames(): string[] };
+    readonly size: number;
+  }
+  export function createMidiMap(options?: {
+    targets?: MidiMapTarget[];
+    storage?: Storage | null;
+    loadMidi?: () => Promise<unknown>;
+    now?: () => number;
+    hub?: SharedMidiInputs;
+  }): MidiMap;
+  export function createSharedMidiInputs(options: { loadMidi: () => Promise<unknown> }): SharedMidiInputs;
+  export function ccToUnit(value: number): number;
+  export function pickup(
+    state: { picked: boolean; last: number | null },
+    v: number,
+    cur: number,
+  ): { picked: boolean; last: number };
+  export function buttonEdge(
+    state: { held: boolean } | undefined,
+    msg: { kind: 'note'; on: boolean; velocity: number } | { kind: 'cc'; value: number },
+  ): { press: boolean; state: { held: boolean } };
+  export function parseMidiMap(raw: unknown): { version: number; bindings: Record<string, MidiControl> };
+  export function sameMidiControl(a: unknown, b: unknown): boolean;
+  /**
+   * The page's one-Learn lock (jog, feel knobs, MIDI map): claiming cancels the Learn holding it.
+   * Returns the release. Spec 031: Esc claims and releases it to cancel whichever Learn runs.
+   */
+  export function claimMidiLearn(cancel: () => void, scope?: object | null): () => void;
+  export function cleanMidiControl(m: unknown): MidiControl | null;
+  export function midiControlHolder(
+    control: unknown,
+    options?: { storage?: Storage | null; exclude?: string; labelOf?: (owner: string) => string | undefined },
+  ): MidiControlHolder | null;
+  export function readMidiMapBindings(storage: Storage | null | undefined): Record<string, MidiControl>;
+  export const MIDI_CONTROL_KINDS: readonly MidiControlKind[];
+  export const MIDI_MAP_STORAGE_KEY: string;
+  export const MIDI_MAP_VERSION: number;
+  export const MIDI_MAP_LEARN_TIMEOUT_MS: number;
+  export const MIDI_MAP_LEARN_MESSAGES: number;
+  export const MIDI_MAP_LEARN_WINDOW_MS: number;
+  export const MIDI_MAP_PICKUP_TOLERANCE: number;
+  export const MIDI_MAP_TARGET_KINDS: readonly MidiMapTargetKind[];
+  export const MIDI_MAP_EXPORT_FILENAME: string;
+
+  // Spec 031: speakers and headphones volume; see packages/mixer/volume.mjs.
+  /** The squared taper: volumeGain(1) === 1, volumeGain(0.7) ≈ 0.49 (−6.2 dB). */
+  export function volumeGain(v01: number): number;
+  export function clampVolume(v: unknown): number;
+  /** A 20 ms linear ramp anchored at the current gain; false when unchanged. */
+  export function setVolume(param: AudioParam, v01: number, ctx: BaseAudioContext): boolean;
+  export function createVolumeNode(ctx: BaseAudioContext, v01?: number): GainNode;
+  export function readVolume(storage: Storage | null | undefined, key: string): number;
+  export function writeVolume(storage: Storage | null | undefined, key: string, v01: number): void;
+  export const VOLUME_RAMP_SECONDS: number;
+  export const SPEAKERS_VOLUME_STORAGE_KEY: string;
+  export const HEADPHONES_VOLUME_STORAGE_KEY: string;
 }

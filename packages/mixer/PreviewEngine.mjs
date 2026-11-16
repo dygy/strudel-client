@@ -9,7 +9,7 @@
  * Audio chain:
  *   previewRepl → previewSuperdough(controller) → previewController.output
  *     → channelMerger → [scratch node, spec 019] → destinationGain → equalizer
- *     → MediaStreamDest → HTMLAudioElement.setSinkId(headphones)
+ *     → headphones volume (spec 031) → MediaStreamDest → HTMLAudioElement.setSinkId(headphones)
  *
  * @class PreviewEngine
  * @license AGPL-3.0-or-later
@@ -19,6 +19,16 @@ import { AudioEqualizer, applyEqualizerSettings, loadEqualizerSettings } from '@
 import { getActiveSoundIds, releaseSounds } from 'superdough';
 import { ScratchDeck } from './scratch/ScratchDeck.mjs';
 import { PatternOffset, ScratchHandOver } from './scratch/ScratchShift.mjs';
+import {
+  HEADPHONES_VOLUME_STORAGE_KEY,
+  clampVolume,
+  createVolumeNode,
+  readVolume,
+  setVolume,
+  writeVolume,
+} from './volume.mjs';
+
+const defaultStorage = () => (typeof localStorage !== 'undefined' ? localStorage : null);
 
 export class PreviewEngine {
   /**
@@ -31,6 +41,8 @@ export class PreviewEngine {
    * @param {Function} [deps.transpiler] - Code transpiler
    * @param {{getActiveSoundIds: Function, releaseSounds: Function}} [deps.voices] - superdough's
    *   voice listing and release (spec 023; default: superdough's exports)
+   * @param {Storage|null} [deps.storage] - Where the headphones volume is kept (spec 031; default:
+   *   localStorage)
    */
   constructor(audioContext, deps) {
     this.audioContext = audioContext;
@@ -50,6 +62,15 @@ export class PreviewEngine {
     this.isInitialized = false;
     this.isPlaying = false;
     this.deviceId = null;
+    /** Spec 031: the headphones volume node, the last node before the device sink (created once). */
+    this.volumeNode = null;
+    /** Spec 031: the headphones volume level, 0..1 (1 = unity), remembered in this browser. */
+    this.volume = readVolume(this._storage(), HEADPHONES_VOLUME_STORAGE_KEY);
+  }
+
+  /** @private */
+  _storage() {
+    return this.deps?.storage !== undefined ? this.deps.storage : defaultStorage();
   }
 
   /**
@@ -89,7 +110,10 @@ export class PreviewEngine {
     destGain.connect(this.equalizer.getInput());
 
     this.mediaStreamDest = ac.createMediaStreamDestination();
-    this.equalizer.getOutput().connect(this.mediaStreamDest);
+    // Spec 031: the headphones volume is the last node, after the EQ (at level 1 its gain is exactly 1).
+    this.volumeNode = createVolumeNode(ac, this.volume);
+    this.equalizer.getOutput().connect(this.volumeNode);
+    this.volumeNode.connect(this.mediaStreamDest);
 
     this.audioElement = new Audio();
     this.audioElement.srcObject = this.mediaStreamDest.stream;
@@ -162,6 +186,36 @@ export class PreviewEngine {
     const attached = await deck.attach();
     if (this.scratchDeck !== deck) return null; // destroy() ran while the worklet loaded
     return attached ? deck : null;
+  }
+
+  /**
+   * Spec 031: set the headphones volume. It ramps over 20 ms (never a jump) and is remembered in
+   * this browser. Before initialize() the level is kept and applied when the chain is built.
+   * @param {number} v01 - 0..1 (clamped); 1 is unity, today's level.
+   * @returns {boolean} Whether a ramp was scheduled (false when unchanged or not built yet).
+   */
+  setVolume(v01) {
+    if (typeof v01 !== 'number' || !Number.isFinite(v01)) return false;
+    this.volume = clampVolume(v01);
+    writeVolume(this._storage(), HEADPHONES_VOLUME_STORAGE_KEY, this.volume);
+    return this.volumeNode ? setVolume(this.volumeNode.gain, this.volume, this.audioContext) : false;
+  }
+
+  /**
+   * Spec 031: the headphones volume level, 0..1.
+   * @returns {number}
+   */
+  getVolume() {
+    return this.volume;
+  }
+
+  /**
+   * Spec 031: the headphones volume node (on the preview's own AudioContext), or null before
+   * initialize(). It belongs to the engine: don't disconnect it.
+   * @returns {GainNode|null}
+   */
+  getVolumeNode() {
+    return this.volumeNode;
   }
 
   /**
@@ -241,6 +295,14 @@ export class PreviewEngine {
     if (this.equalizer) {
       this.equalizer.destroy();
       this.equalizer = null;
+    }
+    if (this.volumeNode) {
+      try {
+        this.volumeNode.disconnect();
+      } catch (e) {
+        /* ok */
+      }
+      this.volumeNode = null;
     }
     if (this.controller?.output?.destinationGain) {
       try {

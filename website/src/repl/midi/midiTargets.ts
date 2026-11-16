@@ -1,0 +1,117 @@
+/**
+ * The MIDI map's targets (spec 031 §2.1, tech §2.6): every live control a knob, fader or pad can
+ * drive, bound to the action its on-screen control takes.
+ *
+ * - EQ bands, EQ on/off and A/B go through eqStore, the EQ panel's own state path: the slider moves,
+ *   the value is saved into the active A/B slot, and a band set while the EQ is off is stored silently.
+ * - Speakers volume (speakersVolume.ts) and headphones volume (the preview engine) ramp and persist.
+ * - The crossfader is the crossfader runtime (crossfader.ts).
+ * - Cue/Go is the set player's press (the set bar's button, Alt+Shift+N); Play/Stop and Update are the
+ *   header's handlers; Performance mode is Alt+Shift+P's toggle.
+ * - Next / Previous type steps the selected transition type through the list, wrapping.
+ *
+ * The scratch jog and feel knobs keep their own Learn (specs 019, 029); they are not map targets.
+ */
+import type { AudioEqualizer } from '@strudel/equalizer';
+import { EQ_GAIN_LIMIT } from '@strudel/equalizer';
+import type { MidiMapTarget } from '@strudel/mixer';
+import { activeEqSettings, setEqBand, toggleEq, toggleEqSlot } from '../eqStore';
+import { getSpeakersVolume, setSpeakersVolume } from '../speakersVolume';
+import { getHeadphonesVolume, setHeadphonesVolume, type HeadphonesVolumeEngine } from '../headphonesVolume';
+import { TRANSITION_TYPE_OPTIONS, type TransitionType } from '../transitionSettings';
+import type { Crossfader } from './crossfader';
+import { MIDI_EQ_SOURCE, MIDI_TARGETS, MIDI_TARGET_IDS, midiEqBandSource, type MidiTargetMeta } from './midiTargetMeta';
+
+export {
+  EQ_BAND_COUNT,
+  MIDI_EQ_SOURCE,
+  MIDI_TARGETS,
+  MIDI_TARGET_IDS,
+  eqBandTargetId,
+  midiEqBandSource,
+  type MidiTargetGroup,
+  type MidiTargetMeta,
+} from './midiTargetMeta';
+
+/** A band's gain (dB, ±24) as 0..1. */
+export const bandGainToUnit = (db: number): number => (db + EQ_GAIN_LIMIT) / (2 * EQ_GAIN_LIMIT);
+
+/** 0..1 as a band's gain, on the slider's 0.5 dB grid (CC 0 → −24, 127 → +24, 64 → 0). */
+export const unitToBandGain = (v01: number): number => {
+  const db = -EQ_GAIN_LIMIT + Math.min(1, Math.max(0, v01)) * 2 * EQ_GAIN_LIMIT;
+  return Math.round(db * 2) / 2;
+};
+
+/** The type `direction` steps away from `current` in the list, wrapping at both ends. */
+export function stepTransitionType(current: TransitionType, direction: 1 | -1): TransitionType {
+  const list = TRANSITION_TYPE_OPTIONS;
+  const index = list.indexOf(current);
+  const from = index < 0 ? 0 : index;
+  return list[(from + direction + list.length) % list.length];
+}
+
+export interface MidiTargetDeps {
+  /** Every EQ the panel drives: the speakers' (main) and the headphones' (preview engine). */
+  equalizers: () => AudioEqualizer[];
+  /** The headphone preview engine, or null. */
+  previewEngine: () => HeadphonesVolumeEngine | null;
+  crossfader: Crossfader;
+  /** The set player's press (Cue/Go); does nothing without a playing set. */
+  cueGo: () => void;
+  togglePlay: () => void;
+  update: () => void;
+  togglePerformance: () => void;
+  /** The selected transition type, and its setter (settings.ts). */
+  getTransitionType: () => TransitionType;
+  setTransitionType: (type: TransitionType) => void;
+  /** The target's name, shown when another Learn is refused because it holds the control. */
+  label: (meta: MidiTargetMeta) => string;
+}
+
+/** The map's targets with their actions (fresh closures over `deps`). */
+export function buildMidiTargets(deps: MidiTargetDeps): MidiMapTarget[] {
+  const action = (meta: MidiTargetMeta): Pick<MidiMapTarget, 'read' | 'write' | 'press'> => {
+    if (meta.group === 'eq' && meta.labelParams) {
+      const index = meta.labelParams.n - 1;
+      return {
+        read: () => bandGainToUnit(activeEqSettings().bands[index]?.gain ?? 0),
+        write: (v) => {
+          setEqBand(index, { gain: unitToBandGain(v) }, deps.equalizers(), midiEqBandSource(index));
+        },
+      };
+    }
+    switch (meta.id) {
+      case MIDI_TARGET_IDS.eqToggle:
+        return { press: () => void toggleEq(deps.equalizers(), MIDI_EQ_SOURCE) };
+      case MIDI_TARGET_IDS.eqAb:
+        return { press: () => void toggleEqSlot(deps.equalizers(), MIDI_EQ_SOURCE) };
+      case MIDI_TARGET_IDS.speakers:
+        return { read: getSpeakersVolume, write: (v) => void setSpeakersVolume(v) };
+      case MIDI_TARGET_IDS.headphones:
+        return {
+          read: () => getHeadphonesVolume(deps.previewEngine()),
+          write: (v) => void setHeadphonesVolume(deps.previewEngine(), v),
+        };
+      case MIDI_TARGET_IDS.crossfader:
+        return {
+          read: () => deps.crossfader.getState().position,
+          write: (v) => deps.crossfader.setPosition(v),
+        };
+      case MIDI_TARGET_IDS.cueGo:
+        return { press: deps.cueGo };
+      case MIDI_TARGET_IDS.playStop:
+        return { press: deps.togglePlay };
+      case MIDI_TARGET_IDS.update:
+        return { press: deps.update };
+      case MIDI_TARGET_IDS.nextType:
+        return { press: () => deps.setTransitionType(stepTransitionType(deps.getTransitionType(), 1)) };
+      case MIDI_TARGET_IDS.prevType:
+        return { press: () => deps.setTransitionType(stepTransitionType(deps.getTransitionType(), -1)) };
+      case MIDI_TARGET_IDS.performance:
+        return { press: deps.togglePerformance };
+      default:
+        return {};
+    }
+  };
+  return MIDI_TARGETS.map((meta) => ({ id: meta.id, kind: meta.kind, label: deps.label(meta), ...action(meta) }));
+}

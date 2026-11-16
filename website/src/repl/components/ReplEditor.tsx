@@ -41,6 +41,8 @@ import { installPerformanceFullscreen } from '../performance/performanceFullscre
 import { installPerformanceClock } from '../performance/performanceClock';
 import { installCloseGuard } from '../performance/closeGuard';
 import { PerformanceStrip } from './performance/PerformanceStrip';
+import { MidiMapContext, useMidiMap } from '../midi/useMidiMap';
+import type { ManualMixControls } from '../useReplContext';
 
 interface ReplContext {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -63,6 +65,8 @@ interface ReplContext {
   setBridge?: SetBridge;
   /** The main REPL's track ids (useReplContext): `playing` feeds the track clock (spec 030). */
   trackIds?: () => { editor: string | null; playing: string | null };
+  /** Spec 031: the crossfader's access to the main repl's manual mix. */
+  manualMix?: ManualMixControls;
 }
 
 interface ReplEditorProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -87,6 +91,9 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
     readOnly,
     tracks: fileManagerHook && typeof fileManagerHook === 'object' ? fileManagerHook.tracks : undefined,
   });
+  // Spec 031: the MIDI map and the crossfader, once per REPL (also signed out and read-only: the
+  // mixer, EQ and transport targets work there as their on-screen controls do).
+  const midiMap = useMidiMap({ context, mixer, setPlayer });
   const settings = useSettings();
   const { panelPosition, isZen } = settings;
   const { filesOpen: isFileManagerOpen, compact, panelOpen } = usePanelLayout();
@@ -457,101 +464,103 @@ function ReplEditor({ context, fileManagerHook, ssrData, readOnly = false, mixer
 
   return (
     <SetPlayerContext.Provider value={setPlayer}>
-      <div
-        className={cx(
-          'h-full flex flex-col relative',
-          // Spec 016 review #5: on a phone held sideways, keep the bars and the code out of the notch.
-          // env() is 0 without a notch (and on every desktop), and the class is absent when wide.
-          compact && 'pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]',
-        )}
-        {...editorProps}
-        data-performance={perf ? 'true' : undefined}
-        style={{ ...editorProps.style, ['--perf-font-size' as string]: `${perfFontSize}px` }}
-      >
-        <Loader active={pending} />
-        <Header
-          context={context}
-          trackName={currentTrackName(fileManagerHook)}
-          className={perf ? 'hidden' : undefined}
-        />
-        {perf && <PerformanceStrip context={context} trackName={currentTrackName(fileManagerHook)} />}
-        {/* Stays visible in the performance view: it is the only sign that saving is paused
+      <MidiMapContext.Provider value={midiMap}>
+        <div
+          className={cx(
+            'h-full flex flex-col relative',
+            // Spec 016 review #5: on a phone held sideways, keep the bars and the code out of the notch.
+            // env() is 0 without a notch (and on every desktop), and the class is absent when wide.
+            compact && 'pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]',
+          )}
+          {...editorProps}
+          data-performance={perf ? 'true' : undefined}
+          style={{ ...editorProps.style, ['--perf-font-size' as string]: `${perfFontSize}px` }}
+        >
+          <Loader active={pending} />
+          <Header
+            context={context}
+            trackName={currentTrackName(fileManagerHook)}
+            className={perf ? 'hidden' : undefined}
+          />
+          {perf && <PerformanceStrip context={context} trackName={currentTrackName(fileManagerHook)} />}
+          {/* Stays visible in the performance view: it is the only sign that saving is paused
             (spec 030 review #3). */}
-        {!readOnly && <TrackConflictNotice controller={fileManagerHook?.trackConflict ?? null} />}
+          {!readOnly && <TrackConflictNotice controller={fileManagerHook?.trackConflict ?? null} />}
 
-        <div className="grow flex relative overflow-hidden">
-          {/* Spec 016: compact drawer slot, desktop sidebar slot, then the editor. Each slot keeps its
+          <div className="grow flex relative overflow-hidden">
+            {/* Spec 016: compact drawer slot, desktop sidebar slot, then the editor. Each slot keeps its
             position whether it renders or not, so a layout switch (rotation, resize) never
             remounts the editor (#code); only the library moves between drawer and sidebar. */}
-          {!isZen && compact && (
-            <div className={hideInPerf} data-perf-hide="drawer">
-              <LibraryDrawer open={isFileManagerOpen} onClose={closeDrawer}>
-                <FileManager
-                  context={context}
-                  fileManagerHook={fileManagerHook}
-                  readOnly={readOnly}
-                  onAfterTrackSelect={closeDrawer}
-                />
-              </LibraryDrawer>
-            </div>
-          )}
-          {!isZen && !compact && (
-            <div
-              data-perf-hide="sidebar"
-              className={cx('flex-shrink-0 overflow-hidden', perf && 'hidden')}
-              style={{
-                maxWidth: isFileManagerOpen ? 500 : 0,
-                transition: 'max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}
-            >
-              <ResizableSidebar defaultWidth={300} minWidth={200} maxWidth={500}>
-                <FileManager context={context} fileManagerHook={fileManagerHook} readOnly={readOnly} />
-              </ResizableSidebar>
-            </div>
-          )}
-          {shouldShowWelcome ? (
-            <WelcomeScreen onCreateTrack={handleCreateTrack} onImportTracks={handleImportTracks} />
-          ) : (
-            <div className="flex-1 relative transition-all duration-200 flex flex-col overflow-hidden">
-              <Code key={codeComponentKey} containerRef={containerRef} editorRef={editorRef} init={init} />
-            </div>
-          )}
-          {!isZen && panelPosition === 'right' && showPanel && (
+            {!isZen && compact && (
+              <div className={hideInPerf} data-perf-hide="drawer">
+                <LibraryDrawer open={isFileManagerOpen} onClose={closeDrawer}>
+                  <FileManager
+                    context={context}
+                    fileManagerHook={fileManagerHook}
+                    readOnly={readOnly}
+                    onAfterTrackSelect={closeDrawer}
+                  />
+                </LibraryDrawer>
+              </div>
+            )}
+            {!isZen && !compact && (
+              <div
+                data-perf-hide="sidebar"
+                className={cx('flex-shrink-0 overflow-hidden', perf && 'hidden')}
+                style={{
+                  maxWidth: isFileManagerOpen ? 500 : 0,
+                  transition: 'max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
+              >
+                <ResizableSidebar defaultWidth={300} minWidth={200} maxWidth={500}>
+                  <FileManager context={context} fileManagerHook={fileManagerHook} readOnly={readOnly} />
+                </ResizableSidebar>
+              </div>
+            )}
+            {shouldShowWelcome ? (
+              <WelcomeScreen onCreateTrack={handleCreateTrack} onImportTracks={handleImportTracks} />
+            ) : (
+              <div className="flex-1 relative transition-all duration-200 flex flex-col overflow-hidden">
+                <Code key={codeComponentKey} containerRef={containerRef} editorRef={editorRef} init={init} />
+              </div>
+            )}
+            {!isZen && panelPosition === 'right' && showPanel && (
+              <div className={hideInPerf} data-perf-hide="panel">
+                <VerticalPanel context={context} />
+              </div>
+            )}
+          </div>
+          <UserFacingErrorMessage error={error} />
+          {!isZen && panelPosition === 'bottom' && showPanel && (
             <div className={hideInPerf} data-perf-hide="panel">
-              <VerticalPanel context={context} />
+              <HorizontalPanel context={context} />
             </div>
+          )}
+          {!isZen && compact && (
+            <div className={hideInPerf} data-perf-hide="control-bar">
+              <CompactControlBar context={context} />
+            </div>
+          )}
+
+          {/* Global Toast Container */}
+          <GlobalToastContainer />
+
+          {/* "Add to set" with no set open: which set (spec 022 2.2) */}
+          {!readOnly && <AddToSetChooser />}
+
+          {/* Global Tooltip - Temporarily disabled for cleaner UX */}
+          {/* <GlobalTooltip /> */}
+
+          {/* Export Dialog — shown after a recording session ends (Req 5.1) */}
+          {(context as any).exportBlob && (
+            <ExportDialog
+              audioBlob={(context as any).exportBlob}
+              audioContext={getAudioContext()}
+              onClose={() => (context as any).clearExport?.()}
+            />
           )}
         </div>
-        <UserFacingErrorMessage error={error} />
-        {!isZen && panelPosition === 'bottom' && showPanel && (
-          <div className={hideInPerf} data-perf-hide="panel">
-            <HorizontalPanel context={context} />
-          </div>
-        )}
-        {!isZen && compact && (
-          <div className={hideInPerf} data-perf-hide="control-bar">
-            <CompactControlBar context={context} />
-          </div>
-        )}
-
-        {/* Global Toast Container */}
-        <GlobalToastContainer />
-
-        {/* "Add to set" with no set open: which set (spec 022 2.2) */}
-        {!readOnly && <AddToSetChooser />}
-
-        {/* Global Tooltip - Temporarily disabled for cleaner UX */}
-        {/* <GlobalTooltip /> */}
-
-        {/* Export Dialog — shown after a recording session ends (Req 5.1) */}
-        {(context as any).exportBlob && (
-          <ExportDialog
-            audioBlob={(context as any).exportBlob}
-            audioContext={getAudioContext()}
-            onClose={() => (context as any).clearExport?.()}
-          />
-        )}
-      </div>
+      </MidiMapContext.Provider>
     </SetPlayerContext.Provider>
   );
 }

@@ -1,7 +1,11 @@
 /**
  * The main (speakers) EQ, spec 008 Req 2.2: one AudioEqualizer on the main AudioContext,
  *
- *   superdough channelMerger → destinationGain → [EQ input … EQ output] → audioContext.destination
+ *   superdough channelMerger → destinationGain → [EQ input … EQ output] → speakers volume → audioContext.destination
+ *
+ * Spec 031: the speakers volume (speakersVolume.ts) is the last node. When the EQ is removed, the
+ * volume node becomes superdough's output insert instead of the bare destination, so from the first
+ * install on nothing reaches the speakers around it.
  *
  * installed through superdough's output insert (SuperdoughAudioController.setOutputInsert), so it
  * survives resetGlobalEffects() rebuilding destinationGain. Recorders and track transitions tap
@@ -33,6 +37,7 @@
  */
 import { AudioEqualizer, applyEqualizerSettings, loadEqualizerSettings } from '@strudel/equalizer';
 import { getAudioContext, getSuperdoughAudioController } from '@strudel/webaudio';
+import { getSpeakersVolumeNode } from './speakersVolume';
 
 /** What the main EQ needs from superdough's controller (SuperdoughAudioController). */
 export interface OutputInsertHost {
@@ -71,7 +76,7 @@ export function initMainEqualizer(
   if (saved) {
     applyEqualizerSettings(eq, saved); // on/off first, then each band: saved-as-off stays silent
   }
-  eq.getOutput().connect(audioContext.destination);
+  eq.getOutput().connect(getSpeakersVolumeNode(audioContext)); // spec 031: the volume is last
   // The limiter stage follows the output's channel count when superdough's output reset changes it
   // (spec 020), so a multichannel output is never downmixed in the wet path.
   controller.setOutputInsert(eq.getInput(), { onChannelCount: (channels) => eq.setChannelCount(channels) });
@@ -83,7 +88,10 @@ export function initMainEqualizer(
   return eq;
 }
 
-/** Release one reference; the last release restores the destination and disconnects the EQ. */
+/**
+ * Release one reference; the last release disconnects the EQ and routes superdough's output straight
+ * into the speakers volume (spec 031), which plays into the destination.
+ */
 export function releaseMainEqualizer(): void {
   if (references === 0) return;
   references--;
@@ -157,7 +165,9 @@ function teardown(): void {
   let fade = 0;
   if (installedOn) {
     try {
-      fade = Number(installedOn.setOutputInsert(null)) || 0;
+      // Spec 031: the speakers volume stays the last node (click-free swap, spec 020).
+      const volume = installedContext ? getSpeakersVolumeNode(installedContext) : null;
+      fade = Number(installedOn.setOutputInsert(volume)) || 0;
     } catch (err) {
       console.warn('[mainEqualizer] could not restore the output:', err);
     }

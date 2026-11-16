@@ -19,7 +19,7 @@ import {
 import { useTranslation } from '@src/i18n';
 import { toastActions } from '@src/stores/toastStore';
 import type { SetItem, SetItemTransition, SetList } from '../../lib/setLists';
-import type { SetBridge } from './setBridge';
+import type { ManualGoResult, SetBridge } from './setBridge';
 import { createSetPlayerController, type CueFailure } from './setPlayerController';
 import { buttonMode, isEndOfSet, NO_SET, type SetPlayerState } from './setPlayer';
 import { readSetPosition, writeSetPosition } from './setPosition';
@@ -58,6 +58,11 @@ export interface SetPlayerContextValue {
   playSet: (setId: string, fromItemId?: string | null) => void;
   endSet: () => void;
   press: () => void;
+  /**
+   * Spec 031, the crossfader: Go the cued item as a manual mix; resolves when the mix ends. `'none'`
+   * when nothing is cued or sets are off.
+   */
+  manualGo?: () => Promise<ManualGoResult | 'none'>;
   selectItem: (itemId: string) => void;
   /** The library's "Add to set": into the open set, or ask which one. */
   requestAddToSet: (target: AddToSetTarget) => void;
@@ -113,6 +118,8 @@ export function useSetPlayer({ bridge, signedIn, readOnly, tracks }: UseSetPlaye
   const tracksRef = useRef(library);
   tracksRef.current = library;
   const enabledRef = useRef(enabled);
+  const bridgeRef = useRef(bridge);
+  bridgeRef.current = bridge;
   enabledRef.current = enabled;
   const tRef = useRef(t);
   tRef.current = t;
@@ -185,7 +192,10 @@ export function useSetPlayer({ bridge, signedIn, readOnly, tracks }: UseSetPlaye
   useEffect(
     () =>
       installSetShortcut(() => void controllerRef.current?.press(), {
-        enabled: () => enabledRef.current && Boolean(controllerRef.current?.getState().setId),
+        // Spec 031 review #6: also while a manual mix runs (signed out, no set): the key hands it over.
+        enabled: () =>
+          (enabledRef.current && Boolean(controllerRef.current?.getState().setId)) ||
+          Boolean(bridgeRef.current?.isManualMixing?.()),
       }),
     [],
   );
@@ -237,6 +247,7 @@ export function useSetPlayer({ bridge, signedIn, readOnly, tracks }: UseSetPlaye
     playSet: (setId, fromItemId) => controller?.start(setId, fromItemId),
     endSet: () => controller?.end(),
     press: () => void controller?.press(),
+    manualGo: () => (enabled && controller ? controller.manualGo() : Promise.resolve('none')),
     selectItem: (itemId) => controller?.select(itemId),
     requestAddToSet: (target) => {
       if (!enabled) return;
