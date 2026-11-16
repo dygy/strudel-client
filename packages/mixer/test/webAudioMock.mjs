@@ -4,7 +4,7 @@
  * Covers everything packages/mixer/*.mjs and @strudel/equalizer call on the
  * AudioContext: createGain, createBiquadFilter (10-band EQ and the cuts), createDynamicsCompressor
  * (the EQ limiter: `reduction` is settable), createDelay, createWaveShaper, createChannelSplitter,
- * createChannelMerger, createAnalyser (loudness tap; spec 026 spectrum: getFloatFrequencyData),
+ * createChannelMerger, createConvolver + createBuffer (spec 032 reverb), createAnalyser (loudness tap; spec 026 spectrum: getFloatFrequencyData),
  * createMediaStreamDestination, audioWorklet.addModule + AudioWorkletNode (spec 019 scratch),
  * currentTime/state/destination, resume/close, the node
  * constructors superdough's output uses (stubWebAudioNodeConstructors),
@@ -204,6 +204,23 @@ export class MockAudioContext {
 
   createDelay(maxDelayTime = 1) {
     return this._track(createNode({ kind: 'Delay', maxDelayTime, delayTime: createAudioParam(0) }));
+  }
+
+  /** A ConvolverNode (spec 032 reverb): `buffer` and `normalize` are plain fields. */
+  createConvolver() {
+    return this._track(createNode({ kind: 'Convolver', buffer: null, normalize: true, channelCount: 2 }));
+  }
+
+  /** An AudioBuffer with real Float32Array channels (spec 032: generated impulse responses). */
+  createBuffer(numberOfChannels, length, sampleRate) {
+    const channels = Array.from({ length: numberOfChannels }, () => new Float32Array(length));
+    return {
+      numberOfChannels,
+      length,
+      sampleRate,
+      duration: length / sampleRate,
+      getChannelData: (c) => channels[c],
+    };
   }
 
   createWaveShaper() {

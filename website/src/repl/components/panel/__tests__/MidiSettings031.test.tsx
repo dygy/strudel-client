@@ -149,8 +149,11 @@ describe('rows', () => {
   it('lists every target in its group, plus the jog and feel knobs', () => {
     render();
     const groups = [...container!.querySelectorAll('[data-midi-group]')].map((g) => g.getAttribute('data-midi-group'));
-    expect(groups).toEqual(['eq', 'mixer', 'set', 'transport', 'transition', 'view', 'scratch']);
+    expect(groups).toEqual(['eq', 'mixer', 'masterFx', 'set', 'transport', 'transition', 'view', 'scratch']);
     expect(container!.querySelectorAll('[data-midi-group="eq"] [data-midi-row]')).toHaveLength(12);
+    // Spec 032 §2.7: filter, four holds, repeat length.
+    expect(container!.querySelectorAll('[data-midi-group="masterFx"] [data-midi-row]')).toHaveLength(6);
+    expect(row('masterFx.repeat').textContent).toContain('Beat-repeat');
     expect(row('eq.band.3').textContent).toContain('Band 3');
     expect(row('mixer.crossfader').textContent).toContain('Crossfader');
     expect(row('scratch.jog').textContent).toContain('Jogger · ch 2 · CC 30');

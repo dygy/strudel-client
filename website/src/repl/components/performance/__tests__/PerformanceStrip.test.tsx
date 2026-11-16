@@ -269,6 +269,18 @@ describe('PerformanceStrip', () => {
     expect(classes).not.toMatch(/(^|\s)!?(pl|pr|ml|mr|left|right)-/);
     expect(classes).not.toMatch(/\btext-(left|right)\b/);
   });
+
+  it('spec 032: has the Master FX row (filter, repeat length, four hold buttons), wrapping inside the strip', () => {
+    render();
+    const row = q('[data-performance-strip] [data-perf-master-fx]')!;
+    expect(row).not.toBeNull();
+    expect(row.className).toMatch(/\bflex-wrap\b/);
+    expect(row.querySelector('[data-master-fx-filter-slider]')).not.toBeNull();
+    expect(row.querySelector('[data-master-fx-select="perf-repeat-length"]')).not.toBeNull();
+    expect(
+      [...row.querySelectorAll('[data-master-fx-hold]')].map((b) => b.getAttribute('data-master-fx-hold')),
+    ).toEqual(['delay', 'reverb', 'repeat', 'brake']);
+  });
 });
 
 describe('LevelMeter in the strip', () => {

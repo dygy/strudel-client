@@ -341,7 +341,7 @@ describe('§2.2 a browser without Web MIDI', () => {
     await flush();
     expect(q('[data-midi-status]')!.textContent).toBe('No MIDI support in this browser');
     const learns = [...container!.querySelectorAll<HTMLButtonElement>('[data-midi-learn]')];
-    expect(learns.length).toBe(24); // 21 targets + jog + 2 feel knobs
+    expect(learns.length).toBe(30); // 21 targets + 6 Master FX (spec 032) + jog + 2 feel knobs
     expect(learns.every((button) => button.disabled)).toBe(true);
   });
 
@@ -349,7 +349,7 @@ describe('§2.2 a browser without Web MIDI', () => {
     render();
     await flush();
     const learns = [...container!.querySelectorAll<HTMLButtonElement>('[data-midi-learn]')];
-    expect(learns.length).toBe(24);
+    expect(learns.length).toBe(30);
     expect(learns.some((button) => button.disabled)).toBe(false);
   });
 });

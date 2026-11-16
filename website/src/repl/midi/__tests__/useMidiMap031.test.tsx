@@ -29,6 +29,7 @@ import { MixerLevels } from '../../components/panel/MixerLevels';
 import { SetPlayerContext, type SetPlayerContextValue } from '../../sets/useSetPlayer';
 import { NO_SET } from '../../sets/setPlayer';
 import { midiEqBandSource } from '../midiTargets';
+import { masterFxRuntime } from '../../masterFx/masterFxRuntime';
 import { atom } from 'nanostores';
 import { claimMidiLearn } from '@strudel/mixer';
 
@@ -163,11 +164,11 @@ afterEach(() => {
 });
 
 describe('useMidiMap', () => {
-  it('creates the map once with the 21 targets, and destroys it on unmount', () => {
+  it('creates the map once with the 21 targets (27 with spec 032 Master FX), and destroys it on unmount', () => {
     const { createMap, map } = render();
     expect(createMap).toHaveBeenCalledTimes(1);
     const targets = (createMap.mock.calls[0] as unknown as [{ targets: { id: string }[] }])[0].targets;
-    expect(targets).toHaveLength(21);
+    expect(targets).toHaveLength(27);
     act(() => root!.unmount());
     root = null;
     expect(map.destroy).toHaveBeenCalledTimes(1);
@@ -239,6 +240,14 @@ describe('useMidiMap', () => {
 });
 
 describe('the Mixer settings levels', () => {
+  it('spec 032 (review #2): All FX off drops the filter knob pickup; the knob own MIDI write does not', () => {
+    const { map } = render();
+    act(() => masterFxRuntime.setFilter(-40, 'midi:masterFx.filter'));
+    expect(map.notifyExternalChange).not.toHaveBeenCalledWith('masterFx.filter');
+    act(() => masterFxRuntime.allOff());
+    expect(map.notifyExternalChange).toHaveBeenCalledWith('masterFx.filter');
+  });
+
   it('the speakers slider sets the speakers volume and drops the pickup', () => {
     const { map } = render();
     drag(q<HTMLInputElement>('#mixer-level-speakers')!, '40');

@@ -111,7 +111,9 @@ afterEach(() => {
 
 describe('the target list', () => {
   it('has the §2.1 targets: 10 bands, EQ on/off, A/B, 3 mixer, Cue/Go, Play/Stop, Update, ±type, Perform', () => {
-    expect(MIDI_TARGETS).toHaveLength(21);
+    // 21 from spec 031, plus spec 032's six Master FX rows.
+    expect(MIDI_TARGETS).toHaveLength(27);
+    expect(MIDI_TARGETS.filter((meta) => meta.group !== 'masterFx')).toHaveLength(21);
     expect(MIDI_TARGETS.filter((meta) => meta.group === 'eq' && meta.kind === 'continuous')).toHaveLength(10);
     const { targets } = setup();
     expect(targets.map((target) => target.id)).toEqual(MIDI_TARGETS.map((meta) => meta.id));
