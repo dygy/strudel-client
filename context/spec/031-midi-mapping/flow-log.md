@@ -43,3 +43,9 @@
 - The audio engineer ran `pnpm run codeformat` repo-wide by mistake: no files outside the 031 set changed (59 files, all 031).
 - Gates: Node 24.12 ×2 and Node 26 → 262 files / 5288 tests, exit 0; tsc 0; format; lint 0; build:cloudflare OK, worker 2.7M.
 - Flow defect: parallel agents shared one scratchpad script name (`redgreen.sh`) and clobbered it; one run created stray empty files (deleted). Use mktemp script names.
+
+## 2026-11-16 — Steps 9–11: push, prod, bookkeeping
+- Owner approved. Pushed 4d07b18..e6572b3 (eaa1bd4 spec, 1452359 feat, 2e16680 test, e6572b3 docs). Deploy run 43796073792 = e6572b3 success.
+- Prod (strudel.dygy.app, signed-in Playwright session, read-only — no bindings or levels changed): Settings → MIDI panel renders (27 Learn buttons), `requestMIDIAccess` not called on load (no stored bindings), speakers/headphones sliders at 100, crossfader at 0; no app console errors. Screenshot docs/screenshots/031-prod-midi.png.
+- Peer (4a) asked about tap/limiter order vs the volume node: deliberate (taps upstream, volume ≤ 1).
+- Agents dispatched: 4 (audio, web, test, reviewer) + follow-ups via SendMessage.

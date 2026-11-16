@@ -34,6 +34,6 @@ Spec: [functional-spec.md](./functional-spec.md) · Tech: [technical-considerati
   - [x] 6.1 Suites (Node 24.12 ×2 and Node 26), tsc, format, lint, `pnpm build:cloudflare` (jsdoc!) + worker size.
   - [x] 6.2 Browser with a stubbed `requestMIDIAccess`: learn/drive/reload, volume ramp, manual crossfade complete + abandon, Dip at 50 %, RTL panel screenshot.
 
-- [ ] **Slice 7: Bookkeeping**
-  - [ ] 7.1 `context/product/feature-map.md` row (MIDI mapping, volumes, manual crossfader); scratch row note on the shared registry.
-  - [ ] 7.2 Roadmap tick, spec Status Completed after prod verification, memory note. No migration.
+- [x] **Slice 7: Bookkeeping**
+  - [x] 7.1 `context/product/feature-map.md` row (MIDI mapping, volumes, manual crossfader); scratch row note on the shared registry.
+  - [x] 7.2 Roadmap tick, spec Status Completed after prod verification, memory note. No migration.

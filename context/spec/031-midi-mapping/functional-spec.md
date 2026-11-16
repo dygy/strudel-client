@@ -1,7 +1,7 @@
 # Functional Specification: MIDI Mapping for Everything
 
 - **Roadmap Item:** Phase 6 — Live sets: "MIDI mapping for everything: EQ, volume, crossfader, Cue/Go and transition, not just the scratch jog." No GitHub issue.
-- **Status:** Draft
+- **Status:** Completed
 - **Author:** Claude (for the owner). The owner chose these on 2026-11-15:
   - new **speakers and headphones volume** controls;
   - a **manual crossfader** that drives the switch to the cued track the way a DJ mixer does;
