@@ -32,6 +32,6 @@ Spec: [functional-spec.md](./functional-spec.md) · Tech: [technical-considerati
   - [x] 6.1 Suites (Node 24.12 ×2 and Node 26), tsc, format, lint, `pnpm build:cloudflare` (worklet asset emitted) + worker size.
   - [x] 6.2 Browser measurements per tech §4 + screenshots (panel LTR/Hebrew, perf row at 375 px).
 
-- [ ] **Slice 7: Bookkeeping**
+- [x] **Slice 7: Bookkeeping**
   - [x] 7.1 `context/product/feature-map.md` row (Master FX); scratch row note on the brake source; MIDI row note on the hold kind.
-  - [ ] 7.2 Roadmap tick, spec Status Completed after prod verification, memory note. No migration.
+  - [x] 7.2 Roadmap tick, spec Status Completed after prod verification, memory note. No migration.

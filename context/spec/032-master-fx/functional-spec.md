@@ -1,7 +1,7 @@
 # Functional Specification: Master FX
 
 - **Roadmap Item:** Phase 6 — Live sets: "Master FX: filter, delay/reverb throw, beat-repeat and brake on the master bus." No GitHub issue.
-- **Status:** Draft
+- **Status:** Completed
 - **Author:** Claude (for the owner). The owner chose these on 2026-11-16:
   - the FX sit **before the EQ** and are **in every recording**, the analyser and the meter;
   - the **brake goes through the scratch deck**: the same curve and the same Brake / Spin-up sliders as spec 025;

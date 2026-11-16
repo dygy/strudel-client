@@ -40,3 +40,9 @@
 - Follow-up noticed (not 032): TrackTransitionController's `currentTime + (T − now)/cps + latency` and its loudness stamp are ~one clock duration (50 ms) late by the same model (specs 017/027).
 - Gates (main): vitest 278 files / 5492 tests; tsc 0; format + lint clean; build:cloudflare exit 0, `_worker.js` 2.7M, beat-repeat worklet inlined in `_astro/Repl.*.js`.
 - Next: commit, push gate.
+
+## 2026-11-16 — Push + prod
+- Owner said yes to the push. Pushed feat/master-fx → main fast-forward 1550577..1e78269 (ea280f6 spec, deb52ab feat, f107759 test, 1e78269 docs). Push gate passed.
+- Deploy run 43966450560 on 1e78269: success.
+- Prod (strudel.dygy.app/embed, signed out, AudioWorkletNode wrapped by an init script): `beat-repeat-processor` created next to `scratch-processor` once audio started; a live pattern flows through the FX stage (analyser on the stage: peak 0.146, context running). Only console error: "no code to evaluate" from pressing Play on the empty editor (test step, pre-existing behaviour). Signed-in Settings panel not checked on prod (no session in the test browser).
+- Bookkeeping: roadmap ticked, spec Status Completed, memory note master-fx-032.
