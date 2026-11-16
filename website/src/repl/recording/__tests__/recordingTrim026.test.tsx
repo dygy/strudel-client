@@ -57,7 +57,9 @@ async function load() {
 }
 
 const streamTargets = (node: any) => node.connections.filter((n: any) => n.stream);
-const gainNodes = (node: any) => node.connections.filter((n: any) => n.kind === 'Gain');
+/** Gains on a node other than the speakers volume (spec 031: the Gain after the EQ that feeds the destination). */
+const gainNodes = (node: any) =>
+  node.connections.filter((n: any) => n.kind === 'Gain' && !n.connections.includes(ac.destination));
 
 beforeEach(() => {
   localStorage.clear();
@@ -93,7 +95,8 @@ describe('openRecordingTap: −1 dB trim on the Record as heard path only (spec 
     // Set before it is connected, never as an instant `.value =` write.
     expect((tap.node as any).gain.calls.some(([m]: [string]) => m === 'value=')).toBe(false);
     expect(output.connections).toEqual([...speakersBefore, tap.node]);
-    expect(output.connections).toContain(ac.destination);
+    // The speakers' feed: the EQ output → speakers volume (spec 031) → destination.
+    expect(output.connections.some((n: any) => n.connections?.includes(ac.destination))).toBe(true);
 
     tap.close();
     expect(output.connections).toEqual(speakersBefore);

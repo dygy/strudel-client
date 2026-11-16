@@ -61,8 +61,12 @@ const streamTargets = (node: any) => node.connections.filter((n: any) => n.strea
 /** After the EQ: the stream destinations on the EQ output's −1 dB recording trim (AC 2.3.2, amended). */
 const postEqStreams = (output: any) =>
   output.connections.filter((n: any) => n.kind === 'Gain').flatMap((trim: any) => streamTargets(trim));
-/** The −1 dB recording trim the EQ output feeds (AC 2.3.2, amended), or undefined. */
-const trimOf = (output: any) => output.connections.find((n: any) => n.kind === 'Gain');
+/**
+ * The −1 dB recording trim the EQ output feeds (AC 2.3.2, amended), or undefined. Not the speakers
+ * volume (spec 031), the other Gain on the EQ output, which feeds the destination.
+ */
+const trimOf = (output: any) =>
+  output.connections.find((n: any) => n.kind === 'Gain' && !n.connections.includes(ac.destination));
 
 beforeEach(() => {
   localStorage.clear();

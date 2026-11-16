@@ -23,6 +23,7 @@ import {
   installMainEqualizerWhenReady,
   releaseMainEqualizer,
 } from '../mainEqualizer';
+import { getSpeakersVolumeNode, resetSpeakersVolumeForTests } from '../speakersVolume';
 
 const BAND_125 = 2;
 
@@ -60,9 +61,12 @@ describe('main (speakers) equalizer', () => {
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
     unstubWebAudio();
+    resetSpeakersVolumeForTests();
   });
   /** Let superdough's insert swap finish (fade, then the bare edge back) and a removed EQ be destroyed. */
   const settle = () => vi.runOnlyPendingTimers();
+  /** Spec 031: the speakers volume, the last node: the EQ (or, without one, destinationGain) plays into it. */
+  const speakers = () => getSpeakersVolumeNode(ac);
 
   it('applies the saved settings when it is created, without the settings panel', () => {
     saveWithBand125(12, true);
@@ -95,7 +99,8 @@ describe('main (speakers) equalizer', () => {
     const destinationGain = controller.output.destinationGain;
     expect(destinationGain.connections).toEqual([eq.getInput()]);
     expect(destinationGain.connections).not.toContain(ac.destination);
-    expect(connections(eq.getOutput())).toEqual([ac.destination]);
+    expect(connections(eq.getOutput())).toEqual([speakers()]);
+    expect(connections(speakers())).toEqual([ac.destination]);
   });
 
   it('stays in the path after resetGlobalEffects() rebuilds destinationGain', () => {
@@ -113,10 +118,10 @@ describe('main (speakers) equalizer', () => {
     settle();
     expect(getMainEqualizer()).toBe(eq);
     expect(controller.output.destinationGain.connections).toEqual([eq.getInput()]);
-    expect(connections(eq.getOutput())).toEqual([ac.destination]);
+    expect(connections(eq.getOutput())).toEqual([speakers()]);
   });
 
-  it('teardown restores the destination and disconnects the EQ', () => {
+  it('teardown routes superdough into the speakers volume (spec 031: still the last node) and disconnects the EQ', () => {
     const eq = initMainEqualizer(ac, controller);
     settle();
 
@@ -124,7 +129,7 @@ describe('main (speakers) equalizer', () => {
     expect(getMainEqualizer()).toBeNull();
     settle(); // the EQ is disconnected once its path has faded out
 
-    expect(controller.output.destinationGain.connections).toEqual([ac.destination]);
+    expect(controller.output.destinationGain.connections).toEqual([speakers()]);
     expect(connections(eq.getOutput())).toEqual([]);
     expect(connections(eq.getInput())).toEqual([]);
   });
@@ -150,7 +155,7 @@ describe('main (speakers) equalizer', () => {
     settle();
 
     destroyMainEqualizer();
-    expect(connections(eq.getOutput())[0] === ac.destination).toBe(true); // still fading through it
+    expect(connections(eq.getOutput())[0] === speakers()).toBe(true); // still fading through it
 
     settle();
     expect(connections(eq.getOutput()).length).toBe(0);
@@ -165,12 +170,12 @@ describe('main (speakers) equalizer', () => {
       releaseMainEqualizer();
       expect(getMainEqualizer()).toBe(eq);
       expect(controller.output.destinationGain.connections).toEqual([eq.getInput()]);
-      expect(connections(eq.getOutput())).toEqual([ac.destination]);
+      expect(connections(eq.getOutput())).toEqual([speakers()]);
 
       releaseMainEqualizer();
       expect(getMainEqualizer()).toBeNull();
       settle();
-      expect(controller.output.destinationGain.connections).toEqual([ac.destination]);
+      expect(controller.output.destinationGain.connections).toEqual([speakers()]);
       expect(connections(eq.getOutput())).toEqual([]);
     });
 
@@ -219,7 +224,11 @@ describe('main EQ on the global superdough controller, after audioReady', () => 
     await new Promise((r) => setTimeout(r, 80)); // superdough's insert swap settles (spec 020)
     expect(webaudio.getSuperdoughAudioController().output.outputInsert).toBe(eq.getInput());
     expect(webaudio.getSuperdoughAudioController().output.destinationGain.connections).toEqual([eq.getInput()]);
-    expect(connections(eq.getOutput())).toEqual([webaudio.getAudioContext().destination]);
+    // Spec 031: the EQ plays into the speakers volume, the last node before the destination.
+    const ac = webaudio.getAudioContext();
+    const [volume] = connections(eq.getOutput()) as any[];
+    expect(connections(eq.getOutput())).toHaveLength(1);
+    expect(volume.connections).toEqual([ac.destination]);
   });
 
   it('waits for audioReady: the controller is not built (channels not sized) before the device is set', async () => {
@@ -276,6 +285,9 @@ describe('main EQ on the global superdough controller, after audioReady', () => 
 
     releaseB();
     expect(me.getMainEqualizer()).toBeNull();
-    expect(webaudio.getSuperdoughAudioController().output.outputInsert).toBeNull();
+    // Spec 031: without the EQ, superdough plays straight into the speakers volume (still last).
+    const insert = webaudio.getSuperdoughAudioController().output.outputInsert;
+    expect(insert.kind).toBe('Gain');
+    expect(insert.connections).toEqual([webaudio.getAudioContext().destination]);
   });
 });
