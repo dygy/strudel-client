@@ -149,7 +149,7 @@ The work splits into four parts:
   - It adds 2 permanent `GainNode`s: speakers (main context) and headphones (preview context). They ramp over 20 ms and are never re-created per change.
   - The speakers node must survive superdough `reset()` and EQ insert swaps (spec 020's click-free swap must still be click-free).
   - The manual mix is pattern-level, like every transition (per-event envelopes, plus `releaseSounds` on abandon/complete). It adds no Web Audio nodes.
-- **Upstream impact:** none. `packages/mixer` is the fork's own package. `superdough` is untouched, unless the volume node needs an `OutputInsertHost` hook; if so, it must be additive, flagged as a fork addition, and documented.
+- **Upstream impact:** `superdough.mjs` gains an additive fork addition (review #1–2): an `activeSoundSides` WeakMap, an optional `side` parameter on `getActiveSoundIds`, and a record from `value._mixSide` when a sound starts. Without the control or the parameter, behaviour is unchanged. Outputs that forward every control (OSC) see `_mixSide` during a manual mix. The volume node needed no superdough change (`mainEqualizer.ts` keeps it last).
 - **Risks:**
   - **Abandon correctness:** restoring the old pattern after the new code was evaluated. The tests must prove the old pattern, its origin and its cps come back and that no new-track voice lingers.
   - **EQ state path:** MIDI writes must go where the panel writes, or saves and A/B diverge.

@@ -178,3 +178,20 @@ New strings go into all 9 locales:
 ## Change Log
 
 - 2026-11-15 — Draft from the owner's choices.
+- 2026-11-16 — Implementation decisions (accepted at review):
+  - **The crossfader:**
+    - is inert while the speakers are stopped;
+    - starts a mix only after it has been at the playing end, so a fader parked mid-way never brings a track in at half level (new string "Move to the playing end to start a mix");
+    - keeps its row left-to-right in RTL locales, to match the hardware fader;
+    - in the editor path, uses a forced switch (no instant fallback).
+  - **EQ bands from MIDI** snap to the slider's 0.5 dB step.
+  - **MIDI status and Learn:** both gain `'failed'` (MIDI unavailable for a reason other than permission), with its own string.
+  - **Import** is strict: one bad entry rejects the file.
+- 2026-11-16 — Review fixes:
+  - **Voices are tagged by side** (an additive superdough fork addition, `_mixSide`). Abandon releases only the new track; complete and hand-over release the old one.
+  - **Abandon restores** the EQ recommendation, title and active code, and re-cues the cued item's own code.
+  - **Stop during a manual mix** is "cancelled" (still cued, no toast).
+  - **Cue/Go and Alt+Shift+N** hand a manual mix over even without a set.
+  - **Jog/feel conflicts** with a panel binding name the holder.
+  - **Esc** cancels any Learn.
+  - **Known limit:** outputs that forward every control (OSC) also receive `_mixSide` during a manual mix.
