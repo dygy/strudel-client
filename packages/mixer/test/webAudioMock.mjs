@@ -71,9 +71,22 @@ function createNode(extra = {}) {
       this.routes.push({ target, output, input });
       return target;
     },
-    // disconnect() drops every connection; disconnect(target) only that one (as in Web Audio).
-    disconnect(target) {
+    // disconnect() drops every connection; disconnect(target) only that one; disconnect(target,
+    // output, input) only that edge (spec 033: the meter's inputs 0 and 1), as in Web Audio. Like
+    // Web Audio, disconnecting a target/edge that is not connected throws InvalidAccessError.
+    disconnect(target, output, input) {
       this.disconnected++;
+      if (output !== undefined) {
+        const matches = (r) => r.target === target && r.output === output && (input === undefined || r.input === input);
+        if (!this.routes.some(matches)) {
+          const error = new Error('disconnect: no such connection');
+          error.name = 'InvalidAccessError';
+          throw error;
+        }
+        this.routes = this.routes.filter((r) => !matches(r));
+        this.connections = this.routes.map((r) => r.target);
+        return;
+      }
       this.connections = target === undefined ? [] : this.connections.filter((c) => c !== target);
       this.routes = target === undefined ? [] : this.routes.filter((r) => r.target !== target);
     },
