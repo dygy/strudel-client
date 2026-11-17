@@ -400,6 +400,41 @@ export interface SettingsTranslations {
   mixerCrossfaderHint: string;
   /** Spec 031 review #7: a jog or feel Learn refused, naming who holds the control. */
   scratchMidiConflictHolder: string;
+  // Spec 033: the EQ's Before EQ spectrum layer
+  eqSpectrumPre: string;
+  eqSpectrumPreHint: string;
+  // Spec 033: the loudness meter (Settings → Meter, the header and performance strips)
+  meter: {
+    title: string;
+    description: string;
+    on: string;
+    offNote: string;
+    momentary: string;
+    shortTerm: string;
+    integrated: string;
+    truePeak: string;
+    range: string;
+    peakRms: string;
+    history: string;
+    historyLabel: string;
+    target: string;
+    targetStreaming: string;
+    targetBroadcast: string;
+    targetClub: string;
+    targetOff: string;
+    warnings: string;
+    warningLight: string;
+    warningNone: string;
+    warningTitle: string;
+    reasonCount: string;
+    reasonTruePeak: string;
+    reasonLimiter: string;
+    reasonClip: string;
+    reset: string;
+    resetHint: string;
+    open: string;
+    strip: string;
+  };
 }
 
 export interface TabsTranslations {

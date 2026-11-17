@@ -85,15 +85,43 @@ export const LIMITER_MAKEUP_DB = 0.6 * -LIMITER.threshold * (1 - 1 / LIMITER.rat
 /** The spectrum tap's analysis (spec 026): 4096-point FFT (~11.7 Hz bins at 48 kHz), smoothed. */
 export const ANALYSER_TAP = { fftSize: 4096, smoothingTimeConstant: 0.8 } as const;
 
+/**
+ * Where a spectrum tap listens (spec 033): `'output'` is the EQ's final output (after the bands,
+ * cuts, output level and limiter; the default, spec 026), `'input'` the signal entering the EQ.
+ */
+export type AnalyserTapPoint = 'output' | 'input';
+
+/** Options for AudioEqualizer.createAnalyserTap. */
+export interface AnalyserTapOptions {
+  /** Where to listen (default `'output'`). */
+  point?: AnalyserTapPoint;
+  fftSize?: number;
+  smoothingTimeConstant?: number;
+}
+
 /** A spectrum tap from AudioEqualizer.createAnalyserTap. */
 export interface AnalyserTap {
   analyser: AnalyserNode;
+  /** Where it listens (spec 033). */
+  point: AnalyserTapPoint;
   /** The EQ's sample rate (Hz): bin i of the analyser is at i · sampleRate / fftSize. */
   sampleRate: number;
   /** Whether the EQ's AudioContext is running (a suspended or closed one gives no new data). */
   isRunning(): boolean;
-  /** Disconnect the analyser from the EQ output (idempotent). */
+  /** Disconnect the analyser from the point it listens to (idempotent). */
   dispose(): void;
+}
+
+/**
+ * What changed in the EQ's routing, for AudioEqualizer.onTopologyChange (spec 033):
+ * - `'enabled'`: the EQ was switched on or off (the limiter is in the path only while on);
+ * - `'channels'`: setChannelCount rebuilt the limiter stage (the limiter input node is unchanged);
+ * - `'destroyed'`: destroy() is about to disconnect every node.
+ */
+export interface EqualizerTopologyChange {
+  reason: 'enabled' | 'channels' | 'destroyed';
+  /** getLimiterInput() after the change: the limiter's input node, or null while off or destroyed. */
+  limiterInput: AudioNode | null;
 }
 
 /**
@@ -218,6 +246,9 @@ export class AudioEqualizer {
   private outputGainTarget = 1;
   /** Connected spectrum taps (createAnalyserTap), disconnected by their dispose or destroy(). */
   private analyserTaps = new Set<AnalyserNode>();
+  /** onTopologyChange listeners (spec 033). */
+  private topologyListeners = new Set<(change: EqualizerTopologyChange) => void>();
+  private destroyed = false;
 
   constructor(audioContext: AudioContext) {
     this.audioContext = audioContext;
@@ -406,6 +437,7 @@ export class AudioEqualizer {
     const running = this.audioContext.state === 'running';
     const stage = this.buildLimiterStage(next, running ? 0 : MAKEUP_TRIM);
     this.limiterStage = stage;
+    this.notifyTopology('channels');
     if (!running) {
       this.dropLimiterStage(old);
       return;
@@ -473,33 +505,82 @@ export class AudioEqualizer {
   }
 
   /**
-   * A spectrum tap (spec 026): an AnalyserNode fed from the EQ's final output (after the bands, cuts,
-   * output level and limiter, or the dry path while off; what the speakers get). It is a fan-out:
-   * the output's own connections and samples are unchanged. The EQ owns the connection: call
-   * `dispose()` to disconnect it (safe to call twice; destroy() disconnects it too).
-   * @param options - `fftSize` (default 4096) and `smoothingTimeConstant` (default 0.8)
-   * @returns The analyser and its dispose
+   * A spectrum tap: an AnalyserNode fed as a fan-out from one point of the EQ.
+   * - `point: 'output'` (the default, spec 026): the final output, after the bands, cuts, output
+   *   level and limiter, or the dry path while off; what the speakers get.
+   * - `point: 'input'` (spec 033): the signal entering the EQ, before any of it (the "before EQ"
+   *   spectrum). The same while the EQ is on or off.
+   *
+   * The point's own connections and samples are unchanged. The EQ owns the connection: call
+   * `dispose()` to disconnect exactly that edge (safe to call twice; destroy() disconnects it too).
+   * @param options - `point` (default `'output'`), `fftSize` (default 4096) and
+   *   `smoothingTimeConstant` (default 0.8)
+   * @returns The analyser, its point and its dispose
+   * @throws RangeError for an unknown `point`
    */
-  createAnalyserTap(options: { fftSize?: number; smoothingTimeConstant?: number } = {}): AnalyserTap {
-    const output = this.getOutput();
+  createAnalyserTap(options: AnalyserTapOptions = {}): AnalyserTap {
+    const point = options.point ?? 'output';
+    if (point !== 'output' && point !== 'input') {
+      throw new RangeError(`[Equalizer] Unknown analyser tap point: ${String(point)}`);
+    }
+    const source = point === 'input' ? this.getInput() : this.getOutput();
     const analyser = this.audioContext.createAnalyser();
     analyser.fftSize = options.fftSize ?? ANALYSER_TAP.fftSize;
     analyser.smoothingTimeConstant = options.smoothingTimeConstant ?? ANALYSER_TAP.smoothingTimeConstant;
-    output.connect(analyser);
+    source.connect(analyser);
     this.analyserTaps.add(analyser);
     return {
       analyser,
+      point,
       sampleRate: this.audioContext.sampleRate || 44100,
       isRunning: () => this.audioContext.state === 'running',
       dispose: () => {
         if (!this.analyserTaps.delete(analyser)) return;
         try {
-          output.disconnect(analyser);
+          source.disconnect(analyser);
         } catch {
           // already disconnected
         }
       },
     };
+  }
+
+  /**
+   * The limiter's input (spec 033): the output level node, which feeds the limiter stage. Connect a
+   * meter to it (as a fan-out) to see the level the limiter acts on. Null while the EQ is off (the
+   * off path bypasses the limiter, so nothing is limited) and after destroy(). The node is the same
+   * object for the EQ's lifetime: setChannelCount rebuilds only the stage after it.
+   */
+  getLimiterInput(): AudioNode | null {
+    if (this.destroyed || !this.isEnabled) return null;
+    return this.outputGainNode;
+  }
+
+  /**
+   * Listen for routing changes that matter to a tap on getLimiterInput() (spec 033): the EQ switched
+   * on or off (only on a real change), setChannelCount rebuilding the limiter stage, and destroy().
+   * The listener gets the reason and the new getLimiterInput(). A listener that throws is logged and
+   * does not stop the others.
+   * @param listener - Called synchronously after the change
+   * @returns Unsubscribe
+   */
+  onTopologyChange(listener: (change: EqualizerTopologyChange) => void): () => void {
+    if (this.destroyed || typeof listener !== 'function') return () => {};
+    this.topologyListeners.add(listener);
+    return () => {
+      this.topologyListeners.delete(listener);
+    };
+  }
+
+  private notifyTopology(reason: EqualizerTopologyChange['reason']): void {
+    const change: EqualizerTopologyChange = { reason, limiterInput: this.getLimiterInput() };
+    for (const listener of [...this.topologyListeners]) {
+      try {
+        listener(change);
+      } catch (err) {
+        console.warn('[Equalizer] topology listener failed:', err);
+      }
+    }
   }
 
   /** How many spectrum taps are connected now (tests, diagnostics). */
@@ -513,6 +594,7 @@ export class AudioEqualizer {
    * settings back and crossfades to the wet path. Settings are remembered either way.
    */
   setEnabled(enabled: boolean): void {
+    const changed = this.isEnabled !== enabled;
     this.isEnabled = enabled;
 
     // Glide every band back to its stored gain, or to 0 dB (flat) while off.
@@ -524,6 +606,7 @@ export class AudioEqualizer {
     // Equal-gain crossfade (the same time constant on both, so wet + dry stays 1).
     if (this.wetGain) this.glide(this.wetGain.gain, enabled ? 1 : 0, CROSSFADE_TIME_CONSTANT);
     if (this.dryGain) this.glide(this.dryGain.gain, enabled ? 0 : 1, CROSSFADE_TIME_CONSTANT);
+    if (changed) this.notifyTopology('enabled');
   }
 
   /**
@@ -722,6 +805,11 @@ export class AudioEqualizer {
    * Clean up resources: disconnect every node this EQ created.
    */
   destroy(): void {
+    if (!this.destroyed) {
+      this.destroyed = true;
+      this.notifyTopology('destroyed');
+    }
+    this.topologyListeners.clear();
     this.analyserTaps.forEach((analyser) => analyser.disconnect());
     this.analyserTaps.clear();
     this.nodes.forEach((node) => node.disconnect());

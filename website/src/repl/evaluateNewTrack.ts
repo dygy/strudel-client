@@ -65,6 +65,11 @@ export interface EvaluateNewTrackDeps {
   cleanupCanvases: () => Promise<void>;
   /** Set while the instant path stops the scheduler, so onToggle(false) skips its own cleanup. */
   setRestarting: (restarting: boolean) => void;
+  /**
+   * Spec 033: the instant switch that stopped the scheduler has ended; `restarted` says whether the
+   * scheduler plays again (false when the new code failed or a step threw). Optional.
+   */
+  switchEnded?: (restarted: boolean) => void;
 }
 
 export interface EvaluateNewTrackOptions {
@@ -165,12 +170,16 @@ export async function evaluateNewTrack(
       deps.setRestarting(false);
     }
   }
-  if (prepare) {
-    await prepare();
+  try {
+    if (prepare) {
+      await prepare();
+    }
+    await deps.cleanupCanvases();
+    deps.flash();
+    // The core repl catches an evaluation error itself (shows it, resolves undefined).
+    const pattern = await repl.evaluate(code);
+    return pattern ? 'ok' : 'failed';
+  } finally {
+    if (shouldRestart) deps.switchEnded?.(Boolean(repl.scheduler?.started));
   }
-  await deps.cleanupCanvases();
-  deps.flash();
-  // The core repl catches an evaluation error itself (shows it, resolves undefined).
-  const pattern = await repl.evaluate(code);
-  return pattern ? 'ok' : 'failed';
 }

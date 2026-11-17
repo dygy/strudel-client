@@ -54,6 +54,7 @@ import {
 } from '../../playingEqProfile';
 import { EqualizerListeningControls } from './EqualizerListeningControls';
 import { loadRecordPostEq, saveRecordPostEq } from '../../recording/recordingTap';
+import { browserStorage, readSpectrumPreOn, writeSpectrumPreOn } from '../../meter/meterSettings';
 import { EqualizerUserPresets, type UserPresetChange } from './EqualizerUserPresets';
 
 interface EqualizerUIProps {
@@ -192,9 +193,13 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   // so the panel ignores its own echo and shows every other change (a MIDI knob, the A/B pad).
   const [storeSource] = useState(() => `panel:${++panelInstances}`);
   const [spectrumOn, setSpectrumOn] = useState(loadSpectrumOn);
+  // Spec 033: the Before EQ layer (the signal entering the EQ), off by default.
+  const [spectrumPreOn, setSpectrumPreOn] = useState(() => readSpectrumPreOn(browserStorage()));
   const [recordPostEq, setRecordPostEq] = useState(loadRecordPostEq);
   /** The latest spectrum frame (null: none drawn) and the chart's draw function, for the rAF loop. */
   const spectrumRef = useRef<{ data: Float32Array; sampleRate: number } | null>(null);
+  /** The latest Before EQ frame (spec 033), drawn first, paler; null when the layer is off. */
+  const spectrumPreRef = useRef<{ data: Float32Array; sampleRate: number } | null>(null);
   const drawChartRef = useRef<() => void>(() => {});
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { compact } = usePanelViewport();
@@ -306,16 +311,22 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   // connected (a fan-out from the main EQ's output) and frames are requested only while the panel is
   // mounted, the Spectrum toggle is on, the main EQ exists and the speakers play. Otherwise the tap
   // is disposed and one frame without the spectrum is drawn: no animation frames while stopped.
+  // Spec 033: with Before EQ on too, a second tap on the EQ's input feeds the paler layer in the same
+  // frame loop; it is connected only while both toggles are on and the speakers play.
   const spectrumEqualizer = mainEqualizer ?? appMainEqualizer;
   const spectrumActive = spectrumOn && speakersPlaying && !!spectrumEqualizer;
+  const spectrumPreActive = spectrumActive && spectrumPreOn;
   useEffect(() => {
     if (!spectrumActive || !spectrumEqualizer) {
       spectrumRef.current = null;
+      spectrumPreRef.current = null;
       drawChartRef.current();
       return;
     }
     const tap = spectrumEqualizer.createAnalyserTap();
     const data = new Float32Array(tap.analyser.frequencyBinCount);
+    const preTap = spectrumPreActive ? spectrumEqualizer.createAnalyserTap({ point: 'input' }) : null;
+    const preData = preTap ? new Float32Array(preTap.analyser.frequencyBinCount) : null;
     const raf =
       typeof requestAnimationFrame === 'function'
         ? // Called as plain functions: as methods of this object they throw "Illegal invocation".
@@ -327,11 +338,16 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
       if (!tap.isRunning()) {
         // A suspended context gives no new data: draw silence and stop until the next play.
         spectrumRef.current = null;
+        spectrumPreRef.current = null;
         drawChartRef.current();
         return;
       }
       tap.analyser.getFloatFrequencyData(data);
       spectrumRef.current = { data, sampleRate: tap.sampleRate };
+      if (preTap && preData) {
+        preTap.analyser.getFloatFrequencyData(preData);
+        spectrumPreRef.current = { data: preData, sampleRate: preTap.sampleRate };
+      }
       drawChartRef.current();
       frame = raf.request(tick);
     };
@@ -339,10 +355,12 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     return () => {
       if (frame) raf.cancel(frame);
       tap.dispose();
+      preTap?.dispose();
       spectrumRef.current = null;
+      spectrumPreRef.current = null;
       drawChartRef.current();
     };
-  }, [spectrumActive, spectrumEqualizer]);
+  }, [spectrumActive, spectrumPreActive, spectrumEqualizer]);
 
   /** The full settings as saved, with `patch` applied (every control saves all of them). */
   const settingsWith = (patch: Partial<EqualizerSettings>): EqualizerSettings => ({
@@ -424,6 +442,25 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
   };
 
   const drawSpectrum = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    // Spec 033: the Before EQ layer first, paler and in another tint, so the gap shows what the EQ does.
+    const pre = spectrumPreRef.current;
+    if (pre) {
+      const prePoints = spectrumPoints(pre.data, pre.sampleRate, width, height);
+      if (prePoints.length > 0) {
+        ctx.beginPath();
+        ctx.moveTo(prePoints[0][0], height);
+        prePoints.forEach(([x, y]) => ctx.lineTo(x, y));
+        ctx.lineTo(prePoints[prePoints.length - 1][0], height);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(226, 232, 240, 0.10)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(226, 232, 240, 0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        prePoints.forEach(([x, y], index) => (index === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+        ctx.stroke();
+      }
+    }
     const frame = spectrumRef.current;
     if (!frame) return;
     const points = spectrumPoints(frame.data, frame.sampleRate, width, height);
@@ -705,6 +742,11 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
     }
   };
 
+  const handleSpectrumPreChange = (on: boolean) => {
+    setSpectrumPreOn(on);
+    writeSpectrumPreOn(browserStorage(), on);
+  };
+
   const handleRecordPostEqChange = (on: boolean) => {
     setRecordPostEq(on);
     saveRecordPostEq(on);
@@ -774,6 +816,8 @@ export function EqualizerUI({ previewEngine, mainEqualizer }: EqualizerUIProps) 
         onCopySlot={handleCopySlot}
         spectrumOn={spectrumOn}
         onSpectrumChange={handleSpectrumChange}
+        spectrumPreOn={spectrumPreOn}
+        onSpectrumPreChange={handleSpectrumPreChange}
         recordPostEq={recordPostEq}
         onRecordPostEqChange={handleRecordPostEqChange}
         compact={compact}

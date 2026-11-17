@@ -9,6 +9,9 @@ interface EqualizerListeningControlsProps {
   onCopySlot: () => void;
   spectrumOn: boolean;
   onSpectrumChange: (on: boolean) => void;
+  /** Spec 033: the Before EQ layer (drawn only while Spectrum is on too). */
+  spectrumPreOn: boolean;
+  onSpectrumPreChange: (on: boolean) => void;
   recordPostEq: boolean;
   onRecordPostEqChange: (on: boolean) => void;
   /** Phone layout: 44px touch targets. */
@@ -19,7 +22,8 @@ const SLOTS: readonly EqualizerSlotName[] = ['A', 'B'];
 
 /**
  * The EQ's listening tools (spec 026), in both layouts: the A | B slots with the Copy button, the
- * Spectrum toggle, and Record as heard. UI only: the panel owns the state and the audio.
+ * Spectrum toggle with its Before EQ layer (spec 033), and Record as heard. UI only: the panel owns the
+ * state and the audio.
  */
 export function EqualizerListeningControls({
   activeSlot,
@@ -27,6 +31,8 @@ export function EqualizerListeningControls({
   onCopySlot,
   spectrumOn,
   onSpectrumChange,
+  spectrumPreOn,
+  onSpectrumPreChange,
   recordPostEq,
   onRecordPostEqChange,
   compact,
@@ -73,19 +79,37 @@ export function EqualizerListeningControls({
       </div>
       <p className="text-xs text-gray-500">{t('equalizerSlotsHint')}</p>
 
-      <label
-        className={`flex items-center gap-2 text-sm text-foreground cursor-pointer${compact ? ' min-h-11' : ''}`}
-        title={t('equalizerSpectrumHint')}
-      >
-        <input
-          type="checkbox"
-          data-eq-spectrum
-          checked={spectrumOn}
-          onChange={(e) => onSpectrumChange(e.target.checked)}
-          className={checkboxClass}
-        />
-        <span>{t('equalizerSpectrum')}</span>
-      </label>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <label
+          className={`flex items-center gap-2 text-sm text-foreground cursor-pointer${compact ? ' min-h-11' : ''}`}
+          title={t('equalizerSpectrumHint')}
+        >
+          <input
+            type="checkbox"
+            data-eq-spectrum
+            checked={spectrumOn}
+            onChange={(e) => onSpectrumChange(e.target.checked)}
+            className={checkboxClass}
+          />
+          <span>{t('equalizerSpectrum')}</span>
+        </label>
+        <label
+          className={`flex items-center gap-2 text-sm text-foreground${spectrumOn ? ' cursor-pointer' : ' opacity-50'}${
+            compact ? ' min-h-11' : ''
+          }`}
+          title={t('eqSpectrumPreHint')}
+        >
+          <input
+            type="checkbox"
+            data-eq-spectrum-pre
+            checked={spectrumPreOn}
+            disabled={!spectrumOn}
+            onChange={(e) => onSpectrumPreChange(e.target.checked)}
+            className={checkboxClass}
+          />
+          <span>{t('eqSpectrumPre')}</span>
+        </label>
+      </div>
 
       <label className={`flex items-start gap-2 text-sm text-foreground cursor-pointer${compact ? ' min-h-11' : ''}`}>
         <input

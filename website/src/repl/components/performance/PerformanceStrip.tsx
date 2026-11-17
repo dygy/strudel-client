@@ -7,7 +7,7 @@
  * spacing only so an RTL language mirrors it. Mounted by ReplEditor only while the view is open: it
  * owns the meter's tap, the clock display and its buttons, nothing else. Spec 031 adds a compact
  * crossfader (the Mixer settings' one, same state); spec 032 the Master FX row (filter, repeat length,
- * the four hold buttons).
+ * the four hold buttons); spec 033 the loudness strip beside the level meter.
  */
 import { useStore } from '@nanostores/react';
 import cx from '@src/cx';
@@ -16,6 +16,7 @@ import { PlayButton, UpdateButton, type ReplContext } from '../Header';
 import { useSetBarModel } from '../set/useSetBarModel';
 import { PerformanceClocks } from './PerformanceClocks';
 import { LevelMeter } from './LevelMeter';
+import { LoudnessStrip } from '../meter/LoudnessStrip';
 import { CrossfaderControl } from '../panel/MixerLevels';
 import { MasterFxRow } from '../masterfx/MasterFxRow';
 import {
@@ -95,6 +96,7 @@ export function PerformanceStrip({ context, trackName }: { context: ReplContext;
       <MasterFxRow />
       <PerformanceClocks />
       <LevelMeter />
+      <LoudnessStrip variant="performance" />
       <div className="flex items-center gap-1 shrink-0" data-perf-font="">
         <button
           type="button"

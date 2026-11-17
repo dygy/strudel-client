@@ -191,3 +191,26 @@ export {
   BEAT_REPEAT_FADE_SECONDS,
   BEAT_REPEAT_MIN_LENGTH_FRAMES,
 } from './masterfx/beatRepeatCore.mjs';
+// Spec 033: the loudness meter (LUFS M/S/I, LRA, true peak, peak/RMS, over events) in the
+// `loudness-meter-processor` AudioWorklet. `LufsMeter`, because `LoudnessMeter` above is spec 017's.
+export { LufsMeter, LUFS_METER_NODE_OPTIONS, LUFS_METER_INPUTS } from './meter/LoudnessMeter.mjs';
+export { loadLoudnessWorklet, LOUDNESS_PROCESSOR } from './meter/loudnessLoader.mjs';
+export {
+  LoudnessMeterCore,
+  kWeightingCoefficients,
+  powerToLufs,
+  TRUE_PEAK_FIR,
+  LOUDNESS_SUBBLOCK_SECONDS,
+  LOUDNESS_MOMENTARY_BLOCKS,
+  LOUDNESS_SHORT_TERM_BLOCKS,
+  LOUDNESS_ABSOLUTE_GATE,
+  LOUDNESS_RELATIVE_GATE,
+  LOUDNESS_LRA_RELATIVE_GATE,
+  LOUDNESS_LRA_MIN_SECONDS,
+  LOUDNESS_HISTOGRAM,
+  LOUDNESS_PEAK_WINDOW_SECONDS,
+  LOUDNESS_OVER_MERGE_SECONDS,
+  LOUDNESS_TRUE_PEAK_LIMIT_DBTP,
+  LOUDNESS_LIMITER_CEILING_DBFS,
+  LOUDNESS_OVER_REASONS,
+} from './meter/loudnessCore.mjs';

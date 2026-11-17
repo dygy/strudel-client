@@ -938,4 +938,98 @@ declare module '@strudel/mixer' {
   export const VOLUME_RAMP_SECONDS: number;
   export const SPEAKERS_VOLUME_STORAGE_KEY: string;
   export const HEADPHONES_VOLUME_STORAGE_KEY: string;
+
+  // Spec 033: the loudness meter; see packages/mixer/meter/*.
+  /** The over-event reasons: true peak above −1 dBTP, limiter input at −0.3 dBFS, post-EQ at 0 dBFS. */
+  export type LoudnessOverReason = 'truePeak' | 'limiter' | 'clip';
+  /** One reading of the loudness meter (about every 100 ms). Silence is null, never −Infinity. */
+  export interface LoudnessSnapshot {
+    /** Momentary (400 ms), LUFS. */
+    m: number | null;
+    /** Short-term (3 s), LUFS. */
+    s: number | null;
+    /** Integrated since reset (gated), LUFS. */
+    i: number | null;
+    /** Loudness range, LU; null until 10 s measured. */
+    lra: number | null;
+    /** Highest true peak since reset, dBTP. */
+    tpMax: number | null;
+    /** Highest true peak over the last 100 ms, dBTP. */
+    tpBlock: number | null;
+    /** Sample peak [L, R] over the last 300 ms, dBFS. */
+    peakDb: Array<number | null>;
+    /** RMS [L, R] over the last 300 ms, dBFS. */
+    rmsDb: Array<number | null>;
+    /** Over-event counts since reset (events closer than 0.5 s count once). */
+    events: Record<LoudnessOverReason, number>;
+    /** Whether the limiter input (input 1) was present in the last block; if not, `clip` watches input 0. */
+    preLimiter: boolean;
+    /** Audio measured since reset, seconds. */
+    measuredSeconds: number;
+  }
+  /** The loudness meter node owner (`LoudnessMeter` is spec 017's match-loudness tap). */
+  export class LufsMeter {
+    /** Loads the worklet once per context (a failed load is retried) and makes the meter node. */
+    static create(
+      audioContext: BaseAudioContext,
+      options?: { load?: (ctx: BaseAudioContext) => Promise<void> },
+    ): Promise<LufsMeter>;
+    constructor(audioContext: BaseAudioContext, node: AudioWorkletNode);
+    readonly node: AudioWorkletNode;
+    readonly destroyed: boolean;
+    /**
+     * postEq → input 0 (measured), preLimiter → input 1 (null while the EQ is off). Changes only the
+     * edges that differ; false once destroyed.
+     */
+    attach(sources?: { postEq?: AudioNode | null; preLimiter?: AudioNode | null }): boolean;
+    detach(): void;
+    getSources(): { postEq: AudioNode | null; preLimiter: AudioNode | null };
+    /** Clears Integrated, true peak, LRA, the windows and the event counts; measuring continues. */
+    reset(): void;
+    onSnapshot(listener: (snapshot: LoudnessSnapshot) => void): () => void;
+    getSnapshot(): LoudnessSnapshot | null;
+    /** Disconnects only its own edges, stops the processor, closes the port. Idempotent. */
+    destroy(): void;
+  }
+  export const LUFS_METER_NODE_OPTIONS: Readonly<AudioWorkletNodeOptions>;
+  export const LUFS_METER_INPUTS: Readonly<{ postEq: 0; preLimiter: 1 }>;
+  export function loadLoudnessWorklet(audioContext: BaseAudioContext): Promise<void>;
+  export const LOUDNESS_PROCESSOR: string;
+  /** The pure DSP (no Web Audio): feed blocks, read snapshots. */
+  export class LoudnessMeterCore {
+    constructor(options: { sampleRate: number; channels?: number });
+    readonly sampleRate: number;
+    process(
+      channels: ArrayLike<ArrayLike<number>> | null | undefined,
+      preLimiter?: ArrayLike<ArrayLike<number>> | null,
+      frameCount?: number,
+    ): void;
+    snapshot(): LoudnessSnapshot;
+    reset(): void;
+    momentary(): number | null;
+    shortTerm(): number | null;
+    integratedLoudness(): number | null;
+    loudnessRange(): number | null;
+  }
+  /** The BS.1770-4 K-weighting biquads (normalised to a0 = 1) for a sample rate. */
+  export function kWeightingCoefficients(sampleRate: number): {
+    pre: { b: number[]; a: number[] };
+    rlb: { b: number[]; a: number[] };
+  };
+  /** LUFS of a channel-summed mean square; null at or below −70 LUFS. */
+  export function powerToLufs(power: number): number | null;
+  export const TRUE_PEAK_FIR: ReadonlyArray<ReadonlyArray<number>>;
+  export const LOUDNESS_SUBBLOCK_SECONDS: number;
+  export const LOUDNESS_MOMENTARY_BLOCKS: number;
+  export const LOUDNESS_SHORT_TERM_BLOCKS: number;
+  export const LOUDNESS_ABSOLUTE_GATE: number;
+  export const LOUDNESS_RELATIVE_GATE: number;
+  export const LOUDNESS_LRA_RELATIVE_GATE: number;
+  export const LOUDNESS_LRA_MIN_SECONDS: number;
+  export const LOUDNESS_HISTOGRAM: Readonly<{ min: number; max: number; binWidth: number; bins: number }>;
+  export const LOUDNESS_PEAK_WINDOW_SECONDS: number;
+  export const LOUDNESS_OVER_MERGE_SECONDS: number;
+  export const LOUDNESS_TRUE_PEAK_LIMIT_DBTP: number;
+  export const LOUDNESS_LIMITER_CEILING_DBFS: number;
+  export const LOUDNESS_OVER_REASONS: readonly LoudnessOverReason[];
 }

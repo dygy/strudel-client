@@ -30,6 +30,7 @@ import {
 } from './recordActions';
 import { CompactTitleBar } from './compact/CompactTitleBar';
 import { openPerformance } from '../performance/performanceStore';
+import { LoudnessStrip } from './meter/LoudnessStrip';
 import '../Repl.css';
 
 const { BASE_URL } = import.meta.env;
@@ -346,6 +347,9 @@ export function Header({ context, embedded, trackName, className }: HeaderProps)
         {!embedded && <SetBar />}
         {/* The stage view: big code, Now/Next, clocks, levels (spec 030 2.1) */}
         {!embedded && <PerformButton />}
+        {/* Short-term loudness and the latching warning (spec 033 2.5); desktop only: a compact
+            embed keeps this header, but its bar has no room for the strip. */}
+        {!compact && <LoudnessStrip variant="header" />}
 
         {/* Preview (headphones) — only when mixer is available */}
         {context.mixer && (

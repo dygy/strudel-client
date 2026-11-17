@@ -16,6 +16,7 @@ Audio mixing for the strudel-client fork. The package exists only in this fork a
 - **MIDI mapping** (spec 031) in `midi/midiMap.mjs`: `createMidiMap` binds any knob, fader or pad to an app target, with Learn, soft takeover and JSON export/import. `scratch/midiLearnShared.mjs` keeps one control from being bound twice across the jog, the feel knobs and the map. See [MIDI map](#midi-map).
 - **Volume** (spec 031) in `volume.mjs`: the speakers and headphones volume nodes, their taper and their ramped setter. See [Volumes](#volumes).
 - **Master FX** (spec 032) in `masterfx/`: `MasterFx`, the speakers' filter, delay and reverb throws and beat-repeat, for superdough's master insert slot. See [Master FX](#master-fx).
+- **Loudness meter** (spec 033) in `meter/`: `LufsMeter`, LUFS Momentary/Short-term/Integrated, loudness range, true peak, peak/RMS and over events, measured in an AudioWorklet. See [Loudness meter](#loudness-meter).
 
 The speakers' EQ is not in this package. It is `@strudel/equalizer`, installed on superdough's output insert by `website/src/repl/mainEqualizer.ts`.
 
@@ -129,6 +130,36 @@ The graph is `input → beat-repeat worklet → filter (dry/wet) → split`, the
 - **Beat-repeat.** `roll({ startTime, length })` (AudioContext seconds) repeats that slice once the track has played it, phase-locked to `startTime`; `roll(null)` goes back to live where the track is now; `setRollLength(seconds)` applies at the next repeat. The `beat-repeat-processor` worklet (`beatRepeatWorklet.mjs`, loaded by `beatRepeatLoader.mjs` like the scratch worklet) keeps an 8 s ring and uses 3 ms equal-power crossfades. Its DSP is the pure `beatRepeatCore.mjs`. A different channel count rebuilds the worklet node.
 - **Settings.** `masterFxSettings.mjs` has the choices, ranges and defaults (`MASTER_FX_DELAY_FRACTIONS`, `MASTER_FX_REPEAT_LENGTHS`, `MASTER_FX_RANGES`, `MASTER_FX_DEFAULTS`), `sanitizeMasterFxSettings` and `nextRepeatLength`.
 - `destroy()` disconnects every node the stage made and cancels its timers.
+
+## Loudness meter
+
+`meter/LoudnessMeter.mjs` exports `LufsMeter`. It isn't called `LoudnessMeter`, because that name already belongs to the spec 017 match-loudness tap.
+
+```js
+const meter = await LufsMeter.create(ctx); // loads the worklet once per context
+meter.attach({ postEq: eqOutputOrDestinationGain, preLimiter: eq.getLimiterInput() }); // null while the EQ is off
+const off = meter.onSnapshot((s) => render(s)); // about every 100 ms
+meter.reset(); // Integrated, true peak, LRA, event counts
+meter.destroy(); // removes only its own edges
+```
+
+- **Graph.** There is one `loudness-meter-processor` node with 2 inputs, both `channelCount: 2`, `'explicit'`, `'speakers'`, and **no outputs**. Input 0 is the measured signal and input 1 is the EQ limiter's input.
+  - The edges are fan-outs, so attaching, resetting and destroying are silent.
+  - `attach` again changes only the edges that differ.
+  - Edges are removed with `source.disconnect(node, 0, input)`, never a bare `disconnect()`, so the sources' other connections survive.
+- **DSP.** `meter/loudnessCore.mjs` (`LoudnessMeterCore`) is pure and follows ITU-R BS.1770-4 / EBU R128.
+  - K-weighting comes from the analog prototypes for any sample rate (`kWeightingCoefficients`).
+  - Sub-blocks are 100 ms. M is 400 ms and S is 3 s.
+  - Integrated is gated at −70 LUFS and −10 LU through a 0.01 LU histogram, with exact power sums.
+  - LRA follows EBU Tech 3342 (−20 LU gate, P95 − P10). It is null before 10 s.
+  - True peak uses the Annex 2 48-tap 4× FIR (`TRUE_PEAK_FIR`).
+  - Sample peak and RMS cover 300 ms.
+- **Over events.** There are three reasons, each counted with a 0.5 s merge and compared at float32 precision:
+  - `truePeak`: above −1 dBTP;
+  - `limiter`: input 1 at or above −0.3 dBFS;
+  - `clip`: input 0 at or above 0 dBFS, checked only while input 1 is absent.
+- **Snapshot.** `{ m, s, i, lra, tpMax, tpBlock, peakDb[2], rmsDb[2], events: { truePeak, limiter, clip }, preLimiter, measuredSeconds }`. Silence is `null`, never −Infinity.
+- **Limits.** More than 2 channels are measured on the stereo down-mix.
 
 ## History
 

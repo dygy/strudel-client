@@ -9,6 +9,8 @@ import { LanguageSelector } from './LanguageSelector';
 import { SampleCacheSettings } from './SampleCacheSettings';
 import { MixerSettings } from './MixerSettings';
 import { MasterFxPanel } from '../masterfx/MasterFxPanel';
+import { MeterPanel } from '../meter/MeterPanel';
+import { METER_SETTINGS_ID } from '../../meter/openMeterPanel';
 import { MidiSettings } from './MidiSettings';
 import { ConnectedAssistants } from './ConnectedAssistants';
 import { AllowAssistantSwitch } from '../../assistantControl/AllowAssistantSwitch';
@@ -124,11 +126,16 @@ interface FormItemProps {
   label?: React.ReactNode;
   children: React.ReactNode;
   sublabel?: string;
+  /** A scroll target (e.g. the loudness strips open `settings-meter`). */
+  id?: string;
 }
 
-function FormItem({ label, children, sublabel }: FormItemProps) {
+function FormItem({ label, children, sublabel, id }: FormItemProps) {
   return (
-    <div className="bg-background bg-opacity-40 backdrop-blur-sm rounded-xl p-6 border border-lineHighlight border-opacity-20 hover:border-opacity-40 transition-all duration-300 shadow-sm hover:shadow-md">
+    <div
+      id={id}
+      className="bg-background bg-opacity-40 backdrop-blur-sm rounded-xl p-6 border border-lineHighlight border-opacity-20 hover:border-opacity-40 transition-all duration-300 shadow-sm hover:shadow-md"
+    >
       {label && <label className="block text-base font-semibold text-foreground mb-4">{label}</label>}
       <div className="space-y-3">{children}</div>
       {sublabel && <p className="text-sm text-foreground opacity-60 mt-3 leading-relaxed">{sublabel}</p>}
@@ -298,6 +305,11 @@ export function SettingsTab({ started, mixer, readOnly = false }: SettingsTabPro
 
         {/* Spec 032: Master FX on the speakers (usable while playing, never disabled) */}
         <MasterFxPanel />
+
+        {/* Spec 033: the loudness meter (the header and performance strips open it here) */}
+        <FormItem label={t('meter.title')} id={METER_SETTINGS_ID}>
+          <MeterPanel />
+        </FormItem>
 
         {/* Spec 031: MIDI mapping for every live control (nothing outside the REPL) */}
         <MidiSettings />

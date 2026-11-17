@@ -11,7 +11,16 @@ export {
   LIMITER,
   ANALYSER_TAP,
 } from './AudioEqualizer.js';
-export type { EqualizerState, BandUpdate, CutConfig, CutUpdate, AnalyserTap } from './AudioEqualizer.js';
+export type {
+  EqualizerState,
+  BandUpdate,
+  CutConfig,
+  CutUpdate,
+  AnalyserTap,
+  AnalyserTapPoint,
+  AnalyserTapOptions,
+  EqualizerTopologyChange,
+} from './AudioEqualizer.js';
 export { EQUALIZER_PRESETS, EQUALIZER_PRESET_FAMILIES } from './presets.js';
 export type { EqualizerPreset, EqualizerPresetGroup, EqualizerPresetFamily } from './presets.js';
 export { describeSettings, EQUALIZER_REGIONS, DESCRIBE_REGION_THRESHOLD_DB } from './describe.js';

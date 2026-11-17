@@ -66,6 +66,7 @@ import {
 } from './evaluateNewTrack';
 import { installMainEqualizerWhenReady } from './mainEqualizer';
 import { masterFxRuntime } from './masterFx/masterFxRuntime';
+import { loudnessRuntime } from './meter/loudnessRuntime';
 import { runRestoringAbandon } from './abandonedMix';
 import { playingCodeEvaluated, playingStopped } from './playingEqProfile';
 import { scratchRuntime } from './scratch/scratchRuntime';
@@ -322,6 +323,10 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         },
         onToggle: (playing: boolean) => {
           console.log('[canvas-cleanup] onToggle called, playing:', playing);
+          // Spec 033: Play after Stop resets the loudness meter; the instant switch's stop/start does
+          // not. isSmoothTransitioningRef is set only during that synchronous repl.stop(), which is
+          // where this runs, so it is read here and not in an effect on `started`.
+          loudnessRuntime.setPlaying(playing, { switching: isSmoothTransitioningRef.current });
           if (!playing) {
             console.log('[canvas-cleanup] Pattern stopped, cleaning up canvas elements and resetting CPS');
 
@@ -524,6 +529,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     // Spec 032: the Master FX stage goes into superdough's master insert slot (before the EQ) at the
     // same point, so it is in place before the first note.
     const releaseMasterFx = masterFxRuntime.installWhenReady(audioReady);
+    // Spec 033: the loudness meter listens to the speakers output (after the EQ) once audio is ready.
+    const releaseLoudness = loudnessRuntime.installWhenReady(audioReady);
 
     const initPreview = async () => {
       try {
@@ -568,6 +575,7 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
     return () => {
       releaseMainEqualizer();
       releaseMasterFx();
+      releaseLoudness();
       if (mixerRef.current) {
         scratchRuntime.detachPreview();
         mixerRef.current.destroy();
@@ -1004,6 +1012,8 @@ export function useReplContext(options: UseReplContextOptions = {}): ReplContext
         setRestarting: (restarting) => {
           isSmoothTransitioningRef.current = restarting;
         },
+        // Spec 033: a failed instant switch leaves the speakers stopped; the next Play resets the meter.
+        switchEnded: (restarted) => loudnessRuntime.switchEnded(restarted),
       },
       code,
       options,
