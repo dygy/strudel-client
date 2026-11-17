@@ -1,7 +1,7 @@
 # Functional Specification: Loudness Meter and Analyser
 
 - **Roadmap Item:** Phase 6, Live sets: "Loudness meter and analyser: LUFS/RMS, spectrum before and after the EQ, clipping warning." There is no GitHub issue.
-- **Status:** Draft
+- **Status:** Completed
 - **Author:** Claude (for the owner). The owner chose these on 2026-11-17:
   - **Placement:** a **compact loudness strip** in the header and in the performance view, plus a detailed **Settings → Meter** panel.
   - **What is measured:** the speakers output **after the EQ and before the speakers volume**. This is what Record as heard records, so the volume knob doesn't change the readings. Clipping is also detected **before the EQ limiter**, which shows that the limiter is working.

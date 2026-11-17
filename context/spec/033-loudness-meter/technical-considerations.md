@@ -1,7 +1,7 @@
 # Technical Specification: Loudness Meter and Analyser
 
 - **Functional Specification:** [functional-spec.md](./functional-spec.md)
-- **Status:** Draft
+- **Status:** Completed
 - **Author:** Claude (for the owner)
 
 ---

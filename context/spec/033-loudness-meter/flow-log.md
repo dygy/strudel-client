@@ -98,3 +98,28 @@
 - **Screenshots:** `/private/tmp/claude-501/-Users-arkadiishvartcman-WebstormProjects-strudel-client/2de1382d-27cd-4ec7-926c-a1d7a0fa8262/scratchpad/033-evidence/`.
 - **Noticed:** reading labels in the narrow panel are truncated ("Momentary (40…"). This goes to review.
 - **Next:** the reviewer.
+
+## 2026-11-17: Review, push, prod
+- **Review:** `review/033-loudness-meter.md` has 1 Major (TS2493 in a test, which would have failed the CI typecheck), 2 Minor (`stoppedBySwitch` left set after a failed instant switch; truncated labels) and 1 Nit (the dBFS column wraps). The owner said fix all, and all were fixed by the web agent, RED→GREEN.
+- **Gates (main context):**
+  - tsc: 0 errors.
+  - format and lint: clean.
+  - Node 24.12 with `--maxWorkers=2`: 288 files / 5662 tests passed.
+  - `build:cloudflare`: OK, `_worker.js` 2.7M.
+- **Commits:** 481ef75 spec, 8196639 feat, 14fc3f7 test, 7d1f119 docs. The owner answered «Пуш в main → прод»; `181c9e7..7d1f119` was a fast-forward.
+- **Deploy:** run 44047489287 on 7d1f119 succeeded.
+- **Prod check (`strudel.dygy.app/embed`, signed out):**
+  - After Play, `loudness-meter-processor` is created next to the beat-repeat and scratch processors.
+  - It sent 40 snapshots in 4 s.
+  - A −23 dBFS 1 kHz stereo sine on input 0 reads M −22.99, S −22.99, peak −23.00, RMS −26.01.
+  - `preLimiter` is present, so the EQ is on.
+  - The header strip renders ("S—" while the scheduler is stopped).
+  - The only console error is the existing "no code to evaluate" from the empty embed.
+- **Not verified:**
+  - the signed-in panel on prod (no session in the test browser);
+  - Firefox and Safari zero-output keepalive;
+  - a failed instant switch in a real browser (unit-tested through the real `evaluateNewTrack`).
+- **Flow defects:**
+  - a fresh worktree lacks `doc.json` (`pnpm run pretest`);
+  - the Playwright MCP still writes into the main checkout's `.playwright-mcp/`;
+  - still no `.dev.vars`, so local checks use `/embed` and harness pages.

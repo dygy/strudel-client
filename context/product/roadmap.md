@@ -62,7 +62,7 @@ Items marked shipped (`[x]`) are live on `strudel.dygy.app`. The specs numbered 
 - [x] **Performance mode:** full-screen view with large code, now and next, set timer, levels; guard against closing the tab ([030](../spec/030-performance-mode/), f15abf9, 2026-11-15).
 - [x] **MIDI mapping for everything:** EQ, volume, crossfader, Cue/Go and transition, not just the scratch jog ([031](../spec/031-midi-mapping/), 1452359, 2026-11-16).
 - [x] **Master FX:** filter, delay/reverb throw, beat-repeat and brake on the master bus, before the EQ and in every recording; brake through the speakers' scratch deck; hold-to-act, MIDI-mappable ([032](../spec/032-master-fx/), deb52ab, 2026-11-16).
-- [ ] **Loudness meter and analyser:** LUFS/RMS, spectrum before and after the EQ, clipping warning.
+- [x] **Loudness meter and analyser:** LUFS (M/S/I, LRA), true peak, peak/RMS, a latching clipping warning, spectrum before and after the EQ; header + performance strip + Settings → Meter ([033](../spec/033-loudness-meter/), 8196639, 2026-11-17).
 - [ ] **Set recording with a tracklist:** timestamps of every Go written next to the recording.
 - [ ] **Track version history:** snapshots on save, diff and restore.
 - [ ] **Trash:** deleted tracks recoverable for 30 days.
