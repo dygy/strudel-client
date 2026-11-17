@@ -150,7 +150,7 @@ The panel comes after Master FX and contains:
 - A **"Before EQ"** toggle sits next to the existing Spectrum toggle. It is off by default and remembered in this browser.
 - It is drawn only while the Spectrum toggle and the Before EQ toggle are both on and the speakers play. It stops drawing when stopped or hidden, just like the 026 spectrum.
 - **Acceptance Criteria:**
-  - [ ] Given the EQ with +12 dB at 100 Hz and noise playing, with both layers on, then at 100 Hz the after-EQ layer is about 12 dB above the before-EQ layer (±3 dB), and at 2 kHz they match within ±2 dB.
+  - [ ] Given the EQ with +12 dB on its 125 Hz band and noise playing, with both layers on, then at 125 Hz the after-EQ layer is about 12 dB above the before-EQ layer (±3 dB), and at 2 kHz they match within ±2 dB.
   - [ ] Given the EQ off, then the two layers match within ±1 dB across 50 Hz–15 kHz.
   - [ ] Given Before EQ off, then only the 026 spectrum is drawn and no before-EQ measurement runs.
 
