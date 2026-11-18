@@ -50,8 +50,25 @@ describe.each(copies)('comments, %s', (_copy, formatCode) => {
     ['a multi-line block comment with odd spacing', '/* 640x384);x\n   keep   this,a=b\n\n\t)y   */'],
     ['replacement patterns', '// costs $1, $& and $` and $$'],
     ['an unterminated block comment', '/* never closed)x\n  a=b'],
+    // MIDI-grep's header: the number-glued-to-a-word split made `117` + a line `s` of live code, and `\s+` ate the
+    // double space (8 library tracks pasted from MIDI-grep reports, 2026-10-31..11-03)
+    ['a number glued to its unit, with a double space', '// Bars: 66  Duration: 117s'],
   ])('keeps %s verbatim', async (_name, comment) => {
     expect(await format(comment)).toBe(comment);
+  });
+
+  it('a MIDI-grep header gets no line of its own out of a comment', async () => {
+    const header = [
+      '// MIDI-grep dynamic — transcribed note material on pitched instruments',
+      '// BPM: 135.024',
+      '// Key: F# minor',
+      '// Bars: 66  Duration: 117s',
+      'const cps = 0.5626 // 135.024 BPM, 4 beats/bar',
+      'setcps(cps)',
+    ].join('\n');
+    const out = await format(header);
+    expect(out.split('\n')).not.toContain('s');
+    expect(out).toContain('// Bars: 66  Duration: 117s\n');
   });
 
   it('a following line stays code at its own indent', async () => {
